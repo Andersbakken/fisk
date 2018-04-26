@@ -57,3 +57,11 @@ typings/
 # dotenv environment variables file
 .env
 
+/.ninja_deps
+/CMakeCache.txt
+/CMakeFiles/
+/.ninja_log
+/build.ninja
+/cmake_install.cmake
+/compile_commands.json
+/rules.ninja
