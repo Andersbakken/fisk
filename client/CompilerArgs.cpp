@@ -57,7 +57,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
     ret->objectFileIndex = -1;
     for (size_t i=1; i<args.size(); ++i) {
         const std::string &arg = args[i];
-        if (arg == "-c") {
+        if (arg.empty()) {
+        } else if (arg == "-c") {
             if (ret->mode == Link)
                 ret->mode = Compile;
         } else if (arg == "-S") {
@@ -95,12 +96,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             }
         } else if (hasArg(arg)) {
             ++i;
-        } else if (arg.c_str()("-")) {
-            ret->sourceFileIndexes.append(i);
+        } else if (arg[0] != '-') {
+            ret->sourceFileIndexes.push_back(i);
             if (!(ret->flags & LanguageMask)) {
-                const size_t lastDot = arg.lastIndexOf('.');
+                const size_t lastDot = arg.rfind('.');
                 if (lastDot != std::string::npos) {
-                    const char *ext = arg.constData() + lastDot + 1;
+                    const char *ext = arg.c_str() + lastDot + 1;
                     // https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html
                     struct {
                         const char *suffix;
