@@ -59,9 +59,10 @@ typings/
 
 /.ninja_deps
 /CMakeCache.txt
-/CMakeFiles/
+CMakeFiles/
 /.ninja_log
 /build.ninja
-/cmake_install.cmake
+cmake_install.cmake
 /compile_commands.json
 /rules.ninja
+/bin/client
