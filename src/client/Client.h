@@ -9,6 +9,7 @@ namespace Client {
 std::string findCompiler(int argc, char **argv);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 [[ noreturn ]] void runLocal(const std::string &compiler, int argc, char **argv);
+unsigned long long mono();
 
 template <size_t StaticBufSize = 4096>
 static std::string format(const char *format, va_list args)

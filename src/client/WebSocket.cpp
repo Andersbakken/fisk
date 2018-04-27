@@ -9,6 +9,35 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <openssl/sha.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+
+static std::string sha1(const std::string &str)
+{
+    std::string res(SHA_DIGEST_LENGTH, ' ');
+    SHA1(reinterpret_cast<const unsigned char *>(str.c_str()), str.size(), reinterpret_cast<unsigned char *>(&res[0]));
+    return res;
+}
+
+std::string base64(const std::string &src)
+{
+    BIO *b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO *sink = BIO_new(BIO_s_mem());
+    BIO_push(b64, sink);
+    BIO_write(b64, &src[0], src.size());
+    BIO_flush(b64);
+    const char *encoded;
+    const long len = BIO_get_mem_data(sink, &encoded);
+    return std::string(encoded, len);
+}
+
+std::string create_acceptkey(const std::string& clientkey)
+{
+    std::string s = clientkey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    return base64(sha1(s));
+}
 
 bool WebSocket::connect(std::string &&hostPort,
                         uint32_t timeout,
@@ -44,7 +73,7 @@ bool WebSocket::connect(std::string &&hostPort,
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags |= AI_CANONNAME;
 
-    const int ret = getaddrinfo(host.c_str(), nullptr, &hints, &res);
+    int ret = getaddrinfo(host.c_str(), nullptr, &hints, &res);
     if (ret != 0) {
         Log::error("Couldn't resolve host %s", host.c_str());
         return false;
@@ -55,7 +84,11 @@ bool WebSocket::connect(std::string &&hostPort,
         if (mFD == -1)
             continue;
 
-        if (::connect(mFD, addr->ai_addr, addr->ai_addrlen) == 0)
+        do {
+            ret = ::connect(mFD, addr->ai_addr, addr->ai_addrlen);
+        } while (ret == -1 && errno == EINTR);
+
+        if (!ret)
             break;
     }
     freeaddrinfo(res);

@@ -39,14 +39,59 @@ Config::Config()
     load("/etc/fisk.json");
 }
 
-std::string Config::scheduler() const
+json11::Json Config::operator[](const std::string &value) const
 {
     for (const json11::Json &json : mJSON) {
         const json11::Json &value = json["scheduler"];
-        if (value.is_string()) {
-            return value.string_value();
+        if (!value.is_null()) {
+            return value;
         }
     }
+    return json11::Json();
+}
+
+std::string Config::scheduler() const
+{
+    json11::Json val = operator[]("scheduler");
+    if (val.is_string())
+        return val.string_value();
 
     return "localhost:9999";
 }
+
+unsigned long long Config::schedulerConnectTimeout()
+{
+    json11::Json val = operator[]("scheduler_connect_timeout");
+    if (val.is_string())
+        return val.int_value();
+
+    return 1000;
+}
+
+unsigned long long Config::acquiredSlaveTimeout()
+{
+    json11::Json val = operator[]("acquired_slave_timeout");
+    if (val.is_string())
+        return val.int_value();
+
+    return 1000;
+}
+
+unsigned long long Config::slaveConnectTimeout()
+{
+    json11::Json val = operator[]("slave_connect_timeout");
+    if (val.is_string())
+        return val.int_value();
+
+    return 1000;
+}
+
+unsigned long long Config::responseTimeout()
+{
+    json11::Json val = operator[]("response_timeout");
+    if (val.is_string())
+        return val.int_value();
+
+    return 20000;
+}
+
