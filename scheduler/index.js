@@ -46,5 +46,8 @@ server.on("compile", function(compile) {
     });
 });
 
+server.on("error", function(err) {
+    console.error(`error '${err.message}' from ${err.ip}`);
+});
 
 server.listen();
