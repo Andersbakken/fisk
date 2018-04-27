@@ -57,12 +57,23 @@ class Server extends EventEmitter {
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         const ip = req.connection.remoteAddress;
+
+        const error = msg => {
+            ws.send(`{"error": "${msg}"}`);
+            ws.close();
+            this.emit("error", { ip: ip, message: msg });
+        };
+
         ws.on("message", msg => {
             switch (typeof msg) {
             case "string":
                 if (client === undefined) {
-                    ws.send('{"error": "No client type received"}');
-                    ws.close();
+                    error("No client type received");
+                    return;
+                }
+                if (remaining.bytes) {
+                    // bad, client have to send all the data in a binary message before sending JSON
+                    error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
                     return;
                 }
                 // assume JSON
@@ -72,43 +83,38 @@ class Server extends EventEmitter {
                 } catch (e) {
                 }
                 if (json === undefined) {
-                    ws.send('{"error": "Unable to parse string message as JSON"}');
-                    ws.close();
+                    error("Unable to parse string message as JSON");
                     return;
                 }
                 if ("type" in json) {
                     client.emit(json.type, json);
                 } else {
-                    ws.send('{"error": "No type property in JSON"}');
-                    ws.close();
+                    error("No type property in JSON");
                     return;
                 }
                 break;
             case "object":
                 if (msg instanceof Buffer) {
-                    // first byte denotes our message type
                     if (!msg.length) {
                         // no data?
-                        ws.send('{"error": "No data in buffer"}');
-                        ws.close();
+                        error("No data in buffer");
                         return;
                     }
                     if (remaining.bytes) {
                         // more data
                         if (msg.length > remaining.bytes) {
                             // woops
-                            ws.send(`{"error": "length ${msg.length} > ${remaining.bytes}"}`);
-                            ws.close();
+                            error(`length ${msg.length} > ${remaining.bytes}`);
                             return;
                         }
                         remaining.bytes -= msg.length;
                         client.emit(remaining.type, { data: msg, last: !remaining.bytes });
                     } else {
+                        // first byte denotes our message type
                         const type = msg.readUInt8(0);
                         if (client === undefined) {
                             if (msg.length > 1) {
-                                ws.send('{"error": "Client type message length must be exactly one byte"}');
-                                ws.close();
+                                error("Client type message length must be exactly one byte");
                                 return;
                             }
                             switch (type) {
@@ -121,26 +127,22 @@ class Server extends EventEmitter {
                                 this.emit("compile", client);
                                 break;
                             default:
-                                ws.send(`{"error": "Unrecognized client type: ${type}"}`);
-                                ws.close();
+                                error(`Unrecognized client type: ${type}`);
                                 break;
                             }
                             return;
                         }
                         if (msg.length < 5) {
-                            ws.send('{"error": "No length in Buffer"}');
-                            ws.close();
+                            error("No length in Buffer");
                             return;
                         }
                         if (!(type in BinaryTypes)) {
-                            ws.send(`{"error": "Invalid binary type '${type}'"}`);
-                            ws.close();
+                            error(`Invalid binary type '${type}`);
                             return;
                         }
                         const len = msg.readUInt32(1);
                         if (len < msg.length - 5) {
-                            ws.send(`{"error": "length mismatch, ${len} vs ${msg.length - 5}"}`);
-                            ws.close();
+                            error(`length mismatch, ${len} vs ${msg.length - 5}`);
                             return;
                         }
                         if (len > msg.length - 5) {
@@ -154,8 +156,11 @@ class Server extends EventEmitter {
             }
         });
         ws.on("close", () => {
+            if (remaining.bytes)
+                client.emit("error", "Got close while reading a binary message");
             if (client)
                 client.emit("close");
+            ws.removeAllListeners();
         });
     }
 }
