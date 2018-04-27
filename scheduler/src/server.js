@@ -2,6 +2,7 @@
 
 const EventEmitter = require("events");
 const WebSocket = require("ws");
+const Url = require("url");
 
 const BinaryTypes = {
     // 0 and 1 is a special type that denotes a new compile or slave
@@ -68,13 +69,24 @@ class Server extends EventEmitter {
             }
         };
 
+        const url = Url.parse(req.url);
+        switch (url.pathname) {
+        case "/compile":
+            client = new Client(ws, ip, Client.Type.Compile);
+            this.emit("compile", client);
+            break;
+        case "/slave":
+            client = new Client(ws, ip, Client.Type.Slave);
+            this.emit("slave", client);
+            break;
+        default:
+            error(`Invalid pathname ${url.pathname}`);
+            return;
+        }
+
         ws.on("message", msg => {
             switch (typeof msg) {
             case "string":
-                if (client === undefined) {
-                    error("No client type received");
-                    return;
-                }
                 if (remaining.bytes) {
                     // bad, client have to send all the data in a binary message before sending JSON
                     error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
@@ -116,26 +128,6 @@ class Server extends EventEmitter {
                     } else {
                         // first byte denotes our message type
                         const type = msg.readUInt8(0);
-                        if (client === undefined) {
-                            if (msg.length > 1) {
-                                error("Client type message length must be exactly one byte");
-                                return;
-                            }
-                            switch (type) {
-                            case Client.Type.Slave:
-                                client = new Client(ws, ip, type);
-                                this.emit("slave", client);
-                                break;
-                            case Client.Type.Compile:
-                                client = new Client(ws, ip, type);
-                                this.emit("compile", client);
-                                break;
-                            default:
-                                error(`Unrecognized client type: ${type}`);
-                                break;
-                            }
-                            return;
-                        }
                         if (msg.length < 5) {
                             error("No length in Buffer");
                             return;
