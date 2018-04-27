@@ -26,7 +26,9 @@ int main(int argc, char **argv)
     }
     std::shared_ptr<CompilerArgs> compilerArgs = CompilerArgs::create(args);
     if (!compilerArgs || compilerArgs->mode != CompilerArgs::Compile) {
-        return Client::runLocal(compiler, argc, argv);
+        Log::debug("Have to run locally because mode %s",
+                   CompilerArgs::modeName(compilerArgs ? compilerArgs->mode : CompilerArgs::Invalid));
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
     // Watchdog::start(compiler, argc, argv);
@@ -39,7 +41,8 @@ int main(int argc, char **argv)
     sigaction(SIGPIPE, &act, 0);
 
     if (!websocket.connect(config.scheduler())) {
-        return Client::runLocal(compiler, argc, argv);
+        Log::debug("Have to run locally because no server");
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
     json11::Json my_json = json11::Json::object {
         { "client", config.clientName() },
@@ -47,8 +50,10 @@ int main(int argc, char **argv)
     };
     const std::string msg = my_json.dump();
 
-    if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size()))
-        return Client::runLocal(compiler, argc, argv);
+    if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size())) {
+        Log::debug("Have to run locally because no send");
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+    }
 
     if (!websocket.process([](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
@@ -59,7 +64,7 @@ int main(int argc, char **argv)
                     printf("Got binary message: %zu bytes\n", len);
                 }
             })) {
-        return Client::runLocal(compiler, argc, argv);
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
     return 0;
 }
