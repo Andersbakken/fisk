@@ -6,42 +6,45 @@ const server = new Server(option);
 
 const slaves = {};
 
-server.on("load", function(slave) {
-    if (!(slave.ip in slaves))
-        slaves[slave.ip] = {};
-    slaves[slave.ip].load = slave.load;
+server.on("slave", function(slave) {
+    slaves[slave.ip] = {};
+    slave.on("load", function(load) {
+        slaves[slave.ip].load = slave.load;
+    });
+    slave.on("environments", function(environs) {
+        slave[slave.ip].environs = environs;
+    });
+    slave.on("close", function() {
+        delete slaves[slave.ip];
+        slave.removeAllListeners();
+    });
 });
 
-server.on("close", function(client) {
-    if (client.slave)
-        delete slaves[client.ip];
-});
-
-server.on("requestSlave", function(client) {
-    // find a slave
-    let best = { load: Infinity };
-    for (let ip in slaves) {
-        let slave = slaves[ip];
-        if ("load" in slave) {
-            if (slave.load < best.load) {
-                best.load = slave.load;
-                best.ip = ip;
+server.on("compile", function(compile) {
+    compile.on("requestSlave", function(request) {
+        let best = { load: Infinity };
+        for (let ip in slaves) {
+            let slave = slaves[ip];
+            if ("load" in slave) {
+                if (slave.load < best.load) {
+                    best.load = slave.load;
+                    best.ip = ip;
+                }
             }
         }
-    }
-    if (best.load < Infinity) {
-        client.send("requestSlave", { ip: best.ip });
-    } else {
-        client.send("requestSlave", {});
-    }
+        if (best.load < Infinity) {
+            compile.send("requestSlave", { ip: best.ip });
+        } else {
+            compile.send("requestSlave", {});
+        }
+    });
+    compile.on("environment", function(environ) {
+        // distribute environment to slaves
+    });
+    compile.on("close", function() {
+        compile.removeAllListeners();
+    });
 });
 
-server.on("error", function(error) {
-    throw error;
-});
-
-server.on("environment", function(environ) {
-    // distribute environment to slaves
-});
 
 server.listen();

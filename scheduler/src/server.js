@@ -4,10 +4,38 @@ const EventEmitter = require("events");
 const WebSocket = require("ws");
 
 const BinaryTypes = {
-    // 0 is a special type that denotes a new slave
-    1: "environment"
+    // 0 and 1 is a special type that denotes a new compile or slave
+    2: "environment"
 };
-const SlaveType = 0;
+
+class Client extends EventEmitter {
+    constructor(ws, ip, type) {
+        super();
+        this.ws = ws;
+        this.ip = ip;
+        this.type = type;
+    }
+
+    send(type, msg) {
+        if (msg === undefined) {
+            this.ws.send(JSON.stringify(type));
+        } else {
+            let tosend;
+            if (typeof msg === "object") {
+                tosend = msg;
+                tosend.type = type;
+            } else {
+                tosend = { type: type, message: msg };
+            }
+            this.ws.send(JSON.stringify(tosend));
+        }
+    }
+};
+
+Client.Type = {
+    Slave: 0,
+    Compile: 1
+};
 
 class Server extends EventEmitter {
     constructor(option) {
@@ -26,14 +54,17 @@ class Server extends EventEmitter {
     }
 
     _handleConnection(ws, req) {
-        let slave = undefined;
+        let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         const ip = req.connection.remoteAddress;
         ws.on("message", msg => {
             switch (typeof msg) {
             case "string":
-                if (slave === undefined)
-                    slave = false;
+                if (client === undefined) {
+                    ws.send('{"error": "No client type received"}');
+                    ws.close();
+                    return;
+                }
                 // assume JSON
                 let json;
                 try {
@@ -41,14 +72,16 @@ class Server extends EventEmitter {
                 } catch (e) {
                 }
                 if (json === undefined) {
-                    this.emit("error", "Unable to parse string message as JSON");
+                    ws.send('{"error": "Unable to parse string message as JSON"}');
+                    ws.close();
+                    return;
                 }
                 if ("type" in json) {
-                    json.ip = ip;
-                    json.slave = slave;
-                    this.emit(json.type, json);
+                    client.emit(json.type, json);
                 } else {
-                    this.emit("error", "No type in JSON");
+                    ws.send('{"error": "No type property in JSON"}');
+                    ws.close();
+                    return;
                 }
                 break;
             case "object":
@@ -56,56 +89,73 @@ class Server extends EventEmitter {
                     // first byte denotes our message type
                     if (!msg.length) {
                         // no data?
-                        this.emit("error", "No data in Buffer");
+                        ws.send('{"error": "No data in buffer"}');
+                        ws.close();
                         return;
                     }
                     if (remaining.bytes) {
                         // more data
                         if (msg.length > remaining.bytes) {
                             // woops
-                            this.emit("error", `length ${msg.length} > ${remaining.bytes}`);
+                            ws.send(`{"error": "length ${msg.length} > ${remaining.bytes}"}`);
                             ws.close();
                             return;
                         }
                         remaining.bytes -= msg.length;
-                        this.emit(remaining.type, { ip: ip, slave: slave, data: msg, last: !remaining.bytes });
+                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
                     } else {
                         const type = msg.readUInt8(0);
-                        if (type === SlaveType) {
-                            // new slave reporting
-                            slave = true;
-                        } else {
-                            if (msg.length < 5) {
-                                this.emit("error", "No length in Buffer");
+                        if (client === undefined) {
+                            if (msg.length > 1) {
+                                ws.send('{"error": "Client type message length must be exactly one byte"}');
                                 ws.close();
                                 return;
                             }
-                            if (slave === undefined)
-                                slave = false;
-                            if (!(type in BinaryTypes)) {
-                                this.emit("error", `Invalid binary type '${type}'`);
+                            switch (type) {
+                            case Client.Type.Slave:
+                                client = new Client(ws, ip, type);
+                                this.emit("slave", client);
+                                break;
+                            case Client.Type.Compile:
+                                client = new Client(ws, ip, type);
+                                this.emit("compile", client);
+                                break;
+                            default:
+                                ws.send(`{"error": "Unrecognized client type: ${type}"}`);
                                 ws.close();
-                                return;
+                                break;
                             }
-                            const len = msg.readUInt32(1);
-                            if (len < msg.length - 5) {
-                                this.emit("error", `length mismatch, ${len} vs ${msg.length - 5}`);
-                                ws.close();
-                                return;
-                            }
-                            if (len > msg.length - 5) {
-                                remaining.type = BinaryTypes[type];
-                                remaining.bytes = len - (msg.length - 5);
-                            }
-                            this.emit(BinaryTypes[type], { ip: ip, slave: slave, data: msg.slice(5), last: !remaining.bytes });
+                            return;
                         }
+                        if (msg.length < 5) {
+                            ws.send('{"error": "No length in Buffer"}');
+                            ws.close();
+                            return;
+                        }
+                        if (!(type in BinaryTypes)) {
+                            ws.send(`{"error": "Invalid binary type '${type}'"}`);
+                            ws.close();
+                            return;
+                        }
+                        const len = msg.readUInt32(1);
+                        if (len < msg.length - 5) {
+                            ws.send(`{"error": "length mismatch, ${len} vs ${msg.length - 5}"}`);
+                            ws.close();
+                            return;
+                        }
+                        if (len > msg.length - 5) {
+                            remaining.type = BinaryTypes[type];
+                            remaining.bytes = len - (msg.length - 5);
+                        }
+                        client.emit(BinaryTypes[type], { data: msg.slice(5), last: !remaining.bytes });
                     }
                 }
                 break;
             }
         });
         ws.on("close", () => {
-            this.emit("close", { ip: ip, slave: slave });
+            if (client)
+                client.emit("close");
         });
     }
 }
