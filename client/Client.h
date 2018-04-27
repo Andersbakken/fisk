@@ -4,11 +4,13 @@
 #include <string>
 #include <cstdarg>
 #include <assert.h>
+#include <mutex>
 
 namespace Client {
+std::mutex &mutex();
 std::string findCompiler(int argc, char **argv);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
-[[ noreturn ]] void runLocal(const std::string &compiler, int argc, char **argv);
+int runLocal(const std::string &compiler, int argc, char **argv, std::unique_lock<std::mutex> *lock = 0);
 unsigned long long mono();
 
 template <size_t StaticBufSize = 4096>

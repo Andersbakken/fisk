@@ -3,7 +3,10 @@
 
 void Log::log(Level /* level */, const std::string &string)
 {
+    assert(!string.empty());
     fwrite(string.c_str(), 1, string.size(), stderr);
+    if (string.at(string.size() - 1) != '\n')
+        fwrite("\n", 1, 1, stderr);
 }
 
 void Log::log(Level level, const char *fmt, va_list args)

@@ -2,6 +2,7 @@
 #include "Log.h"
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 Config::Config()
 {
@@ -56,13 +57,13 @@ std::string Config::scheduler() const
     if (val.is_string())
         return val.string_value();
 
-    return "localhost:9999";
+    return "ws://localhost:8097/compile";
 }
 
 unsigned long long Config::schedulerConnectTimeout()
 {
     json11::Json val = operator[]("scheduler_connect_timeout");
-    if (val.is_string())
+    if (val.is_number())
         return val.int_value();
 
     return 1000;
@@ -71,7 +72,7 @@ unsigned long long Config::schedulerConnectTimeout()
 unsigned long long Config::acquiredSlaveTimeout()
 {
     json11::Json val = operator[]("acquired_slave_timeout");
-    if (val.is_string())
+    if (val.is_number())
         return val.int_value();
 
     return 1000;
@@ -80,7 +81,7 @@ unsigned long long Config::acquiredSlaveTimeout()
 unsigned long long Config::slaveConnectTimeout()
 {
     json11::Json val = operator[]("slave_connect_timeout");
-    if (val.is_string())
+    if (val.is_number())
         return val.int_value();
 
     return 1000;
@@ -89,9 +90,23 @@ unsigned long long Config::slaveConnectTimeout()
 unsigned long long Config::responseTimeout()
 {
     json11::Json val = operator[]("response_timeout");
-    if (val.is_string())
+    if (val.is_number())
         return val.int_value();
 
     return 20000;
 }
 
+
+std::string Config::clientName() const
+{
+    json11::Json val = operator[]("clientName");
+    if (val.is_string())
+        return val.string_value();
+
+    char buf[1024];
+    if (!gethostname(buf, sizeof(buf)))
+        return buf;
+
+    Log::error("Unable to retrieve client name %d %s", errno, strerror(errno));
+    return "unknown";
+}

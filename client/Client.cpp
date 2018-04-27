@@ -1,4 +1,6 @@
 #include "Client.h"
+
+#include "Log.h"
 #include <unistd.h>
 #include <climits>
 #include <cstdlib>
@@ -7,6 +9,12 @@
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
+
+static std::mutex sMutex;
+std::mutex &Client::mutex()
+{
+    return sMutex;
+}
 
 std::string Client::findCompiler(int argc, char **argv)
 {
@@ -60,8 +68,10 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-[[ noreturn ]] void Client::runLocal(const std::string &exec, int argc, char **argv)
+int Client::runLocal(const std::string &exec, int argc, char **argv, std::unique_lock<std::mutex> *lock)
 {
+    if (!lock)
+        sMutex.lock();
     char **argvCopy = new char*[argc + 1];
     argvCopy[0] = strdup(exec.c_str());
     for (size_t i=1; i<argc; ++i) {
@@ -69,8 +79,8 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
     argvCopy[argc] = 0;
     ::execv(exec.c_str(), argvCopy);
-    fprintf(stderr, "fisk: Failed to exec %s (%d %s)\n", exec.c_str(), errno, strerror(errno));
-    _exit(1);
+    Log::error("fisk: Failed to exec %s (%d %s)", exec.c_str(), errno, strerror(errno));
+    return 1;
 }
 
 bool gettime(timeval *time)
