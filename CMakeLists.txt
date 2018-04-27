@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 2.8)
-include_directories(3rdparty/jeayeson/include)
-include_directories(3rdparty/boost_variant/include)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_subdirectory(3rdparty)
 add_subdirectory(src)
