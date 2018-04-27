@@ -14,6 +14,9 @@ server.on("slave", function(slave) {
     slave.on("environments", function(environs) {
         slave[slave.ip].environs = environs;
     });
+    slave.on("error", function(msg) {
+        console.error(`slave error '${msg}' from ${slave.ip}`);
+    });
     slave.on("close", function() {
         delete slaves[slave.ip];
         slave.removeAllListeners();
@@ -40,6 +43,9 @@ server.on("compile", function(compile) {
     });
     compile.on("environment", function(environ) {
         // distribute environment to slaves
+    });
+    compile.on("error", function(msg) {
+        console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", function() {
         compile.removeAllListeners();
