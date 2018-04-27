@@ -44,7 +44,7 @@ struct CompilerArgs
         Link
     } mode { Invalid };
 
-    const char *modeName() const
+    static const char *modeName(Mode mode)
     {
         switch (mode) {
         case Invalid: return "Invalid";
@@ -53,6 +53,10 @@ struct CompilerArgs
         case Link: return "link";
         }
         return "";
+    }
+    const char *modeName() const
+    {
+        return modeName(mode);
     }
 
     enum Flag {

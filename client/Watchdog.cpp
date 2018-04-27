@@ -46,7 +46,8 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                 }
                 auto now = std::chrono::system_clock::now();
                 if (sCond.wait_until(lock, now + (timeout * 1ms)) == std::cv_status::timeout && !sStopped) {
-                    Client::runLocal(compiler, argc, argv, &lock);
+                    Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                    return;
                 }
                 if (!sStopped)
                     return;

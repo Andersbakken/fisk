@@ -210,21 +210,10 @@ bool WebSocket::connect(std::string &&url)
         return false;
     }
 
-    {
-        int flags, r;
-        while ((flags = fcntl(mFD, F_GETFL, 0)) == -1 && errno == EINTR);
-        if (flags == -1) {
-            Log::error("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            return false;
-        }
-        while ((r = fcntl(mFD, F_SETFL, flags | SOCK_CLOEXEC)) == -1 && errno == EINTR);
-
-        if (r == -1) {
-            Log::error("Failed to make socket cloexec %d %s", errno, strerror(errno));
-            return false;
-        }
+    if (!Client::setFlag(mFD, O_CLOEXEC)) {
+        Log::error("Failed to make socket O_CLOEXEC");
+        return false;
     }
-
 
     std::string random(16, ' ');
     ::random(&random[0], random.size());
@@ -291,19 +280,9 @@ bool WebSocket::connect(std::string &&url)
             return false;
         }
     }
-    {
-        int flags, r;
-        while ((flags = fcntl(mFD, F_GETFL, 0)) == -1 && errno == EINTR);
-        if (flags == -1) {
-            Log::error("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            return false;
-        }
-        while ((r = fcntl(mFD, F_SETFL, flags | O_NONBLOCK)) == -1 && errno == EINTR);
-
-        if (r == -1) {
-            Log::error("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            return false;
-        }
+    if (!Client::setFlag(mFD, O_NONBLOCK)) {
+        Log::error("Failed to make socket non blocking %d %s", errno, strerror(errno));
+        return false;
     }
     ret = wslay_event_context_client_init(&mContext, &mCallbacks, this);
     if (ret != 0) {

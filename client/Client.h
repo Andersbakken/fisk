@@ -4,14 +4,36 @@
 #include <string>
 #include <cstdarg>
 #include <assert.h>
+#include <sys/stat.h>
+#include <memory>
 #include <mutex>
 
 namespace Client {
 std::mutex &mutex();
 std::string findCompiler(int argc, char **argv);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
-int runLocal(const std::string &compiler, int argc, char **argv, std::unique_lock<std::mutex> *lock = 0);
+class Slot
+{
+public:
+    Slot(int fd, std::string &&path);
+   ~Slot();
+private:
+    Slot(const Slot &) = delete;
+    Slot &operator=(const Slot &) = delete;
+
+    const int mFD;
+    const std::string mPath;
+};
+
+enum AcquireSlotMode {
+    Try,
+    Wait
+};
+std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
+int runLocal(const std::string &compiler, int argc, char **argv, std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
+bool setFlag(int fd, int flag);
+bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 
 template <size_t StaticBufSize = 4096>
 static std::string format(const char *format, va_list args)
