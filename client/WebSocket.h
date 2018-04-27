@@ -4,32 +4,28 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <wslay/wslay.h>
 
 class WebSocket
 {
 public:
+    WebSocket();
+    ~WebSocket();
+
     enum Mode {
         Text,
         Binary
     };
-    struct Message {
-        Mode mode;
-        std::string data;
-    };
-    bool connect(std::string &&host,
-                 uint32_t ms,
-                 std::function<void(Message &&)> &&onMessage,
-                 std::function<void(std::string &&)> &&onError,
-                 std::function<void()> &&onClosed);
-    void send(Message &&message);
+    bool connect(std::string &&url);
+    bool send(Mode mode, const void *data, size_t len);
+    bool process(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
 private:
-    unsigned long long mConnectTime { 0 }, mConnectTimeout { 0 };
-    std::string mHost;
-    std::vector<Message> mMessages;
-    std::function<void(Message &&)> mOnMessage;
-    std::function<void(std::string &&)> mOnError;
-    std::function<void()> mOnClosed;
+    std::function<void(Mode mode, const void *data, size_t len)> mOnMessage;
+
+    std::string mUrl;
     int mFD { -1 };
+    wslay_event_callbacks mCallbacks { 0 };
+    wslay_event_context *mContext { 0 };
 };
 
 #endif /* WEBSOCKET_H */
