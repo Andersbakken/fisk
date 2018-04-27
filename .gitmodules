@@ -4,3 +4,6 @@
 [submodule "3rdparty/wslay"]
 	path = 3rdparty/wslay
 	url = https://github.com/tatsuhiro-t/wslay.git
+[submodule "LUrlParser"]
+	path = 3rdparty/LUrlParser
+	url = https://github.com/corporateshark/LUrlParser.git
