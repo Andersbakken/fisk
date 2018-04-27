@@ -1,0 +1,23 @@
+{
+  "name": "scheduler",
+  "version": "1.0.0",
+  "description": "Scheduler for fisk",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Andersbakken/fisk.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Andersbakken/fisk/issues"
+  },
+  "homepage": "https://github.com/Andersbakken/fisk#readme",
+  "dependencies": {
+    "@jhanssen/options": "^1.0.8",
+    "ws": "^5.1.1"
+  }
+}
