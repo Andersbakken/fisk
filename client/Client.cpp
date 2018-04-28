@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/inotify.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -79,6 +81,7 @@ Client::Slot::Slot(int fd, std::string &&path)
 Client::Slot::~Slot()
 {
     if (mFD != -1) {
+        Log::info("Dropping lock on %s", mPath.c_str());
         flock(mFD, LOCK_UN);
         unlink(mPath.c_str());
     }
@@ -149,6 +152,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
                 continue;
             }
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
+                Log::info("Acquired lock on %s", path.c_str());
                 return std::make_unique<Slot>(fd, std::move(path));
             }
         }
@@ -196,77 +200,62 @@ int Client::runLocal(const std::string &exec, int argc, char **argv, std::unique
         argvCopy[argc] = 0;
         ::execv(exec.c_str(), argvCopy);
         Log::error("fisk: Failed to exec %s (%d %s)", exec.c_str(), errno, strerror(errno));
+        _exit(101);
     };
 
-    int pipe[2];
-    if (::pipe(pipe) != 0) {
-        Log::error("Failed to create a pipe %d %s", errno, strerror(errno));
-        run();
-        return 0;
-    }
-    if (!Client::setFlag(pipe[1], O_CLOEXEC)) {
-        Log::error("Failed to make pipe O_CLOEXEC");
-        run();
-        return 0;
-    }
-    
-    pid_t ret = fork();
-    if (ret == -1) {
+    const pid_t pid = fork();
+    if (pid == -1) { // errpr
         Log::error("Failed to fork: %d %s", errno, strerror(errno));
         run();
         return 0;
-    } else if (ret == 0) {        
+    } else if (pid == 0) { // child
         run();
         return 0;
-    } else {
-        if (ret == -1) {
+    } else { // paren
+        int status;
+        waitpid(pid, &status, 0);
+        slot.reset();
+        if (WIFEXITED(status))
+            return WEXITSTATUS(status);
+        _exit(101);
+    }
+}
 
-            char **argvCopy = new char*[argc + 1];
-            argvCopy[0] = strdup(exec.c_str());
-            for (size_t i=1; i<argc; ++i) {
-                argvCopy[i] = argv[i];
-            }
-            argvCopy[argc] = 0;
-            ::execv(exec.c_str(), argvCopy);
-            Log::error("fisk: Failed to exec %s (%d %s)", exec.c_str(), errno, strerror(errno));
-            return 1;
-        }
-
-        bool gettime(timeval *time)
-        {
+bool gettime(timeval *time)
+{
 #if defined(__APPLE__)
-            static mach_timebase_info_data_t info;
-            static bool first = true;
-            unsigned long long machtime = mach_absolute_time();
-            if (first) {
-                first = false;
-                mach_timebase_info(&info);
-            }
-            machtime = machtime * info.numer / (info.denom * 1000); // microseconds
-            time->tv_sec = machtime / 1000000;
-            time->tv_usec = machtime % 1000000;
+    static mach_timebase_info_data_t info;
+    static bool first = true;
+    unsigned long long machtime = mach_absolute_time();
+    if (first) {
+        first = false;
+        mach_timebase_info(&info);
+    }
+    machtime = machtime * info.numer / (info.denom * 1000); // microseconds
+    time->tv_sec = machtime / 1000000;
+    time->tv_usec = machtime % 1000000;
 #elif defined(__linux__)
-            timespec spec;
-            const clockid_t cid = CLOCK_MONOTONIC_RAW;
-            const int ret = ::clock_gettime(cid, &spec);
-            if (ret == -1) {
-                memset(time, 0, sizeof(timeval));
-                return false;
-            }
-            time->tv_sec = spec.tv_sec;
-            time->tv_usec = spec.tv_nsec / 1000;
+    timespec spec;
+    const clockid_t cid = CLOCK_MONOTONIC_RAW;
+    const int ret = ::clock_gettime(cid, &spec);
+    if (ret == -1) {
+        memset(time, 0, sizeof(timeval));
+        return false;
+    }
+    time->tv_sec = spec.tv_sec;
+    time->tv_usec = spec.tv_nsec / 1000;
 #else
 #error No gettime() implementation
 #endif
-            return true;
-        }
+    return true;
+}
 
-        unsigned long long Client::mono()
-        {
-            timeval time;
-            if (gettime(&time)) {
-                return (time.tv_sec * static_cast<uint64_t>(1000)) + (time.tv_usec / static_cast<uint64_t>(1000));
-            }
-            return 0;
-        }
+unsigned long long Client::mono()
+{
+    timeval time;
+    if (gettime(&time)) {
+        return (time.tv_sec * static_cast<uint64_t>(1000)) + (time.tv_usec / static_cast<uint64_t>(1000));
+    }
+    return 0;
+}
 
