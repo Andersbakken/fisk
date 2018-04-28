@@ -33,6 +33,11 @@ int main(int argc, char **argv)
 
     // Watchdog::start(compiler, argc, argv);
     Config config;
+    if (!config.noLocal()) {
+        std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
+        if (slot)
+            return Client::runLocal(compiler, argc, argv, std::move(slot));
+    }
     WebSocket websocket;
 
     struct sigaction act;
@@ -46,7 +51,7 @@ int main(int argc, char **argv)
     }
     json11::Json my_json = json11::Json::object {
         { "client", config.clientName() },
-        { "foobar", false }
+        { "type", "shitballs" }
     };
     const std::string msg = my_json.dump();
 

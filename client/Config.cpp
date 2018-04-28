@@ -131,3 +131,12 @@ size_t Config::localSlots(std::string *dir) const
     return ret;
 }
 
+
+bool Config::noLocal() const
+{
+    json11::Json val = operator[]("no_local");
+    if (val.is_bool()) {
+        return val.bool_value();
+    }
+    return false;
+}
