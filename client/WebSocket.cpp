@@ -152,7 +152,7 @@ bool WebSocket::connect(std::string &&url)
     if (!port)
         port = 80;
 
-#warning should support literals maybe
+    // ### should support literals maybe
     // in_addr literal;
     // addrinfo *addr;
     // if (inet_aton(host.c_str(), &literal)) {
