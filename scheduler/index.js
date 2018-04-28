@@ -7,9 +7,11 @@ const slaves = {};
 let environments;
 
 server.on("slave", function(slave) {
+    console.log("slave connected", slave.ip);
     slaves[slave.ip] = { client: slave };
     slave.on("load", function(load) {
-        slaves[slave.ip].load = slave.load;
+        console.log("slave load", load);
+        slaves[slave.ip].load = load.message;
     });
     slave.on("environments", function(environs) {
         slave[slave.ip].environments = environs;
