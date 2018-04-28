@@ -1,6 +1,7 @@
 #include "Client.h"
 
 #include "Log.h"
+#include "CompilerArgs.h"
 #include "Config.h"
 #include <unistd.h>
 #include <climits>
@@ -10,6 +11,7 @@
 #include <sys/inotify.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <process.hpp>
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -126,6 +128,40 @@ bool Client::recursiveMkdir(const std::string &dir, mode_t mode)
         return true;
     }
     return false;
+}
+
+Client::Preprocessed Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
+{
+    assert(args->mode == CompilerArgs::Compile);
+    std::string out, err;
+    out.reserve(1024 * 1024);
+    std::string commandLine = compiler;
+    const size_t count = args->commandLine.size();
+    auto append = [&commandLine](const std::string &arg) {
+        const size_t idx = arg.find('\'');
+        if (idx != std::string::npos) {
+            // ### gotta escape quotes
+        }
+        commandLine += arg;
+
+    };
+    for (size_t i=1; i<count; ++i) {
+        commandLine += " '";
+        if (i == args->objectFileIndex) {
+            commandLine += '-';            
+        } else {
+            append(args->commandLine.at(i));
+        }
+        commandLine += '\'';
+    }
+    TinyProcessLib::Process proc(commandLine, std::string(),
+                                 [&out](const char *bytes, size_t n) {
+                                     out.append(bytes, n);
+                                 }, [&err](const char *bytes, size_t n) {
+                                     err.append(bytes, n);
+                                 });
+    const int exit_status = proc.get_exit_status();
+    return Preprocessed { std::move(out), std::move(err), exit_status };
 }
 
 std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)

@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 
+struct CompilerArgs;
 namespace Client {
 std::mutex &mutex();
 std::string findCompiler(int argc, char **argv);
@@ -34,6 +35,13 @@ int runLocal(const std::string &compiler, int argc, char **argv, std::unique_ptr
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
+
+struct Preprocessed
+{
+    std::string stdOut, stdErr;
+    int exitStatus;
+};
+Preprocessed preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 
 template <size_t StaticBufSize = 4096>
 static std::string format(const char *format, va_list args)
