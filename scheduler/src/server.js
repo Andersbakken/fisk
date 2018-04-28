@@ -1,5 +1,3 @@
-/*global require,module*/
-
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
