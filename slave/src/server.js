@@ -7,12 +7,11 @@ const BinaryTypes = {
     2: "environment"
 };
 
-class Client extends EventEmitter {
-    constructor(ws, ip, type) {
+class Compile extends EventEmitter {
+    constructor(ws, ip) {
         super();
         this.ws = ws;
         this.ip = ip;
-        this.type = type;
     }
 
     send(type, msg) {
@@ -31,11 +30,6 @@ class Client extends EventEmitter {
     }
 };
 
-Client.Type = {
-    Slave: 0,
-    Compile: 1
-};
-
 class Server extends EventEmitter {
     constructor(option) {
         super();
@@ -45,11 +39,11 @@ class Server extends EventEmitter {
 
     listen() {
         this.ws = new WebSocket.Server({
-            port: this.option("port", 8097),
+            port: this.option("port", 8096),
             backlog: this.option("backlog", 50)
         });
         console.log("listening on", this.ws.options.port);
-        this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
+        this.ws.on("connection", this._handleConnection);
     }
 
     _handleConnection(ws, req) {
@@ -70,28 +64,8 @@ class Server extends EventEmitter {
         const url = Url.parse(req.url);
         switch (url.pathname) {
         case "/compile":
-            // look at headers
-            if (!("x-fisk-environ" in req.headers)) {
-                error("No x-fisk-environ header");
-                return;
-            }
-            if (!("x-fisk-arch" in req.headers)) {
-                error("no x-fisk-arch header");
-                return;
-            }
-            const environ = req.headers["x-fisk-environ"];
-            const arch = req.headers["x-fisk-arch"];
-
-            client = new Client(ws, ip, Client.Type.Compile);
+            client = new Compile(ws, ip);
             this.emit("compile", client);
-
-            process.nextTick(() => {
-                client.emit("job", { environment: environ, architecture: arch });
-            });
-            break;
-        case "/slave":
-            client = new Client(ws, ip, Client.Type.Slave);
-            this.emit("slave", client);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
