@@ -7,7 +7,7 @@ const server = new Server(option);
 const slaves = {};
 
 server.on("slave", function(slave) {
-    slaves[slave.ip] = {};
+    slaves[slave.ip] = { client: slave };
     slave.on("load", function(load) {
         slaves[slave.ip].load = slave.load;
     });
@@ -24,7 +24,7 @@ server.on("slave", function(slave) {
 });
 
 server.on("compile", function(compile) {
-    compile.on("requestSlave", function(request) {
+    compile.on("job", function(request) {
         let best = { load: Infinity };
         for (let ip in slaves) {
             let slave = slaves[ip];
@@ -36,9 +36,9 @@ server.on("compile", function(compile) {
             }
         }
         if (best.load < Infinity) {
-            compile.send("requestSlave", { ip: best.ip });
+            compile.send("slave", { ip: best.ip });
         } else {
-            compile.send("requestSlave", {});
+            compile.send("slave", {});
         }
     });
     compile.on("environment", function(environ) {
