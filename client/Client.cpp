@@ -298,35 +298,85 @@ unsigned long long Client::mono()
     return 0;
 }
 
-std::string Client::compilerSignature(const std::string &compiler)
+std::string Client::environmentSignature(const std::string &compiler)
 {
-    // auto readSignature = [&compiler]() -> std::string {
+    struct stat st;
+    if (::stat(compiler.c_str(), &st)) {
+        return std::string();
+    }
 
-       
+    auto readSignature = [&compiler]() -> std::string {
+        std::string out, err;
+        TinyProcessLib::Process proc(compiler + " -v", std::string(),
+                                     [&out](const char *bytes, size_t n) {
+                                         out.append(bytes, n);
+                                     }, [&err](const char *bytes, size_t n) {
+                                         err.append(bytes, n);
+                                     });
+        const int exit_status = proc.get_exit_status();
+        if (exit_status) {
+            Log::error("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
+            return std::string();
+        }
+#warning need to add arch to the signature
+        return Client::base64(Client::sha1(out + err));        
+    };
+    const std::string cache = Config::envCache();
+    if (cache.empty()) 
+        return readSignature();
 
-    // };
-    // std::string cache = Config::envCache();
-    // if (!cache.empty()) {
-    //     struct stat st;
-    //     if (::stat(compiler.c_str(), &st)) {
-    //         return std::string();
-    //     }
-    //     FILE *f = fopen(cache.c_str(), "r");
-    //     if (!f) {
-    //         return readSignature();
-    //     fseek(f, 0, SEEK_END);
-    //     const long size = ftell(f);
-    //     fseek(f, 0, SEEK_SET);
-    //     if (size) {
-    //         std::string contents(size, ' ');
-    //         const size_t read = fread(&contents[0], 1, size, f);
-    //         fclose(f);
-    //     if (read != size) {
-    //         Log::error("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
-    //         return;
-    //     }
-
-        
-    // }
+    std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
+    json11::Json::object json;
+    FILE *f = fopen(cache.c_str(), "r");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        const long size = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (size) {
+            std::string contents(size, ' ');
+            const size_t read = fread(&contents[0], 1, size, f);
+            fclose(f);
+            if (read != size) {
+                Log::error("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));                
+            } else {
+                std::string err;
+                json11::Json obj = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
+                if (!err.empty()) {
+                    Log::error("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
+                } 
+                if (obj.is_object()) {
+                    json11::Json value = obj[key];
+                    if (value.is_string()) {
+                        Log::debug("Cache hit for compiler %s", key.c_str());
+                        return value.string_value();
+                    }
+                    json = obj.object_items();
+                    auto it = json.begin();
+                    while (it != json.end()) {
+                        if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
+                            json.erase(it++);
+                        } else {
+                            ++it;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    const std::string ret = readSignature();
+    if (!ret.empty()) {
+        json[key] = ret;
+        FILE *f = fopen(cache.c_str(), "w");
+        if (f) {
+            std::string str = json11::Json(json).dump();
+            if (fwrite(str.c_str(), 1, str.size(), f) != str.size()) {
+                Log::error("Failed to write to file %s - %d %s", cache.c_str(), errno, strerror(errno));
+            }
+            fclose(f);
+        } else {
+            Log::error("Failed to open %s for writing %d %s", cache.c_str(), errno, strerror(errno));
+        }
+    }
+    return ret;
 }
 

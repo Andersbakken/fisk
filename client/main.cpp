@@ -52,7 +52,9 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    if (!websocket.connect(Config::scheduler())) {
+    const std::string signature = Client::environmentSignature(compiler);
+    Log::info("Got signature %s for %s", signature.c_str(), compiler.c_str());
+    if (!websocket.connect(Config::scheduler(), signature)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
