@@ -112,7 +112,16 @@ class Server extends EventEmitter {
                     return;
                 }
                 if ("type" in json) {
-                    client.emit(json.type, json);
+                    switch (json.type) {
+                    case "environment":
+                        remaining.type = `${json.type}data`;
+                        remaining.bytes = json.bytes;
+                        client.emit(json.type, json);
+                        break;
+                    default:
+                        client.emit(json.type, json);
+                        break;
+                    }
                 } else {
                     error("No type property in JSON");
                     return;
@@ -125,37 +134,17 @@ class Server extends EventEmitter {
                         error("No data in buffer");
                         return;
                     }
-                    if (remaining.bytes) {
-                        // more data
-                        if (msg.length > remaining.bytes) {
-                            // woops
-                            error(`length ${msg.length} > ${remaining.bytes}`);
-                            return;
-                        }
-                        remaining.bytes -= msg.length;
-                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
-                    } else {
-                        // first byte denotes our message type
-                        const type = msg.readUInt8(0);
-                        if (msg.length < 5) {
-                            error("No length in Buffer");
-                            return;
-                        }
-                        if (!(type in BinaryTypes)) {
-                            error(`Invalid binary type '${type}`);
-                            return;
-                        }
-                        const len = msg.readUInt32(1);
-                        if (len < msg.length - 5) {
-                            error(`length mismatch, ${len} vs ${msg.length - 5}`);
-                            return;
-                        }
-                        if (len > msg.length - 5) {
-                            remaining.type = BinaryTypes[type];
-                            remaining.bytes = len - (msg.length - 5);
-                        }
-                        client.emit(BinaryTypes[type], { data: msg.slice(5), last: !remaining.bytes });
+                    if (!remaining.bytes) {
+                        error("Got binary message without a preceeding json message describing the data");
+                        return;
                     }
+                    if (msg.length > remaining.bytes) {
+                        // woops
+                        error(`length ${msg.length} > ${remaining.bytes}`);
+                        return;
+                    }
+                    remaining.bytes -= msg.length;
+                    client.emit(remaining.type, { data: msg, last: !remaining.bytes });
                 }
                 break;
             }

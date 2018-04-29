@@ -4,7 +4,6 @@ const Environments = require("./src/environments");
 const server = new Server(option);
 
 const slaves = {};
-let environments;
 
 server.on("slave", function(slave) {
     console.log("slave connected", slave.ip);
@@ -14,11 +13,11 @@ server.on("slave", function(slave) {
         slaves[slave.ip].load = load.message;
     });
     slave.on("environments", function(environs) {
-        slave[slave.ip].environments = environs;
+        slaves[slave.ip].environments = environs;
         // send the slave any new environments
-        for (var k in environments) {
+        for (var k in Environments.environments) {
             if (environs.indexOf(k) === -1) {
-                environments[k].send(slave);
+                Environments.environments[k].send(slave);
             }
         }
     });
@@ -57,12 +56,22 @@ server.on("compile", function(compile) {
         }
     });
     compile.on("environment", function(environ) {
-        // save environment and distribute to slaves
-        Environments.save(environ);
-        for (var ip in slaves) {
-            let slave = slaves[ip];
-            slave.client.send(environ);
-        }
+        Environments.prepare(environ);
+    });
+    compile.on("environmentdata", function(environ) {
+        Environments.save(environ).then(() => {
+            if (environ.last) {
+                Environments.complete();
+                // send any new environments to slaves
+                for (var ip in slaves) {
+                    let slave = slaves[ip];
+                    for (var ek in Environments.environments) {
+                        if (slave.environments.indexOf(ek) === -1) {
+                            Environments.environments[ek].send(slave.client);
+                        }
+                    }
+                }
+            }});
     });
     compile.on("error", function(msg) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
@@ -76,7 +85,6 @@ server.on("error", function(err) {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(envs => {
-    environments = envs;
+Environments.load().then(() => {
     server.listen();
 });
