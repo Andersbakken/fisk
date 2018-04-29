@@ -1,10 +1,48 @@
 const fs = require("fs-extra");
 const mkdirp = require("mkdirp");
+const path = require("path");
+
+class File {
+    constructor(path, environ) {
+        this._path = path;
+        this._fd = fs.openSync(path, "w");
+
+        this.environ = environ;
+    }
+
+    save(data) {
+        if (!this._fd)
+            throw new Error(`No fd for ${this._path}`);
+        return new Promise((resolve, reject) => {
+            fs.write(this._fd, data).then(() => {
+                resolve();
+            }).catch(e => {
+                fs.closeSync(this._fd);
+                this._fd = undefined;
+
+                reject(e);
+            });
+        });
+    }
+
+    discard() {
+        if (!this._fd)
+            throw new Error(`No fd for ${this._path}`);
+        fs.closeSync(this._fd);
+        fs.unlinkSync(this._path);
+    }
+
+    close() {
+        if (!this._fd)
+            throw new Error(`No fd for ${this._path}`);
+        fs.closeSync(this._fd);
+        this._fd = undefined;
+    }
+}
 
 const environments = {
     _environs: [],
     _path: undefined,
-    _saving: undefined,
 
     load: function load(path) {
         return new Promise((resolve, reject) => {
@@ -38,57 +76,13 @@ const environments = {
     },
 
     prepare: function(environ) {
-        if (environments._saving)
-            throw new Error("Already saving");
         if (environments._environs.indexOf(environ.message) !== -1)
-            return false;
-        environments._saving = { environ: environ.message };
-        try {
-            environments._saving.fd = fs.openSync(environ.message + ".tar.gz", "w");
-        } catch (e) {
-            environments._saving = undefined;
-            throw e;
-        }
-        return true;
+            return undefined;
+        return new File(path.join(environments._path, environ.message + ".tar.gz"), environ.message);
     },
 
-    save: function save(data) {
-        if (!environments._saving)
-            throw new Error("Not saving");
-        return new Promise((resolve, reject) => {
-            fs.write(environments._saving.fd, data).then(() => {
-                resolve();
-            }).catch(e => {
-                fs.closeSync(environments._saving.fd);
-                fs.unlinkSync(environments._path);
-                environments._path = undefined;
-                environments._saving = undefined;
-
-                reject(e);
-            });
-        });
-    },
-
-    complete: function() {
-        if (!environments._saving)
-            throw new Error("Not saving");
-        fs.closeSync(environments._saving.fd);
-        environments._environs.push(this._saving.environ);
-        environments._path = undefined;
-        environments._saving = undefined;
-    },
-
-    discard: function() {
-        if (!environments._saving)
-            throw new Error("Not saving");
-        fs.closeSync(environments._saving.fd);
-        fs.unlinkSync(environments._path);
-        environments._path = undefined;
-        environments._saving = undefined;
-    },
-
-    isSaving() {
-        return environments._saving !== undefined;
+    complete: function(file) {
+        environments._environs.push(file.environ);
     },
 
     get environments() {
