@@ -191,6 +191,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
                 Log::info("Acquired lock on %s", path.c_str());
                 return std::make_unique<Slot>(fd, std::move(path));
             }
+            ::close(fd);
         }
         return std::unique_ptr<Slot>();
     };
