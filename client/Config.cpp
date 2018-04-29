@@ -5,9 +5,21 @@
 #include <unistd.h>
 #include <thread>
 
-Config::Config()
+static std::vector<json11::Json> sJSON;
+static json11::Json value(const std::string &key)
 {
-    auto load = [this](const std::string &path) {
+    for (const json11::Json &json : sJSON) {
+        const json11::Json &value = json[key];
+        if (!value.is_null()) {
+            return value;
+        }
+    }
+    return json11::Json();
+}
+
+void Config::init()
+{
+    auto load = [](const std::string &path) {
         FILE *f = fopen(path.c_str(), "r");
         if (!f)
             return;
@@ -33,7 +45,7 @@ Config::Config()
             Log::error("Failed to parse json from %s: %s", path.c_str(), err.c_str());
             return;
         }
-        mJSON.push_back(std::move(parsed));
+        sJSON.push_back(std::move(parsed));
     };
     if (const char *home = getenv("HOME")) {
         load(std::string(home) + "/.config/fisk.json");
@@ -41,65 +53,54 @@ Config::Config()
     load("/etc/fisk.json");
 }
 
-json11::Json Config::operator[](const std::string &key) const
+std::string Config::scheduler()
 {
-    for (const json11::Json &json : mJSON) {
-        const json11::Json &value = json[key];
-        if (!value.is_null()) {
-            return value;
-        }
-    }
-    return json11::Json();
-}
-
-std::string Config::scheduler() const
-{
-    json11::Json val = operator[]("scheduler");
+    json11::Json val = value("scheduler");
     if (val.is_string())
         return val.string_value();
 
     return "ws://localhost:8097/compile";
 }
 
-unsigned long long Config::schedulerConnectTimeout() const
+unsigned long long Config::schedulerConnectTimeout()
 {
-    json11::Json val = operator[]("scheduler_connect_timeout");
+    json11::Json val = value("scheduler_connect_timeout");
     if (val.is_number())
         return val.int_value();
 
     return 1000;
 }
 
-unsigned long long Config::acquiredSlaveTimeout() const
+unsigned long long Config::acquiredSlaveTimeout()
 {
-    json11::Json val = operator[]("acquired_slave_timeout");
+    json11::Json val = value("acquired_slave_timeout");
     if (val.is_number())
         return val.int_value();
 
     return 1000;
 }
 
-unsigned long long Config::slaveConnectTimeout() const
+unsigned long long Config::slaveConnectTimeout()
 {
-    json11::Json val = operator[]("slave_connect_timeout");
+    json11::Json val = value("slave_connect_timeout");
     if (val.is_number())
         return val.int_value();
 
     return 1000;
 }
 
-unsigned long long Config::responseTimeout() const
+unsigned long long Config::responseTimeout()
 {
-    json11::Json val = operator[]("response_timeout");
+    json11::Json val = value("response_timeout");
     if (val.is_number())
         return val.int_value();
 
     return 20000;
 }
 
-std::string Config::clientName() const
+std::string Config::clientName()
 {
-    json11::Json val = operator[]("clientName");
+    json11::Json val = value("clientName");
     if (val.is_string())
         return val.string_value();
 
@@ -111,9 +112,9 @@ std::string Config::clientName() const
     return "unknown";
 }
 
-size_t Config::localSlots(std::string *dir) const
+size_t Config::localSlots(std::string *dir)
 {
-    json11::Json val = operator[]("local_slots");
+    json11::Json val = value("local_slots");
     size_t ret;
     if (val.is_number()) {
         ret = val.int_value();
@@ -121,7 +122,7 @@ size_t Config::localSlots(std::string *dir) const
         ret = std::thread::hardware_concurrency();
     }
     if (dir) {
-        val = operator[]("local_slots_dir");
+        val = value("local_slots_dir");
         if (val.is_string()) {
             *dir = val.string_value();
         } else if (const char *home = getenv("HOME")) {
@@ -132,11 +133,22 @@ size_t Config::localSlots(std::string *dir) const
 }
 
 
-bool Config::noLocal() const
+bool Config::noLocal()
 {
-    json11::Json val = operator[]("no_local");
+    json11::Json val = value("no_local");
     if (val.is_bool()) {
         return val.bool_value();
     }
     return false;
+}
+
+std::string Config::envCache()
+{
+    json11::Json val = value("env_cache");
+    if (val.is_string())
+        return val.string_value();
+    if (const char *home = getenv("HOME")) {
+        return home + std::string("/.cache/fisk/env");
+    }
+    return std::string();
 }

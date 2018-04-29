@@ -169,7 +169,7 @@ Client::Preprocessed Client::preprocess(const std::string &compiler, const std::
 std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
 {
     std::string dir;
-    const size_t slots = Config().localSlots(&dir);
+    const size_t slots = Config::localSlots(&dir);
     if (dir.empty() || !slots) {
         return std::make_unique<Slot>(-1, std::string());
     }
@@ -300,8 +300,33 @@ unsigned long long Client::mono()
 
 std::string Client::compilerSignature(const std::string &compiler)
 {
-    struct stat st;
-    if (!::stat(compiler.c_str(), &st)) {
-    }
+    // auto readSignature = [&compiler]() -> std::string {
+
+       
+
+    // };
+    // std::string cache = Config::envCache();
+    // if (!cache.empty()) {
+    //     struct stat st;
+    //     if (::stat(compiler.c_str(), &st)) {
+    //         return std::string();
+    //     }
+    //     FILE *f = fopen(cache.c_str(), "r");
+    //     if (!f) {
+    //         return readSignature();
+    //     fseek(f, 0, SEEK_END);
+    //     const long size = ftell(f);
+    //     fseek(f, 0, SEEK_SET);
+    //     if (size) {
+    //         std::string contents(size, ' ');
+    //         const size_t read = fread(&contents[0], 1, size, f);
+    //         fclose(f);
+    //     if (read != size) {
+    //         Log::error("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
+    //         return;
+    //     }
+
+        
+    // }
 }
 

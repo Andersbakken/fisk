@@ -24,22 +24,21 @@ void Watchdog::transition(Stage stage)
 void Watchdog::start(const std::string &compiler, int argc, char **argv)
 {
     sThread = std::thread([compiler, argc, argv]() {
-            Config config;
             while (true) {
                 std::unique_lock<std::mutex> lock(Client::mutex());
                 unsigned long long timeout;
                 switch (sStage) {
                 case Initial:
-                    timeout = config.schedulerConnectTimeout();
+                    timeout = Config::schedulerConnectTimeout();
                     break;
                 case ConnectedToScheduler:
-                    timeout = config.acquiredSlaveTimeout();
+                    timeout = Config::acquiredSlaveTimeout();
                     break;
                 case AcquiredSlave:
-                    timeout = config.slaveConnectTimeout();
+                    timeout = Config::slaveConnectTimeout();
                     break;
                 case ConnectedToSlave:
-                    timeout = config.responseTimeout();
+                    timeout = Config::responseTimeout();
                     break;
                 case WaitingForResponse:
                     return;

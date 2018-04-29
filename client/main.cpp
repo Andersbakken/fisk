@@ -19,6 +19,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    Config::init();
+
     std::vector<std::string> args(argc);
     for (size_t i=0; i<argc; ++i) {
         // printf("%zu: %s\n", i, argv[i]);
@@ -31,8 +33,7 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    Config config;
-    if (!config.noLocal()) {
+    if (!Config::noLocal()) {
         std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
         if (slot)
             return Client::runLocal(compiler, argc, argv, std::move(slot));
@@ -51,13 +52,13 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    if (!websocket.connect(config.scheduler())) {
+    if (!websocket.connect(Config::scheduler())) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
     json11::Json my_json = json11::Json::object {
-        { "client", config.clientName() },
+        { "client", Config::clientName() },
         { "type", "shitballs" }
     };
     const std::string msg = my_json.dump();
