@@ -17,7 +17,6 @@ server.on("slave", function(slave) {
         slave[slave.ip].environments = environs;
         // send the slave any new environments
         for (var k in environments) {
-            // ### should verify that the slave has the right architechture here
             if (environs.indexOf(k) === -1) {
                 environments[k].send(slave);
             }
@@ -60,7 +59,6 @@ server.on("compile", function(compile) {
     compile.on("environment", function(environ) {
         // save environment and distribute to slaves
         Environments.save(environ);
-        // ### should verify that the slave has the right architechture here
         for (var ip in slaves) {
             let slave = slaves[ip];
             slave.client.send(environ);

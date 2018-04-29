@@ -75,18 +75,13 @@ class Server extends EventEmitter {
                 error("No x-fisk-environ header");
                 return;
             }
-            if (!("x-fisk-arch" in req.headers)) {
-                error("no x-fisk-arch header");
-                return;
-            }
             const environ = req.headers["x-fisk-environ"];
-            const arch = req.headers["x-fisk-arch"];
 
             client = new Client(ws, ip, Client.Type.Compile);
             this.emit("compile", client);
 
             process.nextTick(() => {
-                client.emit("job", { environment: environ, architecture: arch });
+                client.emit("job", { environment: environ });
             });
             break;
         case "/slave":
