@@ -319,11 +319,11 @@ std::string Client::environmentSignature(const std::string &compiler)
             return std::string();
         }
 #ifdef __APPLE__
-        const char *arch = "Darwin X86_64 ";
+        const char *arch = "Darwin:x86_64:";
 #elif defined(__linux__) && defined(__i686)
-        const char *arch = "Linux i686 "
+        const char *arch = "Linux:i686:"
 #elif defined(__linux__) && defined(__x86_64)
-        const char *arch = "Linux X86_64 ";
+        const char *arch = "Linux:x86_64:";
 #else
 #error unsupported platform
 #endif
