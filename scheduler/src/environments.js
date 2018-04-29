@@ -69,7 +69,21 @@ const environments = {
             throw new Error("Not saving");
         fs.closeSync(environments._saving.fd);
         environments._environs.push(this._saving.environ);
+        environments._path = undefined;
         environments._saving = undefined;
+    },
+
+    discard: function() {
+        if (!environments._saving)
+            throw new Error("Not saving");
+        fs.closeSync(environments._saving.fd);
+        fs.unlinkSync(environments._path);
+        environments._path = undefined;
+        environments._saving = undefined;
+    },
+
+    isSaving() {
+        return environments._saving !== undefined;
     },
 
     get environments() {

@@ -82,9 +82,13 @@ server.on("compile", function(compile) {
     });
     compile.on("error", function(msg) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
+        if (Environments.isSaving())
+            Environments.discard();
     });
     compile.on("close", function() {
         compile.removeAllListeners();
+        if (Environments.isSaving())
+            Environments.discard();
     });
 });
 
