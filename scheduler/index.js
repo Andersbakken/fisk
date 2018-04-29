@@ -33,6 +33,7 @@ server.on("slave", function(slave) {
 });
 
 server.on("compile", function(compile) {
+    let file;
     compile.on("job", function(request) {
         /*
         if (!(request.environment in environments)) {
@@ -58,7 +59,8 @@ server.on("compile", function(compile) {
         }
     });
     compile.on("environment", function(environ) {
-        if (!Environments.prepare(environ)) {
+        file = Environments.prepare(environ);
+        if (!file) {
             // we already have this environment
             console.error("already got environment", environ.message);
             compile.send({ "error": "already got environment" });
@@ -66,9 +68,16 @@ server.on("compile", function(compile) {
         }
     });
     compile.on("environmentdata", function(environ) {
-        Environments.save(environ).then(() => {
+        if (!file) {
+            console.error("no pending file");
+            compile.send({ "error": "no pending file" });
+            compile.close();
+        }
+        file.save(environ.data).then(() => {
             if (environ.last) {
-                Environments.complete();
+                file.close();
+                Environments.complete(file);
+                file = undefined;
                 // send any new environments to slaves
                 for (var ip in slaves) {
                     let slave = slaves[ip];
@@ -78,17 +87,25 @@ server.on("compile", function(compile) {
                         }
                     }
                 }
-            }});
+            }
+        }).catch(err => {
+            console.log("file error", err);
+            file = undefined;
+        });
     });
     compile.on("error", function(msg) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
-        if (Environments.isSaving())
-            Environments.discard();
+        if (file) {
+            file.discard();
+            file = undefined;
+        }
     });
     compile.on("close", function() {
         compile.removeAllListeners();
-        if (Environments.isSaving())
-            Environments.discard();
+        if (file) {
+            file.discard();
+            file = undefined;
+        }
     });
 });
 
