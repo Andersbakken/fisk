@@ -69,7 +69,7 @@ const send = {
                 return fs.open(q.file);
             }).then(fd => {
                 // send file size to client
-                q.client.send({ type: "environment", size: size });
+                q.client.send({ type: "environment", bytes: size });
                 // read file in chunks and send
                 const bufsiz = 32768;
                 const buf = Buffer.alloc(bufsiz);
