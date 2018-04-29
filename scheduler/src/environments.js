@@ -59,6 +59,11 @@ const environments = {
             fs.write(environments._saving.fd, data).then(() => {
                 resolve();
             }).catch(e => {
+                fs.closeSync(environments._saving.fd);
+                fs.unlinkSync(environments._path);
+                environments._path = undefined;
+                environments._saving = undefined;
+
                 reject(e);
             });
         });
