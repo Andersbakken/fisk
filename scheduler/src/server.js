@@ -29,6 +29,10 @@ class Client extends EventEmitter {
             this.ws.send(JSON.stringify(tosend));
         }
     }
+
+    close() {
+        this.ws.close();
+    }
 };
 
 Client.Type = {
