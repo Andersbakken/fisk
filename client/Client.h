@@ -62,6 +62,8 @@ static std::string format(const char *format, va_list args)
     va_end(copy);
     return ret;
 }
+
+std::string compilerSignature(const std::string &compiler);
 }
 
 #endif /* CLIENT_H */

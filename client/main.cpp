@@ -31,13 +31,13 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    // Watchdog::start(compiler, argc, argv);
     Config config;
     if (!config.noLocal()) {
         std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
         if (slot)
             return Client::runLocal(compiler, argc, argv, std::move(slot));
     }
+    Watchdog::start(compiler, argc, argv);
     WebSocket websocket;
 
     struct sigaction act;
@@ -45,8 +45,15 @@ int main(int argc, char **argv)
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, 0);
 
+    Client::Preprocessed ret = Client::preprocess(compiler, compilerArgs);
+    if (ret.exitStatus != 0) {
+        Watchdog::stop();
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+    }
+
     if (!websocket.connect(config.scheduler())) {
         Log::debug("Have to run locally because no server");
+        Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
     json11::Json my_json = json11::Json::object {
@@ -57,6 +64,7 @@ int main(int argc, char **argv)
 
     if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size())) {
         Log::debug("Have to run locally because no send");
+        Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
@@ -69,8 +77,10 @@ int main(int argc, char **argv)
                     printf("Got binary message: %zu bytes\n", len);
                 }
             })) {
+        Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
+
     return 0;
 }
 
