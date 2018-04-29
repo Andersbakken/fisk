@@ -17,7 +17,11 @@ class Client extends EventEmitter {
 
     send(type, msg) {
         if (msg === undefined) {
-            this.ws.send(JSON.stringify(type));
+            if (type instanceof Buffer) {
+                this.ws.send(type);
+            } else {
+                this.ws.send(JSON.stringify(type));
+            }
         } else {
             let tosend;
             if (typeof msg === "object") {

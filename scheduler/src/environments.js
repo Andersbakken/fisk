@@ -40,6 +40,83 @@ class File {
     }
 }
 
+const send = {
+    _queue: [],
+    _sending: false,
+
+    enqueue: function enqueue(client, file) {
+        send._queue.push({ client: client, file: file });
+        if (!send._sending) {
+            send._next().then(() => {
+                if (send._queue.length > 0) {
+                    process.nextTick(send._next);
+                }
+            }).catch(e => {
+                console.error(e);
+            });
+        }
+    },
+
+    _next() {
+        send._sending = true;
+        const q = send._queue.shift();
+        let size;
+        return new Promise((resolve, reject) => {
+            fs.stat(q.file).then(st => {
+                if (!st.isFile())
+                    throw new Error(`${q.file} not a file`);
+                size = st.size;
+                return fs.open(q.file);
+            }).then(fd => {
+                // send file size to client
+                q.client.send({ type: "environment", size: size });
+                // read file in chunks and send
+                const bufsiz = 32768;
+                const buf = Buffer.alloc(bufsiz);
+                let remaining = size;
+                const readNext = () => {
+                    if (!remaining) {
+                        send._sending = false;
+                        resolve();
+                    }
+                    const bytes = Math.min(bufsiz, remaining);
+                    remaining -= bytes;
+                    fs.read(fd, buf, 0, bytes).then(() => {
+                        if (bytes === bufsiz) {
+                            q.client.send(buf);
+                        } else {
+                            q.client.send(buf.slice(0, bytes));
+                        }
+                        readNext();
+                    }).catch(e => {
+                        throw e;
+                    });
+                };
+                readNext();
+            }).catch(e => {
+                send._sending = false;
+                reject(e);
+            });
+        });
+    }
+};
+
+class Environment {
+    constructor(path, file) {
+        this._path = path;
+        this._file = file;
+        this._hash = file.substr(0, file.length - 7);
+    }
+
+    get hash() {
+        return this._hash;
+    }
+
+    send(client) {
+        send.enqueue(client, path.join(this._path, this._file));
+    }
+}
+
 const environments = {
     _environs: [],
     _path: undefined,
@@ -93,7 +170,10 @@ const environments = {
         environments._path = path;
         return new Promise((resolve, reject) => {
             fs.readdir(path).then(files => {
-                environments._environs = files.filter(e => e.endsWith(".tar.gz")).map(e => e.substr(0, e.length - 7));
+                const envs = files.filter(e => e.endsWith(".tar.gz"));
+                for (let i = 0; i < envs.length; ++i) {
+                    environments._environs.push(path, new Environment(envs[i]));
+                }
                 resolve();
             }).catch(e => {
                 reject(e);
