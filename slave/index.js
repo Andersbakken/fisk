@@ -37,7 +37,7 @@ const server = new Server(option);
 server.on("compile", function(compile) {
     compile.on("job", function(job) {
     });
-    compile.on("data", function(data) {
+    compile.on("jobdata", function(data) {
     });
     compile.on("error", function(err) {
         console.error("compile error", err);
