@@ -172,7 +172,7 @@ const environments = {
             fs.readdir(path).then(files => {
                 const envs = files.filter(e => e.endsWith(".tar.gz"));
                 for (let i = 0; i < envs.length; ++i) {
-                    environments._environs.push(path, new Environment(envs[i]));
+                    environments._environs.push(new Environment(path, envs[i]));
                 }
                 resolve();
             }).catch(e => {
