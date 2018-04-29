@@ -63,14 +63,14 @@ server.on("compile", function(compile) {
         if (!file) {
             // we already have this environment
             console.error("already got environment", environ.message);
-            compile.send({ "error": "already got environment" });
+            compile.send({ error: "already got environment" });
             compile.close();
         }
     });
     compile.on("environmentdata", function(environ) {
         if (!file) {
             console.error("no pending file");
-            compile.send({ "error": "no pending file" });
+            compile.send({ error: "no pending file" });
             compile.close();
         }
         file.save(environ.data).then(() => {
