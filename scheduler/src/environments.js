@@ -40,13 +40,16 @@ const environments = {
     prepare: function(environ) {
         if (environments._saving)
             throw new Error("Already saving");
-        environments._saving = { environ: environ };
+        if (environments._environs.indexOf(environ.message) !== -1)
+            return false;
+        environments._saving = { environ: environ.message };
         try {
             environments._saving.fd = fs.openSync(environ.message + ".tar.gz", "w");
         } catch (e) {
             environments._saving = undefined;
             throw e;
         }
+        return true;
     },
 
     save: function save(data) {
@@ -65,9 +68,8 @@ const environments = {
         if (!environments._saving)
             throw new Error("Not saving");
         fs.closeSync(environments._saving.fd);
+        environments._environs.push(this._saving.environ);
         environments._saving = undefined;
-        return new Promise((resolve, reject) => {
-        });
     },
 
     get environments() {

@@ -58,7 +58,12 @@ server.on("compile", function(compile) {
         }
     });
     compile.on("environment", function(environ) {
-        Environments.prepare(environ);
+        if (!Environments.prepare(environ)) {
+            // we already have this environment
+            console.error("already got environment", environ.message);
+            compile.send({ "error": "already got environment" });
+            compile.close();
+        }
     });
     compile.on("environmentdata", function(environ) {
         Environments.save(environ).then(() => {
