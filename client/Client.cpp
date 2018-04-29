@@ -148,7 +148,7 @@ Client::Preprocessed Client::preprocess(const std::string &compiler, const std::
     for (size_t i=1; i<count; ++i) {
         commandLine += " '";
         if (i == args->objectFileIndex) {
-            commandLine += '-';            
+            commandLine += '-';
         } else {
             append(args->commandLine.at(i));
         }
@@ -318,11 +318,20 @@ std::string Client::environmentSignature(const std::string &compiler)
             Log::error("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
             return std::string();
         }
-#warning need to add arch to the signature
-        return Client::base64(Client::sha1(out + err));        
+#ifdef __APPLE__
+        const char *arch = "Darwin X86_64 ";
+#elif defined(__linux__) && defined(__i686)
+        const char *arch = "Linux i686 "
+#elif defined(__linux__) && defined(__x86_64)
+        const char *arch = "Linux X86_64 ";
+#else
+#error unsupported platform
+#endif
+
+        return arch + Client::base64(Client::sha1(out + err));
     };
     const std::string cache = Config::envCache();
-    if (cache.empty()) 
+    if (cache.empty())
         return readSignature();
 
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
@@ -337,13 +346,13 @@ std::string Client::environmentSignature(const std::string &compiler)
             const size_t read = fread(&contents[0], 1, size, f);
             fclose(f);
             if (read != size) {
-                Log::error("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));                
+                Log::error("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
             } else {
                 std::string err;
                 json11::Json obj = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
                 if (!err.empty()) {
                     Log::error("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
-                } 
+                }
                 if (obj.is_object()) {
                     json11::Json value = obj[key];
                     if (value.is_string()) {
@@ -366,6 +375,9 @@ std::string Client::environmentSignature(const std::string &compiler)
     const std::string ret = readSignature();
     if (!ret.empty()) {
         json[key] = ret;
+        std::string dirname;
+        parsePath(cache.c_str(), 0, &dirname);
+        recursiveMkdir(dirname);
         FILE *f = fopen(cache.c_str(), "w");
         if (f) {
             std::string str = json11::Json(json).dump();
