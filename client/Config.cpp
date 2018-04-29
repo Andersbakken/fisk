@@ -147,7 +147,7 @@ std::string Config::envCache()
     if (val.is_string())
         return val.string_value();
     if (const char *home = getenv("HOME")) {
-        return home + std::string("/.cache/fisk/env");
+        return home + std::string("/.cache/fisk/env.json");
     }
     return std::string();
 }
