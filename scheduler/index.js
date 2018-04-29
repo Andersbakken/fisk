@@ -1,3 +1,5 @@
+const path = require("path");
+const os = require("os");
 const option = require("@jhanssen/options")("fisk-scheduler");
 const Server = require("./src/server");
 const Environments = require("./src/environments");
@@ -85,6 +87,9 @@ server.on("error", function(err) {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load().then(() => {
+Environments.load(option("env-dir", path.join(os.homedir(), ".cache", "fisk", "environs"))).then(() => {
     server.listen();
+}).catch(e => {
+    console.error(e);
+    process.exit();
 });
