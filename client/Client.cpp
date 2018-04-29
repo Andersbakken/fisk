@@ -154,6 +154,7 @@ Client::Preprocessed Client::preprocess(const std::string &compiler, const std::
         }
         commandLine += '\'';
     }
+    commandLine += " '-E'";
     TinyProcessLib::Process proc(commandLine, std::string(),
                                  [&out](const char *bytes, size_t n) {
                                      out.append(bytes, n);
@@ -161,6 +162,7 @@ Client::Preprocessed Client::preprocess(const std::string &compiler, const std::
                                      err.append(bytes, n);
                                  });
     const int exit_status = proc.get_exit_status();
+    // printf("%s -> %d\n", commandLine.c_str(), exit_status);
     return Preprocessed { std::move(out), std::move(err), exit_status };
 }
 
@@ -294,5 +296,12 @@ unsigned long long Client::mono()
         return (time.tv_sec * static_cast<uint64_t>(1000)) + (time.tv_usec / static_cast<uint64_t>(1000));
     }
     return 0;
+}
+
+std::string Client::compilerSignature(const std::string &compiler)
+{
+    struct stat st;
+    if (!::stat(compiler.c_str(), &st)) {
+    }
 }
 
