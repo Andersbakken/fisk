@@ -18,5 +18,6 @@ std::string clientName();
 size_t localSlots(std::string *dir = 0);
 std::string envCache();
 bool noLocal();
+bool watchdog();
 }
 #endif /* CONFIG_H */

@@ -9,38 +9,15 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/sha.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-static inline std::string sha1(const std::string &str)
-{
-    std::string res(SHA_DIGEST_LENGTH, ' ');
-    SHA1(reinterpret_cast<const unsigned char *>(str.c_str()), str.size(), reinterpret_cast<unsigned char *>(&res[0]));
-    return res;
-}
-
-static inline std::string base64(const std::string &src)
-{
-    BIO *b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    BIO *sink = BIO_new(BIO_s_mem());
-    BIO_push(b64, sink);
-    BIO_write(b64, &src[0], src.size());
-    BIO_flush(b64);
-    const char *encoded;
-    const long len = BIO_get_mem_data(sink, &encoded);
-    return std::string(encoded, len);
-}
-
 static inline std::string create_acceptkey(const std::string& clientkey)
 {
     std::string s = clientkey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    return base64(sha1(s));
+    return Client::base64(Client::sha1(s));
 }
 
 static inline size_t random(void *data, size_t len)
@@ -128,7 +105,7 @@ WebSocket::~WebSocket()
         ::close(mFD);
 }
 
-bool WebSocket::connect(std::string &&url)
+bool WebSocket::connect(std::string &&url, const std::string &env)
 {
     mUrl = std::move(url);
     LUrlParser::clParseURL parsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
@@ -217,7 +194,7 @@ bool WebSocket::connect(std::string &&url)
 
     std::string random(16, ' ');
     ::random(&random[0], random.size());
-    const std::string client_key = base64(random);
+    const std::string client_key = Client::base64(random);
 
     {
         char reqHeader[4096];
@@ -229,8 +206,10 @@ bool WebSocket::connect(std::string &&url)
                                               "Connection: Upgrade\r\n"
                                               "Sec-WebSocket-Key: %s\r\n"
                                               "Sec-WebSocket-Version: 13\r\n"
+                                              "x-fisk-environ: %s\r\n"
                                               "\r\n",
-                                              parsedUrl.m_Path.c_str(), host.c_str(), port, client_key.c_str());
+                                              parsedUrl.m_Path.c_str(), host.c_str(), port,
+                                              client_key.c_str(), env.c_str());
 
 
         size_t off = 0;

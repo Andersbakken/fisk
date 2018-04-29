@@ -16,7 +16,7 @@ public:
         Text,
         Binary
     };
-    bool connect(std::string &&url);
+    bool connect(std::string &&url, const std::string &env);
     bool send(Mode mode, const void *data, size_t len);
     bool process(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
 private:

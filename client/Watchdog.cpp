@@ -23,6 +23,9 @@ void Watchdog::transition(Stage stage)
 
 void Watchdog::start(const std::string &compiler, int argc, char **argv)
 {
+    if (!Config::watchdog())
+        return;
+
     sThread = std::thread([compiler, argc, argv]() {
             while (true) {
                 std::unique_lock<std::mutex> lock(Client::mutex());
@@ -57,6 +60,9 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
 
 void Watchdog::stop()
 {
+    if (!Config::watchdog())
+        return;
+
     {
         std::unique_lock<std::mutex> lock(Client::mutex());
         assert(!sStopped);
@@ -65,4 +71,3 @@ void Watchdog::stop()
     }
     sThread.join();
 }
-

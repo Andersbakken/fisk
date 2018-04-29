@@ -11,7 +11,7 @@ void Log::log(Level /* level */, const std::string &string)
 
 void Log::log(Level level, const char *fmt, va_list args)
 {
-    log(level, Client::format(fmt, args));
+    log(level, Client::vformat(fmt, args));
 }
 
 void Log::debug(const char *fmt, ...)

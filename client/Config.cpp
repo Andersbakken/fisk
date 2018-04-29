@@ -132,7 +132,6 @@ size_t Config::localSlots(std::string *dir)
     return ret;
 }
 
-
 bool Config::noLocal()
 {
     json11::Json val = value("no_local");
@@ -151,4 +150,13 @@ std::string Config::envCache()
         return home + std::string("/.cache/fisk/env");
     }
     return std::string();
+}
+
+bool Config::watchdog()
+{
+    json11::Json val = value("watchdog");
+    if (val.is_bool()) {
+        return val.bool_value();
+    }
+    return true;
 }
