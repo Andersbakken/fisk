@@ -6,20 +6,17 @@
 #include <cstdint>
 #include <vector>
 
-class Config
+namespace Config
 {
-public:
-    Config();
-    std::string scheduler() const;
-    unsigned long long schedulerConnectTimeout() const;
-    unsigned long long acquiredSlaveTimeout() const;
-    unsigned long long slaveConnectTimeout() const;
-    unsigned long long responseTimeout() const;
-    std::string clientName() const;
-    size_t localSlots(std::string *dir = 0) const;
-    bool noLocal() const;
-private:
-    json11::Json operator[](const std::string &value) const;
-    std::vector<json11::Json> mJSON;
-};
+void init();
+std::string scheduler();
+unsigned long long schedulerConnectTimeout();
+unsigned long long acquiredSlaveTimeout();
+unsigned long long slaveConnectTimeout();
+unsigned long long responseTimeout();
+std::string clientName();
+size_t localSlots(std::string *dir = 0);
+std::string envCache();
+bool noLocal();
+}
 #endif /* CONFIG_H */
