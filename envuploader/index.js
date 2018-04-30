@@ -55,8 +55,8 @@ function makeTarball()
 
         package.on('close', (code) => {
             if (!code) {
-                let lines = out.split('\n');
-                var line = lines[lines.length - 1] || lines[lines.length - 2];
+                let lines = out.split('\n').filter(x => x);
+                var line = lines[lines.length - 1]
                 console.log(lines);
                 console.log("This is it", line);
                 tarball = line.split(" ")[1];
@@ -110,6 +110,7 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
     ws.send(JSON.stringify({ hash: argv.hash, bytes: size, host: argv.host }));
     console.log("sent text message", size);
     const chunkSize = 16384;
+    let sent = 0;
     let buf = Buffer.allocUnsafe(chunkSize);
     for (let i=0; i<size; i += chunkSize) {
         let s = Math.min(size - i, chunkSize);
@@ -119,8 +120,10 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         if (fs.readSync(f, buf, 0, s) != s) {
             die("Failed to read bytes from enviroment");
         }
+        sent += s;
         ws.send(buf);
     }
+    console.log(`sent ${sent} bytes`);
 }).catch((err) => {
     die(err);
 });
