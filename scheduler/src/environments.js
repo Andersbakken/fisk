@@ -2,16 +2,16 @@ const fs = require("fs-extra");
 const mkdirp = require("mkdirp");
 const path = require("path");
 
-const send = {
+const socket = {
     _queue: [],
     _sending: false,
 
     enqueue: function enqueue(client, file, skip) {
-        send._queue.push({ client: client, file: file, skip });
-        if (!send._sending) {
-            send._next().then(() => {
-                if (send._queue.length > 0) {
-                    process.nextTick(send._next);
+        socket._queue.push({ client: client, file: file, skip });
+        if (!socket._sending) {
+            socket._next().then(() => {
+                if (socket._queue.length > 0) {
+                    process.nextTick(socket._next);
                 }
             }).catch(e => {
                 console.error(e);
@@ -20,8 +20,8 @@ const send = {
     },
 
     _next() {
-        send._sending = true;
-        const q = send._queue.shift();
+        socket._sending = true;
+        const q = socket._queue.shift();
         let size;
         return new Promise((resolve, reject) => {
             const data = {};
@@ -45,7 +45,7 @@ const send = {
                 let remaining = size;
                 const readNext = () => {
                     if (!remaining) {
-                        send._sending = false;
+                        socket._sending = false;
                         resolve();
                     }
                     const bytes = Math.min(bufsiz, remaining);
@@ -63,7 +63,7 @@ const send = {
                 };
                 readNext();
             }).catch(e => {
-                send._sending = false;
+                socket._sending = false;
                 reject(e);
             });
         });
@@ -88,7 +88,7 @@ class Environment {
     }
 
     send(client) {
-        send.enqueue(client, path.join(this._path, this._file), this._hostlen);
+        socket.enqueue(client, path.join(this._path, this._file), this._hostlen);
     }
 }
 
