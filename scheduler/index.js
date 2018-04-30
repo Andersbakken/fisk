@@ -36,12 +36,10 @@ server.on("slave", function(slave) {
 server.on("compile", function(compile) {
     let file;
     compile.on("job", function(request) {
-        /*
-        if (!(request.environment in environments)) {
+        if (!Environments.hasEnvironment(request.environment)) {
             compile.send("slave", { needsEnvironment: true });
             return;
         }
-        */
 
         let best = { load: Infinity };
         for (let ip in slaves) {

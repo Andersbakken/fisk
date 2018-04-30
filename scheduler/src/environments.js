@@ -145,14 +145,16 @@ class File {
                 resolve();
                 return;
             }
+            this._headerWritten = true;
+
             const buf = Buffer.from(this.host, "utf8");
             const hdr = Buffer.alloc(4);
 
             this.hostlen = buf.length + 4;
 
             hdr.writeUInt32LE(buf.length, 0);
+            // console.log("writing header", buf.length + 4);
             fs.write(this._fd, Buffer.concat([hdr, buf], buf.length + 4)).then(() => {
-                this._headerWritten = true;
                 resolve();
             }).catch(e => {
                 reject(e);
@@ -170,6 +172,7 @@ const environments = {
             fs.stat(path).then(st => {
                 if (st.isDirectory()) {
                     // we're good
+                    environments._path = path;
                     environments._read(path).then(() => {
                         resolve();
                     }).catch(e => {
@@ -187,6 +190,7 @@ const environments = {
                             return;
                         }
                         // we're good
+                        environments._path = path;
                         resolve();
                     });
                 } else {
@@ -209,12 +213,21 @@ const environments = {
         environments._environs.push(new Environment(file.path, file.environ, file.host, file.hostlen));
     },
 
+    hasEnvironment: function hasEnvironment(hash) {
+        for (var i = 0; i < environments._environs.length; ++i) {
+            const env = environments._environs[i];
+            if (env.hash === hash) {
+                return true;
+            }
+        }
+        return false;
+    },
+
     get environments() {
         return environments._environs;
     },
 
     _read(p) {
-        environments._path = p;
         return new Promise((resolve, reject) => {
             fs.readdir(p).then(files => {
                 let envs = files.filter(e => e.endsWith(".tar.gz"));
