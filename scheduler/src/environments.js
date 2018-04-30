@@ -266,7 +266,8 @@ const environments = {
                     }
                     const env = envs.shift();
                     let data = {};
-                    fs.open(path.join(p, env)).then(fd => {
+
+                    fs.open(path.join(p, env), "r").then(fd => {
                         data.fd = fd;
                         data.buf = Buffer.alloc(1024);
                         return fs.read(fd, data.buf, 0, 1024);
@@ -282,10 +283,12 @@ const environments = {
                         const hostlen = data.buf.readUInt32LE(0);
                         const host = data.buf.toString("utf8", 4, hostlen);
                         environments._environs.push(new Environment(p, env, host, hostlen));
+                        process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {
                             fs.closeSync(data.fd);
                         }
+                        console.error(e);
                         process.nextTick(next);
                     });
                 };
