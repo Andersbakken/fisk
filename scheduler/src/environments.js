@@ -97,6 +97,7 @@ class File {
         this._fd = fs.openSync(path, "w");
         this._headerWritten = false;
         this._pending = [];
+        this._writing = false;
 
         this.path = path;
         this.environ = environ;
@@ -109,7 +110,8 @@ class File {
             throw new Error(`No fd for ${this._path}`);
         return new Promise((resolve, reject) => {
             this._pending.push({ data: data, resolve: resolve, reject: reject });
-            if (this._pending.length === 1) {
+            if (!this._writing) {
+                this._writing = true;
                 this._write();
             }
         });
@@ -137,6 +139,8 @@ class File {
 
                 if (this._pending.length > 0) {
                     process.nextTick(() => { this._write(); });
+                } else {
+                    this._writing = false;
                 }
             }).catch(e => {
                 fs.closeSync(this._fd);
