@@ -24,25 +24,19 @@ const socket = {
         const q = socket._queue.shift();
         let size;
         return new Promise((resolve, reject) => {
-            const data = {};
             fs.stat(q.file).then(st => {
                 if (!st.isFile())
                     throw new Error(`${q.file} not a file`);
                 size = st.size;
                 return fs.open(q.file);
             }).then(fd => {
-                // discard x number of bytes
-                // no seek? nice going node
-                data.fd = fd;
-                const gah = Buffer.alloc(q.skip);
-                return fs.read(fd, gah, 0, q.skip);
-            }).then(() => {
                 // send file size to client
                 q.client.send({ type: "environment", bytes: size });
                 // read file in chunks and send
                 const bufsiz = 32768;
                 const buf = Buffer.alloc(bufsiz);
                 let remaining = size;
+                let from = q.skip;
                 const readNext = () => {
                     if (!remaining) {
                         socket._sending = false;
@@ -50,7 +44,8 @@ const socket = {
                     }
                     const bytes = Math.min(bufsiz, remaining);
                     remaining -= bytes;
-                    fs.read(data.fd, buf, 0, bytes).then(() => {
+                    fs.read(fd, buf, 0, bytes, from).then(() => {
+                        from = undefined;
                         if (bytes === bufsiz) {
                             q.client.send(buf);
                         } else {
@@ -60,6 +55,7 @@ const socket = {
                     }).catch(e => {
                         throw e;
                     });
+                    from = undefined;
                 };
                 readNext();
             }).catch(e => {
