@@ -39,6 +39,7 @@ public:
     Stream &operator=(Stream &&other)
     {
         mData = std::move(other.mData);
+        return *this;
     }
 
     template <typename T>
@@ -46,6 +47,7 @@ public:
     {
         if (mData)
             mData->stream << t;
+        return *this;
     }
 private:
     Stream(const Stream &) = delete;

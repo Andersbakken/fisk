@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     Config::init();
 
     std::vector<std::string> args(argc);
-    for (size_t i=0; i<argc; ++i) {
+    for (int i=0; i<argc; ++i) {
         // printf("%zu: %s\n", i, argv[i]);
         args[i] = argv[i];
     }
@@ -52,9 +52,9 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    const std::string signature = Client::environmentSignature(compiler);
-    Log::info("Got signature %s for %s", signature.c_str(), compiler.c_str());
-    if (!websocket.connect(Config::scheduler(), signature)) {
+    const std::string hash = Client::environmentHash(compiler);
+    Log::info("Got hash %s for %s", hash.c_str(), compiler.c_str());
+    if (!websocket.connect(Config::scheduler() + "/compile", hash)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     //     return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     // }
 
-    if (!websocket.process([&compiler, argc, argv](WebSocket::Mode type, const void *data, size_t len) {
+    if (!websocket.process([&compiler, &hash, argc, argv](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
                     std::string err;
                     json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
@@ -82,20 +82,35 @@ int main(int argc, char **argv)
                         return;
                     }
                     printf("GOT JSON\n%s\n", msg.dump().c_str());
-                    if (msg["type"].string_value() == "slave" && msg["needs_environment"].bool_value()) {
+                    if (msg["type"].string_value() == "needsEnvironment") {
                         const std::string execPath = Client::findExecutablePath(argv[0]);
                         std::string dirname;
                         Client::parsePath(execPath.c_str(), 0, &dirname);
+                        Log::error("BALLS [%s] [%s] [%s]",
+                                   argv[0], execPath.c_str(), dirname.c_str());
                         if (execPath.empty() || dirname.empty()) {
                             Log::error("Failed to get current directory");
                             Watchdog::stop();
                             Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
                             return;
                         }
-                        char buf[PATH_MAX];
-                        realpath(dirname.c_str(), buf);
-                        system(Client::format("bash -c \"'%s' '%s/../envuploader/index.js' & disown\"", buf,
-                                              Config::node().c_str()).c_str());
+#ifdef __APPLE__
+                        const char *host = "Darwin x86_64:";
+#elif defined(__linux__) && defined(__i686)
+                        const char *host = "Linux i686:"
+#elif defined(__linux__) && defined(__x86_64)
+                        const char *host = "Linux x86_64:";
+#else
+#error unsupported platform
+#endif
+
+                        std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './index.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
+                                                             dirname.c_str(), Config::node().c_str(), Config::scheduler().c_str(), host, hash.c_str(), compiler.c_str());
+
+                        Log::debug("system(\"%s\")", command.c_str());
+                        system(command.c_str());
+                        Watchdog::stop();
+                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
                     }
                     // printf("Got message: \n");
                     // fwrite(data, 1, len, stdout);

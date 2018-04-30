@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wformat -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 find_package(OpenSSL REQUIRED)
 add_executable(fiskc Client.cpp CompilerArgs.cpp Config.cpp Log.cpp Watchdog.cpp WebSocket.cpp main.cpp)

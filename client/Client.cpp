@@ -233,7 +233,7 @@ int Client::runLocal(const std::string &exec, int argc, char **argv, std::unique
     auto run = [&exec, argc, argv]() {
         char **argvCopy = new char*[argc + 1];
         argvCopy[0] = strdup(exec.c_str());
-        for (size_t i=1; i<argc; ++i) {
+        for (int i=1; i<argc; ++i) {
             argvCopy[i] = argv[i];
         }
         argvCopy[argc] = 0;
@@ -298,7 +298,7 @@ unsigned long long Client::mono()
     return 0;
 }
 
-std::string Client::environmentSignature(const std::string &compiler)
+std::string Client::environmentHash(const std::string &compiler)
 {
     struct stat st;
     if (::stat(compiler.c_str(), &st)) {
@@ -336,7 +336,7 @@ std::string Client::environmentSignature(const std::string &compiler)
             std::string contents(size, ' ');
             const size_t read = fread(&contents[0], 1, size, f);
             fclose(f);
-            if (read != size) {
+            if (read != static_cast<size_t>(size)) {
                 Log::error("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
             } else {
                 std::string err;
@@ -385,43 +385,18 @@ std::string Client::environmentSignature(const std::string &compiler)
 
 std::string Client::findExecutablePath(const char *argv0)
 {
-    {
-        assert(argv0);
-        std::string p = argv0;
-        if (fileType(p) == File) {
-            if (p[0] == '/')
-                return p;
-
-            if (!strncmp(p.c_str(), "./", 2)) 
-                p.erase(0, 2);
-            char buf[PATH_MAX];
-            if (!getcwd(buf, sizeof(buf)))
-                return std::string();
-            p.insert(0, buf);
-            if (fileType(p) == File) {
-                return p;
-            }
-        }
-    }
-    const char *path = getenv("PATH");
-
-    const std::vector<std::string> paths = split(path, ":");
-    for (size_t i=0; i<paths.size(); ++i) {
-        const std::string p = (paths.at(i) + "/") + argv0;
-        if (fileType(p) == File) {
-            return p;
-        }
-    }
 #if defined(__linux__)
     char buf[32];
     const int w = snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid());
     std::string p(buf, w);
     if (fileType(p) == Symlink) {
         char buf[PATH_MAX];
-        if (readlink(p.c_str(), buf, sizeof(buf)) > 0) {
-            p = buf;
-            if (fileType(p) == File)
+        const ssize_t len = readlink(p.c_str(), buf, sizeof(buf));
+        if (len > 0) {
+            p.assign(buf, len);
+            if (fileType(p) == File) {
                 return p;
+            }
         }
     }
 #elif defined(__APPLE__)
