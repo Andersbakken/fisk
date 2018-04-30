@@ -211,7 +211,6 @@ bool WebSocket::connect(std::string &&url, const std::string &env)
                                               parsedUrl.m_Path.c_str(), host.c_str(), port,
                                               client_key.c_str(), env.c_str());
 
-
         size_t off = 0;
         while (off < reqHeaderSize) {
             ssize_t r;
@@ -293,6 +292,17 @@ bool WebSocket::process(std::function<void(Mode mode, const void *data, size_t l
     if (wslay_event_want_write(mContext))
         FD_SET(mFD, &w);
     const int ret = select(mFD + 1, &r, &w, 0, 0);
+
+    bool error = false;
+    if (FD_ISSET(mFD, &r)) {
+        if (wslay_event_recv(mContext) != 0)
+            error = true;
+    }
+    if (FD_ISSET(mFD, &w)) {
+        if (wslay_event_send(mContext) != 0)
+            error = true;
+    }
+    printf("Selected %d\n", ret);
     assert(ret);
     mOnMessage = nullptr;
     return ret > 0;

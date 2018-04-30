@@ -71,11 +71,35 @@ int main(int argc, char **argv)
     //     return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     // }
 
-    if (!websocket.process([](WebSocket::Mode type, const void *data, size_t len) {
+    if (!websocket.process([&compiler, argc, argv](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
-                    printf("Got message: \n");
-                    fwrite(data, 1, len, stdout);
-                    printf("\n");
+                    std::string err;
+                    json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
+                    if (!err.empty()) {
+                        Log::error("Failed to parse json from scheduler: %s", err.c_str());
+                        Watchdog::stop();
+                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                        return;
+                    }
+                    printf("GOT JSON\n%s\n", msg.dump().c_str());
+                    if (msg["type"].string_value() == "slave" && msg["needs_environment"].bool_value()) {
+                        const std::string execPath = Client::findExecutablePath(argv[0]);
+                        std::string dirname;
+                        Client::parsePath(execPath.c_str(), 0, &dirname);
+                        if (execPath.empty() || dirname.empty()) {
+                            Log::error("Failed to get current directory");
+                            Watchdog::stop();
+                            Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                            return;
+                        }
+                        char buf[PATH_MAX];
+                        realpath(dirname.c_str(), buf);
+                        system(Client::format("bash -c \"'%s' '%s/../envuploader/index.js' & disown\"", buf,
+                                              Config::node().c_str()).c_str());
+                    }
+                    // printf("Got message: \n");
+                    // fwrite(data, 1, len, stdout);
+                    // printf("\n");
                 } else {
                     printf("Got binary message: %zu bytes\n", len);
                 }

@@ -318,17 +318,8 @@ std::string Client::environmentSignature(const std::string &compiler)
             Log::error("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
             return std::string();
         }
-#ifdef __APPLE__
-        const char *arch = "Darwin:x86_64:";
-#elif defined(__linux__) && defined(__i686)
-        const char *arch = "Linux:i686:"
-#elif defined(__linux__) && defined(__x86_64)
-        const char *arch = "Linux:x86_64:";
-#else
-#error unsupported platform
-#endif
 
-        return arch + Client::base64(Client::sha1(out + err));
+        return Client::base64(Client::sha1(out + err));
     };
     const std::string cache = Config::envCache();
     if (cache.empty())
@@ -392,3 +383,61 @@ std::string Client::environmentSignature(const std::string &compiler)
     return ret;
 }
 
+std::string Client::findExecutablePath(const char *argv0)
+{
+    {
+        assert(argv0);
+        std::string p = argv0;
+        if (fileType(p) == File) {
+            if (p[0] == '/')
+                return p;
+
+            if (!strncmp(p.c_str(), "./", 2)) 
+                p.erase(0, 2);
+            char buf[PATH_MAX];
+            if (!getcwd(buf, sizeof(buf)))
+                return std::string();
+            p.insert(0, buf);
+            if (fileType(p) == File) {
+                return p;
+            }
+        }
+    }
+    const char *path = getenv("PATH");
+
+    const std::vector<std::string> paths = split(path, ":");
+    for (size_t i=0; i<paths.size(); ++i) {
+        const std::string p = (paths.at(i) + "/") + argv0;
+        if (fileType(p) == File) {
+            return p;
+        }
+    }
+#if defined(__linux__)
+    char buf[32];
+    const int w = snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid());
+    std::string p(buf, w);
+    if (fileType(p) == Symlink) {
+        char buf[PATH_MAX];
+        if (readlink(p.c_str(), buf, sizeof(buf)) > 0) {
+            p = buf;
+            if (fileType(p) == File)
+                return p;
+        }
+    }
+#elif defined(__APPLE__)
+    // {
+    //     char buf[PATH_MAX];
+    //     uint32_t size = sizeof(buf);
+    //     if (_NSGetExecutablePath(buf, &size) == 0) {
+    //         sExecutablePath = std::string(buf, size).followLink();
+    //         if (sExecutablePath.isFile())
+    //             return;
+    //     }
+    // }
+#error not done
+#else
+#warning Unknown platform.
+#endif
+
+    return std::string();
+}

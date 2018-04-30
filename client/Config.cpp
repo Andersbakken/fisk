@@ -160,3 +160,11 @@ bool Config::watchdog()
     }
     return true;
 }
+
+std::string Config::node()
+{
+    json11::Json val = value("node");
+    if (val.is_string())
+        return val.string_value();
+    return "node";
+}

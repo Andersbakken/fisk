@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <memory>
 #include <mutex>
+#include <string.h>
+#include <vector>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
@@ -99,7 +101,45 @@ inline std::string base64(const std::string &src)
     return std::string(encoded, len);
 }
 
+inline std::vector<std::string> split(const std::string &str, const std::string &delim)
+{
+    std::vector<std::string> ret;
+    size_t start = 0U;
+    size_t end = str.find(delim);
+    while (end != std::string::npos) {
+        ret.push_back(str.substr(start, end - start));
+        start = end + delim.length();
+        end = str.find(delim, start);
+    }
+    return ret;
+}
+
+enum FileType {
+    File,
+    Directory,
+    Symlink,
+    Invalid
+};
+
+inline FileType fileType(const std::string &path, struct stat *st = 0)
+{
+    struct stat dummy;
+    struct stat &stat = st ? *st : dummy;
+    memset(&stat, 0, sizeof(struct stat));
+    if (::stat(path.c_str(), &stat))
+        return Invalid;
+
+    if (S_ISREG(stat.st_mode))
+        return File;
+    if (S_ISDIR(stat.st_mode))
+        return Directory;
+    if (S_ISLNK(stat.st_mode))
+        return Symlink;
+    return Invalid;
+}
+
 std::string environmentSignature(const std::string &compiler);
+std::string findExecutablePath(const char *argv0);
 }
 
 #endif /* CLIENT_H */
