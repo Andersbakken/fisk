@@ -19,5 +19,6 @@ size_t localSlots(std::string *dir = 0);
 std::string envCache();
 bool noLocal();
 bool watchdog();
+std::string node();
 }
 #endif /* CONFIG_H */
