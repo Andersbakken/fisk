@@ -150,7 +150,7 @@ class File {
 
             this.hostlen = buf.length + 4;
 
-            hdr.buf.writeUInt32LE(buf.length, 0);
+            hdr.writeUInt32LE(buf.length, 0);
             fs.write(this._fd, Buffer.concat([hdr, buf], buf.length + 4)).then(() => {
                 this._headerWritten = true;
                 resolve();
