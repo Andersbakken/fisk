@@ -67,10 +67,9 @@ const socket = {
 };
 
 class Environment {
-    constructor(path, file, host, hostlen) {
+    constructor(path, hash, host, hostlen) {
         this._path = path;
-        this._file = file;
-        this._hash = file.substr(0, file.length - 7);
+        this._hash = hash;
         this._host = host;
         this._hostlen = hostlen;
     }
@@ -83,8 +82,12 @@ class Environment {
         return this._host;
     }
 
+    get file() {
+        return this._hash + ".tar.gz";
+    }
+
     send(client) {
-        socket.enqueue(client, path.join(this._path, this._file), this._hostlen);
+        socket.enqueue(client, path.join(this._path, this.file), this._hostlen);
     }
 }
 
@@ -282,7 +285,7 @@ const environments = {
                     }).then(() => {
                         const hostlen = data.buf.readUInt32LE(0);
                         const host = data.buf.toString("utf8", 4, hostlen);
-                        environments._environs.push(new Environment(p, env, host, hostlen));
+                        environments._environs.push(new Environment(p, env.substr(0, -7), host, hostlen));
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {
