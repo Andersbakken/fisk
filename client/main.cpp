@@ -59,17 +59,17 @@ int main(int argc, char **argv)
         Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
-    json11::Json my_json = json11::Json::object {
-        { "client", Config::clientName() },
-        { "type", "shitballs" }
-    };
-    const std::string msg = my_json.dump();
+    // json11::Json my_json = json11::Json::object {
+    //     { "client", Config::clientName() },
+    //     { "type", "compile" }
+    // };
+    // const std::string msg = my_json.dump();
 
-    if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size())) {
-        Log::debug("Have to run locally because no send");
-        Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-    }
+    // if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size())) {
+    //     Log::debug("Have to run locally because no send");
+    //     Watchdog::stop();
+    //     return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+    // }
 
     if (!websocket.process([](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
