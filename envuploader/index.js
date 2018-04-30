@@ -8,10 +8,10 @@ const silent = argv.silent;
 let tarball;
 let scheduler;
 
-if (!argv.scheduler || !argv.environ || !argv.compiler) {
+if (!argv.scheduler || !argv.hash || !argv.compiler || !argv.arch) {
     console.log(argv);
     if (!silent) {
-        console.error("Bad args, need --scheduler, --environ and --compiler");
+        console.error("Bad args, need --scheduler, --hash, --arch and --compiler");
     }
     process.exit(1);
 }
@@ -77,7 +77,7 @@ function connectWs()
                                  [],
                                  {
                                      'headers': {
-                                         'x-fisk-environ': argv.environ
+                                         'x-fisk-hash': argv.hash
                                      }
                                  });
 
@@ -107,7 +107,7 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         die(`Failed to open file ${data[0]} for reading`);
     }
     
-    ws.send(JSON.stringify({ environ: argv.environ, bytes: size, type: "environ" }));
+    ws.send(JSON.stringify({ hash: argv.hash, bytes: size, type: "environ", arch: argv.arch }));
     console.log("sent text message", size);
     const chunkSize = 16384;
     let buf = Buffer.allocUnsafe(chunkSize);
