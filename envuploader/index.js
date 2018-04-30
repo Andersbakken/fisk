@@ -36,22 +36,32 @@ function die()
     process.exit(1);
 }
 
+let createEnvProc
+process.on('SIGINT', () => { process.exit(); });
+
+process.on('exit', () => {
+    if (!silent)
+        console.log("exit", typeof createEnvProc);
+    if (createEnvProc)
+        createEnvProc.kill(9);
+});
+
 function makeTarball()
 {
     return new Promise((resolve, reject) => {
         let out = "";
         let err = "";
 
-        const package = child_process.spawn(`${__dirname}/icecc-create-env`, [ argv.compiler ], { shell: true, cwd: "/tmp" });
-        package.stdout.on('data', (data) => {
+        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: "/tmp" });
+        createEnvProc.stdout.on('data', (data) => {
             out += data;
         });
 
-        package.stderr.on('data', (data) => {
+        createEnvProc.stderr.on('data', (data) => {
             err += data;
         });
 
-        package.on('close', (code) => {
+        createEnvProc.on('close', (code) => {
             if (!code) {
                 let lines = out.split('\n').filter(x => x);
                 if (!silent) {
@@ -84,13 +94,20 @@ function connectWs()
                                  });
 
 
-        ws.on('open', function open() {
+        ws.on('open', () => {
             resolve(ws);
         });
 
-        ws.on('message', function incoming(data) {
+        ws.on('message', data => {
             if (!silent)
                 console.log("Got message from scheduler", data);
+        });
+        ws.on('error', err => {
+            if (!silent)
+                console.error("Got error", err);
+        });
+        ws.on('close', () => {
+            process.exit();
         });
     });
 }
