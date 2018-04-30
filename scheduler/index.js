@@ -59,20 +59,30 @@ server.on("compile", function(compile) {
             compile.send("slave", {});
         }
     });
-    compile.on("environment", function(environ) {
+    compile.on("error", function(msg) {
+        console.error(`compile error '${msg}' from ${compile.ip}`);
+    });
+    compile.on("close", function() {
+        compile.removeAllListeners();
+    });
+});
+
+server.on("uploadEnvironment", function(upload) {
+    let file;
+    upload.on("environment", function(environ) {
         file = Environments.prepare(environ);
         if (!file) {
             // we already have this environment
             console.error("already got environment", environ.message);
-            compile.send({ error: "already got environment" });
-            compile.close();
+            upload.send({ error: "already got environment" });
+            upload.close();
         }
     });
-    compile.on("environmentdata", function(environ) {
+    upload.on("environmentdata", function(environ) {
         if (!file) {
             console.error("no pending file");
-            compile.send({ error: "no pending file" });
-            compile.close();
+            upload.send({ error: "no pending file" });
+            upload.close();
         }
         file.save(environ.data).then(() => {
             if (environ.last) {
@@ -94,15 +104,15 @@ server.on("compile", function(compile) {
             file = undefined;
         });
     });
-    compile.on("error", function(msg) {
-        console.error(`compile error '${msg}' from ${compile.ip}`);
+    upload.on("error", function(msg) {
+        console.error(`upload error '${msg}' from ${upload.ip}`);
         if (file) {
             file.discard();
             file = undefined;
         }
     });
-    compile.on("close", function() {
-        compile.removeAllListeners();
+    upload.on("close", function() {
+        upload.removeAllListeners();
         if (file) {
             file.discard();
             file = undefined;

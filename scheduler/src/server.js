@@ -41,7 +41,8 @@ class Client extends EventEmitter {
 
 Client.Type = {
     Slave: 0,
-    Compile: 1
+    Compile: 1,
+    UploadEnvironment: 2
 };
 
 class Server extends EventEmitter {
@@ -96,67 +97,76 @@ class Server extends EventEmitter {
             client = new Client(ws, ip, Client.Type.Slave);
             this.emit("slave", client);
             break;
+        case "/uploadenvironment":
+            client = new Client(ws, ip, Client.Type.UploadEnvironment);
+            this.emit("uploadEnvironment", client);
+
+            ws.on("message", msg => {
+                switch (typeof msg) {
+                case "string":
+                    if (remaining.bytes) {
+                        // bad, client have to send all the data in a binary message before sending JSON
+                        error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
+                        return;
+                    }
+                    // assume JSON
+                    let json;
+                    try {
+                        json = JSON.parse(msg);
+                    } catch (e) {
+                    }
+                    if (json === undefined) {
+                        error("Unable to parse string message as JSON");
+                        return;
+                    }
+                    if (!("host" in json)) {
+                        error("Need a host property");
+                        return;
+                    }
+                    if (!("hash" in json)) {
+                        error("Need a hash property");
+                        return;
+                    }
+                    if (!("bytes" in json)) {
+                        error("Need a bytes property");
+                        return;
+                    }
+
+                    remaining.type = "environmentdata";
+                    remaining.bytes = json.bytes;
+
+                    client.emit("environment", json);
+
+                    break;
+                case "object":
+                    if (msg instanceof Buffer) {
+                        if (!msg.length) {
+                            // no data?
+                            error("No data in buffer");
+                            return;
+                        }
+                        if (!remaining.bytes) {
+                            error("Got binary message without a preceeding json message describing the data");
+                            return;
+                        }
+                        if (msg.length > remaining.bytes) {
+                            // woops
+                            error(`length ${msg.length} > ${remaining.bytes}`);
+                            return;
+                        }
+                        remaining.bytes -= msg.length;
+                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                    }
+                    break;
+                }
+            });
+
+            break;
         default:
             error(`Invalid pathname ${url.pathname}`);
             return;
         }
 
-        ws.on("message", msg => {
-            switch (typeof msg) {
-            case "string":
-                if (remaining.bytes) {
-                    // bad, client have to send all the data in a binary message before sending JSON
-                    error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
-                    return;
-                }
-                // assume JSON
-                let json;
-                try {
-                    json = JSON.parse(msg);
-                } catch (e) {
-                }
-                if (json === undefined) {
-                    error("Unable to parse string message as JSON");
-                    return;
-                }
-                if ("type" in json) {
-                    switch (json.type) {
-                    case "environment":
-                        remaining.type = `${json.type}data`;
-                        remaining.bytes = json.bytes;
-                        client.emit(json.type, json);
-                        break;
-                    default:
-                        client.emit(json.type, json);
-                        break;
-                    }
-                } else {
-                    error("No type property in JSON");
-                    return;
-                }
-                break;
-            case "object":
-                if (msg instanceof Buffer) {
-                    if (!msg.length) {
-                        // no data?
-                        error("No data in buffer");
-                        return;
-                    }
-                    if (!remaining.bytes) {
-                        error("Got binary message without a preceeding json message describing the data");
-                        return;
-                    }
-                    if (msg.length > remaining.bytes) {
-                        // woops
-                        error(`length ${msg.length} > ${remaining.bytes}`);
-                        return;
-                    }
-                    remaining.bytes -= msg.length;
-                    client.emit(remaining.type, { data: msg, last: !remaining.bytes });
-                }
-                break;
-            }
-        });
         ws.on("close", () => {
             if (remaining.bytes)
                 client.emit("error", "Got close while reading a binary message");
