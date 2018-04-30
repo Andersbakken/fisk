@@ -81,13 +81,11 @@ int main(int argc, char **argv)
                         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
                         return;
                     }
-                    printf("GOT JSON\n%s\n", msg.dump().c_str());
+                    Log::debug("GOT JSON\n%s", msg.dump().c_str());
                     if (msg["type"].string_value() == "needsEnvironment") {
                         const std::string execPath = Client::findExecutablePath(argv[0]);
                         std::string dirname;
                         Client::parsePath(execPath.c_str(), 0, &dirname);
-                        Log::error("BALLS [%s] [%s] [%s]",
-                                   argv[0], execPath.c_str(), dirname.c_str());
                         if (execPath.empty() || dirname.empty()) {
                             Log::error("Failed to get current directory");
                             Watchdog::stop();
@@ -95,11 +93,11 @@ int main(int argc, char **argv)
                             return;
                         }
 #ifdef __APPLE__
-                        const char *host = "Darwin x86_64:";
+                        const char *host = "Darwin x86_64";
 #elif defined(__linux__) && defined(__i686)
-                        const char *host = "Linux i686:"
+                        const char *host = "Linux i686"
 #elif defined(__linux__) && defined(__x86_64)
-                        const char *host = "Linux x86_64:";
+                        const char *host = "Linux x86_64";
 #else
 #error unsupported platform
 #endif
@@ -112,9 +110,6 @@ int main(int argc, char **argv)
                         Watchdog::stop();
                         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
                     }
-                    // printf("Got message: \n");
-                    // fwrite(data, 1, len, stdout);
-                    // printf("\n");
                 } else {
                     printf("Got binary message: %zu bytes\n", len);
                 }
