@@ -8,10 +8,10 @@ const silent = argv.silent;
 let tarball;
 let scheduler;
 
-if (!argv.scheduler || !argv.hash || !argv.compiler || !argv.arch) {
+if (!argv.scheduler || !argv.hash || !argv.compiler || !argv.host) {
     console.log(argv);
     if (!silent) {
-        console.error("Bad args, need --scheduler, --hash, --arch and --compiler");
+        console.error("Bad args, need --scheduler, --hash, --host and --compiler");
     }
     process.exit(1);
 }
@@ -107,7 +107,7 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         die(`Failed to open file ${data[0]} for reading`);
     }
     
-    ws.send(JSON.stringify({ hash: argv.hash, bytes: size, type: "environ", arch: argv.arch }));
+    ws.send(JSON.stringify({ hash: argv.hash, bytes: size, host: argv.host }));
     console.log("sent text message", size);
     const chunkSize = 16384;
     let buf = Buffer.allocUnsafe(chunkSize);
