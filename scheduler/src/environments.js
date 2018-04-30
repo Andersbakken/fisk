@@ -96,6 +96,7 @@ class File {
     constructor(path, environ, host) {
         this._fd = fs.openSync(path, "w");
         this._headerWritten = false;
+        this._pending = [];
 
         this.path = path;
         this.environ = environ;
@@ -107,21 +108,10 @@ class File {
         if (!this._fd)
             throw new Error(`No fd for ${this._path}`);
         return new Promise((resolve, reject) => {
-            this._writeHeader().then(() => {
-                fs.write(this._fd, data).then(() => {
-                    resolve();
-                }).catch(e => {
-                    fs.closeSync(this._fd);
-                    this._fd = undefined;
-
-                    reject(e);
-                });
-            }).catch(e => {
-                fs.closeSync(this._fd);
-                this._fd = undefined;
-
-                reject(e);
-            });
+            this._pending.push({ data: data, resolve: resolve, reject: reject });
+            if (this._pending.length === 1) {
+                this._write();
+            }
         });
     }
 
@@ -137,6 +127,29 @@ class File {
             throw new Error(`No fd for ${this._path}`);
         fs.closeSync(this._fd);
         this._fd = undefined;
+    }
+
+    _write() {
+        const pending = this._pending.shift();
+        this._writeHeader().then(() => {
+            fs.write(this._fd, pending.data).then(() => {
+                pending.resolve();
+
+                if (this._pending.length > 0) {
+                    process.nextTick(() => { this._write(); });
+                }
+            }).catch(e => {
+                fs.closeSync(this._fd);
+                this._fd = undefined;
+                pending.reject(e);
+                this._clearPending(e);
+            });
+        }).catch(e => {
+            fs.closeSync(this._fd);
+            this._fd = undefined;
+            pending.reject(e);
+            this._clearPending(e);
+        });
     }
 
     _writeHeader() {
@@ -160,6 +173,16 @@ class File {
                 reject(e);
             });
         });
+    }
+
+    _clearPending(e) {
+        if (!this._pending)
+            return;
+
+        for (let i = 0; i < this._pending.length; ++i) {
+            this._pending[i].reject(e);
+        }
+        this._pending = undefined;
     }
 }
 
