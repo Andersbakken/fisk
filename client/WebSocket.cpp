@@ -305,6 +305,6 @@ bool WebSocket::process(std::function<void(Mode mode, const void *data, size_t l
     printf("Selected %d\n", ret);
     assert(ret);
     mOnMessage = nullptr;
-    return ret > 0;
+    return ret > 0 && !error;
 }
 

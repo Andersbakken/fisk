@@ -34,7 +34,7 @@ void Config::init()
         std::string contents(size, ' ');
         const size_t read = fread(&contents[0], 1, size, f);
         fclose(f);
-        if (read != size) {
+        if (read != static_cast<size_t>(size)) {
             Log::error("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
             return;
         }
@@ -59,7 +59,7 @@ std::string Config::scheduler()
     if (val.is_string())
         return val.string_value();
 
-    return "ws://localhost:8097/compile";
+    return "ws://localhost:8097";
 }
 
 unsigned long long Config::schedulerConnectTimeout()

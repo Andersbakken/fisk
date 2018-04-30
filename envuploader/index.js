@@ -38,9 +38,7 @@ function die()
 
 function makeTarball()
 {
-    console.log("Got called");
     return new Promise((resolve, reject) => {
-        console.log("balls", `${__dirname}/icecc-create-env`);
         let out = "";
         let err = "";
 
@@ -56,16 +54,20 @@ function makeTarball()
         package.on('close', (code) => {
             if (!code) {
                 let lines = out.split('\n').filter(x => x);
+                if (!silent) {
+                    console.log("output:\n" + out);
+                }
+
                 var line = lines[lines.length - 1]
-                console.log(lines);
-                console.log("This is it", line);
                 tarball = line.split(" ")[1];
-                console.log(tarball);
+                if (!silent)
+                    console.log("git tarball", tarball);
                 resolve(`/tmp/${tarball}`);
             } else {
                 die(`icecc-create-env exited with code: ${code}\n${err}`);
             }
-            console.log(`child process exited with code ${code}`);
+            if (!silent)
+                console.log(`child process exited with code ${code}`);
         });
     });
 }
@@ -106,10 +108,11 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
     if (!f) {
         die(`Failed to open file ${data[0]} for reading`);
     }
-    
+
     ws.send(JSON.stringify({ hash: argv.hash, bytes: size, host: argv.host }));
-    console.log("sent text message", size);
-    const chunkSize = 16384;
+    if (!silent)
+        console.log("sent text message", size);
+    const chunkSize = 64 * 1024;
     let sent = 0;
     let buf = Buffer.allocUnsafe(chunkSize);
     for (let i=0; i<size; i += chunkSize) {
@@ -123,7 +126,8 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         sent += s;
         ws.send(buf);
     }
-    console.log(`sent ${sent} bytes`);
+    if (!silent)
+        console.log(`sent ${sent} bytes`);
 }).catch((err) => {
     die(err);
 });

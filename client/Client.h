@@ -126,19 +126,22 @@ inline FileType fileType(const std::string &path, struct stat *st = 0)
     struct stat dummy;
     struct stat &stat = st ? *st : dummy;
     memset(&stat, 0, sizeof(struct stat));
-    if (::stat(path.c_str(), &stat))
+    if (lstat(path.c_str(), &stat)) {
+        printf("ERR [%s] %d %s\n", path.c_str(), errno, strerror(errno));
         return Invalid;
+    }
 
-    if (S_ISREG(stat.st_mode))
-        return File;
-    if (S_ISDIR(stat.st_mode))
-        return Directory;
     if (S_ISLNK(stat.st_mode))
         return Symlink;
+    if (S_ISDIR(stat.st_mode))
+        return Directory;
+    if (S_ISREG(stat.st_mode))
+        return File;
+    printf("BAD MODE %d\n", stat.st_mode);
     return Invalid;
 }
 
-std::string environmentSignature(const std::string &compiler);
+std::string environmentHash(const std::string &compiler);
 std::string findExecutablePath(const char *argv0);
 }
 

@@ -69,6 +69,7 @@ server.on("uploadEnvironment", function(upload) {
     let file;
     upload.on("environment", function(environ) {
         file = Environments.prepare(environ);
+        console.log("Got environment message", environ, typeof file);
         if (!file) {
             // we already have this environment
             console.error("already got environment", environ.message);
@@ -82,6 +83,7 @@ server.on("uploadEnvironment", function(upload) {
             upload.send({ error: "no pending file" });
             upload.close();
         }
+        console.log("Got environmentdata message", environ.data.length, environ.last);
         file.save(environ.data).then(() => {
             if (environ.last) {
                 file.close();
