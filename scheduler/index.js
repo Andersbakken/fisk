@@ -37,7 +37,7 @@ server.on("compile", function(compile) {
     let file;
     compile.on("job", function(request) {
         if (!Environments.hasEnvironment(request.environment)) {
-            compile.send("slave", { needsEnvironment: true });
+            compile.send({ type: "needsEnvironment" });
             return;
         }
 
