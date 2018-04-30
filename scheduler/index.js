@@ -87,6 +87,7 @@ server.on("uploadEnvironment", function(upload) {
         file.save(environ.data).then(() => {
             if (environ.last) {
                 file.close();
+                upload.close();
                 Environments.complete(file);
                 file = undefined;
                 // send any new environments to slaves
