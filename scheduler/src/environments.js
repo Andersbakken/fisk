@@ -72,6 +72,7 @@ class Environment {
         this._hash = hash;
         this._host = host;
         this._hostlen = hostlen;
+        console.log("Created environment", JSON.stringify(this));
     }
 
     get hash() {
@@ -242,6 +243,7 @@ const environments = {
     hasEnvironment: function hasEnvironment(hash) {
         for (var i = 0; i < environments._environs.length; ++i) {
             const env = environments._environs[i];
+            console.log(i, env.hash, hash, env.hash === hash);
             if (env.hash === hash) {
                 return true;
             }

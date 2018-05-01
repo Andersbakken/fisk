@@ -36,6 +36,7 @@ server.on("slave", function(slave) {
 server.on("compile", function(compile) {
     let file;
     compile.on("job", function(request) {
+        console.log("request", request.environment);
         if (!Environments.hasEnvironment(request.environment)) {
             compile.send({ type: "needsEnvironment" });
             return;
@@ -44,15 +45,18 @@ server.on("compile", function(compile) {
         let best = { load: Infinity };
         for (let ip in slaves) {
             let slave = slaves[ip];
-            if ("load" in slave && "environments" in slave) {
+            console.log("GOT SLAVE", slave);
+            if ("load" in slave /* && "environments" in slave*/) {
                 if (/*slave.environments.indexOf(request.environment) !== -1 &&*/ slave.load < best.load) {
                     best.load = slave.load;
                     best.ip = ip;
+                    best.slavePort = slave.client.slavePort;
                 }
             }
         }
+        console.log("best", best);
         if (best.load < Infinity) {
-            compile.send("slave", { ip: best.ip });
+            compile.send("slave", { ip: best.ip, port: best.slavePort });
         } else {
             compile.send("slave", {});
         }
@@ -94,7 +98,7 @@ server.on("uploadEnvironment", function(upload) {
                 for (var ip in slaves) {
                     let slave = slaves[ip];
                     for (var ek in Environments.environments) {
-                        if (slave.environments.indexOf(ek) === -1) {
+                        if (slave.environments && slave.environments.indexOf(ek) === -1) {
                             Environments.environments[ek].send(slave.client);
                         }
                     }

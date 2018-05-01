@@ -8,11 +8,10 @@ const BinaryTypes = {
 };
 
 class Client extends EventEmitter {
-    constructor(ws, ip, type) {
+    constructor(obj) {
         super();
-        this.ws = ws;
-        this.ip = ip;
-        this.type = type;
+        for (let key in obj)
+            this[key] = obj[key];
     }
 
     send(type, msg) {
@@ -54,8 +53,8 @@ class Server extends EventEmitter {
 
     listen() {
         this.ws = new WebSocket.Server({
-            port: this.option("port", 8097),
-            backlog: this.option("backlog", 50)
+            port: this.option.int("port", 8097),
+            backlog: this.option.int("backlog", 50)
         });
         console.log("listening on", this.ws.options.port);
         this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
@@ -64,7 +63,10 @@ class Server extends EventEmitter {
     _handleConnection(ws, req) {
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
-        const ip = req.connection.remoteAddress;
+        let ip = req.connection.remoteAddress;
+        if (ip.substr(0, 7) == "::ffff:") {
+            ip = ip.substr(7);
+        }
 
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
@@ -86,7 +88,7 @@ class Server extends EventEmitter {
             }
             const environ = req.headers["x-fisk-environ"];
 
-            client = new Client(ws, ip, Client.Type.Compile);
+            client = new Client({ws: ws, ip: ip, type: Client.Type.Compile});
             this.emit("compile", client);
 
             process.nextTick(() => {
@@ -94,11 +96,29 @@ class Server extends EventEmitter {
             });
             break;
         case "/slave":
-            client = new Client(ws, ip, Client.Type.Slave);
+            if (!("x-fisk-slave-port" in req.headers)) {
+                error("No x-fisk-slave-port header");
+                return;
+            }
+            const slavePort = parseInt(req.headers["x-fisk-slave-port"]);
+            client = new Client({ws: ws, ip: ip, slavePort: slavePort, type: Client.Type.Slave});
+            ws.on("message", msg => {
+                let json;
+                try {
+                    json = JSON.parse(msg);
+                } catch (e) {
+                }
+                if (json === undefined) {
+                    error("Unable to parse string message as JSON");
+                    return;
+                }
+                if ("type" in json)
+                    client.emit(json.type, json);
+            });
             this.emit("slave", client);
             break;
         case "/uploadenvironment":
-            client = new Client(ws, ip, Client.Type.UploadEnvironment);
+            client = new Client({ws: ws, ip: ip, type: Client.Type.UploadEnvironment});
             this.emit("uploadEnvironment", client);
 
             ws.on("message", msg => {
