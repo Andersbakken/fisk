@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Andersbakken/fisk#readme",
   "dependencies": {
     "@jhanssen/options": "^1.0.8",
+    "mktemp": "^0.4.0",
     "ws": "^5.1.1"
   }
 }
