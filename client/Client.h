@@ -18,7 +18,7 @@
 struct CompilerArgs;
 namespace Client {
 std::mutex &mutex();
-std::string findCompiler(int argc, char **argv);
+std::string findCompiler(int argc, char **argv, std::string *resolvedCompiler);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 class Slot
 {
@@ -115,6 +115,28 @@ inline std::string base64(const std::string &src)
     const char *encoded;
     const long len = BIO_get_mem_data(sink, &encoded);
     return std::string(encoded, len);
+}
+
+inline std::string toHex(const std::string &src)
+{
+    size_t s = src.size();
+    std::string ret(s * 2, ' ');
+    const unsigned char *in = reinterpret_cast<const unsigned char *>(src.c_str());
+    const unsigned char hex[] = "0123456789ABCDEF";
+    unsigned char *out = reinterpret_cast<unsigned char *>(&ret[0]);
+    while (s--) {
+        assert(in);
+        assert(out);
+        *out++ = hex[(*in) >> 4];
+        assert(isprint(hex[(*in) >> 4]));
+
+        assert(out);
+        *out++ = hex[(*in) & 0x0F];
+        assert(isprint(hex[(*in) & 0x0F]));
+        ++in;
+    }
+
+    return ret;
 }
 
 inline std::vector<std::string> split(const std::string &str, const std::string &delim)

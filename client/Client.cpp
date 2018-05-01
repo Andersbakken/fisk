@@ -23,7 +23,7 @@ std::mutex &Client::mutex()
     return sMutex;
 }
 
-std::string Client::findCompiler(int argc, char **argv)
+std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCompiler)
 {
     const char *path = getenv("PATH");
     std::string exec;
@@ -57,6 +57,24 @@ std::string Client::findCompiler(int argc, char **argv)
             } while (end);
         }
     }
+
+    *resolvedCompiler = exec;
+
+    const size_t slash = resolvedCompiler->rfind('/');
+    if (slash != std::string::npos) {
+        for (size_t i=slash + 2; i<resolvedCompiler->size(); ++i) {
+            if ((*resolvedCompiler)[i] == '+' && (*resolvedCompiler)[i - 1] == '+') {
+                if ((*resolvedCompiler)[i - 2] == 'c') {
+                    (*resolvedCompiler)[i - 1] = 'c';
+                    resolvedCompiler->erase(i);
+                } else if ((*resolvedCompiler)[i - 2] == 'g') {
+                    (*resolvedCompiler)[i - 1] = 'c';
+                    (*resolvedCompiler)[i] = 'c';
+                }
+            }
+        }
+    }
+
     return exec;
 }
 
@@ -344,7 +362,7 @@ std::string Client::environmentHash(const std::string &compiler)
             return std::string();
         }
 
-        return Client::base64(Client::sha1(out + err));
+        return Client::toHex(Client::sha1(out + err));
     };
     const std::string cache = Config::envCache();
     if (cache.empty())
