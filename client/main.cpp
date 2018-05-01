@@ -154,10 +154,30 @@ int main(int argc, char **argv)
         slaveWS.send(WebSocket::Text, json.c_str(), json.size());
         slaveWS.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
         Watchdog::transition(Watchdog::WaitingForResponse);
-        if (!slaveWS.process([](WebSocket::Mode type, const void *data, size_t len) {
+        size_t received = 0;
+        size_t total = std::string::npos;
+        auto process = [&received, &total, &compiler, argc, argv](WebSocket::Mode type, const void *data, size_t len) {
+            if (type == WebSocket::Text) {
+                Log::debug("GOT MSG [%s]", std::string(reinterpret_cast<const char *>(data), len).c_str());
+                std::string err;
+                json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
+                if (!err.empty()) {
+                    Log::error("Failed to parse json from slave: %s", err.c_str());
+                    Watchdog::stop();
+                    Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                    return;
+                }
+                // total =
+            } else {
+                Log::debug("Got binary data: %zu bytes", len);
 
+            }
+        };
 
-                })) {
+        while (received < total) {
+            if (!slaveWS.process(process)) {
+                break;
+            }
         }
     } else {
         Log::debug("Have to run locally because no slave");

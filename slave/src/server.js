@@ -16,7 +16,11 @@ class Compile extends EventEmitter {
 
     send(type, msg) {
         if (msg === undefined) {
-            this.ws.send(JSON.stringify(type));
+            if (type instanceof Buffer) {
+                this.ws.send(type);
+            } else {
+                this.ws.send(JSON.stringify(type));
+            }
         } else {
             let tosend;
             if (typeof msg === "object") {
@@ -27,6 +31,10 @@ class Compile extends EventEmitter {
             }
             this.ws.send(JSON.stringify(tosend));
         }
+    }
+
+    close() {
+        this.ws.close();
     }
 };
 
@@ -43,7 +51,7 @@ class Server extends EventEmitter {
             backlog: this.option.int("backlog", 50)
         });
         console.log("listening on", this.ws.options.port);
-        this.ws.on("connection", this._handleConnection);
+        this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
     }
 
     _handleConnection(ws, req) {
@@ -116,6 +124,7 @@ class Server extends EventEmitter {
                         return;
                     }
                     remaining.bytes -= msg.length;
+                    console.log("Emitting", remaining.type, { data: msg.length, last: !remaining.bytes });
                     client.emit(remaining.type, { data: msg, last: !remaining.bytes });
                 }
                 break;
