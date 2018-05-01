@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const option = require("@jhanssen/options")("fisk-slave");
 const Server = require("./src/server");
 const Client = require("./src/client");
