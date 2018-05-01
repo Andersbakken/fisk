@@ -114,7 +114,7 @@ int main(int argcIn, char **argvIn)
 #error unsupported platform
 #endif
 
-                        std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './index.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
+                        std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
                                                              dirname.c_str(), Config::node().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
 
                         Log::debug("system(\"%s\")", command.c_str());

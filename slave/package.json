@@ -2,7 +2,7 @@
   "name": "slave",
   "version": "1.0.0",
   "description": "Slave for fisk",
-  "main": "index.js",
+  "main": "slave.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
