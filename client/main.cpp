@@ -11,9 +11,16 @@
 #include <unistd.h>
 #include <signal.h>
 
-int main(int argc, char **argv)
+static std::string compiler;
+static std::string resolvedCompiler;
+static std::string hash;
+static int argc;
+static char **argv;
+int main(int argcIn, char **argvIn)
 {
-    std::string compiler = Client::findCompiler(argc, argv);
+    argc = argcIn;
+    argv = argvIn;
+    compiler = Client::findCompiler(argc, argv, &resolvedCompiler);
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;
@@ -53,8 +60,8 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
-    const std::string hash = Client::environmentHash(compiler);
-    Log::info("Got hash %s for %s", hash.c_str(), compiler.c_str());
+    hash = Client::environmentHash(resolvedCompiler);
+    Log::info("Got hash %s for %s", hash.c_str(), resolvedCompiler.c_str());
     if (!websocket.connect(Config::scheduler() + "/compile", hash)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
@@ -75,7 +82,7 @@ int main(int argc, char **argv)
     std::string slaveIp;
     uint16_t slavePort = 0;
 
-    if (!websocket.process([&compiler, &hash, argc, argv, &slavePort, &slaveIp](WebSocket::Mode type, const void *data, size_t len) {
+    if (!websocket.process([&slavePort, &slaveIp](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
                     std::string err;
                     json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
@@ -108,7 +115,7 @@ int main(int argc, char **argv)
 #endif
 
                         std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './index.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
-                                                             dirname.c_str(), Config::node().c_str(), Config::scheduler().c_str(), host, hash.c_str(), compiler.c_str());
+                                                             dirname.c_str(), Config::node().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
 
                         Log::debug("system(\"%s\")", command.c_str());
                         system(command.c_str());
@@ -160,7 +167,7 @@ int main(int argc, char **argv)
         };
         std::vector<File> files;
         FILE *f = 0;
-        auto fill = [&files, &f, &compiler, argc, argv](const unsigned char *data, const size_t bytes) {
+        auto fill = [&files, &f](const unsigned char *data, const size_t bytes) {
             assert(f);
             auto *front = &files.front();
             size_t offset = 0;
@@ -194,7 +201,7 @@ int main(int argc, char **argv)
                 Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
             }
         };
-        auto process = [&compiler, argc, argv, &files, &f, &fill](WebSocket::Mode type, const void *data, size_t len) {
+        auto process = [&files, &f, &fill](WebSocket::Mode type, const void *data, size_t len) {
             if (type == WebSocket::Text) {
                 Log::debug("GOT MSG [%s]", std::string(reinterpret_cast<const char *>(data), len).c_str());
                 std::string err;
