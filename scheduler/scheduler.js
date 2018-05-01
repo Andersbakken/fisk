@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 const path = require("path");
 const os = require("os");
 const option = require("@jhanssen/options")("fisk-scheduler");
