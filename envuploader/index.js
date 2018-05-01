@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 const fs = require('fs');
 const child_process = require('child_process');
 const WebSocket = require('ws');
@@ -36,7 +37,7 @@ function die()
     process.exit(1);
 }
 
-let createEnvProc
+let createEnvProc;
 process.on('SIGINT', () => { process.exit(); });
 
 process.on('exit', () => {
@@ -68,7 +69,7 @@ function makeTarball()
                     console.log("output:\n" + out);
                 }
 
-                var line = lines[lines.length - 1]
+                var line = lines[lines.length - 1];
                 tarball = line.split(" ")[1];
                 if (!silent)
                     console.log("git tarball", tarball);
