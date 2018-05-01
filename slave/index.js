@@ -46,9 +46,21 @@ client.connect();
 const server = new Server(option);
 
 server.on("compile", function(compile) {
+    console.log("Got here", 1);
     compile.on("job", function(job) {
+        console.log("Got here", 2);
     });
     compile.on("jobdata", function(data) {
+        console.log("Got data", data.last);
+        if (data.last) {
+            compile.send({ type: "response", index: [ { path: "fisk.c.o", bytes: 984 }, { path: "fisk.c.d", bytes: 100 } ] });
+            var dotO = Buffer.allocUnsafe(984);
+            compile.send(dotO);
+            var dotD = Buffer.allocUnsafe(100);
+            compile.send(dotD);
+            compile.close();
+        }
+
     });
     compile.on("error", function(err) {
         console.error("compile error", err);
