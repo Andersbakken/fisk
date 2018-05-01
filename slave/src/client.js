@@ -11,6 +11,7 @@ class Client extends EventEmitter {
         super();
 
         this.scheduler = option("scheduler", "localhost:8097");
+        this.serverPort = option.int("port", 8096);
     }
 
     connect() {
@@ -18,12 +19,12 @@ class Client extends EventEmitter {
         console.log("connecting to", this.scheduler);
 
         let remaining = { bytes: undefined, type: undefined };
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(url, { headers: { "x-fisk-slave-port": this.serverPort } });
         this.ws.on("open", () => {
             this.emit("connect");
         });
         this.ws.on("error", err => {
-            console.error("client websocket error", err);
+            console.error("client websocket error", err.message);
         });
         this.ws.on("message", msg => {
             const error = msg => {

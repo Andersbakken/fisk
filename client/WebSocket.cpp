@@ -211,6 +211,8 @@ bool WebSocket::connect(std::string &&url, const std::string &env)
                                               parsedUrl.m_Path.c_str(), host.c_str(), port,
                                               client_key.c_str(), env.c_str());
 
+        Log::debug("Sent headers:\n%s", reqHeader);
+
         size_t off = 0;
         while (off < reqHeaderSize) {
             ssize_t r;

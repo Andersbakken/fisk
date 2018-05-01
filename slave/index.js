@@ -5,16 +5,22 @@ const load = require("./src/load");
 
 const client = new Client(option);
 
+let connectInterval;
 client.on("environment", function(environ) {
     // environment from scheduler
 });
 
+load.on("data", function(data) {
+    console.log("sending load", data);
+    client.send("load", data);
+});
+
 client.on("connect", function() {
     console.log("connected");
-    load.on("data", function(data) {
-        console.log("sending load", data);
-        client.send("load", data);
-    });
+    if (connectInterval) {
+        clearInterval(connectInterval);
+        connectInterval = undefined;
+    }
     load.start(option("loadInterval", 1000));
 });
 
@@ -24,11 +30,16 @@ client.on("error", function(err) {
 
 client.on("close", function() {
     console.log("client closed");
-    load.removeAllListeners();
-    if (load.running()) {
+    if (load.running())
         load.stop();
+    if (!connectInterval) {
+        connectInterval = setInterval(() => {
+            console.log("Reconnecting...");
+            client.connect();
+        }, 1000);
     }
 });
+
 
 client.connect();
 

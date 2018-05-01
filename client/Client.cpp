@@ -130,40 +130,65 @@ bool Client::recursiveMkdir(const std::string &dir, mode_t mode)
     return false;
 }
 
-Client::Preprocessed Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
+std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
 {
-    assert(args->mode == CompilerArgs::Compile);
-    std::string out, err;
-    out.reserve(1024 * 1024);
-    std::string commandLine = compiler;
-    const size_t count = args->commandLine.size();
-    auto append = [&commandLine](const std::string &arg) {
-        const size_t idx = arg.find('\'');
-        if (idx != std::string::npos) {
-            // ### gotta escape quotes
-        }
-        commandLine += arg;
+    Preprocessed *ptr = new Preprocessed;
+    std::unique_ptr<Client::Preprocessed> ret(ptr);
+    ret->mThread = std::thread([ptr, args, compiler] {
+            assert(args->mode == CompilerArgs::Compile);
+            std::string out, err;
+            ptr->stdOut.reserve(1024 * 1024);
+            std::string commandLine = compiler;
+            const size_t count = args->commandLine.size();
+            auto append = [&commandLine](const std::string &arg) {
+                const size_t idx = arg.find('\'');
+                if (idx != std::string::npos) {
+                    // ### gotta escape quotes
+                }
+                commandLine += arg;
 
-    };
-    for (size_t i=1; i<count; ++i) {
-        commandLine += " '";
-        if (i == args->objectFileIndex) {
-            commandLine += '-';
-        } else {
-            append(args->commandLine.at(i));
+            };
+            for (size_t i=1; i<count; ++i) {
+                commandLine += " '";
+                if (i == args->objectFileIndex) {
+                    commandLine += '-';
+                } else {
+                    append(args->commandLine.at(i));
+                }
+                commandLine += '\'';
+            }
+            commandLine += " '-E'";
+            TinyProcessLib::Process proc(commandLine, std::string(),
+                                         [ptr](const char *bytes, size_t n) {
+                                             ptr->stdOut.append(bytes, n);
+                                         }, [ptr](const char *bytes, size_t n) {
+                                             ptr->stdErr.append(bytes, n);
+                                         });
+            ptr->exitStatus = proc.get_exit_status();
+            std::unique_lock<std::mutex> lock(ptr->mMutex);
+            ptr->mDone = true;
+            ptr->mCond.notify_one();
+        });
+    return ret;
+}
+
+Client::Preprocessed::~Preprocessed()
+{
+    wait();
+}
+
+void Client::Preprocessed::wait()
+{
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (mJoined)
+            return;
+        while (!mDone) {
+            mCond.wait(lock);
         }
-        commandLine += '\'';
+        mJoined = true;
     }
-    commandLine += " '-E'";
-    TinyProcessLib::Process proc(commandLine, std::string(),
-                                 [&out](const char *bytes, size_t n) {
-                                     out.append(bytes, n);
-                                 }, [&err](const char *bytes, size_t n) {
-                                     err.append(bytes, n);
-                                 });
-    const int exit_status = proc.get_exit_status();
-    // printf("%s -> %d\n", commandLine.c_str(), exit_status);
-    return Preprocessed { std::move(out), std::move(err), exit_status };
+    mThread.join();
 }
 
 std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)

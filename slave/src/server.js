@@ -39,8 +39,8 @@ class Server extends EventEmitter {
 
     listen() {
         this.ws = new WebSocket.Server({
-            port: this.option("port", 8096),
-            backlog: this.option("backlog", 50)
+            port: this.option.int("port", 8096),
+            backlog: this.option.int("backlog", 50)
         });
         console.log("listening on", this.ws.options.port);
         this.ws.on("connection", this._handleConnection);
@@ -49,7 +49,10 @@ class Server extends EventEmitter {
     _handleConnection(ws, req) {
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
-        const ip = req.connection.remoteAddress;
+        let ip = req.connection.remoteAddress;
+        if (ip.substr(0, 7) == "::ffff:") {
+            ip = ip.substr(7);
+        }
 
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
@@ -75,6 +78,7 @@ class Server extends EventEmitter {
         ws.on("message", msg => {
             switch (typeof msg) {
             case "string":
+                console.log("Got message", msg);
                 if (remaining.bytes) {
                     // bad, client have to send all the data in a binary message before sending JSON
                     error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
@@ -90,24 +94,13 @@ class Server extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                if ("type" in json) {
-                    switch (json.type) {
-                    case "job":
-                        remaining.type = `${json.type}data`;
-                        remaining.bytes = json.bytes;
-                        client.emit(json.type, json);
-                        break;
-                    default:
-                        client.emit(json.type, json);
-                        break;
-                    }
-                } else {
-                    error("No type property in JSON");
-                    return;
-                }
+                remaining.type = "jobdata";
+                remaining.bytes = json.bytes;
+                client.emit("job", json);
                 break;
             case "object":
                 if (msg instanceof Buffer) {
+                    console.log("Got binary", msg.length, remaining.bytes);
                     if (!msg.length) {
                         // no data?
                         error("No data in buffer");

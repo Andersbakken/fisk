@@ -46,8 +46,9 @@ int main(int argc, char **argv)
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, 0);
 
-    Client::Preprocessed ret = Client::preprocess(compiler, compilerArgs);
-    if (ret.exitStatus != 0) {
+    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(compiler, compilerArgs);
+    if (!preprocessed) {
+        Log::error("Failed to preprocess");
         Watchdog::stop();
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
@@ -71,7 +72,10 @@ int main(int argc, char **argv)
     //     return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     // }
 
-    if (!websocket.process([&compiler, &hash, argc, argv](WebSocket::Mode type, const void *data, size_t len) {
+    std::string slaveIp;
+    uint16_t slavePort = 0;
+
+    if (!websocket.process([&compiler, &hash, argc, argv, &slavePort, &slaveIp](WebSocket::Mode type, const void *data, size_t len) {
                 if (type == WebSocket::Text) {
                     std::string err;
                     json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
@@ -82,7 +86,8 @@ int main(int argc, char **argv)
                         return;
                     }
                     Log::debug("GOT JSON\n%s", msg.dump().c_str());
-                    if (msg["type"].string_value() == "needsEnvironment") {
+                    const std::string type = msg["type"].string_value();
+                    if (type == "needsEnvironment") {
                         const std::string execPath = Client::findExecutablePath(argv[0]);
                         std::string dirname;
                         Client::parsePath(execPath.c_str(), 0, &dirname);
@@ -109,6 +114,13 @@ int main(int argc, char **argv)
                         system(command.c_str());
                         Watchdog::stop();
                         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                    } else if (type == "slave") {
+                        slaveIp = msg["ip"].string_value();
+                        slavePort = msg["port"].int_value();
+                        Log::debug("type %d", msg["port"].type());
+                        Log::debug("Got here %s:%d", slaveIp.c_str(), slavePort);
+                    } else {
+                        Log::error("Unexpected message type: %s", type.c_str());
                     }
                 } else {
                     printf("Got binary message: %zu bytes\n", len);
@@ -118,6 +130,40 @@ int main(int argc, char **argv)
         return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
     }
 
+    if (!slaveIp.empty() && slavePort) {
+        preprocessed->wait();
+        if (preprocessed->exitStatus != 0) {
+            Log::error("Failed to preprocess. Running locally");
+            Watchdog::stop();
+            return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        }
+        Watchdog::transition(Watchdog::AcquiredSlave);
+        WebSocket slaveWS;
+        if (!slaveWS.connect(Client::format("ws://%s:%d/compile", slaveIp.c_str(), slavePort), hash)) {
+            Log::debug("Have to run locally because no slave connection");
+            Watchdog::stop();
+            return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        }
+        Watchdog::transition(Watchdog::ConnectedToSlave);
+        args[0] = compiler;
+        json11::Json::object msg {
+            { "commandLine", args },
+            { "bytes", static_cast<int>(preprocessed->stdOut.size()) }
+        };
+        std::string json = json11::Json(msg).dump();
+        slaveWS.send(WebSocket::Text, json.c_str(), json.size());
+        slaveWS.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
+        Watchdog::transition(Watchdog::WaitingForResponse);
+        if (!slaveWS.process([](WebSocket::Mode type, const void *data, size_t len) {
+
+
+                })) {
+        }
+    } else {
+        Log::debug("Have to run locally because no slave");
+        Watchdog::stop();
+        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+    }
     return 0;
 }
 

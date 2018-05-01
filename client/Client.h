@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
+#include <thread>
 #include <string.h>
 #include <vector>
 #include <openssl/bio.h>
@@ -41,12 +43,26 @@ unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 
-struct Preprocessed
+class Preprocessed
 {
+public:
+    Preprocessed()
+        : exitStatus(-1), mDone(false), mJoined(false)
+    {}
+    ~Preprocessed();
+    void wait();
+
     std::string stdOut, stdErr;
     int exitStatus;
+private:
+    std::mutex mMutex;
+    std::condition_variable mCond;
+    std::thread mThread;
+    bool mDone;
+    bool mJoined;
+    friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 };
-Preprocessed preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
+std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 
 template <size_t StaticBufSize = 4096>
 static std::string vformat(const char *format, va_list args)
