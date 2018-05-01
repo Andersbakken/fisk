@@ -3,6 +3,7 @@ const mktemp = require('mktemp');
 const fs = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
+const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
     constructor(args, preprocessed) {
@@ -20,7 +21,7 @@ class Compile extends EventEmitter {
             switch (args[i]) {
             case '-o':
                 originalOutput = args[++i];
-                args[i] = tmpdir + "/output.o";
+                args[i] = path.join(tmpdir, magicalObjectName);
                 break;
             case '-x':
                 hasDashX = true;
@@ -82,7 +83,7 @@ class Compile extends EventEmitter {
 
         if (!originalOutput) {
             args.push('-o');
-            args.push(tmpdir + "/output.o");
+            args.push(tmpdir + "/slave.out");
             originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
         }
 
@@ -137,7 +138,32 @@ class Compile extends EventEmitter {
         });
 
         proc.on('exit', (code, signal) => {
-            this.emit('exit', { code: code, signal: signal });
+            // try {
+            let files = [];
+            function addDir(dir, prefix) {
+                try {
+                    fs.readdirSync(dir).forEach(file => {
+                        try {
+                            let stat = fs.statSync(path.join(dir, file));
+                            if (stat.isDirectory()) {
+                                addDir(path.join(dir,  file), prefix ? prefix + file + '/' : file + '/');
+                            } else if (stat.isFile()) {
+                                let contents = fs.readFileSync(path.join(dir, file));
+                                if (file === magicalObjectName)
+                                    file = originalOutput;
+                                files.push(prefix + file, contents);
+                            }
+                        } catch (err) {
+                        }
+                    });
+                } catch (err) {
+                    this.emit('exit', { code: 101, signal: signal, files: [], error: err });
+                    return;
+                }
+            }
+            addDir(tmpdir, "");
+            this.emit('exit', { code: code, signal: signal, files: files });
+
         });
         proc.stdin.write(preprocessed);
         proc.stdin.end();
