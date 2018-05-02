@@ -43,40 +43,23 @@ WebSocket::WebSocket()
                                   uint8_t *buf, size_t len,
                                   int flags, void *user_data) -> ssize_t {
         WebSocket *ws = static_cast<WebSocket *>(user_data);
-        assert(ws);
-        ssize_t r;
-        while ((r = ::recv(ws->mFD, buf, len, 0)) == -1 && errno == EINTR);
-
-        if (r == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
-            } else {
-                wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
-            }
-        } else if (r == 0) {
-            wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
-            r = -1;
+        if (ws->mRecvBuffer.empty()) {
+            wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
+            return -1;
         }
-        return r;
+        const ssize_t ret = std::min<ssize_t>(ws->mRecvBuffer.size(), len);
+        memcpy(buf, &ws->mRecvBuffer[0], ret);
+        ws->mRecvBuffer.erase(ws->mRecvBuffer.begin(), ws->mRecvBuffer.begin() + ret);
+        return ret;
     };
 
     mCallbacks.send_callback = [](wslay_event_context *ctx,
                                   const uint8_t *data, size_t len,
                                   int flags, void *user_data) -> ssize_t {
         WebSocket *ws = static_cast<WebSocket *>(user_data);
-        assert(ws);
-        ssize_t r;
-        int sflags = 0;
-        while ((r = ::send(ws->mFD, data, len, sflags)) == -1 && errno == EINTR);
-
-        if (r == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
-            } else {
-                wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
-            }
-        }
-        return r;
+        ws->mSendBuffer.resize(ws->mSendBuffer.size() + len);
+        memcpy(&ws->mSendBuffer[ws->mSendBuffer.size() - len], data, len);
+        return len;
     };
     mCallbacks.genmask_callback = [](wslay_event_context *,
                                      uint8_t *buf, size_t len,
@@ -89,10 +72,18 @@ WebSocket::WebSocket()
         WebSocket *ws = static_cast<WebSocket *>(user_data);
         assert(ws);
         assert(ws->mOnMessage);
-        if (arg->opcode == WSLAY_TEXT_FRAME) {
+        switch (arg->opcode) {
+        case WSLAY_TEXT_FRAME:
             ws->mOnMessage(Text, arg->msg, arg->msg_length);
-        } else if (arg->opcode == WSLAY_BINARY_FRAME) {
+            break;
+        case WSLAY_BINARY_FRAME:
             ws->mOnMessage(Binary, arg->msg, arg->msg_length);
+            break;
+        case WSLAY_PING:
+        case WSLAY_PONG:
+        case WSLAY_CONTINUATION_FRAME:
+            wslay_event_send(ctx);
+            break;
         }
     };
 }
@@ -283,30 +274,77 @@ bool WebSocket::send(Mode mode, const void *msg, size_t len)
     return !wslay_event_queue_msg(mContext, &wmsg) && !wslay_event_send(mContext);
 }
 
-bool WebSocket::process(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
+
+bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
 {
     mOnMessage = std::move(onMessage);
-    fd_set r, w;
-    FD_ZERO(&r);
-    FD_ZERO(&w);
-    if (wslay_event_want_read(mContext))
-        FD_SET(mFD, &r);
-    if (wslay_event_want_write(mContext))
-        FD_SET(mFD, &w);
-    const int ret = select(mFD + 1, &r, &w, 0, 0);
-
+    bool closed = false;
     bool error = false;
-    if (FD_ISSET(mFD, &r)) {
-        if (wslay_event_recv(mContext) != 0)
-            error = true;
+    while (true) {
+        fd_set r, w;
+        int ret;
+        do {
+            FD_ZERO(&r);
+            FD_ZERO(&w);
+            FD_SET(mFD, &r);
+            if (wslay_event_want_write(mContext) || !mSendBuffer.empty())
+                FD_SET(mFD, &w);
+            ret = select(mFD + 1, &r, &w, 0, 0);
+        } while (ret == -1 && errno == EINTR);
+
+        const bool sendBufferWasEmpty = mSendBuffer.empty();
+        if (FD_ISSET(mFD, &r)) {
+            while (true) {
+                char buf[BUFSIZ];
+                const ssize_t r = ::read(mFD, buf, sizeof(buf));
+                if (!r) {
+                    closed = true;
+                } else if (r > 0) {
+                    mRecvBuffer.insert(mRecvBuffer.end(), buf, buf + r);
+                } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                    break;
+                } else {
+                    errno = true;
+                    break;
+                }
+            }
+        }
+        while (true) {
+            const size_t last = mRecvBuffer.size();
+            wslay_event_recv(mContext);
+            if (!mRecvBuffer.empty() || last == mRecvBuffer.size())
+                break;
+        }
+
+        if (FD_ISSET(mFD, &w) || (!mSendBuffer.empty() && sendBufferWasEmpty)) {
+            size_t sendBufferOffset = 0;
+            while (sendBufferOffset < mSendBuffer.size()) {
+                const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
+                if (r > 0) {
+                    sendBufferOffset += r;
+                } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                    break;
+                } else {
+                    errno = true;
+                    break;
+                }
+            }
+            if (sendBufferOffset) {
+                mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + sendBufferOffset);
+            }
+        }
+
+        if (closed || error)
+            break;
+        if (mExit && mSendBuffer.empty()) {
+            break;
+        }
     }
-    if (FD_ISSET(mFD, &w)) {
-        if (wslay_event_send(mContext) != 0)
-            error = true;
-    }
-    printf("Selected %d\n", ret);
-    assert(ret);
     mOnMessage = nullptr;
-    return ret > 0 && !error;
+    return !error;
 }
 
+void WebSocket::exit()
+{
+    mExit = true;
+}

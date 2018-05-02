@@ -4,6 +4,7 @@ const option = require("@jhanssen/options")("fisk-slave");
 const Server = require("./src/server");
 const Client = require("./src/client");
 const load = require("./src/load");
+const Compile = require("./src/compile");
 
 const client = new Client(option);
 
@@ -13,7 +14,7 @@ client.on("environment", function(environ) {
 });
 
 load.on("data", function(data) {
-    console.log("sending load", data);
+    // console.log("sending load", data);
     client.send("load", data);
 });
 
@@ -48,19 +49,35 @@ client.connect();
 const server = new Server(option);
 
 server.on("compile", function(compile) {
-    console.log("Got here", 1);
+    let commandLine;
     compile.on("job", function(job) {
-        console.log("Got here", 2);
+        commandLine = job.commandLine;
     });
     compile.on("jobdata", function(data) {
-        console.log("Got data", data.last);
         if (data.last) {
-            compile.send({ type: "response", index: [ { path: "fisk.c.o", bytes: 984 }, { path: "fisk.c.d", bytes: 100 } ] });
-            var dotO = Buffer.allocUnsafe(984);
-            compile.send(dotO);
-            var dotD = Buffer.allocUnsafe(100);
-            compile.send(dotD);
-            compile.close();
+            console.log("Got data", data.data.length, commandLine);
+            let c = new Compile(commandLine, data.data);
+            c.on('stdout', data => { console.log("Got stdout", data); compile.send({ type: 'stdout', data: data }); });
+            c.on('stderr', data => { console.log("Got stderr", data); compile.send({ type: 'stderr', data: data }); });
+            c.on('exit', event => {
+                compile.send({
+                    type: 'response',
+                    index: event.files.map(item => {
+                        return { path: item.path, bytes: item.contents.length };
+                    }),
+                    exitCode: event.exitCode,
+                });
+                for (var i=0; i<event.files.length; ++i) {
+                    compile.send(event.files[i].contents);
+                }
+                compile.close();
+            });
+
+            // compile.send({ type: "response", index: [ { path: "fisk.c.o", bytes: 984 }, { path: "fisk.c.d", bytes: 100 } ] });
+            // var dotO = Buffer.allocUnsafe(984);
+            // compile.send(dotO);
+            // var dotD = Buffer.allocUnsafe(100);
+            // compile.send(dotD);
         }
 
     });
