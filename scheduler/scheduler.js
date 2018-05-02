@@ -13,7 +13,7 @@ server.on("slave", function(slave) {
     console.log("slave connected", slave.ip);
     slaves[slave.ip] = { client: slave };
     slave.on("load", function(load) {
-        console.log("slave load", load);
+        // console.log("slave load", load);
         slaves[slave.ip].load = load.message;
     });
     slave.on("environments", function(environs) {

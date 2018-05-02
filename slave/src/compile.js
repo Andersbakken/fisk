@@ -12,7 +12,7 @@ class Compile extends EventEmitter {
             throw new Error("Bad args");
         }
         const compiler = args.shift();
-        const tmpdir = mktemp.createDirSync('/tmp/fisk-slave-compile-XXX-XXX');
+        const tmpdir = mktemp.createDirSync('/tmp/fisk-slave-compile-XXXXXX');
 
         var hasDashX = false;
         var sourceFile;
@@ -88,45 +88,52 @@ class Compile extends EventEmitter {
         }
 
         if (!hasDashX) {
-            switch (path.extname(sourceFile)) {
-            case '.C':
-            case '.cc':
-            case '.cpp':
-            case '.CPP':
-            case '.c++':
-            case '.cp':
-            case '.cxx':
-            case '.ii':
+            if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
                 args.unshift('c++-cpp-output');
-                break;
-            case '.hh':
-            case '.hpp':
-            case '.H':
-                args.unshift('c++-header');
-                break;
-            case '.h':
-                args.unshift('c-header');
-                break;
-            case '.c':
-                args.unshift('cpp-output');
-                break;
-            case '.m':
-            case '.mi':
-                args.unshift('objective-c-cpp-output');
-                break;
-            case '.mm':
-            case '.M':
-            case '.mii':
-                args.unshift('objective-c++-cpp-output');
-                break;
-            default:
-                throw new Error(`Can't determine source language for file: ${sourceFile}`);
+            } else {
+                switch (path.extname(sourceFile)) {
+                case '.C':
+                case '.cc':
+                case '.cpp':
+                case '.CPP':
+                case '.c++':
+                case '.cp':
+                case '.cxx':
+                case '.ii':
+                    args.unshift('c++-cpp-output');
+                    break;
+                case '.hh':
+                case '.hpp':
+                case '.H':
+                    args.unshift('c++-header');
+                    break;
+                case '.h':
+                    args.unshift('c-header');
+                    break;
+                case '.c':
+                    args.unshift('cpp-output');
+                    break;
+                case '.m':
+                case '.mi':
+                    args.unshift('objective-c-cpp-output');
+                    break;
+                case '.mm':
+                case '.M':
+                case '.mii':
+                    args.unshift('objective-c++-cpp-output');
+                    break;
+                default:
+                    throw new Error(`Can't determine source language for file: ${sourceFile}`);
+                }
             }
             args.unshift('-x');
         }
         args.push('-fpreprocessed'); // is this good for clang?
         console.log(args.join(' '));
         var proc = child_process.spawn(compiler, args, { cwd: tmpdir });
+        proc.stdout.setEncoding('utf8');
+        proc.stderr.setEncoding('utf8');
+
         proc.stdout.on('data', data => {
             this.emit('stdout', data);
         });
@@ -137,7 +144,7 @@ class Compile extends EventEmitter {
             this.emit('error', err);
         });
 
-        proc.on('exit', (code, signal) => {
+        proc.on('exit', (exitCode) => {
             // try {
             let files = [];
             function addDir(dir, prefix) {
@@ -151,18 +158,18 @@ class Compile extends EventEmitter {
                                 let contents = fs.readFileSync(path.join(dir, file));
                                 if (file === magicalObjectName)
                                     file = originalOutput;
-                                files.push(prefix + file, contents);
+                                files.push({ path: prefix + file, contents: contents });
                             }
                         } catch (err) {
                         }
                     });
                 } catch (err) {
-                    this.emit('exit', { code: 101, signal: signal, files: [], error: err });
+                    this.emit('exit', { exitCode: 101, files: [], error: err });
                     return;
                 }
             }
             addDir(tmpdir, "");
-            this.emit('exit', { code: code, signal: signal, files: files });
+            this.emit('exit', { exitCode: exitCode, files: files });
 
         });
         proc.stdin.write(preprocessed);
