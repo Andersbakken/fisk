@@ -8,11 +8,14 @@
 #include <cstdlib>
 #include <string.h>
 #include <sys/file.h>
+#ifdef __linux__
 #include <sys/inotify.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <process.hpp>
 #ifdef __APPLE__
+#include <mach-o/dyld.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
@@ -245,6 +248,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
         return slot;
     }
 
+#ifdef __linux__
     int inotifyFD = inotify_init1(IN_CLOEXEC);
     if (inotifyFD == -1) {
         Log::error("Failed to inotify_init1 %d %s", errno, strerror(errno));
@@ -268,6 +272,13 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
     } while (!slot);
 
     ::close(inotifyFD);
+#elif __APPLE__
+    do {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        slot = check();
+    } while (!slot);
+#endif
+
     return slot;
 }
 
@@ -443,18 +454,18 @@ std::string Client::findExecutablePath(const char *argv0)
         }
     }
 #elif defined(__APPLE__)
-    // {
-    //     char buf[PATH_MAX];
-    //     uint32_t size = sizeof(buf);
-    //     if (_NSGetExecutablePath(buf, &size) == 0) {
-    //         sExecutablePath = std::string(buf, size).followLink();
-    //         if (sExecutablePath.isFile())
-    //             return;
-    //     }
-    // }
-#error not done
+    {
+        char buf[PATH_MAX + 1];
+        uint32_t size = PATH_MAX;
+        if (_NSGetExecutablePath(buf, &size) == 0) {
+            char ret[PATH_MAX];
+            buf[PATH_MAX] = '\0';
+            realpath(buf, ret);
+            return ret;
+        }
+    }
 #else
-#warning Unknown platform.
+#error Unknown platform
 #endif
 
     return std::string();
