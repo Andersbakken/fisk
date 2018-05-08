@@ -29,36 +29,46 @@ std::mutex &Client::mutex()
 std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCompiler)
 {
     const char *path = getenv("PATH");
+    // printf("PATH %s\n", path);
     std::string exec;
     if (path) {
-        std::string self, basename, dirname;
+        std::string self, basename;
         char realPath[PATH_MAX];
         const char *begin = path, *end = 0;
+        // printf("trying realpath [%s]\n", argv[0]);
         if (realpath(argv[0], realPath)) {
+            std::string dirname;
             parsePath(realPath, 0, &dirname);
             parsePath(argv[0], &basename, 0);
-            // printf("realPath %s dirname %s argv[0] %s basename %s\n", realPath, dirname.c_str(), argv[0], basename.c_str());
             self = dirname + basename;
-            do {
-                end = strchr(begin, ':');
-                if (!end) {
-                    exec = begin;
-                } else {
-                    exec.assign(begin, end - begin);
-                    begin = end + 1;
-                }
-                // printf("trying %s\n", exec.c_str());
-                if (!exec.empty()) {
-                    if (exec[exec.size() - 1] != '/')
-                        exec += '/';
-                    exec += basename;
-                    if (exec != self && !access(exec.c_str(), X_OK)) {
+        } else if (strchr(argv[0], '/')) {
+            return std::string();
+        } else {
+            basename = argv[0];
+        }
+        // printf("realPath %s dirname %s argv[0] %s basename %s\n", realPath, dirname.c_str(), argv[0], basename.c_str());
+        do {
+            end = strchr(begin, ':');
+            if (!end) {
+                exec = begin;
+            } else {
+                exec.assign(begin, end - begin);
+                begin = end + 1;
+            }
+            if (!exec.empty()) {
+                if (exec[exec.size() - 1] != '/')
+                    exec += '/';
+                exec += basename;
+                if (exec != self && !access(exec.c_str(), X_OK)) {
+                    if (self.empty()) {
+                        self = exec;
+                    } else {
                         break;
                     }
-                    exec.clear();
                 }
-            } while (end);
-        }
+                exec.clear();
+            }
+        } while (end);
     }
 
     *resolvedCompiler = exec;
