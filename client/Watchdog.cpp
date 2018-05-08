@@ -51,7 +51,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
                     return;
                 }
-                if (!sStopped)
+                if (sStopped)
                     return;
             }
         });
