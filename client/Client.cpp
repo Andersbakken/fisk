@@ -292,7 +292,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
     return slot;
 }
 
-int Client::runLocal(const std::string &exec, int argc, char **argv, std::unique_ptr<Slot> &&slot)
+void Client::runLocal(const std::string &exec, int argc, char **argv, std::unique_ptr<Slot> &&slot)
 {
     auto run = [&exec, argc, argv]() {
         char **argvCopy = new char*[argc + 1];
@@ -303,24 +303,23 @@ int Client::runLocal(const std::string &exec, int argc, char **argv, std::unique
         argvCopy[argc] = 0;
         ::execv(exec.c_str(), argvCopy);
         Log::error("fisk: Failed to exec %s (%d %s)", exec.c_str(), errno, strerror(errno));
-        _exit(101);
     };
 
     const pid_t pid = fork();
     if (pid == -1) { // errpr
         Log::error("Failed to fork: %d %s", errno, strerror(errno));
         run();
-        return 0;
+        exit(101);
     } else if (pid == 0) { // child
         run();
-        return 0;
+        exit(101);
     } else { // paren
         int status;
         waitpid(pid, &status, 0);
         slot.reset();
         if (WIFEXITED(status))
-            return WEXITSTATUS(status);
-        _exit(101);
+            exit(WEXITSTATUS(status));
+        exit(101);
     }
 }
 
