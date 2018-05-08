@@ -38,7 +38,7 @@ enum AcquireSlotMode {
     Wait
 };
 std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
-int runLocal(const std::string &compiler, int argc, char **argv, std::unique_ptr<Slot> &&slot);
+[[noreturn]] void runLocal(const std::string &compiler, int argc, char **argv, std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);

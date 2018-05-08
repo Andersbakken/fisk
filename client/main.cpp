@@ -37,13 +37,16 @@ int main(int argcIn, char **argvIn)
     if (!compilerArgs || compilerArgs->mode != CompilerArgs::Compile) {
         Log::debug("Have to run locally because mode %s",
                    CompilerArgs::modeName(compilerArgs ? compilerArgs->mode : CompilerArgs::Invalid));
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
 
     if (!Config::noLocal()) {
         std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
-        if (slot)
-            return Client::runLocal(compiler, argc, argv, std::move(slot));
+        if (slot) {
+            Client::runLocal(compiler, argc, argv, std::move(slot));
+            return 0; // unreachable
+        }
     }
     Watchdog::start(compiler, argc, argv);
     WebSocket websocket;
@@ -57,7 +60,8 @@ int main(int argcIn, char **argvIn)
     if (!preprocessed) {
         Log::error("Failed to preprocess");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
 
     hash = Client::environmentHash(resolvedCompiler);
@@ -65,7 +69,8 @@ int main(int argcIn, char **argvIn)
     if (!websocket.connect(Config::scheduler() + "/compile", hash)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
     // json11::Json my_json = json11::Json::object {
     //     { "client", Config::clientName() },
@@ -135,27 +140,32 @@ int main(int argcIn, char **argvIn)
                 }
             })) {
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
 
     if (slaveIp.empty() || !slavePort) {
         Log::debug("Have to run locally because no slave");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
 
     preprocessed->wait();
     if (preprocessed->exitStatus != 0) {
         Log::error("Failed to preprocess. Running locally");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
     Watchdog::transition(Watchdog::AcquiredSlave);
     WebSocket slaveWS;
     if (!slaveWS.connect(Client::format("ws://%s:%d/compile", slaveIp.c_str(), slavePort), hash)) {
         Log::debug("Have to run locally because no slave connection");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
+
     }
     Watchdog::transition(Watchdog::ConnectedToSlave);
     args[0] = compiler;
@@ -277,7 +287,8 @@ int main(int argcIn, char **argvIn)
     if (!slaveWS.exec(process)) { // ### This could happen even if we've already written all the data
         Log::debug("Have to run locally because failed to get message from slave");
         Watchdog::stop();
-        return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
     return exitCode;
 }
