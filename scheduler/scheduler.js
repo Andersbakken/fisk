@@ -9,21 +9,19 @@ const server = new Server(option);
 
 const slaves = {};
 
-server.on("slave", function(slave) {
-    console.log("slave connected", slave.ip);
-    slaves[slave.ip] = { client: slave };
+server.on("slave", function(slave, environments) {
+    console.log("slave connected", slave.ip, environments);
+    slaves[slave.ip] = { client: slave, environments: environments };
+    console.log("slave has these environments", environments);
+    for (var k in Environments.environments) {
+        if (environments.indexOf(k) === -1) {
+            Environments.environments[k].send(slave);
+        }
+    }
+
     slave.on("load", function(load) {
         // console.log("slave load", load);
         slaves[slave.ip].load = load.message;
-    });
-    slave.on("environments", function(environs) {
-        slaves[slave.ip].environments = environs;
-        // send the slave any new environments
-        for (var k in Environments.environments) {
-            if (environs.indexOf(k) === -1) {
-                Environments.environments[k].send(slave);
-            }
-        }
     });
     slave.on("error", function(msg) {
         console.error(`slave error '${msg}' from ${slave.ip}`);
@@ -32,6 +30,7 @@ server.on("slave", function(slave) {
         delete slaves[slave.ip];
         slave.removeAllListeners();
     });
+
 });
 
 server.on("compile", function(compile) {
@@ -72,25 +71,25 @@ server.on("compile", function(compile) {
 
 server.on("uploadEnvironment", function(upload) {
     let file;
-    upload.on("environment", function(environ) {
-        file = Environments.prepare(environ);
-        console.log("Got environment message", environ, typeof file);
+    upload.on("environment", function(environment) {
+        file = Environments.prepare(environment);
+        console.log("Got environment message", environment, typeof file);
         if (!file) {
             // we already have this environment
-            console.error("already got environment", environ.message);
+            console.error("already got environment", environment.message);
             upload.send({ error: "already got environment" });
             upload.close();
         }
     });
-    upload.on("environmentdata", function(environ) {
+    upload.on("environmentdata", function(environment) {
         if (!file) {
             console.error("no pending file");
             upload.send({ error: "no pending file" });
             upload.close();
         }
-        console.log("Got environmentdata message", environ.data.length, environ.last);
-        file.save(environ.data).then(() => {
-            if (environ.last) {
+        console.log("Got environmentdata message", environment.data.length, environment.last);
+        file.save(environment.data).then(() => {
+            if (environment.last) {
                 file.close();
                 upload.close();
                 Environments.complete(file);
@@ -130,7 +129,7 @@ server.on("error", function(err) {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(option("env-dir", path.join(os.homedir(), ".cache", "fisk", "scheduler", "environs"))).then(() => {
+Environments.load(option("env-dir", path.join(os.homedir(), ".cache", "fisk", "scheduler", "environments"))).then(() => {
     server.listen();
 }).catch(e => {
     console.error(e);

@@ -1,4 +1,5 @@
 const fs = require("fs-extra");
+const seekSync = require('fs-ext').seekSync;
 const mkdirp = require("mkdirp");
 const path = require("path");
 
@@ -6,8 +7,8 @@ const socket = {
     _queue: [],
     _sending: false,
 
-    enqueue: function enqueue(client, file, skip) {
-        socket._queue.push({ client: client, file: file, skip });
+    enqueue: function enqueue(client, hash, file, skip) {
+        socket._queue.push({ client: client, hash: hash, file: file, skip });
         if (!socket._sending) {
             socket._next().then(() => {
                 if (socket._queue.length > 0) {
@@ -28,34 +29,33 @@ const socket = {
                 if (!st.isFile())
                     throw new Error(`${q.file} not a file`);
                 size = st.size;
-                return fs.open(q.file);
+                return fs.open(q.file, "r");
             }).then(fd => {
                 // send file size to client
-                q.client.send({ type: "environment", bytes: size });
+                q.client.send({ type: "environment", bytes: size, hash: q.hash });
                 // read file in chunks and send
-                const bufsiz = 32768;
-                const buf = Buffer.alloc(bufsiz);
                 let remaining = size;
-                let from = q.skip;
+                if (q.skip) {
+                    seekSync(fd, q.skip, 0);
+                }
                 const readNext = () => {
                     if (!remaining) {
                         socket._sending = false;
                         resolve();
+                        return;
                     }
+                    const bufsiz = 32768;
                     const bytes = Math.min(bufsiz, remaining);
+                    const buf = Buffer.allocUnsafe(bytes);
+
                     remaining -= bytes;
-                    fs.read(fd, buf, 0, bytes, from).then(() => {
-                        from = undefined;
-                        if (bytes === bufsiz) {
-                            q.client.send(buf);
-                        } else {
-                            q.client.send(buf.slice(0, bytes));
-                        }
+                    fs.read(fd, buf, 0, bytes).then(() => {
+                        // console.log(buf);
+                        q.client.send(buf);
                         readNext();
                     }).catch(e => {
                         throw e;
                     });
-                    from = undefined;
                 };
                 readNext();
             }).catch(e => {
@@ -88,19 +88,19 @@ class Environment {
     }
 
     send(client) {
-        socket.enqueue(client, path.join(this._path, this.file), this._hostlen);
+        socket.enqueue(client, this.hash, path.join(this._path, this.file), this._hostlen + 4);
     }
 }
 
 class File {
-    constructor(path, environ, host) {
+    constructor(path, environment, host) {
         this._fd = fs.openSync(path, "w");
         this._headerWritten = false;
         this._pending = [];
         this._writing = false;
 
         this.path = path;
-        this.environ = environ;
+        this.environment = environment;
         this.host = host;
         this.hostlen = undefined;
     }
@@ -191,7 +191,7 @@ class File {
 }
 
 const environments = {
-    _environs: [],
+    _environments: [],
     _path: undefined,
 
     load: function load(path) {
@@ -227,22 +227,22 @@ const environments = {
         });
     },
 
-    prepare: function(environ) {
-        if (environments._environs.indexOf(environ.hash) !== -1)
+    prepare: function(environment) {
+        if (environments._environments.indexOf(environment.hash) !== -1)
             return undefined;
-        return new File(path.join(environments._path, environ.hash + ".tar.gz"), environ.hash, environ.host);
+        return new File(path.join(environments._path, environment.hash + ".tar.gz"), environment.hash, environment.host);
     },
 
     complete: function(file) {
         if (file.hostlen === undefined) {
             throw new Error("File hostlen undefined");
         }
-        environments._environs.push(new Environment(file.path, file.environ, file.host, file.hostlen));
+        environments._environments.push(new Environment(file.path, file.environment, file.host, file.hostlen));
     },
 
     hasEnvironment: function hasEnvironment(hash) {
-        for (var i = 0; i < environments._environs.length; ++i) {
-            const env = environments._environs[i];
+        for (var i = 0; i < environments._environments.length; ++i) {
+            const env = environments._environments[i];
             console.log(i, env.hash, hash, env.hash === hash);
             if (env.hash === hash) {
                 return true;
@@ -252,7 +252,7 @@ const environments = {
     },
 
     get environments() {
-        return environments._environs;
+        return environments._environments;
     },
 
     _read(p) {
@@ -262,7 +262,7 @@ const environments = {
                 // let toread = [];
                 // for (let i = 0; i < envs.length; ++i) {
                 //     toread.push(envs[i])
-                //     environments._environs.push(new Environment(p, envs[i]));
+                //     environments._environments.push(new Environment(p, envs[i]));
                 // }
                 const next = () => {
                     if (!envs.length) {
@@ -287,7 +287,7 @@ const environments = {
                     }).then(() => {
                         const hostlen = data.buf.readUInt32LE(0);
                         const host = data.buf.toString("utf8", 4, hostlen + 4);
-                        environments._environs.push(new Environment(p, env.substr(0, env.length - 7), host, hostlen));
+                        environments._environments.push(new Environment(p, env.substr(0, env.length - 7), host, hostlen));
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {

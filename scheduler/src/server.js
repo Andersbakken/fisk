@@ -77,17 +77,17 @@ class Server extends EventEmitter {
         switch (url.pathname) {
         case "/compile":
             // look at headers
-            if (!("x-fisk-environ" in req.headers)) {
-                error("No x-fisk-environ header");
+            if (!("x-fisk-environment" in req.headers)) {
+                error("No x-fisk-environment header");
                 return;
             }
-            const environ = req.headers["x-fisk-environ"];
+            const environment = req.headers["x-fisk-environment"];
 
             client = new Client({ws: ws, ip: ip, type: Client.Type.Compile});
             this.emit("compile", client);
 
             process.nextTick(() => {
-                client.emit("job", { environment: environ });
+                client.emit("job", { environment: environment });
             });
             break;
         case "/slave":
@@ -95,8 +95,13 @@ class Server extends EventEmitter {
                 error("No x-fisk-slave-port header");
                 return;
             }
+
+            if (!("x-fisk-environment" in req.headers)) {
+                error("No x-fisk-slave-environment header");
+                return;
+            }
             const slavePort = parseInt(req.headers["x-fisk-slave-port"]);
-            client = new Client({ws: ws, ip: ip, slavePort: slavePort, type: Client.Type.Slave});
+            client = new Client({ws: ws, ip: ip, slavePort: slavePort, type: Client.Type.Slave });
             ws.on("message", msg => {
                 let json;
                 try {
@@ -110,7 +115,8 @@ class Server extends EventEmitter {
                 if ("type" in json)
                     client.emit(json.type, json);
             });
-            this.emit("slave", client);
+            let envs = req.headers["x-fisk-environment"].replace(/\s+/g, '').split(';').filter(x => x);
+            this.emit("slave", client, envs);
             break;
         case "/uploadenvironment":
             client = new Client({ws: ws, ip: ip, type: Client.Type.UploadEnvironment});

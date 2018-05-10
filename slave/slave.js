@@ -9,7 +9,8 @@ const Compile = require("./src/compile");
 const client = new Client(option);
 
 let connectInterval;
-client.on("environment", function(environ) {
+client.on("environment", function(message) {
+    console.log("Got env", message);
     // environment from scheduler
 });
 
