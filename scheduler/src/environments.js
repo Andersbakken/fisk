@@ -286,7 +286,7 @@ const environments = {
                         return fs.close(fd);
                     }).then(() => {
                         const hostlen = data.buf.readUInt32LE(0);
-                        const host = data.buf.toString("utf8", 4, hostlen);
+                        const host = data.buf.toString("utf8", 4, hostlen + 4);
                         environments._environs.push(new Environment(p, env.substr(0, env.length - 7), host, hostlen));
                         process.nextTick(next);
                     }).catch(e => {
