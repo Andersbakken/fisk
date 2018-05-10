@@ -18,8 +18,13 @@ class Client extends EventEmitter {
         const url = `ws://${this.scheduler}/slave`;
         console.log("connecting to", this.scheduler);
 
-        let remaining = { bytes: undefined, type: undefined };
-        this.ws = new WebSocket(url, { headers: { "x-fisk-slave-port": this.serverPort } });
+        let remaining = { bytes: undefined, type: undefined, hash: undefined };
+        this.ws = new WebSocket(url, {
+            headers: {
+                "x-fisk-slave-port": this.serverPort,
+                "x-fisk-environment": ""
+            }
+        });
         this.ws.on("open", () => {
             this.emit("connect");
         });
@@ -50,7 +55,9 @@ class Client extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                if ("type" in json) {
+                if (json.type === 'environment') {
+                    remaining = json;
+                } else if ("type" in json) {
                     this.emit(json.type, json);
                 } else {
                     error("No type property in JSON");
@@ -72,28 +79,9 @@ class Client extends EventEmitter {
                             return;
                         }
                         remaining.bytes -= msg.length;
-                        this.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                        this.emit(remaining.type, { data: msg, last: !remaining.bytes, hash: remaining.hash });
                     } else {
-                        // first byte denotes our message type
-                        const type = msg.readUInt8(0);
-                        if (msg.length < 5) {
-                            error("No length in Buffer");
-                            return;
-                        }
-                        if (!(type in BinaryTypes)) {
-                            error(`Invalid binary type '${type}`);
-                            return;
-                        }
-                        const len = msg.readUInt32(1);
-                        if (len < msg.length - 5) {
-                            error(`length mismatch, ${len} vs ${msg.length - 5}`);
-                            return;
-                        }
-                        if (len > msg.length - 5) {
-                            remaining.type = BinaryTypes[type];
-                            remaining.bytes = len - (msg.length - 5);
-                        }
-                        this.emit(BinaryTypes[type], { data: msg.slice(5), last: !remaining.bytes });
+                        error(`Unexpected binary message of length: ${msg.length}`);
                     }
                 }
                 break;
