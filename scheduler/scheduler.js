@@ -130,7 +130,7 @@ server.on("error", function(err) {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(option("env-dir", path.join(os.homedir(), ".cache", "fisk", "environs"))).then(() => {
+Environments.load(option("env-dir", path.join(os.homedir(), ".cache", "fisk", "scheduler", "environs"))).then(() => {
     server.listen();
 }).catch(e => {
     console.error(e);
