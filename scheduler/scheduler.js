@@ -12,12 +12,11 @@ const slaves = {};
 server.on("slave", function(slave, environments) {
     console.log("slave connected", slave.ip, environments);
     slaves[slave.ip] = { client: slave, environments: environments };
-    console.log("slave has these environments", environments);
-    for (var k in Environments.environments) {
-        if (environments.indexOf(k) === -1) {
-            Environments.environments[k].send(slave);
+    Environments.environments.forEach((k) => {
+        if (environments.indexOf(k.hash) === -1) {
+            k.send(slave);
         }
-    }
+    });
 
     slave.on("load", function(load) {
         // console.log("slave load", load);

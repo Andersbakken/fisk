@@ -14,15 +14,15 @@ class Client extends EventEmitter {
         this.serverPort = option.int("port", 8096);
     }
 
-    connect() {
+    connect(environments) {
         const url = `ws://${this.scheduler}/slave`;
         console.log("connecting to", this.scheduler);
 
-        let remaining = { bytes: undefined, type: undefined, hash: undefined };
+        let remaining = 0;
         this.ws = new WebSocket(url, {
             headers: {
                 "x-fisk-slave-port": this.serverPort,
-                "x-fisk-environment": ""
+                "x-fisk-environments": environments.map(env => env.hash).join(";")
             }
         });
         this.ws.on("open", () => {
@@ -40,7 +40,7 @@ class Client extends EventEmitter {
 
             switch (typeof msg) {
             case "string":
-                if (remaining.bytes) {
+                if (remaining) {
                     // bad, client have to send all the data in a binary message before sending JSON
                     error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
                     return;
@@ -55,14 +55,15 @@ class Client extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                if (json.type === 'environment') {
-                    remaining = json;
-                } else if ("type" in json) {
-                    this.emit(json.type, json);
-                } else {
-                    error("No type property in JSON");
+                if (!json.type) {
+                    error("Bad message, no type");
                     return;
                 }
+
+                if (json.bytes) {
+                    remaining = json.bytes;
+                }
+                this.emit(json.type, json);
                 break;
             case "object":
                 if (msg instanceof Buffer) {
@@ -71,18 +72,20 @@ class Client extends EventEmitter {
                         error("No data in buffer");
                         return;
                     }
-                    if (remaining.bytes) {
+                    if (remaining) {
                         // more data
-                        if (msg.length > remaining.bytes) {
+                        if (msg.length > remaining) {
                             // woops
-                            error(`length ${msg.length} > ${remaining.bytes}`);
+                            error(`length ${msg.length} > ${remaining}`);
                             return;
                         }
-                        remaining.bytes -= msg.length;
-                        this.emit(remaining.type, { data: msg, last: !remaining.bytes, hash: remaining.hash });
+                        remaining -= msg.length;
+                        this.emit("data", { data: msg, last: !remaining });
                     } else {
                         error(`Unexpected binary message of length: ${msg.length}`);
                     }
+                } else {
+                    error("Unexpected object");
                 }
                 break;
             }
