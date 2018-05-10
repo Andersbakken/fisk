@@ -2,11 +2,6 @@ const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
 
-const BinaryTypes = {
-    // 0 and 1 is a special type that denotes a new compile or slave
-    2: "environment"
-};
-
 class Client extends EventEmitter {
     constructor(obj) {
         super();
