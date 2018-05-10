@@ -48,9 +48,9 @@ void Config::init()
         sJSON.push_back(std::move(parsed));
     };
     if (const char *home = getenv("HOME")) {
-        load(std::string(home) + "/.config/fisk.json");
+        load(std::string(home) + "/.config/fisk/client.json");
     }
-    load("/etc/fisk.json");
+    load("/etc/fisk/client.json");
 }
 
 std::string Config::scheduler()
@@ -126,7 +126,7 @@ size_t Config::localSlots(std::string *dir)
         if (val.is_string()) {
             *dir = val.string_value();
         } else if (const char *home = getenv("HOME")) {
-            *dir = home + std::string("/.cache/fisk/slots");
+            *dir = home + std::string("/.cache/fisk/client/slots");
         }
     }
     return ret;
@@ -147,7 +147,7 @@ std::string Config::envCache()
     if (val.is_string())
         return val.string_value();
     if (const char *home = getenv("HOME")) {
-        return home + std::string("/.cache/fisk/env.json");
+        return home + std::string("/.cache/fisk/client/env.json");
     }
     return std::string();
 }
