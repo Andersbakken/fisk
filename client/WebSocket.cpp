@@ -197,7 +197,7 @@ bool WebSocket::connect(std::string &&url, const std::string &env)
                                               "Connection: Upgrade\r\n"
                                               "Sec-WebSocket-Key: %s\r\n"
                                               "Sec-WebSocket-Version: 13\r\n"
-                                              "x-fisk-environment: %s\r\n"
+                                              "x-fisk-environments: %s\r\n"
                                               "\r\n",
                                               parsedUrl.m_Path.c_str(), host.c_str(), port,
                                               client_key.c_str(), env.c_str());

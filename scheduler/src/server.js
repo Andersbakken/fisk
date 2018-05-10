@@ -77,11 +77,11 @@ class Server extends EventEmitter {
         switch (url.pathname) {
         case "/compile":
             // look at headers
-            if (!("x-fisk-environment" in req.headers)) {
-                error("No x-fisk-environment header");
+            if (!("x-fisk-environments" in req.headers)) {
+                error("No x-fisk-environments header");
                 return;
             }
-            const environment = req.headers["x-fisk-environment"];
+            const environment = req.headers["x-fisk-environments"];
 
             client = new Client({ws: ws, ip: ip, type: Client.Type.Compile});
             this.emit("compile", client);
@@ -96,7 +96,7 @@ class Server extends EventEmitter {
                 return;
             }
 
-            if (!("x-fisk-environment" in req.headers)) {
+            if (!("x-fisk-environments" in req.headers)) {
                 error("No x-fisk-slave-environment header");
                 return;
             }
@@ -115,7 +115,8 @@ class Server extends EventEmitter {
                 if ("type" in json)
                     client.emit(json.type, json);
             });
-            let envs = req.headers["x-fisk-environment"].replace(/\s+/g, '').split(';').filter(x => x);
+            let envs = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
+            console.log("GOT DUDE", envs, req.headers);
             this.emit("slave", client, envs);
             break;
         case "/uploadenvironment":

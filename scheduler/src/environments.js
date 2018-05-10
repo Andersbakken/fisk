@@ -1,5 +1,4 @@
 const fs = require("fs-extra");
-const seekSync = require('fs-ext').seekSync;
 const mkdirp = require("mkdirp");
 const path = require("path");
 
@@ -31,26 +30,28 @@ const socket = {
                 size = st.size;
                 return fs.open(q.file, "r");
             }).then(fd => {
-                // send file size to client
-                q.client.send({ type: "environment", bytes: size, hash: q.hash });
-                // read file in chunks and send
                 let remaining = size;
                 if (q.skip) {
-                    seekSync(fd, q.skip, 0);
+                    var buf = Buffer.allocUnsafe(q.skip);
+                    fs.readSync(fd, buf, 0, q.skip);
+                    remaining -= q.skip;
                 }
+                // send file size to client
+                q.client.send({ type: "environment", bytes: remaining, hash: q.hash });
+                // read file in chunks and send
+                let idx = 0;
+                var last = undefined;
                 const readNext = () => {
                     if (!remaining) {
                         socket._sending = false;
                         resolve();
                         return;
                     }
-                    const bufsiz = 32768;
-                    const bytes = Math.min(bufsiz, remaining);
+                    const bytes = Math.min(32768, remaining);
                     const buf = Buffer.allocUnsafe(bytes);
 
                     remaining -= bytes;
                     fs.read(fd, buf, 0, bytes).then(() => {
-                        // console.log(buf);
                         q.client.send(buf);
                         readNext();
                     }).catch(e => {
