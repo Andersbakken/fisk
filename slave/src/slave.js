@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")("fisk-slave");
+const option = require("@jhanssen/options")("fisk/slave");
+const common = require('../../common')(option);
 const Server = require("./server");
 const Client = require("./client");
 const load = require("./load");
@@ -13,7 +14,7 @@ const VM = require('./VM');
 
 let environments = {};
 const client = new Client(option);
-const environmentsRoot = path.join(os.homedir(), ".cache", "fisk", "slave", "environments");
+const environmentsRoot = path.join(compile.cacheDir(), "environments");
 
 function exec(command, options)
 {
