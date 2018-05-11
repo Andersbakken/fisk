@@ -197,10 +197,6 @@ elif test "$1" = "--clang"; then
     shift
     added_clang=$1
     shift
-    if test "x$1" != "x--addfile" -a -e "$1"; then
-        # accept 2nd argument being the compilerwrapper binary, for backwards compatibility
-        shift
-    fi
     clang=1
 else
     if test -z "$1"; then
@@ -221,6 +217,7 @@ else
         # allowing to bypass any possible wrapper script etc. Note we must pass
         # just the binary name, not full path.
         added_clang=$($1 -print-prog-name=$(basename $1))
+        added_clangxx=$($1 -print-prog-name=$(basename $1)++)
     elif echo "$test_output" | grep -q 'clang __clang__ gcc.*'; then
         gcc=1
         # Gcc's -print-prog-name is useless, as it prints simply "gcc", so we have to
@@ -282,6 +279,15 @@ if test -n "$clang"; then
         echo "$added_clang is not a binary file."
         exit 1
     fi
+
+    if ! test -x "$added_clangxx" ; then
+        echo "'$added_clangxx' is no executable."
+        exit 1
+    fi
+    if ! file --mime-type -L "$added_clangxx" | grep -q ': application/'; then
+        echo "$added_clangxx is not a binary file."
+        exit 1
+    fi
 fi
 
 extrafiles=
@@ -335,11 +341,9 @@ if test -n "$clang"; then
     # In case clang is installed elsewhere.
     stripprefix=$(dirname $(dirname $added_clang))
     add_file $added_clang /usr/bin/clang
-    # HACK: Older icecream remotes have /usr/bin/{gcc|g++} hardcoded and wouldn't
-    # call /usr/bin/clang at all. So include a wrapper binary that will call gcc or clang
-    # depending on an extra argument added by icecream.
-    add_file /usr/bin/gcc
-    add_file /usr/bin/g++
+
+    added_clangxx=$(resolve_path $added_clangxx)
+    add_file $added_clangxx /usr/bin/clang++
 
     search_addfile $added_clang as /usr/bin
     search_addfile $added_clang objcopy /usr/bin
