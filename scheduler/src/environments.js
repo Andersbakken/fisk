@@ -89,7 +89,7 @@ class Environment {
     }
 
     send(client) {
-        socket.enqueue(client, this.hash, path.join(this._path, this.file), this._hostlen + 4);
+        socket.enqueue(client, this.hash, this._path, this._hostlen + 4);
     }
 }
 
@@ -168,7 +168,7 @@ class File {
             const buf = Buffer.from(this.host, "utf8");
             const hdr = Buffer.alloc(4);
 
-            this.hostlen = buf.length + 4;
+            this.hostlen = buf.length;
 
             hdr.writeUInt32LE(buf.length, 0);
             // console.log("writing header", buf.length + 4);
@@ -288,7 +288,7 @@ const environments = {
                     }).then(() => {
                         const hostlen = data.buf.readUInt32LE(0);
                         const host = data.buf.toString("utf8", 4, hostlen + 4);
-                        environments._environments.push(new Environment(p, env.substr(0, env.length - 7), host, hostlen));
+                        environments._environments.push(new Environment(path.join(p, env), env.substr(0, env.length - 7), host, hostlen));
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {

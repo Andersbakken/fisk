@@ -116,7 +116,7 @@ class Server extends EventEmitter {
                     client.emit(json.type, json);
             });
             let envs = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
-            console.log("GOT DUDE", envs, req.headers);
+            console.log("GOT DUDE", envs);
             this.emit("slave", client, envs);
             break;
         case "/uploadenvironment":

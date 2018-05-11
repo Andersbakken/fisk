@@ -63,6 +63,24 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
                     if (self.empty()) {
                         self = exec;
                     } else {
+                        if (fileType(exec) == Symlink) {
+                            char link[PATH_MAX + 1];
+                            const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
+                            if (len < 0) {
+                                Log::error("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
+                                exec.clear();
+                                continue;
+                            }
+                            link[len] = '\0';
+                            std::string linkedFile;
+                            parsePath(link, &linkedFile, 0);
+#warning // ccache? others?
+                            if (linkedFile == "icecc" || linkedFile == "fiskc") {
+                                exec.clear();
+                                continue;
+                            }
+                        }
+
                         break;
                     }
                 }
