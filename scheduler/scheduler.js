@@ -14,6 +14,7 @@ server.on("slave", function(slave, environments) {
     slaves[slave.ip] = { client: slave, environments: environments };
     Environments.environments.forEach((k) => {
         if (environments.indexOf(k.hash) === -1) {
+            console.log("sending", k.hash, "to", slave.ip);
             k.send(slave);
         }
     });

@@ -126,6 +126,7 @@ client.on("data", message => {
         }).then(() => {
             console.log("STEP 4");
             client.send("environment", { hash: pendingEnvironment.hash });
+            environments.push({ hash: pendingEnvironment.hash, dir: pendingEnvironment.dir });
             pendingEnvironment = undefined;
         }).catch((err) => {
             console.log("STEP 5");
