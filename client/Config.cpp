@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <thread>
+#include <arpa/inet.h>
 
 static std::vector<json11::Json> sJSON;
 static json11::Json value(const std::string &key)
@@ -58,10 +59,9 @@ void Config::init()
     if (!versionFile.empty()) {
         versionFile += "version";
         if (FILE *f = fopen(versionFile.c_str(), "r")) {
-            char buf[128];
-            if (fread(buf, 1, sizeof(buf) - 1, f) > 0) {
-                int version = atoi(buf);
-                if (version == Version) {
+            uint32_t version;
+            if (fread(&version, 1, sizeof(version) - 1, f) == 4) {
+                if (htonl(version) == Version) {
                     fclose(f);
                     return;
                 }
@@ -72,7 +72,7 @@ void Config::init()
     Client::recursiveRmdir(dir);
     Client::recursiveMkdir(dir);
     if (FILE *f = fopen(versionFile.c_str(), "w")) {
-        const int version = Version;
+        const uint32_t version = htonl(Version);
         fwrite(&version, 1, sizeof(version), f);
         fclose(f);
     }
