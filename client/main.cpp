@@ -35,9 +35,10 @@ int main(int argcIn, char **argvIn)
         args[i] = argv[i];
     }
     std::shared_ptr<CompilerArgs> compilerArgs = CompilerArgs::create(args);
-    if (!compilerArgs || compilerArgs->mode != CompilerArgs::Compile) {
-        Log::debug("Have to run locally because mode %s",
-                   CompilerArgs::modeName(compilerArgs ? compilerArgs->mode : CompilerArgs::Invalid));
+    if (!compilerArgs || compilerArgs->mode != CompilerArgs::Compile || compilerArgs->flags & CompilerArgs::StdinInput) {
+        Log::debug("Have to run locally because mode %s - flags 0x%x",
+                   CompilerArgs::modeName(compilerArgs ? compilerArgs->mode : CompilerArgs::Invalid),
+                   compilerArgs->flags);
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
