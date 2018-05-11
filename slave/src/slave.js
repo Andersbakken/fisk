@@ -14,7 +14,12 @@ const VM = require('./VM');
 
 let environments = {};
 const client = new Client(option);
-const environmentsRoot = path.join(compile.cacheDir(), "environments");
+const environmentsRoot = path.join(common.cacheDir(), "environments");
+
+if (process.getuid() !== 0) {
+    console.error("fisk slave needs to run as root to be able to chroot");
+    process.exit(1);
+}
 
 function exec(command, options)
 {
