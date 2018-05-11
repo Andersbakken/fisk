@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "Client.h"
 #include "Log.h"
 #include <errno.h>
 #include <string.h>
@@ -51,6 +52,30 @@ void Config::init()
         load(std::string(home) + "/.config/fisk/client.json");
     }
     load("/etc/fisk/client.json");
+
+    const std::string dir = cacheDir();
+    std::string versionFile = dir;
+    if (!versionFile.empty()) {
+        versionFile += "version";
+        if (FILE *f = fopen(versionFile.c_str(), "r")) {
+            char buf[128];
+            if (fread(buf, 1, sizeof(buf) - 1, f) > 0) {
+                int version = atoi(buf);
+                if (version == Version) {
+                    fclose(f);
+                    return;
+                }
+            }
+            fclose(f);
+        }
+    }
+    Client::recursiveRmdir(dir);
+    Client::recursiveMkdir(dir);
+    if (FILE *f = fopen(versionFile.c_str(), "w")) {
+        const int version = Version;
+        fwrite(&version, 1, sizeof(version), f);
+        fclose(f);
+    }
 }
 
 std::string Config::scheduler()
@@ -112,6 +137,23 @@ std::string Config::clientName()
     return "unknown";
 }
 
+std::string Config::cacheDir()
+{
+    json11::Json val = value("cache_dir");
+    if (val.is_string()) {
+        std::string ret = val.string_value();
+        if (!ret.empty()) {
+            if (ret[ret.size() - 1] != '/')
+                ret += '/';
+            return ret;
+        }
+    }
+    if (const char *home = getenv("HOME")) {
+        return home + std::string("/.cache/fisk/client/");
+    }
+    return std::string();
+}
+
 size_t Config::localSlots(std::string *dir)
 {
     json11::Json val = value("local_slots");
@@ -122,12 +164,7 @@ size_t Config::localSlots(std::string *dir)
         ret = std::thread::hardware_concurrency();
     }
     if (dir) {
-        val = value("local_slots_dir");
-        if (val.is_string()) {
-            *dir = val.string_value();
-        } else if (const char *home = getenv("HOME")) {
-            *dir = home + std::string("/.cache/fisk/client/slots");
-        }
+        *dir = cacheDir() + "/slots";
     }
     return ret;
 }
@@ -143,13 +180,10 @@ bool Config::noLocal()
 
 std::string Config::envCache()
 {
-    json11::Json val = value("env_cache");
-    if (val.is_string())
-        return val.string_value();
-    if (const char *home = getenv("HOME")) {
-        return home + std::string("/.cache/fisk/client/env.json");
-    }
-    return std::string();
+    std::string ret = cacheDir();
+    if (!ret.empty())
+        ret += "environment_cache.json";
+    return ret;
 }
 
 bool Config::watchdog()
