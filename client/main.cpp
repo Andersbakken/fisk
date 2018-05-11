@@ -135,8 +135,8 @@ int main(int argcIn, char **argvIn)
                     } else {
                         Log::error("Unexpected message type: %s", type.c_str());
                     }
-                } else {
-                    printf("Got binary message: %zu bytes\n", len);
+                // } else {
+                //     printf("Got binary message: %zu bytes\n", len);
                 }
             })) {
         Watchdog::stop();

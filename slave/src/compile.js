@@ -3,6 +3,7 @@ const mktemp = require('mktemp');
 const fs = require('fs');
 const path = require('path');
 const EventEmitter = require('events');
+
 const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
@@ -83,7 +84,7 @@ class Compile extends EventEmitter {
 
         if (!originalOutput) {
             args.push('-o');
-            args.push(tmpdir + "/slave.out");
+            args.push(path.join(tmpdir, magicalObjectName));
             originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
         }
 
@@ -154,7 +155,7 @@ class Compile extends EventEmitter {
                         try {
                             let stat = fs.statSync(path.join(dir, file));
                             if (stat.isDirectory()) {
-                                addDir(path.join(dir,  file), prefix ? prefix + file + '/' : file + '/');
+                                addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
                                 let contents = fs.readFileSync(path.join(dir, file));
                                 if (file === magicalObjectName)
