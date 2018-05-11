@@ -128,7 +128,8 @@ class Compile extends EventEmitter {
             }
             args.unshift('-x');
         }
-        args.push('-fpreprocessed'); // is this good for clang?
+        if (compiler.indexOf('clang') != -1)
+            args.push('-fpreprocessed'); // this is not good for clang
         console.log(args.join(' '));
         var proc = child_process.spawn(compiler, args, { cwd: tmpdir });
         proc.stdout.setEncoding('utf8');
