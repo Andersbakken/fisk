@@ -290,5 +290,6 @@ int main(int argcIn, char **argvIn)
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
+    Watchdog::stop();
     return exitCode;
 }
