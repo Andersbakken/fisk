@@ -112,11 +112,13 @@ class Server extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                if ("type" in json)
+                // console.log("GOT MESSAGE", json);
+                if ("type" in json) {
                     client.emit(json.type, json);
+                }
             });
             let envs = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
-            console.log("GOT DUDE", envs);
+            console.log("Got dude", envs);
             this.emit("slave", client, envs);
             break;
         case "/uploadenvironment":

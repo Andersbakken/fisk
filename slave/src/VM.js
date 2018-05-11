@@ -5,14 +5,15 @@ const fs = require('fs-extra');
 const path = require('path');
 
 let id = 0;
-class Compile extends EventEmitter
+class CompileJob extends EventEmitter
 {
-    constructor(commandLine, vm) {
+    constructor(commandLine, argv0, vm) {
         super();
         this.vm = vm;
         this.commandLine = commandLine;
+        this.argv0 = argv0;
         this.id = ++id;
-        console.log("shait", commandLine, vm.root);
+        console.log("shait", commandLine, argv0, vm.root);
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
         this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
@@ -23,7 +24,7 @@ class Compile extends EventEmitter
         if (last) {
             fs.close(this.fd);
             this.fd = undefined;
-            this.vm.child.send({ type: "compile", commandLine: this.commandLine, id: this.id, dir: this.dir });
+            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.dir });
         }
     }
 };
@@ -75,8 +76,8 @@ class VM
         this.send({type: 'stop'});
     }
 
-    startCompile(commandLine) {
-        let compile = new Compile(commandLine, this);
+    startCompile(commandLine, argv0) {
+        let compile = new CompileJob(commandLine, argv0, this);
         this.compiles[compile.id] = compile;
         return compile;
     }

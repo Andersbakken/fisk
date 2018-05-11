@@ -7,9 +7,10 @@ const EventEmitter = require('events');
 const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
-    constructor(args, dir) {
+    constructor(args, argv0, dir) {
         super();
-        if (!args || !args.length || !dir) {
+        if (!args || !args.length || !dir || !argv0) {
+            console.error(argv0, args, dir);
             throw new Error("Bad args");
         }
         const compiler = args.shift();
@@ -134,7 +135,7 @@ class Compile extends EventEmitter {
         if (compiler.indexOf('clang') != -1)
             args.push('-fpreprocessed'); // this is not good for clang
         console.log(args.join(' '));
-        let proc = child_process.spawn(compiler, args, { cwd: dir });
+        let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
 

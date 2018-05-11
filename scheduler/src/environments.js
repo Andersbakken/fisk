@@ -5,7 +5,7 @@ const socket = {
     _queue: [],
     _sending: false,
 
-    enqueue: function enqueue(client, hash, file, skip) {
+    enqueue(client, hash, file, skip) {
         socket._queue.push({ client: client, hash: hash, file: file, skip });
         if (!socket._sending) {
             socket._next().then(() => {
@@ -93,14 +93,14 @@ class Environment {
 }
 
 class File {
-    constructor(path, environment, host) {
+    constructor(path, hash, host) {
         this._fd = fs.openSync(path, "w");
         this._headerWritten = false;
         this._pending = [];
         this._writing = false;
 
         this.path = path;
-        this.environment = environment;
+        this.hash = hash;
         this.host = host;
         this.hostlen = undefined;
     }
@@ -191,10 +191,10 @@ class File {
 }
 
 const environments = {
-    _environments: [],
+    _data: {},
     _path: undefined,
 
-    load: function load(path) {
+    load(path) {
         return new Promise((resolve, reject) => {
             fs.stat(path).then(st => {
                 if (st.isDirectory()) {
@@ -227,43 +227,37 @@ const environments = {
         });
     },
 
-    prepare: function(environment) {
-        if (environments._environments.indexOf(environment.hash) !== -1)
+    prepare(environment) {
+        if (environment.hash in environments._data)
             return undefined;
         return new File(path.join(environments._path, environment.hash + ".tar.gz"), environment.hash, environment.host);
     },
 
-    complete: function(file) {
+    complete(file) {
         if (file.hostlen === undefined) {
             throw new Error("File hostlen undefined");
         }
-        environments._environments.push(new Environment(file.path, file.environment, file.host, file.hostlen));
+        environments._data[file.hash] = new Environment(file.path, file.hash, file.host, file.hostlen);
     },
 
-    hasEnvironment: function hasEnvironment(hash) {
-        for (let i = 0; i < environments._environments.length; ++i) {
-            const env = environments._environments[i];
-            console.log(i, env.hash, hash, env.hash === hash);
-            if (env.hash === hash) {
-                return true;
-            }
-        }
-        return false;
+    hasEnvironment(hash) {
+        return hash in environments._data;
     },
 
     get environments() {
-        return environments._environments;
+        return environments._data;
+    },
+
+    environment(hash) {
+        if (!(hash in environments._data))
+            return undefined;
+        return environments._data[hash];
     },
 
     _read(p) {
         return new Promise((resolve, reject) => {
             fs.readdir(p).then(files => {
                 let envs = files.filter(e => e.endsWith(".tar.gz"));
-                // let toread = [];
-                // for (let i = 0; i < envs.length; ++i) {
-                //     toread.push(envs[i])
-                //     environments._environments.push(new Environment(p, envs[i]));
-                // }
                 const next = () => {
                     if (!envs.length) {
                         resolve();
@@ -287,7 +281,8 @@ const environments = {
                     }).then(() => {
                         const hostlen = data.buf.readUInt32LE(0);
                         const host = data.buf.toString("utf8", 4, hostlen + 4);
-                        environments._environments.push(new Environment(path.join(p, env), env.substr(0, env.length - 7), host, hostlen));
+                        const hash = env.substr(0, env.length - 7);
+                        environments._data[hash] = new Environment(path.join(p, env), hash, host, hostlen);
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {
