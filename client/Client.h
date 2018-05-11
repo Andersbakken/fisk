@@ -42,6 +42,7 @@ std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
+bool recursiveRmdir(const std::string &path);
 
 class Preprocessed
 {

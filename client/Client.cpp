@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <string.h>
 #include <sys/file.h>
+#include <dirent.h>
 #ifdef __linux__
 #include <sys/inotify.h>
 #endif
@@ -177,6 +178,41 @@ bool Client::recursiveMkdir(const std::string &dir, mode_t mode)
         return true;
     }
     return false;
+}
+
+bool Client::recursiveRmdir(const std::string &dir)
+{
+    DIR *d = opendir(dir.c_str());
+    size_t path_len = dir.size();
+    union {
+        char buf[PATH_MAX];
+        dirent dbuf;
+    };
+
+    if (!d) {
+        return errno == ENOENT;
+    }
+    while (dirent *p = readdir(d)) {
+        /* Skip the names "." and ".." as we don't want to recurse on them. */
+        if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
+            continue;
+        }
+
+        const size_t len = path_len + strlen(p->d_name) + 2;
+        char buffer[PATH_MAX];
+
+        struct stat statbuf;
+        snprintf(buffer, len, "%s/%s", dir.c_str(), p->d_name);
+        if (!::stat(buffer, &statbuf)) {
+            if (S_ISDIR(statbuf.st_mode)) {
+                Client::recursiveRmdir(buffer);
+            } else {
+                unlink(buffer);
+            }
+        }
+    }
+    closedir(d);
+    return ::rmdir(dir.c_str()) == 0;
 }
 
 std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
