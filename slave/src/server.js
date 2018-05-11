@@ -53,7 +53,7 @@ class Server extends EventEmitter {
 
     _handleConnection(ws, req) {
         let client = undefined;
-        let remaining = { bytes: undefined, type: undefined };
+        let bytes = undefined;
         let ip = req.connection.remoteAddress;
         if (ip.substr(0, 7) == "::ffff:") {
             ip = ip.substr(7);
@@ -88,9 +88,9 @@ class Server extends EventEmitter {
             switch (typeof msg) {
             case "string":
                 console.log("Got message", msg);
-                if (remaining.bytes) {
+                if (bytes) {
                     // bad, client have to send all the data in a binary message before sending JSON
-                    error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
+                    error(`Got JSON message while ${bytes} bytes remained of a binary message`);
                     return;
                 }
                 // assume JSON
@@ -103,37 +103,37 @@ class Server extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                remaining.type = "data";
-                remaining.bytes = json.bytes;
+                bytes = json.bytes;
                 client.commandLine = json.commandLine;
+                client.argv0 = json.argv0;
                 this.emit('job', client);
                 break;
             case "object":
                 if (msg instanceof Buffer) {
-                    console.log("Got binary", msg.length, remaining.bytes);
+                    console.log("Got binary", msg.length, bytes);
                     if (!msg.length) {
                         // no data?
                         error("No data in buffer");
                         return;
                     }
-                    if (!remaining.bytes) {
+                    if (!bytes) {
                         error("Got binary message without a preceeding json message describing the data");
                         return;
                     }
-                    if (msg.length > remaining.bytes) {
+                    if (msg.length > bytes) {
                         // woops
-                        error(`length ${msg.length} > ${remaining.bytes}`);
+                        error(`length ${msg.length} > ${bytes}`);
                         return;
                     }
-                    remaining.bytes -= msg.length;
-                    console.log("Emitting", remaining.type, { data: msg.length, last: !remaining.bytes });
-                    client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                    bytes -= msg.length;
+                    console.log("Emitting", 'data', { data: msg.length, last: !bytes });
+                    client.emit('data', { data: msg, last: !bytes });
                 }
                 break;
             }
         });
         ws.on("close", () => {
-            if (remaining.bytes)
+            if (bytes)
                 client.emit("error", "Got close while reading a binary message");
             if (client)
                 client.emit("close");

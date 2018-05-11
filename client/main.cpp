@@ -21,6 +21,7 @@ int main(int argcIn, char **argvIn)
     argc = argcIn;
     argv = argvIn;
     compiler = Client::findCompiler(argc, argv, &resolvedCompiler);
+    printf("%s -> %s\n", compiler.c_str(), resolvedCompiler.c_str());
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;
@@ -168,9 +169,10 @@ int main(int argcIn, char **argvIn)
 
     }
     Watchdog::transition(Watchdog::ConnectedToSlave);
-    args[0] = compiler;
+    args[0] = Client::realpath(compiler);
     json11::Json::object msg {
         { "commandLine", args },
+        { "argv0", compiler },
         { "bytes", static_cast<int>(preprocessed->stdOut.size()) }
     };
     std::string json = json11::Json(msg).dump();

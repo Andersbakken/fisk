@@ -134,9 +134,9 @@ client.on("data", message => {
             console.log("STEP 3");
             return fs.unlink(pendingEnvironment.file);
         }).then(() => {
-            console.log("STEP 4");
-            client.send("environment", { hash: pendingEnvironment.hash });
             environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
+            console.log("STEP 4, sending environments back:", Object.keys(environments));
+            client.send("environments", { environments: Object.keys(environments) });
             pendingEnvironment = undefined;
         }).catch((err) => {
             console.log("STEP 5");
@@ -189,7 +189,8 @@ server.on("job", (job) => {
         console.error("No vm for this hash", job.hash);
         return;
     }
-    var op = vm.startCompile(job.commandLine);
+    console.log("job", job.argv0, Object.keys(job));
+    var op = vm.startCompile(job.commandLine, job.argv0);
     op.on('stdout', data => compile.send({ type: 'stdout', data: data }));
     op.on('stderr', data => compile.send({ type: 'stderr', data: data }));
     op.on('finished', event => {

@@ -10,14 +10,47 @@ const server = new Server(option);
 
 const slaves = {};
 
+function distribute(conf)
+{
+    let ips;
+    if (conf && conf.slave) {
+        if (conf.pendingEnvironments)
+            return;
+        ips = [ conf.slave.ip ];
+    } else {
+        ips = Object.keys(slaves);
+    }
+    let hashes;
+    if (conf && conf.hash) {
+        hashes = [ conf.hash ];
+    } else {
+        hashes = Object.keys(Environments.environments);
+    }
+    console.log("distribute", ips, hashes);
+    for (var h=0; h<hashes.length; ++h) {
+        let hash = hashes[h];
+        for (let i=0; i<ips.length; ++i) {
+            let ip = ips[i];
+            let slave = slaves[ip];
+            if (!slave.pendingEnvironments && slave.environments && slave.environments.indexOf(hash) === -1) {
+                console.log("sending", hash, "to", ip);
+                Environments.environment(hash).send(slave.client);
+                slave.pendingEnvironments = true;
+                break;
+            }
+        }
+    }
+}
+
 server.on("slave", function(slave, environments) {
     console.log("slave connected", slave.ip, environments);
-    slaves[slave.ip] = { client: slave, environments: environments };
-    Environments.environments.forEach((k) => {
-        if (environments.indexOf(k.hash) === -1) {
-            console.log("sending", k.hash, "to", slave.ip);
-            k.send(slave);
-        }
+    slaves[slave.ip] = { client: slave, environments: environments, pendingEnvironments: false };
+    distribute({slave: slave});
+
+    slave.on('environments', function(message) {
+        slaves[slave.ip].environments = message.environments;
+        slave.pendingEnvironments = false;
+        distribute({slave: slave});
     });
 
     slave.on("load", function(load) {
@@ -71,6 +104,7 @@ server.on("compile", function(compile) {
 
 server.on("uploadEnvironment", function(upload) {
     let file;
+    let hash;
     upload.on("environment", function(environment) {
         file = Environments.prepare(environment);
         console.log("Got environment message", environment, typeof file);
@@ -79,6 +113,8 @@ server.on("uploadEnvironment", function(upload) {
             console.error("already got environment", environment.message);
             upload.send({ error: "already got environment" });
             upload.close();
+        } else {
+            hash = environment.hash;
         }
     });
     upload.on("environmentdata", function(environment) {
@@ -95,14 +131,7 @@ server.on("uploadEnvironment", function(upload) {
                 Environments.complete(file);
                 file = undefined;
                 // send any new environments to slaves
-                for (let ip in slaves) {
-                    let slave = slaves[ip];
-                    for (let ek in Environments.environments) {
-                        if (slave.environments && slave.environments.indexOf(ek) === -1) {
-                            Environments.environments[ek].send(slave.client);
-                        }
-                    }
-                }
+                distribute({hash: hash});
             }
         }).catch(err => {
             console.log("file error", err);
@@ -129,7 +158,7 @@ server.on("error", function(err) {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(option("env-dir", common.cachepath.join(os.homedir(), ".cache", "fisk", "scheduler", "environments"))).then(() => {
+Environments.load(option("env-dir", path.join(common.cacheDir(), "environments"))).then(() => {
     server.listen();
 }).catch(e => {
     console.error(e);

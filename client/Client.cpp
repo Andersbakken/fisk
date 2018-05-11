@@ -34,12 +34,13 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
     std::string exec;
     if (path) {
         std::string self, basename;
-        char realPath[PATH_MAX];
         const char *begin = path, *end = 0;
         // printf("trying realpath [%s]\n", argv[0]);
-        if (realpath(argv[0], realPath)) {
+        std::string rp = Client::realpath(argv[0]);
+        printf("REALPATH %s %s\n", argv[0], rp.c_str());
+        if (!rp.empty()) {
             std::string dirname;
-            parsePath(realPath, 0, &dirname);
+            parsePath(rp, 0, &dirname);
             parsePath(argv[0], &basename, 0);
             self = dirname + basename;
         } else if (strchr(argv[0], '/')) {
@@ -75,7 +76,6 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
                             link[len] = '\0';
                             std::string linkedFile;
                             parsePath(link, &linkedFile, 0);
-#warning // ccache? others?
                             if (linkedFile == "icecc" || linkedFile == "fiskc") {
                                 exec.clear();
                                 continue;
@@ -90,7 +90,8 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
         } while (end);
     }
 
-    *resolvedCompiler = exec;
+    *resolvedCompiler = Client::realpath(exec);
+    printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
 
     const size_t slash = resolvedCompiler->rfind('/');
     if (slash != std::string::npos) {
@@ -106,6 +107,7 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
             }
         }
     }
+    printf("RESIULT %s\n", resolvedCompiler->c_str());
 
     return exec;
 }
@@ -500,6 +502,15 @@ std::string Client::environmentHash(const std::string &compiler)
     return ret;
 }
 
+std::string Client::realpath(const std::string &path)
+{
+    char buf[PATH_MAX + 1];
+    if (::realpath(path.c_str(), buf)) {
+        return buf;
+    }
+    return std::string();
+}
+
 std::string Client::findExecutablePath(const char *argv0)
 {
 #if defined(__linux__)
@@ -523,8 +534,7 @@ std::string Client::findExecutablePath(const char *argv0)
         if (_NSGetExecutablePath(buf, &size) == 0) {
             char ret[PATH_MAX];
             buf[PATH_MAX] = '\0';
-            realpath(buf, ret);
-            return ret;
+            return Client::realpath(buf);
         }
     }
 #else

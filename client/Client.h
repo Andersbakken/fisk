@@ -20,6 +20,10 @@ namespace Client {
 std::mutex &mutex();
 std::string findCompiler(int argc, char **argv, std::string *resolvedCompiler);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
+inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
+{
+    return parsePath(path.c_str(), basename, dirname);
+}
 class Slot
 {
 public:
@@ -43,6 +47,7 @@ unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 bool recursiveRmdir(const std::string &path);
+std::string realpath(const std::string &path);
 
 class Preprocessed
 {
