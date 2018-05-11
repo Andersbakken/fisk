@@ -299,16 +299,19 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
                 const ssize_t r = ::read(mFD, buf, sizeof(buf));
                 if (!r) {
                     closed = true;
+                    break;
                 } else if (r > 0) {
                     mRecvBuffer.insert(mRecvBuffer.end(), buf, buf + r);
                 } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
                     break;
                 } else {
-                    errno = true;
+                    error = true;
                     break;
                 }
             }
         }
+        if (closed)
+            break;
         while (true) {
             const size_t last = mRecvBuffer.size();
             wslay_event_recv(mContext);
@@ -325,7 +328,7 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
                 } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
                     break;
                 } else {
-                    errno = true;
+                    error = true;
                     break;
                 }
             }
@@ -334,7 +337,7 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
             }
         }
 
-        if (closed || error)
+        if (error)
             break;
         if (mExit && mSendBuffer.empty()) {
             break;
