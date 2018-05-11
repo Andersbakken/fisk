@@ -45,9 +45,8 @@ server.on("compile", function(compile) {
         let best = { load: Infinity };
         for (let ip in slaves) {
             let slave = slaves[ip];
-            console.log("GOT SLAVE", slave);
-            if ("load" in slave /* && "environments" in slave*/) {
-                if (/*slave.environments.indexOf(request.environment) !== -1 &&*/ slave.load < best.load) {
+            if ("load" in slave && "environments" in slave) {
+                if (slave.environments.indexOf(request.environment) !== -1 && slave.load < best.load) {
                     best.load = slave.load;
                     best.ip = ip;
                     best.slavePort = slave.client.slavePort;
@@ -95,9 +94,9 @@ server.on("uploadEnvironment", function(upload) {
                 Environments.complete(file);
                 file = undefined;
                 // send any new environments to slaves
-                for (var ip in slaves) {
+                for (let ip in slaves) {
                     let slave = slaves[ip];
-                    for (var ek in Environments.environments) {
+                    for (let ek in Environments.environments) {
                         if (slave.environments && slave.environments.indexOf(ek) === -1) {
                             Environments.environments[ek].send(slave.client);
                         }

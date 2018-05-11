@@ -290,6 +290,7 @@ int main(int argcIn, char **argvIn)
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
+#warning we don't wake up from the websocket select when the connection is reset
     Watchdog::stop();
     return exitCode;
 }

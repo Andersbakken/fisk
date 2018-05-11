@@ -7,22 +7,21 @@ const EventEmitter = require('events');
 const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
-    constructor(args, preprocessed) {
+    constructor(args, dir) {
         super();
-        if (!args || !args.length || !preprocessed) {
+        if (!args || !args.length || !dir) {
             throw new Error("Bad args");
         }
         const compiler = args.shift();
-        const tmpdir = mktemp.createDirSync('/tmp/fisk-slave-compile-XXXXXX');
 
-        var hasDashX = false;
-        var sourceFile;
-        var originalOutput;
-        for (var i=0; i<args.length; ++i) {
+        let hasDashX = false;
+        let sourceFile;
+        let originalOutput;
+        for (let i=0; i<args.length; ++i) {
             switch (args[i]) {
             case '-o':
                 originalOutput = args[++i];
-                args[i] = path.join(tmpdir, magicalObjectName);
+                args[i] = path.join(dir, magicalObjectName);
                 break;
             case '-x':
                 hasDashX = true;
@@ -72,8 +71,11 @@ class Compile extends EventEmitter {
                 break;
             default:
                 if (args[i][0] != '-') {
+                    if (sourceFile) {
+                        throw new Error("More than one source file");
+                    }
                     sourceFile = args[i];
-                    args[i] = "-";
+                    args[i] = path.join(dir, 'sourcefile');
                 }
                 break;
             }
@@ -84,7 +86,7 @@ class Compile extends EventEmitter {
 
         if (!originalOutput) {
             args.push('-o');
-            args.push(path.join(tmpdir, magicalObjectName));
+            args.push(path.join(dir, magicalObjectName));
             originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
         }
 
@@ -132,7 +134,7 @@ class Compile extends EventEmitter {
         if (compiler.indexOf('clang') != -1)
             args.push('-fpreprocessed'); // this is not good for clang
         console.log(args.join(' '));
-        var proc = child_process.spawn(compiler, args, { cwd: tmpdir });
+        let proc = child_process.spawn(compiler, args, { cwd: dir });
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
 
@@ -152,15 +154,18 @@ class Compile extends EventEmitter {
             function addDir(dir, prefix) {
                 try {
                     fs.readdirSync(dir).forEach(file => {
+                        if (file === 'sourcefile')
+                            return;
                         try {
                             let stat = fs.statSync(path.join(dir, file));
                             if (stat.isDirectory()) {
                                 addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
-                                let contents = fs.readFileSync(path.join(dir, file));
-                                if (file === magicalObjectName)
-                                    file = originalOutput;
-                                files.push({ path: prefix + file, contents: contents });
+                                if (file === magicalObjectName) {
+                                    files.push({ path: originalOutput, mapped: prefix + file });
+                                } else {
+                                    files.push({ path: prefix + file });
+                                }
                             }
                         } catch (err) {
                         }
@@ -170,17 +175,15 @@ class Compile extends EventEmitter {
                     return;
                 }
             }
-            addDir(tmpdir, "");
+            addDir(dir, "");
             this.emit('exit', { exitCode: exitCode, files: files });
 
         });
-        proc.stdin.write(preprocessed);
-        proc.stdin.end();
     }
 }
 
-// var preproc = fs.readFileSync("/tmp/preproc");
-// var f = new Compile([ "/usr/bin/c++", "-Iclient", "-I3rdparty/json11", "-I3rdparty/wslay/lib/includes", "-I3rdparty/wslay/lib", "-I3rdparty/LUrlParser", "-I3rdparty/tiny-process-library", "-std=c++14", "-Wformat", "-Wall", "-g", "-MD", "-MT", "client/CMakeFiles/fiskc.dir/Config.cpp.o", "-MF", "client/CMakeFiles/fiskc.dir/Config.cpp.o.d", "-o", "client/CMakeFiles/fiskc.dir/Config.cpp.o", "-c", "client/Config.cpp" ], preproc);
+// let preproc = fs.readFileSync("/tmp/preproc");
+// let f = new Compile([ "/usr/bin/c++", "-Iclient", "-I3rdparty/json11", "-I3rdparty/wslay/lib/includes", "-I3rdparty/wslay/lib", "-I3rdparty/LUrlParser", "-I3rdparty/tiny-process-library", "-std=c++14", "-Wformat", "-Wall", "-g", "-MD", "-MT", "client/CMakeFiles/fiskc.dir/Config.cpp.o", "-MF", "client/CMakeFiles/fiskc.dir/Config.cpp.o.d", "-o", "client/CMakeFiles/fiskc.dir/Config.cpp.o", "-c", "client/Config.cpp" ], preproc);
 // f.on('stdout', (data) => {
 //     console.log("Got out", data.length);
 // });

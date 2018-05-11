@@ -31,7 +31,7 @@ const socket = {
             }).then(fd => {
                 let remaining = size;
                 if (q.skip) {
-                    var buf = Buffer.allocUnsafe(q.skip);
+                    let buf = Buffer.allocUnsafe(q.skip);
                     fs.readSync(fd, buf, 0, q.skip);
                     remaining -= q.skip;
                 }
@@ -39,7 +39,7 @@ const socket = {
                 q.client.send({ type: "environment", bytes: remaining, hash: q.hash });
                 // read file in chunks and send
                 let idx = 0;
-                var last = undefined;
+                let last = undefined;
                 const readNext = () => {
                     if (!remaining) {
                         socket._sending = false;
@@ -241,7 +241,7 @@ const environments = {
     },
 
     hasEnvironment: function hasEnvironment(hash) {
-        for (var i = 0; i < environments._environments.length; ++i) {
+        for (let i = 0; i < environments._environments.length; ++i) {
             const env = environments._environments[i];
             console.log(i, env.hash, hash, env.hash === hash);
             if (env.hash === hash) {

@@ -20,6 +20,7 @@
     "@jhanssen/options": "^1.0.8",
     "fs-extra": "^6.0.1",
     "mktemp": "^0.4.0",
+    "posix": "git+https://github.com/Andersbakken/node-posix.git",
     "ws": "^5.1.1"
   }
 }
