@@ -2,7 +2,7 @@
   "name": "scheduler",
   "version": "1.0.0",
   "description": "Scheduler for fisk",
-  "main": "scheduler.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,7 +19,6 @@
   "dependencies": {
     "@jhanssen/options": "^1.0.8",
     "fs-extra": "^5.0.0",
-    "mkdirp": "^0.5.1",
     "ws": "^5.1.1"
   }
 }

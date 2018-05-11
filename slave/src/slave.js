@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 const option = require("@jhanssen/options")("fisk-slave");
-const Server = require("./src/server");
-const Client = require("./src/client");
-const load = require("./src/load");
-const Compile = require("./src/compile");
+const Server = require("./server");
+const Client = require("./client");
+const load = require("./load");
+const Compile = require("./compile");
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');

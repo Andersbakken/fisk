@@ -1,5 +1,4 @@
 const fs = require("fs-extra");
-const mkdirp = require("mkdirp");
 const path = require("path");
 
 const socket = {
@@ -212,7 +211,7 @@ const environments = {
             }).catch(e => {
                 if ("code" in e && e.code == "ENOENT") {
                     // make the directory
-                    mkdirp(path, err => {
+                    fs.mkdirp(path, err => {
                         if (err) {
                             reject(`Can't make directory ${path}: ${e.message}`);
                             return;
