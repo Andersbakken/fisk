@@ -532,7 +532,6 @@ std::string Client::findExecutablePath(const char *argv0)
         char buf[PATH_MAX + 1];
         uint32_t size = PATH_MAX;
         if (_NSGetExecutablePath(buf, &size) == 0) {
-            char ret[PATH_MAX];
             buf[PATH_MAX] = '\0';
             return Client::realpath(buf);
         }
