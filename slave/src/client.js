@@ -1,11 +1,6 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 
-const BinaryTypes = {
-    // 0 and 1 is a special type that denotes a new compile or slave
-    2: "environment"
-};
-
 class Client extends EventEmitter {
     constructor(option) {
         super();
@@ -22,7 +17,7 @@ class Client extends EventEmitter {
         this.ws = new WebSocket(url, {
             headers: {
                 "x-fisk-slave-port": this.serverPort,
-                "x-fisk-environments": environments.map(env => env.hash).join(";")
+                "x-fisk-environments": environments.join(";")
             }
         });
         this.ws.on("open", () => {

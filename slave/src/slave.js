@@ -9,10 +9,28 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 const child_process = require('child_process');
+const VM = require('./VM');
 
-let environments = [];
+let environments = {};
 const client = new Client(option);
 const environmentsRoot = path.join(os.homedir(), ".cache", "fisk", "slave", "environments");
+
+function exec(command, options)
+{
+    return new Promise((resolve, reject) => {
+        child_process.exec(command, options, (err, stdout, stderr) => {
+            if (stderr) {
+                console.error("Got stderr from", command);
+            }
+            if (err) {
+                reject(new Error(`Failed to run command ${command}: ${err.message}`));
+            } else {
+                console.log(command, "finished");
+                resolve();
+            }
+        });
+    });
+}
 
 function loadEnvironments()
 {
@@ -31,7 +49,7 @@ function loadEnvironments()
                 reject(err);
             } else {
                 if (files) {
-                    for (var i=0; i<files.length; ++i) {
+                    for (let i=0; i<files.length; ++i) {
                         try {
                             let dir = path.join(environmentsRoot, files[i]);
                             let stat = fs.statSync(dir);
@@ -39,14 +57,14 @@ function loadEnvironments()
                                 fs.removeSync(dir);
                                 continue;
                             }
-                            var env = JSON.parse(fs.readFileSync(path.join(dir, "environment.json")));
+                            let env = JSON.parse(fs.readFileSync(path.join(dir, "environment.json")));
                             if (env.hash) {
-                                environments.push({hash: env.hash, dir: dir});
+                                environments[env.hash] = new VM(dir, env.hash);
                             } else {
                                 fs.removeSync(dir);
                             }
                         } catch (err) {
-                            console.error(`Got error loading environment ${files[i]} ${err.message}`);
+                            console.error(`Got error loading environment ${files[i]} ${err.stack} ${err.message}`);
                         }
                     }
                 }
@@ -66,6 +84,10 @@ client.on("environment", message => {
         throw new Error("Bad environment without hash");
     }
 
+    if (message.hash in environments) {
+        throw new Error("We already have this environment: " + message.hash);
+    }
+
     console.log("Got env", message);
     const dir = path.join(environmentsRoot, message.hash);
     try {
@@ -83,23 +105,6 @@ client.on("environment", message => {
     pendingEnvironment = { hash: message.hash, fd: fd, dir: dir, file: file, done: false };
     // environment from scheduler
 });
-
-function exec(command, options)
-{
-    return new Promise((resolve, reject) => {
-        child_process.exec(command, options, (err, stdout, stderr) => {
-            if (stderr) {
-                console.error("Got stderr from", command);
-            }
-            if (err) {
-                reject(new Error(`Failed to run command ${command}: ${err.message}`));
-            } else {
-                console.log(command, "finished");
-                resolve();
-            }
-        });
-    });
-}
 
 client.on("data", message => {
     if (!pendingEnvironment || pendingEnvironment.done)
@@ -125,7 +130,7 @@ client.on("data", message => {
         }).then(() => {
             console.log("STEP 4");
             client.send("environment", { hash: pendingEnvironment.hash });
-            environments.push({ hash: pendingEnvironment.hash, dir: pendingEnvironment.dir });
+            environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
             pendingEnvironment = undefined;
         }).catch((err) => {
             console.log("STEP 5");
@@ -164,7 +169,7 @@ client.on("close", () => {
     if (!connectInterval) {
         connectInterval = setInterval(() => {
             console.log("Reconnecting...");
-            client.connect(environments);
+            client.connect(Object.keys(environments));
         }, 1000);
     }
 });
@@ -172,44 +177,35 @@ client.on("close", () => {
 
 const server = new Server(option);
 
-server.on("compile", (compile) => {
-    let commandLine;
-    compile.on("job", (job) => {
-        commandLine = job.commandLine;
-    });
-    compile.on("jobdata", (data) => {
-        if (data.last) {
-            // console.log("Got data", data.data.length, commandLine);
-            let c = new Compile(commandLine, data.data);
-            c.on('stdout', data => { console.log("Got stdout", data); compile.send({ type: 'stdout', data: data }); });
-            c.on('stderr', data => { console.log("Got stderr", data); compile.send({ type: 'stderr', data: data }); });
-            c.on('exit', event => {
-                compile.send({
-                    type: 'response',
-                    index: event.files.map(item => {
-                        return { path: item.path, bytes: item.contents.length };
-                    }),
-                    exitCode: event.exitCode,
-                });
-                for (var i=0; i<event.files.length; ++i) {
-                    compile.send(event.files[i].contents);
-                }
-                compile.close();
-            });
+server.on("job", (job) => {
+    var vm = environments[job.hash];
+    if (!vm) {
+        console.error("No vm for this hash", job.hash);
+        return;
+    }
+    var op = vm.startCompile(job.commandLine);
+    op.on('stdout', data => compile.send({ type: 'stdout', data: data }));
+    op.on('stderr', data => compile.send({ type: 'stderr', data: data }));
+    op.on('finished', event => {
+        // this can't be async, the directory is removed after the event is fired
+        var contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
+        compile.send({
+            type: 'response',
+            index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
+            exitCode: event.exitCode,
+        });
 
-            // compile.send({ type: "response", index: [ { path: "fisk.c.o", bytes: 984 }, { path: "fisk.c.d", bytes: 100 } ] });
-            // var dotO = Buffer.allocUnsafe(984);
-            // compile.send(dotO);
-            // var dotD = Buffer.allocUnsafe(100);
-            // compile.send(dotD);
+        for (let i=0; i<contents.length; ++i) {
+            compile.send(contents[i].contents);
         }
-
+        compile.close();
     });
-    compile.on("error", (err) => {
+    job.on("data", data => op.feed(data.data, data.last));
+    job.on("error", (err) => {
         console.error("compile error", err);
     });
-    compile.on("close", () => {
-        compile.removeAllListeners();
+    job.on("close", () => {
+        job.removeAllListeners();
     });
 });
 
@@ -219,8 +215,9 @@ server.on("error", (err) => {
 
 function start() {
     loadEnvironments().then(() => {
-        console.log(`Loaded ${environments.length} from ${environmentsRoot}`);
-        client.connect(environments);
+        console.log(`Loaded ${Object.keys(environments).length} environments from ${environmentsRoot}`);
+        console.log("environments", Object.keys(environments));
+        client.connect(Object.keys(environments));
         server.listen();
     }).catch((err) => {
         console.error(`Failed to load environments ${err.message}`);

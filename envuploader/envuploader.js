@@ -69,7 +69,7 @@ function makeTarball()
                     console.log("output:\n" + out);
                 }
 
-                var line = lines[lines.length - 1];
+                let line = lines[lines.length - 1];
                 tarball = line.split(" ")[1];
                 if (!silent)
                     console.log("git tarball", tarball);
@@ -122,7 +122,7 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         die("Got error ", err.toString());
     }
     // console.log("Got data", data, size);
-    var f = fs.openSync(data[0], "r");
+    let f = fs.openSync(data[0], "r");
     if (!f) {
         die(`Failed to open file ${data[0]} for reading`);
     }

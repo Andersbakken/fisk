@@ -1,17 +1,14 @@
+
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
 
-const BinaryTypes = {
-    // 0 and 1 is a special type that denotes a new compile or slave
-    2: "environment"
-};
-
-class Compile extends EventEmitter {
-    constructor(ws, ip) {
+class Job extends EventEmitter {
+    constructor(ws, ip, hash) {
         super();
         this.ws = ws;
         this.ip = ip;
+        this.hash = hash;
     }
 
     send(type, msg) {
@@ -75,8 +72,12 @@ class Server extends EventEmitter {
         const url = Url.parse(req.url);
         switch (url.pathname) {
         case "/compile":
-            client = new Compile(ws, ip);
-            this.emit("compile", client);
+            const hash = req.headers["x-fisk-environments"];
+            if (!hash) {
+                error("Bad ws request, no environments");
+                return;
+            }
+            client = new Job(ws, ip, hash);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
@@ -102,9 +103,10 @@ class Server extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                remaining.type = "jobdata";
+                remaining.type = "data";
                 remaining.bytes = json.bytes;
-                client.emit("job", json);
+                client.commandLine = json.commandLine;
+                this.emit('job', client);
                 break;
             case "object":
                 if (msg instanceof Buffer) {
