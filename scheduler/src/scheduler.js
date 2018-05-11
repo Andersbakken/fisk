@@ -3,8 +3,8 @@
 const path = require("path");
 const os = require("os");
 const option = require("@jhanssen/options")("fisk-scheduler");
-const Server = require("./src/server");
-const Environments = require("./src/environments");
+const Server = require("./server");
+const Environments = require("./environments");
 const server = new Server(option);
 
 const slaves = {};
