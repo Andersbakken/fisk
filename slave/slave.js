@@ -18,7 +18,7 @@ function loadEnvironments()
 {
     return new Promise((resolve, reject) => {
         fs.readdir(environmentsRoot, (err, files) => {
-            console.log("GOT FILES", files);
+            // console.log("GOT FILES", files);
             if (err) {
                 if (err.code == "ENOENT") {
                     fs.mkdirp(environmentsRoot).then(() => {
@@ -35,7 +35,6 @@ function loadEnvironments()
                         try {
                             let dir = path.join(environmentsRoot, files[i]);
                             let stat = fs.statSync(dir);
-                            console.log("HERE", dir);
                             if (!stat.isDirectory()) {
                                 fs.removeSync(dir);
                                 continue;
