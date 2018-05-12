@@ -136,6 +136,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 }
             }
         } else if (arg == "-") {
+            ret->sourceFileIndexes.push_back(i);
             ret->flags |= StdinInput;
         }
     }
