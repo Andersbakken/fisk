@@ -101,8 +101,12 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
                     (*resolvedCompiler)[i - 1] = 'c';
                     resolvedCompiler->erase(i);
                 } else if ((*resolvedCompiler)[i - 2] == 'g') {
-                    (*resolvedCompiler)[i - 1] = 'c';
-                    (*resolvedCompiler)[i] = 'c';
+                    if (i > 6 && !strncmp(resolvedCompiler->c_str() + i - 6, "clang", 5)) {
+                        resolvedCompiler->erase(resolvedCompiler->begin() + i - 1, resolvedCompiler->begin() + i + 1);
+                    } else {
+                        (*resolvedCompiler)[i - 1] = 'c';
+                        (*resolvedCompiler)[i] = 'c';
+                    }
                 }
             }
         }

@@ -8,7 +8,7 @@
 
 namespace Config
 {
-enum { Version = 1 };
+enum { Version = 2 };
 void init();
 std::string scheduler();
 unsigned long long schedulerConnectTimeout();
