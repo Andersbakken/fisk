@@ -144,7 +144,7 @@ client.on("data", message => {
             try {
                 fs.removeSync(pendingEnvironment.dir);
             } catch (rmdirErr) {
-                console.error("Failed to remove directory", dir, rmdirErr);
+                console.error("Failed to remove directory", pendingEnvironment.dir, rmdirErr);
             }
             pendingEnvironment = undefined;
         });
@@ -191,21 +191,21 @@ server.on("job", (job) => {
     }
     console.log("job", job.argv0, Object.keys(job));
     var op = vm.startCompile(job.commandLine, job.argv0);
-    op.on('stdout', data => compile.send({ type: 'stdout', data: data }));
-    op.on('stderr', data => compile.send({ type: 'stderr', data: data }));
+    op.on('stdout', data => job.send({ type: 'stdout', data: data }));
+    op.on('stderr', data => job.send({ type: 'stderr', data: data }));
     op.on('finished', event => {
         // this can't be async, the directory is removed after the event is fired
         var contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
-        compile.send({
+        job.send({
             type: 'response',
             index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
             exitCode: event.exitCode,
         });
 
         for (let i=0; i<contents.length; ++i) {
-            compile.send(contents[i].contents);
+            job.send(contents[i].contents);
         }
-        compile.close();
+        job.close();
     });
     job.on("data", data => op.feed(data.data, data.last));
     job.on("error", (err) => {

@@ -13,8 +13,8 @@ class CompileJob extends EventEmitter
         this.commandLine = commandLine;
         this.argv0 = argv0;
         this.id = ++id;
-        console.log("shait", commandLine, argv0, vm.root);
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
+        this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
         this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
     }
@@ -24,7 +24,8 @@ class CompileJob extends EventEmitter
         if (last) {
             fs.close(this.fd);
             this.fd = undefined;
-            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.dir });
+
+            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir});
         }
     }
 };
@@ -55,7 +56,7 @@ class VM
                 this.compiles[msg.id].emit('finished', {
                     exitCode: msg.exitCode,
                     files: msg.files.map(file => {
-                        file.absolute = path.join(this.dir, file.mapped ? file.mapped : file.path);
+                        file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
                         delete file.mapped;
                         return file;
                     })

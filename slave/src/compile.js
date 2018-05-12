@@ -13,7 +13,7 @@ class Compile extends EventEmitter {
             console.error(argv0, args, dir);
             throw new Error("Bad args");
         }
-        const compiler = args.shift();
+        let compiler = args.shift();
 
         let hasDashX = false;
         let sourceFile;
@@ -132,9 +132,9 @@ class Compile extends EventEmitter {
             }
             args.unshift('-x');
         }
-        if (compiler.indexOf('clang') != -1)
+        if (compiler.indexOf('clang') == -1)
             args.push('-fpreprocessed'); // this is not good for clang
-        console.log(args.join(' '));
+        console.log("CALLING " + compiler + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
@@ -150,6 +150,7 @@ class Compile extends EventEmitter {
         });
 
         proc.on('exit', (exitCode) => {
+
             // try {
             let files = [];
             function addDir(dir, prefix) {
@@ -163,20 +164,21 @@ class Compile extends EventEmitter {
                                 addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
                                 if (file === magicalObjectName) {
-                                    files.push({ path: originalOutput, mapped: prefix + file });
+                                    files.push({ path: originalOutput, mapped: path.join(prefix, file) });
                                 } else {
-                                    files.push({ path: prefix + file });
+                                    files.push({ path: path.join(prefix, file) });
                                 }
                             }
                         } catch (err) {
                         }
+                        // console.log("ADDED FILE", file, files[files.length - 1]);
                     });
                 } catch (err) {
                     this.emit('exit', { exitCode: 101, files: [], error: err });
                     return;
                 }
             }
-            addDir(dir, "");
+            addDir(dir, dir);
             this.emit('exit', { exitCode: exitCode, files: files });
 
         });
