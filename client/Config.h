@@ -21,6 +21,9 @@ size_t localSlots(std::string *dir = 0);
 std::string envCache();
 bool noLocal();
 bool watchdog();
-std::string node();
+std::string nodePath();
+std::string hostName();
+std::string name();
+std::vector<std::string> compatibleHashes(const std::string &hash);
 }
 #endif /* CONFIG_H */

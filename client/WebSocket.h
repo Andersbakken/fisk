@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <map>
 #include <wslay/wslay.h>
 
 class WebSocket
@@ -16,7 +17,7 @@ public:
         Text,
         Binary
     };
-    bool connect(std::string &&url, const std::string &env);
+    bool connect(std::string &&url, const std::map<std::string, std::string> &headers);
     bool send(Mode mode, const void *data, size_t len);
     bool exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
     void exit();
