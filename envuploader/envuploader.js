@@ -3,6 +3,7 @@
 const fs = require('fs');
 const child_process = require('child_process');
 const WebSocket = require('ws');
+const os = require('os');
 
 const argv = require('minimist')(process.argv.slice(2));
 const silent = argv.silent;
