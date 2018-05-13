@@ -105,11 +105,11 @@ int main(int argcIn, char **argvIn)
     Log::debug("Got hashes %s for %s", hashes.c_str(), resolvedCompiler.c_str());
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = hashes;
-    headers["name"] = Config::name();
+    headers["x-fisk-client-name"] = Config::name();
     {
         std::string hostName = Config::hostName();
         if (!hostName.empty())
-            headers["hostname"] = std::move(hostName);
+            headers["x-fisk-client-hostname"] = std::move(hostName);
     }
     if (!websocket.connect(Config::scheduler() + "/compile", headers)) {
         Log::debug("Have to run locally because no server");
