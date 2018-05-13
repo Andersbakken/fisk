@@ -53,7 +53,7 @@ process.on('message', (msg) => {
             } else {
                 compiles.splice(idx, 1);
             }
-            process.send({type: 'compileFinished', id: msg.id, files: event.files, exitCode: event.exitCode });
+            process.send({type: 'compileFinished', id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
             if (stopping && !compiles.length)
                 process.exit();
         });

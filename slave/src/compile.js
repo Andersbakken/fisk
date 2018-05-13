@@ -174,13 +174,12 @@ class Compile extends EventEmitter {
                         // console.log("ADDED FILE", file, files[files.length - 1]);
                     });
                 } catch (err) {
-                    this.emit('exit', { exitCode: 101, files: [], error: err });
+                    this.emit('exit', { exitCode: 101, files: [], error: err, sourceFile: sourceFile });
                     return;
                 }
             }
             addDir(dir, dir);
-            this.emit('exit', { exitCode: exitCode, files: files });
-
+            this.emit('exit', { exitCode: exitCode, files: files, sourceFile: sourceFile });
         });
     }
 }
