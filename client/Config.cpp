@@ -195,10 +195,49 @@ bool Config::watchdog()
     return true;
 }
 
-std::string Config::node()
+std::string Config::nodePath()
 {
-    json11::Json val = value("node");
+    json11::Json val = value("node_path");
     if (val.is_string())
         return val.string_value();
     return "node";
+}
+
+std::string Config::hostName()
+{
+    json11::Json val = value("hostname");
+    if (val.is_string())
+        return val.string_value();
+    return std::string();
+}
+
+std::string Config::name()
+{
+    json11::Json val = value("name");
+    if (val.is_string())
+        return val.string_value();
+    std::string name = hostName();
+    if (name.empty()) {
+        name.resize(_POSIX_HOST_NAME_MAX + 1);
+        ::gethostname(&name[0], name.size());
+        name.resize(strlen(name.c_str()));
+    }
+    return name;
+}
+
+std::vector<std::string> Config::compatibleHashes(const std::string &hash)
+{
+    std::vector<std::string> ret;
+    json11::Json val = value("compatible_hashes");
+    if (val.is_object()) {
+        const json11::Json &value = val[hash];
+        if (value.is_string()) {
+            ret.push_back(value.string_value());
+        } else if (value.is_array()) {
+            for (const json11::Json &array_val : value.array_items()) {
+                ret.push_back(array_val.string_value());
+            }
+        }
+    }
+    return ret;
 }

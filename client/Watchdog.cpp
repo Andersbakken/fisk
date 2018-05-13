@@ -71,7 +71,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
 
 void Watchdog::stop()
 {
-    printf("Watchdog stop\n");
+    Log::debug("Watchdog stop\n");
     if (!Config::watchdog())
         return;
 

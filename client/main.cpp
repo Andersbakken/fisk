@@ -13,9 +13,9 @@
 
 static std::string compiler;
 static std::string resolvedCompiler;
-static std::string hash;
 static int argc = 0;
 static char **argv = 0;;
+static std::string hash;
 int main(int argcIn, char **argvIn)
 {
 #ifdef NDEBUG
@@ -97,8 +97,21 @@ int main(int argcIn, char **argvIn)
     }
 
     hash = Client::environmentHash(resolvedCompiler);
-    Log::debug("Got hash %s for %s", hash.c_str(), resolvedCompiler.c_str());
-    if (!websocket.connect(Config::scheduler() + "/compile", hash)) {
+    std::vector<std::string> compatibleHashes = Config::compatibleHashes(hash);;
+    std::string hashes = hash;
+    for (const std::string &compatibleHash : compatibleHashes) {
+        hashes += ";" + compatibleHash;
+    }
+    Log::debug("Got hashes %s for %s", hashes.c_str(), resolvedCompiler.c_str());
+    std::map<std::string, std::string> headers;
+    headers["x-fisk-environments"] = hashes;
+    headers["name"] = Config::name();
+    {
+        std::string hostName = Config::hostName();
+        if (!hostName.empty())
+            headers["hostname"] = std::move(hostName);
+    }
+    if (!websocket.connect(Config::scheduler() + "/compile", headers)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
@@ -141,7 +154,7 @@ int main(int argcIn, char **argvIn)
 #endif
 
                         std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
-                                                             dirname.c_str(), Config::node().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
+                                                             dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
 
                         Log::debug("system(\"%s\")", command.c_str());
                         system(command.c_str());
@@ -156,8 +169,8 @@ int main(int argcIn, char **argvIn)
                     } else {
                         Log::error("Unexpected message type: %s", type.c_str());
                     }
-                // } else {
-                //     printf("Got binary message: %zu bytes\n", len);
+                    // } else {
+                    //     printf("Got binary message: %zu bytes\n", len);
                 }
             })) {
         Watchdog::stop();
@@ -182,7 +195,7 @@ int main(int argcIn, char **argvIn)
     // usleep(1000 * 1000 * 16);
     Watchdog::transition(Watchdog::AcquiredSlave);
     WebSocket slaveWS;
-    if (!slaveWS.connect(Client::format("ws://%s:%d/compile", slaveIp.c_str(), slavePort), hash)) {
+    if (!slaveWS.connect(Client::format("ws://%s:%d/compile", slaveIp.c_str(), slavePort), headers)) {
         Log::debug("Have to run locally because no slave connection");
         Watchdog::stop();
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));

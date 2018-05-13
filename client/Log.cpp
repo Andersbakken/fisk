@@ -18,7 +18,7 @@ std::string Log::logFileName()
 void Log::init(Log::Level level, const char *file)
 {
     sLevel = level;
-    if (!file && *file) {
+    if (file && *file) {
         sLogFile = fopen(file, "w");
         if (!sLogFile) {
             Log::error("Couldn't open log file %s for writing", file);

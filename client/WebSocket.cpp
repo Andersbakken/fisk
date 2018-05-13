@@ -96,7 +96,7 @@ WebSocket::~WebSocket()
         ::close(mFD);
 }
 
-bool WebSocket::connect(std::string &&url, const std::string &env)
+bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers)
 {
     mUrl = std::move(url);
     LUrlParser::clParseURL parsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
@@ -190,6 +190,11 @@ bool WebSocket::connect(std::string &&url, const std::string &env)
     {
         char reqHeader[4096];
         Log::debug("Writing HTTP handshake");
+        std::string extraHeaders;
+        extraHeaders.reserve(1024);
+        for (const std::pair<std::string, std::string> &header : headers) {
+            extraHeaders += Client::format("%s: %s\r\n", header.first.c_str(), header.second.c_str());
+        }
         const size_t reqHeaderSize = snprintf(reqHeader, sizeof(reqHeader),
                                               "GET /%s HTTP/1.1\r\n"
                                               "Host: %s:%d\r\n"
@@ -197,10 +202,10 @@ bool WebSocket::connect(std::string &&url, const std::string &env)
                                               "Connection: Upgrade\r\n"
                                               "Sec-WebSocket-Key: %s\r\n"
                                               "Sec-WebSocket-Version: 13\r\n"
-                                              "x-fisk-environments: %s\r\n"
+                                              "%s"
                                               "\r\n",
                                               parsedUrl.m_Path.c_str(), host.c_str(), port,
-                                              client_key.c_str(), env.c_str());
+                                              client_key.c_str(), extraHeaders.c_str());
 
         Log::debug("Sent headers:\n%s", reqHeader);
 
