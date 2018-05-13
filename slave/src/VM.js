@@ -54,6 +54,7 @@ class VM
             case 'compileFinished':
                 this.compiles[msg.id].emit('finished', {
                     exitCode: msg.exitCode,
+                    sourceFile: msg.sourceFile,
                     files: msg.files.map(file => {
                         file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
                         delete file.mapped;

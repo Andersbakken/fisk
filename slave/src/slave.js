@@ -206,6 +206,7 @@ server.on("job", (job) => {
             job.send(contents[i].contents);
         }
         job.close();
+        client.send("jobFinished", { client: { ip: job.ip, hostname: job.hostname }, sourceFile: event.sourceFile });
     });
     job.on("data", data => op.feed(data.data, data.last));
     job.on("error", (err) => {

@@ -65,6 +65,9 @@ server.on("slave", function(slave, environments) {
         slave.removeAllListeners();
     });
 
+    slave.on("jobFinished", function(job) {
+        console.log("slave", slave.ip, "performed a job", job);
+    });
 });
 
 server.on("compile", function(compile) {
