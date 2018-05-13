@@ -53,15 +53,9 @@ function makeTarball()
         let out = "";
         let err = "";
 
-        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: "/tmp" });
-        createEnvProc.stdout.on('data', (data) => {
-            out += data;
-        });
-
-        createEnvProc.stderr.on('data', (data) => {
-            err += data;
-        });
-
+        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: os.tmpdir() });
+        createEnvProc.stdout.on('data', (data) => { out += data; });
+        createEnvProc.stderr.on('data', (data) => { err += data; });
         createEnvProc.on('close', (code) => {
             if (!code) {
                 let lines = out.split('\n').filter(x => x);
@@ -146,6 +140,8 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
     }
     if (!silent)
         console.log(`sent ${sent} bytes`);
+    if (!argv["keep-tarball"])
+        fs.unlinkSync(data[0]);
 }).catch((err) => {
     die(err);
 });
