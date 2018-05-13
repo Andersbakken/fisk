@@ -33,13 +33,13 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
 {
     if (ok)
         *ok = true;
-    if (!strcmp("Debug", str)) {
+    if (!strcasecmp("Debug", str)) {
         return Debug;
-    } else if (!strcmp("Warning", str)) {
+    } else if (!strcasecmp("Warning", str)) {
         return Warning;
-    } else if (!strcmp("Error", str)) {
+    } else if (!strcasecmp("Error", str)) {
         return Error;
-    } else if (!strcmp("Silent", str)) {
+    } else if (!strcasecmp("Silent", str)) {
         return Silent;
     }
     if (!ok)
