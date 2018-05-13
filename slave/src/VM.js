@@ -24,7 +24,6 @@ class CompileJob extends EventEmitter
         if (last) {
             fs.close(this.fd);
             this.fd = undefined;
-
             this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir});
         }
     }

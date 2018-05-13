@@ -12,14 +12,18 @@ namespace Log
 
 enum Level {
     Debug,
-    Info,
     Warning,
-    Error
+    Error,
+    Silent
 };
+Level logLevel();
+std::string logFileName();
+void init(Level level, const char *file);
+Level stringToLevel(const char *str, bool *ok);
+
 void log(Level level, const std::string &string);
 void log(Level level, const char *fmt, va_list args);
 void debug(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
-void info(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void warning(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void error(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
