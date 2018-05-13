@@ -1,6 +1,7 @@
 #include "Watchdog.h"
 #include "Config.h"
 #include "Client.h"
+#include "Log.h"
 #include <assert.h>
 #include <thread>
 #include <chrono>
@@ -16,6 +17,7 @@ using namespace std::chrono_literals;
 void Watchdog::transition(Stage stage)
 {
     std::unique_lock<std::mutex> lock(Client::mutex());
+    Log::debug("Watchdog transition from %s to %s", stageName(sStage), stageName(stage));
     assert(sStage != stage);
     sStage = stage;
     sCond.notify_one();
@@ -47,12 +49,21 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     return;
                 }
                 auto now = std::chrono::system_clock::now();
-                if (sCond.wait_until(lock, now + (timeout * 1ms)) == std::cv_status::timeout && !sStopped) {
-                    Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-                    return;
-                }
-                if (sStopped)
-                    return;
+                const Stage next = static_cast<Stage>(sStage + 1);
+                Log::debug("Waiting for %s %llu\n", stageName(next), timeout);
+                const auto absTime = now + (timeout * 1ms);
+                do {
+                    const bool timedOut = sCond.wait_until(lock, absTime) == std::cv_status::timeout;
+                    if (sStopped)
+                        return;
+                    if (timedOut) {
+                        Log::warning("Timed out waiting for %s (%llums), running locally", stageName(next), timeout);
+                        // printf("GOT HERE\n");
+                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                        return;
+                    }
+                } while (sStage < next);
+                // printf("OR GOT HERE\n");
             }
         });
 }
@@ -60,6 +71,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
 
 void Watchdog::stop()
 {
+    printf("Watchdog stop\n");
     if (!Config::watchdog())
         return;
 

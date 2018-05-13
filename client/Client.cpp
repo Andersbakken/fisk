@@ -37,7 +37,7 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
         const char *begin = path, *end = 0;
         // printf("trying realpath [%s]\n", argv[0]);
         std::string rp = Client::realpath(argv[0]);
-        printf("REALPATH %s %s\n", argv[0], rp.c_str());
+        // printf("REALPATH %s %s\n", argv[0], rp.c_str());
         if (!rp.empty()) {
             std::string dirname;
             parsePath(rp, 0, &dirname);
@@ -91,7 +91,7 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
     }
 
     *resolvedCompiler = Client::realpath(exec);
-    printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
+    // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
 
     const size_t slash = resolvedCompiler->rfind('/');
     if (slash != std::string::npos) {
@@ -111,7 +111,7 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
             }
         }
     }
-    printf("RESIULT %s\n", resolvedCompiler->c_str());
+    // printf("RESULT %s\n", resolvedCompiler->c_str());
 
     return exec;
 }
@@ -139,7 +139,7 @@ Client::Slot::Slot(int fd, std::string &&path)
 Client::Slot::~Slot()
 {
     if (mFD != -1) {
-        Log::info("Dropping lock on %s", mPath.c_str());
+        Log::debug("Dropping lock on %s", mPath.c_str());
         flock(mFD, LOCK_UN);
         unlink(mPath.c_str());
     }
@@ -306,7 +306,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
                 continue;
             }
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                Log::info("Acquired lock on %s", path.c_str());
+                Log::debug("Acquired lock on %s", path.c_str());
                 return std::make_unique<Slot>(fd, std::move(path));
             }
             ::close(fd);
@@ -378,8 +378,8 @@ void Client::runLocal(const std::string &exec, int argc, char **argv, std::uniqu
         waitpid(pid, &status, 0);
         slot.reset();
         if (WIFEXITED(status))
-            exit(WEXITSTATUS(status));
-        exit(101);
+            _exit(WEXITSTATUS(status));
+        _exit(101);
     }
 }
 

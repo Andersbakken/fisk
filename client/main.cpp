@@ -14,14 +14,41 @@
 static std::string compiler;
 static std::string resolvedCompiler;
 static std::string hash;
-static int argc;
-static char **argv;
+static int argc = 0;
+static char **argv = 0;;
 int main(int argcIn, char **argvIn)
 {
-    argc = argcIn;
-    argv = argvIn;
+#ifdef NDEBUG
+    Log::Level level = Log::Silent;
+#else
+    Log::Level level = Log::Warning;
+#endif
+    const char *logLevel = getenv("FISK_LOG");
+    const char *logFile = getenv("FISK_LOG_FILE");
+    argv = new char *[argcIn + 1];
+    std::unique_ptr<char *[]> argvptr(argv);
+    for (int i=0; i<argcIn; ++i) {
+        if (!strncmp("--fisk-log-level=", argvIn[i], 17)) {
+            logLevel = argvIn[i] + 17;
+        } else if (!strncmp("--fisk-log-file=", argvIn[i], 16)) {
+            logFile = argvIn[i] + 16;
+        } else {
+            argv[argc++] = argvIn[i];
+        }
+    }
+    if (logLevel) {
+        bool ok;
+        level = Log::stringToLevel(logLevel, &ok);
+        if (!ok) {
+            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warning\", \"Error\" or \"Silent\")\n", logLevel);
+            return 1;
+        }
+    }
+
+    Log::init(level, std::move(logFile));
+
     compiler = Client::findCompiler(argc, argv, &resolvedCompiler);
-    printf("%s -> %s\n", compiler.c_str(), resolvedCompiler.c_str());
+    // printf("%s -> %s\n", compiler.c_str(), resolvedCompiler.c_str());
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;
@@ -70,24 +97,13 @@ int main(int argcIn, char **argvIn)
     }
 
     hash = Client::environmentHash(resolvedCompiler);
-    Log::info("Got hash %s for %s", hash.c_str(), resolvedCompiler.c_str());
+    Log::debug("Got hash %s for %s", hash.c_str(), resolvedCompiler.c_str());
     if (!websocket.connect(Config::scheduler() + "/compile", hash)) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
-    // json11::Json my_json = json11::Json::object {
-    //     { "client", Config::clientName() },
-    //     { "type", "compile" }
-    // };
-    // const std::string msg = my_json.dump();
-
-    // if (!websocket.send(WebSocket::Text, msg.c_str(), msg.size())) {
-    //     Log::debug("Have to run locally because no send");
-    //     Watchdog::stop();
-    //     return Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-    // }
 
     std::string slaveIp;
     uint16_t slavePort = 0;
@@ -163,6 +179,7 @@ int main(int argcIn, char **argvIn)
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
+    // usleep(1000 * 1000 * 16);
     Watchdog::transition(Watchdog::AcquiredSlave);
     WebSocket slaveWS;
     if (!slaveWS.connect(Client::format("ws://%s:%d/compile", slaveIp.c_str(), slavePort), hash)) {
