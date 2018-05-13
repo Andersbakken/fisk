@@ -53,7 +53,7 @@ void Log::log(Level level, const std::string &string)
         return;
     assert(!string.empty());
     fwrite(string.c_str(), 1, string.size(), stderr);
-    if (!sLogFile)
+    if (sLogFile)
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     if (string.at(string.size() - 1) != '\n') {
         fwrite("\n", 1, 1, stderr);
