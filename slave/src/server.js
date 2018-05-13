@@ -4,11 +4,12 @@ const WebSocket = require("ws");
 const Url = require("url");
 
 class Job extends EventEmitter {
-    constructor(ws, ip, hash) {
+    constructor(ws, ip, hash, clientName) {
         super();
         this.ws = ws;
         this.ip = ip;
         this.hash = hash;
+        this.clientName = clientName;
     }
 
     send(type, msg) {
@@ -77,7 +78,8 @@ class Server extends EventEmitter {
                 error("Bad ws request, no environments");
                 return;
             }
-            client = new Job(ws, ip, hash);
+            const name = req.headers["x-fisk-client-name"];
+            client = new Job(ws, ip, hash, name);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
