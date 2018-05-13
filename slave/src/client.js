@@ -1,5 +1,6 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
+const os = require('os');
 
 class Client extends EventEmitter {
     constructor(option) {
@@ -7,6 +8,15 @@ class Client extends EventEmitter {
 
         this.scheduler = option("scheduler", "localhost:8097");
         this.serverPort = option.int("port", 8096);
+        this.hostname = option("hostname");
+        this.name = option("name");
+        if (!this.name) {
+            if (this.hostname) {
+                this.name = this.hostname;
+            } else  {
+                this.name = os.hostname();
+            }
+        }
     }
 
     connect(environments) {
@@ -14,12 +24,15 @@ class Client extends EventEmitter {
         console.log("connecting to", this.scheduler);
 
         let remaining = 0;
-        this.ws = new WebSocket(url, {
-            headers: {
-                "x-fisk-slave-port": this.serverPort,
-                "x-fisk-environments": environments.join(";")
-            }
-        });
+        let headers = {
+            "x-fisk-slave-port": this.serverPort,
+            "x-fisk-environments": environments.join(";"),
+            "x-fisk-slave-name": this.name
+        };
+        if (this.hostname)
+            headers["x-fisk-slave-hostname"] = this.hostname;
+
+        this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {
             this.emit("connect");
         });
