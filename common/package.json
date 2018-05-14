@@ -10,7 +10,6 @@
     "type": "git",
     "url": "git+https://github.com/Andersbakken/fisk.git"
   },
-
   "author": "",
   "license": "ISC",
   "dependencies": {
