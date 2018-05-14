@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Andersbakken/fisk#readme",
   "dependencies": {
     "@jhanssen/options": "git+https://github.com/Andersbakken/options.git",
+    "express": "^4.16.3",
     "fs-extra": "^5.0.0",
     "ws": "^5.1.1"
   }

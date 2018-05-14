@@ -6,7 +6,7 @@ const Version = 2;
 
 function cacheDir(option)
 {
-    var dir = option("cache_dir");
+    let dir = option("cache_dir");
     if (!dir) {
         dir = path.join(os.homedir(), ".cache", "fisk", path.basename(option.prefix));
     }
@@ -19,7 +19,7 @@ function validateCache(option)
     const file = path.join(dir, 'version');
     console.log(dir);
     try {
-        var version = fs.readFileSync(file);
+        let version = fs.readFileSync(file);
         if (version.readUInt32BE() == Version) {
             return;
         }
@@ -27,7 +27,7 @@ function validateCache(option)
     }
     fs.remove(dir);
     fs.mkdirpSync(dir);
-    var buf = Buffer.allocUnsafe(4);
+    let buf = Buffer.allocUnsafe(4);
     buf.writeUInt32BE(Version);
     fs.writeFileSync(file, buf);
 }

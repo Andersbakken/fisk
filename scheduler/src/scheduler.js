@@ -27,7 +27,7 @@ function distribute(conf)
         hashes = Object.keys(Environments.environments);
     }
     console.log("distribute", ips, hashes);
-    for (var h=0; h<hashes.length; ++h) {
+    for (let h=0; h<hashes.length; ++h) {
         let hash = hashes[h];
         for (let i=0; i<ips.length; ++i) {
             let ip = ips[i];
@@ -41,6 +41,25 @@ function distribute(conf)
         }
     }
 }
+
+server.express.get("/slaves", (req, res, next) => {
+    let ret = [];
+    for (let ip in slaves) {
+        let s = slaves[ip];
+        ret.push({
+            architecture: s.client.architecture,
+            ip: s.client.ip,
+            name: s.client.name,
+            jobsScheduled: s.client.jobsScheduled,
+            jobsPerformed: s.client.jobsPerformed,
+            hostname: s.client.hostname,
+            name: s.client.name,
+            created: s.client.created,
+            environments: s.environments
+        });
+    }
+    res.send(ret);
+});
 
 server.on("slave", function(slave, environments) {
     console.log("slave connected", slave.ip, environments);
@@ -66,6 +85,7 @@ server.on("slave", function(slave, environments) {
     });
 
     slave.on("jobFinished", function(job) {
+        ++slave.jobsPerformed;
         console.log("slave", slave.ip, "performed a job", job);
     });
 });
@@ -85,14 +105,14 @@ server.on("compile", function(compile) {
             if ("load" in slave && "environments" in slave) {
                 if (slave.environments.indexOf(request.environment) !== -1 && slave.load < best.load) {
                     best.load = slave.load;
-                    best.ip = ip;
-                    best.slavePort = slave.client.slavePort;
+                    best.client = slave.client;
                 }
             }
         }
         console.log("best", best);
         if (best.load < Infinity) {
-            compile.send("slave", { ip: best.ip, port: best.slavePort });
+            ++best.client.jobsScheduled;
+            compile.send("slave", { ip: best.client.ip, hostname: best.client.hostname, port: best.client.slavePort });
         } else {
             compile.send("slave", {});
         }

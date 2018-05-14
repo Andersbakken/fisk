@@ -4,7 +4,7 @@ const Compile = require('./compile');
 
 const argv = require('minimist')(process.argv.slice(2));
 
-var pwd;
+let pwd;
 if (argv.user) {
     try {
         pwd = posix.getpwnam(argv.user);
@@ -43,11 +43,11 @@ process.on('message', (msg) => {
         break;
     case 'compile':
         console.log("GOT COMPILE", msg);
-        var compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
+        let compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
         compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
         compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));
         compile.on('exit', event => {
-            var idx = compiles.indexOf(compile);
+            let idx = compiles.indexOf(compile);
             if (idx == -1) {
                 console.error("Can't find compile");
             } else {
