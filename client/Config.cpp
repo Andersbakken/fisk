@@ -241,3 +241,25 @@ std::vector<std::string> Config::compatibleHashes(const std::string &hash)
     }
     return ret;
 }
+
+std::string Config::logFile()
+{
+    json11::Json val = value("log_file");
+    if (val.is_string())
+        return val.string_value();
+
+    return std::string();
+}
+
+std::string Config::logLevel()
+{
+    json11::Json val = value("log_level");
+    if (val.is_string())
+        return val.string_value();
+
+#ifdef NDEBUG
+    return "silent";
+#else
+    return "warning";
+#endif
+}

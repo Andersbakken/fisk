@@ -2,7 +2,8 @@
 #include "Client.h"
 
 static Log::Level sLevel = Log::Silent;
-FILE *sLogFile = 0;
+static FILE *sLogFile = 0;
+static const unsigned long long sStart = Client::mono();
 std::string sLogFileName;
 
 Log::Level Log::logLevel()
@@ -15,15 +16,15 @@ std::string Log::logFileName()
     return sLogFileName;
 }
 
-void Log::init(Log::Level level, const char *file)
+void Log::init(Log::Level level, std::string &&file)
 {
     sLevel = level;
-    if (file && *file) {
-        sLogFile = fopen(file, "w");
+    if (!file.empty()) {
+        sLogFile = fopen(file.c_str(), "w");
         if (!sLogFile) {
-            Log::error("Couldn't open log file %s for writing", file);
+            Log::error("Couldn't open log file %s for writing", file.c_str());
         } else {
-            sLogFileName = file;
+            sLogFileName = std::move(file);
             std::atexit([]() { fclose(sLogFile); });
         }
     }
@@ -52,9 +53,13 @@ void Log::log(Level level, const std::string &string)
     if (level < sLevel && !sLogFile)
         return;
     assert(!string.empty());
+    const unsigned long long elapsed = Client::mono() - sStart;
+    fprintf(stderr, "%llu.%03llu: ", elapsed / 1000, elapsed % 1000);
     fwrite(string.c_str(), 1, string.size(), stderr);
-    if (sLogFile)
+    if (sLogFile) {
+        fprintf(sLogFile, "%llu.%03llu: ", elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
+    }
     if (string.at(string.size() - 1) != '\n') {
         fwrite("\n", 1, 1, stderr);
         if (sLogFile)

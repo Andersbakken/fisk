@@ -18,7 +18,7 @@ enum Level {
 };
 Level logLevel();
 std::string logFileName();
-void init(Level level, const char *file);
+void init(Level level, std::string &&logFile);
 Level stringToLevel(const char *str, bool *ok);
 
 void log(Level level, const std::string &string);
