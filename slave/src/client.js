@@ -24,10 +24,22 @@ class Client extends EventEmitter {
         console.log("connecting to", this.scheduler);
 
         let remaining = 0;
+        let arch;
+        switch (os.platform()) {
+        case 'darwin': arch = "Darwin"; break;
+        case 'linux': arch = "Linux"; break;
+        default: console.error("Unknown platform", os.platform()); break;
+        }
+        switch (os.arch()) {
+        case 'ia32': arch += " i686"; break;
+        case 'x64': arch += " x86_64"; break;
+        default: console.error("Unknown architecture", os.arch()); break;
+        }
         let headers = {
             "x-fisk-slave-port": this.serverPort,
             "x-fisk-environments": environments.join(";"),
-            "x-fisk-slave-name": this.name
+            "x-fisk-slave-name": this.name,
+            "x-fisk-architecture": arch
         };
         if (this.hostname)
             headers["x-fisk-slave-hostname"] = this.hostname;

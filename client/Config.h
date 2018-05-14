@@ -22,7 +22,7 @@ std::string envCache();
 bool noLocal();
 bool watchdog();
 std::string nodePath();
-std::string hostName();
+std::string hostname();
 std::string name();
 std::vector<std::string> compatibleHashes(const std::string &hash);
 }

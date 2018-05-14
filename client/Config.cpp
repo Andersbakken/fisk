@@ -203,7 +203,7 @@ std::string Config::nodePath()
     return "node";
 }
 
-std::string Config::hostName()
+std::string Config::hostname()
 {
     json11::Json val = value("hostname");
     if (val.is_string())
@@ -216,7 +216,7 @@ std::string Config::name()
     json11::Json val = value("name");
     if (val.is_string())
         return val.string_value();
-    std::string name = hostName();
+    std::string name = hostname();
     if (name.empty()) {
         name.resize(_POSIX_HOST_NAME_MAX + 1);
         ::gethostname(&name[0], name.size());

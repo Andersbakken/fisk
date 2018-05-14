@@ -1,12 +1,19 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
+const http = require('http');
+const express = require('express');
 
 class Client extends EventEmitter {
     constructor(obj) {
         super();
         for (let key in obj)
             this[key] = obj[key];
+        this.created = new Date();
+        if (obj.type == Client.Type.Slave) {
+            this.jobsPerformed = 0;
+            this.jobsScheduled = 0;
+        }
     }
 
     send(type, msg) {
@@ -43,19 +50,23 @@ class Server extends EventEmitter {
     constructor(option) {
         super();
         this.option = option;
+        this.app = express();
         this.id = 0;
     }
 
     listen() {
-        this.ws = new WebSocket.Server({
-            port: this.option.int("port", 8097),
-            backlog: this.option.int("backlog", 50)
-        });
-        console.log("listening on", this.ws.options.port);
+        this.server = http.createServer(this.app);
+        this.ws = new WebSocket.Server({ server: this.server });
+        const port = this.option.int("port", 8097);
+        this.server.listen(port, this.option.int("backlog", 50));
+        console.log("listening on", port);
         this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
     }
 
+    get express() { return this.app; }
+
     _handleConnection(ws, req) {
+        console.log("_handleConnection");
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         let ip = req.connection.remoteAddress;
@@ -83,7 +94,7 @@ class Server extends EventEmitter {
             }
             const environment = req.headers["x-fisk-environments"];
 
-            client = new Client({ws: ws, ip: ip, type: Client.Type.Compile});
+            client = new Client({ws: ws, ip: ip, type: Client.Type.Compile });
             this.emit("compile", client);
 
             process.nextTick(() => {
@@ -101,7 +112,16 @@ class Server extends EventEmitter {
                 return;
             }
             const slavePort = parseInt(req.headers["x-fisk-slave-port"]);
-            client = new Client({ws: ws, ip: ip, slavePort: slavePort, type: Client.Type.Slave });
+            const name = req.headers["x-fisk-slave-name"];
+            const hostname = req.headers["x-fisk-slave-hostname"];
+            const arch = req.headers["x-fisk-architecture"];
+            client = new Client({ ws: ws,
+                                  ip: ip,
+                                  slavePort: slavePort,
+                                  type: Client.Type.Slave,
+                                  name: name,
+                                  hostname: hostname,
+                                  architecture: arch });
             ws.on("message", msg => {
                 let json;
                 try {
@@ -118,7 +138,7 @@ class Server extends EventEmitter {
                 }
             });
             let envs = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
-            console.log("Got dude", envs);
+            // console.log("Got dude", envs);
             this.emit("slave", client, envs);
             break;
         case "/uploadenvironment":

@@ -107,9 +107,9 @@ int main(int argcIn, char **argvIn)
     headers["x-fisk-environments"] = hashes;
     headers["x-fisk-client-name"] = Config::name();
     {
-        std::string hostName = Config::hostName();
-        if (!hostName.empty())
-            headers["x-fisk-client-hostname"] = std::move(hostName);
+        std::string hostname = Config::hostname();
+        if (!hostname.empty())
+            headers["x-fisk-client-hostname"] = std::move(hostname);
     }
     if (!websocket.connect(Config::scheduler() + "/compile", headers)) {
         Log::debug("Have to run locally because no server");

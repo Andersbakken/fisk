@@ -184,18 +184,18 @@ client.on("close", () => {
 const server = new Server(option);
 
 server.on("job", (job) => {
-    var vm = environments[job.hash];
+    let vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);
         return;
     }
     console.log("job", job.argv0, Object.keys(job));
-    var op = vm.startCompile(job.commandLine, job.argv0);
+    let op = vm.startCompile(job.commandLine, job.argv0);
     op.on('stdout', data => job.send({ type: 'stdout', data: data }));
     op.on('stderr', data => job.send({ type: 'stderr', data: data }));
     op.on('finished', event => {
         // this can't be async, the directory is removed after the event is fired
-        var contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
+        let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
         job.send({
             type: 'response',
             index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
