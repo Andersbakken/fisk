@@ -56,7 +56,7 @@ std::string Client::findCompiler(const char *argv0, const char *preresolved, std
 {
     // printf("PATH %s\n", path);
     std::string exec;
-    if (preresolved) {
+    if (!preresolved) {
         const char *path = getenv("PATH");
         if (path) {
             std::string self, basename;
