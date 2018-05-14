@@ -295,10 +295,18 @@ int main(int argcIn, char **argvIn)
 
             const std::string type = msg["type"].string_value();
 
-            if (type == "output") {
+            if (type == "stderr") {
                 const std::string output = msg["data"].string_value();
                 if (!output.empty()) {
-                    fwrite(output.c_str(), 1, output.size(), msg["stderr"].bool_value() ? stderr : stdout);
+                    fwrite(output.c_str(), 1, output.size(), stderr);
+                }
+                return;
+            }
+
+            if (type == "stdout") {
+                const std::string output = msg["data"].string_value();
+                if (!output.empty()) {
+                    fwrite(output.c_str(), 1, output.size(), stdout);
                 }
                 return;
             }
