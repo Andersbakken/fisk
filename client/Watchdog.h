@@ -2,6 +2,7 @@
 #define WATCHDOG_H
 
 #include <string>
+#include <assert.h>
 
 namespace Watchdog {
 enum Stage {
