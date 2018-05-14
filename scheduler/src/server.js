@@ -96,6 +96,9 @@ class Server extends EventEmitter {
 
             client = new Client({ws: ws, ip: ip, type: Client.Type.Compile });
             this.emit("compile", client);
+            ws.on('close', event => {
+                console.log("Got close", event);
+            });
 
             process.nextTick(() => {
                 client.emit("job", { environment: environment });
