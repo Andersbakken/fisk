@@ -141,6 +141,10 @@ class Server extends EventEmitter {
                 client.emit("close");
             ws.removeAllListeners();
         });
+        ws.on('error', (error) => {
+            if (client)
+                client.emit('error', error);
+        });
     }
 }
 
