@@ -27,7 +27,32 @@ std::mutex &Client::mutex()
     return sMutex;
 }
 
-std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCompiler)
+enum CheckResult {
+    Stop,
+    Continue
+};
+
+static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
+{
+    std::string l = link;
+    while (true) {
+        char buf[PATH_MAX + 1];
+        const ssize_t ret = readlink(l.c_str(), buf, PATH_MAX);
+        if (ret == -1) {
+            if (errno != EINVAL) {
+                Log::error("Failed to resolve symlink %s (%d %s)", link.c_str(), errno, strerror(errno));
+            }
+            break;
+        }
+        l.assign(buf, ret);
+        if (check(l) == Stop) {
+            break;
+        }
+    }
+    return l;
+}
+
+std::string Client::findCompiler(char *argv0, std::string *resolvedCompiler, std::string *slaveCompiler)
 {
     const char *path = getenv("PATH");
     // printf("PATH %s\n", path);
@@ -36,19 +61,22 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
         std::string self, basename;
         const char *begin = path, *end = 0;
         // printf("trying realpath [%s]\n", argv[0]);
-        std::string rp = Client::realpath(argv[0]);
+        std::string rp = Client::realpath(argv0);
         // printf("REALPATH %s %s\n", argv[0], rp.c_str());
         if (!rp.empty()) {
             std::string dirname;
             parsePath(rp, 0, &dirname);
-            parsePath(argv[0], &basename, 0);
+            parsePath(argv0, &basename, 0);
             self = dirname + basename;
-        } else if (strchr(argv[0], '/')) {
+        } else if (strchr(argv0, '/')) {
             return std::string();
         } else {
-            basename = argv[0];
+            basename = argv0;
         }
-        // printf("realPath %s dirname %s argv[0] %s basename %s\n", realPath, dirname.c_str(), argv[0], basename.c_str());
+
+        // printf("self %s argv[0] %s basename %s\n", self.c_str(), argv[0], basename.c_str());
+
+        // printf("realPath %s dirname %s argv[0] %s basename %s\n", rp.c_str(), dirname.c_str(), argv[0], basename.c_str());
         do {
             end = strchr(begin, ':');
             if (!end) {
@@ -90,9 +118,16 @@ std::string Client::findCompiler(int argc, char **argv, std::string *resolvedCom
         } while (end);
     }
 
-    *resolvedCompiler = Client::realpath(exec);
+    *resolvedCompiler = resolveSymlink(exec, [](const std::string &p) -> CheckResult {
+            std::string base;
+            parsePath(p, &base, 0);
+            if (base.find("g++") != std::numeric_limits<size_t>::max()|| base.find("gcc") != std::numeric_limits<size_t>::max())
+                return Stop;
+            return Continue;
+        });
     // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
 
+    *slaveCompiler = *resolvedCompiler;
     const size_t slash = resolvedCompiler->rfind('/');
     if (slash != std::string::npos) {
         for (size_t i=slash + 2; i<resolvedCompiler->size(); ++i) {

@@ -18,15 +18,20 @@ static char **argv = 0;;
 static std::string hash;
 int main(int argcIn, char **argvIn)
 {
-#ifdef NDEBUG
-    Log::Level level = Log::Silent;
-#else
-    Log::Level level = Log::Warning;
-#endif
-    const char *logLevel = getenv("FISK_LOG");
-    if (!logLevel)
-        getenv("FISK_DEBUG");
-    const char *logFile = getenv("FISK_LOG_FILE");
+    Config::init();
+    std::string logLevel = Config::logLevel();
+    std::string logFile = Config::logFile();
+    const char *env;
+    if ((env = getenv("FISK_LOG"))) {
+        logLevel = env;
+    } else if ((env = getenv("FISK_DEBUG"))) {
+        logLevel = env;
+    }
+
+    if ((env = getenv("FISK_LOG_FILE"))) {
+        logFile = env;
+    }
+
     argv = new char *[argcIn + 1];
     std::unique_ptr<char *[]> argvptr(argv);
     for (int i=0; i<argcIn; ++i) {
@@ -38,25 +43,25 @@ int main(int argcIn, char **argvIn)
             argv[argc++] = argvIn[i];
         }
     }
-    if (logLevel) {
+    Log::Level level = Log::Silent;
+    if (!logLevel.empty()) {
         bool ok;
-        level = Log::stringToLevel(logLevel, &ok);
+        level = Log::stringToLevel(logLevel.c_str(), &ok);
         if (!ok) {
-            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warning\", \"Error\" or \"Silent\")\n", logLevel);
+            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warning\", \"Error\" or \"Silent\")\n", logLevel.c_str());
             return 1;
         }
     }
 
     Log::init(level, std::move(logFile));
 
-    compiler = Client::findCompiler(argc, argv, &resolvedCompiler);
-    // printf("%s -> %s\n", compiler.c_str(), resolvedCompiler.c_str());
+    std::string slaveCompiler;
+    compiler = Client::findCompiler(argv[0], &resolvedCompiler, &slaveCompiler);
+    Log::debug("Resolved compiler %s to \"%s\" \"%s\" \"%s\")", argv[0], compiler.c_str(), resolvedCompiler.c_str(), slaveCompiler.c_str());
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;
     }
-
-    Config::init();
 
     std::vector<std::string> args(argc);
     for (int i=0; i<argc; ++i) {
@@ -205,7 +210,7 @@ int main(int argcIn, char **argvIn)
 
     }
     Watchdog::transition(Watchdog::ConnectedToSlave);
-    args[0] = Client::realpath(compiler);
+    args[0] = slaveCompiler;
     json11::Json::object msg {
         { "commandLine", args },
         { "argv0", compiler },
