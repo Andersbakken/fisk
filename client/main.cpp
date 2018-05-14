@@ -24,11 +24,13 @@ int main(int argcIn, char **argvIn)
     Log::Level level = Log::Warning;
 #endif
     const char *logLevel = getenv("FISK_LOG");
+    if (!logLevel)
+        getenv("FISK_DEBUG");
     const char *logFile = getenv("FISK_LOG_FILE");
     argv = new char *[argcIn + 1];
     std::unique_ptr<char *[]> argvptr(argv);
     for (int i=0; i<argcIn; ++i) {
-        if (!strncmp("--fisk-log-level=", argvIn[i], 17)) {
+        if (!strncmp("--fisk-log-level=", argvIn[i], 17) || !strncmp("--fisk-log-debug=", argvIn[i], 17)) {
             logLevel = argvIn[i] + 17;
         } else if (!strncmp("--fisk-log-file=", argvIn[i], 16)) {
             logFile = argvIn[i] + 16;
