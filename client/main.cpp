@@ -32,6 +32,11 @@ int main(int argcIn, char **argvIn)
         logFile = env;
     }
 
+    bool disabled = false;
+    if ((env = getenv("FISK_DISABLED"))) {
+        disabled = strlen(env) && !strcmp(env, "0");
+    }
+
     const char *preresolved = getenv("FISK_COMPILER");
 
     argv = new char *[argcIn + 1];
@@ -43,6 +48,8 @@ int main(int argcIn, char **argvIn)
             logFile = argvIn[i] + 16;
         } else if (!strncmp("--fisk-compiler=", argvIn[i], 16)) {
             preresolved = argvIn[i] + 16;
+        } else if (!strcmp("--fisk-disabled", argvIn[i])) {
+            disabled = true;
         } else {
             argv[argc++] = argvIn[i];
         }
@@ -67,6 +74,12 @@ int main(int argcIn, char **argvIn)
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;
+    }
+
+    if (disabled) {
+        Log::debug("Have to run locally because we're disabled");
+        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
     }
 
     std::vector<std::string> args(argc);
