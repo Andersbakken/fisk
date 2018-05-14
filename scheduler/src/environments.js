@@ -230,6 +230,7 @@ const environments = {
     prepare(environment) {
         if (environment.hash in environments._data)
             return undefined;
+        fs.mkdirpSync(environments._path);
         return new File(path.join(environments._path, environment.hash + ".tar.gz"), environment.hash, environment.host);
     },
 
