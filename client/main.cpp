@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <signal.h>
 
-static std::string compiler;
-static std::string resolvedCompiler;
+static std::string compiler; // this is the next one on the path and the one we will exec if we run locally
+static std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
 static int argc = 0;
 static char **argv = 0;;
 static std::string hash;
@@ -32,6 +32,8 @@ int main(int argcIn, char **argvIn)
         logFile = env;
     }
 
+    const char *preresolved = getenv("FISK_COMPILER");
+
     argv = new char *[argcIn + 1];
     std::unique_ptr<char *[]> argvptr(argv);
     for (int i=0; i<argcIn; ++i) {
@@ -39,6 +41,8 @@ int main(int argcIn, char **argvIn)
             logLevel = argvIn[i] + 17;
         } else if (!strncmp("--fisk-log-file=", argvIn[i], 16)) {
             logFile = argvIn[i] + 16;
+        } else if (!strncmp("--fisk-compiler=", argvIn[i], 16)) {
+            preresolved = argvIn[i] + 16;
         } else {
             argv[argc++] = argvIn[i];
         }
@@ -55,9 +59,11 @@ int main(int argcIn, char **argvIn)
 
     Log::init(level, std::move(logFile));
 
-    std::string slaveCompiler;
-    compiler = Client::findCompiler(argv[0], &resolvedCompiler, &slaveCompiler);
-    Log::debug("Resolved compiler %s to \"%s\" \"%s\" \"%s\")", argv[0], compiler.c_str(), resolvedCompiler.c_str(), slaveCompiler.c_str());
+    std::string slaveCompiler; // this is the one that actually will exist on the slave
+    compiler = Client::findCompiler(argv[0], preresolved, &resolvedCompiler, &slaveCompiler);
+    Log::debug("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
+               argv[0], preresolved ? preresolved : "",
+               compiler.c_str(), resolvedCompiler.c_str(), slaveCompiler.c_str());
     if (compiler.empty()) {
         Log::error("Can't find executable for %s", argv[0]);
         return 1;

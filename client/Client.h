@@ -18,7 +18,7 @@
 struct CompilerArgs;
 namespace Client {
 std::mutex &mutex();
-std::string findCompiler(char *argv0, std::string *resolvedCompiler, std::string *slaveCompiler);
+std::string findCompiler(const char *argv0, const char *preresolved, std::string *resolvedCompiler, std::string *slaveCompiler);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
