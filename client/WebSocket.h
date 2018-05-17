@@ -6,8 +6,9 @@
 #include <vector>
 #include <map>
 #include <wslay/wslay.h>
+#include "Select.h"
 
-class WebSocket
+class WebSocket : public Socket
 {
 public:
     WebSocket();
@@ -22,7 +23,16 @@ public:
     bool exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
     void exit();
     void close(const char *reason);
+
+protected:
+    virtual unsigned int mode() const override;
+    virtual int timeout() const override { return -1; }
+    virtual int fd() const override { return mFD; }
+    virtual void onWrite() override;
+    virtual void onRead() override;
+    virtual void onTimeout() override {}
 private:
+    void send();
     std::function<void(Mode mode, const void *data, size_t len)> mOnMessage;
 
     std::string mUrl;
@@ -32,6 +42,8 @@ private:
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
     bool mExit { false };
+    bool mError { false };
+    bool mClosed { false };
 };
 
 #endif /* WEBSOCKET_H */
