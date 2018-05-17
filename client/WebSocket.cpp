@@ -294,14 +294,13 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
             FD_ZERO(&w);
             FD_SET(mFD, &r);
             if (wslay_event_want_write(mContext) || !mSendBuffer.empty()) {
-                printf("WRITEY SHIT %lu\n", mSendBuffer.size());
                 FD_SET(mFD, &w);
             }
             errno = 0;
             ret = select(mFD + 1, &r, &w, 0, 0);
         } while (ret == -1 && errno == EINTR);
 
-        printf("Select woke up %d %d %s\n", ret, errno, strerror(errno));
+        // printf("Select woke up %d %d %s\n", ret, errno, strerror(errno));
 
         const bool sendBufferWasEmpty = mSendBuffer.empty();
         if (FD_ISSET(mFD, &r)) {
