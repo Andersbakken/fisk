@@ -34,17 +34,27 @@ enum CheckResult {
 
 static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
 {
+    errno = 0;
     std::string l = link;
     while (true) {
         char buf[PATH_MAX + 1];
         const ssize_t ret = readlink(l.c_str(), buf, PATH_MAX);
+        // printf("resolved %s to %s -> %zd %d %s\n", l.c_str(), ret > 0 ? std::string(buf, ret).c_str() : "<nut>", ret, errno, strerror(errno));
         if (ret == -1) {
             if (errno != EINVAL) {
                 Log::error("Failed to resolve symlink %s (%d %s)", link.c_str(), errno, strerror(errno));
             }
             break;
         }
-        l.assign(buf, ret);
+        if (buf[0] != '/') {
+            std::string dirname;
+            Client::parsePath(l, 0, &dirname);
+            if (!dirname.empty() && dirname[dirname.size() - 1] != '/')
+                dirname += '/';
+            l = dirname + std::string(buf, ret);
+        } else {
+            l.assign(buf, ret);
+        }
         if (check(l) == Stop) {
             break;
         }
