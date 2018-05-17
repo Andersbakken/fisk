@@ -7,13 +7,15 @@ import { Injectable } from '@angular/core';
 export class FiskService {
     private socket: WebSocket;
     private pending: Array<string>;
-    private listeners: { (data: any): void; } [];
+    private messageListeners: { (data: any): void; } [];
+    private closeListeners: { (data: any): void; } [];
     private open: boolean;
 
     constructor() {
         this.socket = new WebSocket('ws://localhost:8999');
         this.pending = [];
-        this.listeners = [];
+        this.messageListeners = [];
+        this.closeListeners = [];
         this.open = false;
 
         this.socket.addEventListener('open', event => {
@@ -32,15 +34,22 @@ export class FiskService {
                 console.error("unable to parse json", event.data);
                 return;
             }
-            for (let i = 0; i < this.listeners.length; ++i) {
-                this.listeners[i](data);
+            for (let i = 0; i < this.messageListeners.length; ++i) {
+                this.messageListeners[i](data);
             }
         });
+        this.socket.addEventListener('close', () => {
+            for (let i = 0; i < this.closeListeners.length; ++i) {
+                this.closeListeners[i]();
+            }
+        }
     }
 
     on(name: string, on: { (data: any): void; }) {
         if (name == "message") {
-            this.listeners.push(on);
+            this.messageListeners.push(on);
+        } else if (name == "close") {
+            this.closeListeners.push(on);
         }
     }
 
