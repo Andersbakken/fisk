@@ -213,7 +213,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         while (off < reqHeaderSize) {
             ssize_t r;
             size_t len = reqHeaderSize-off;
-            while ((r = write(mFD, reqHeader + off, len)) == -1 && errno == EINTR);
+            while ((r = ::write(mFD, reqHeader + off, len)) == -1 && errno == EINTR);
             if (r == -1) {
                 Log::error("Failed to write http upgrade request to %s %d %s", mUrl.c_str(), errno, strerror(errno));
                 return false;
@@ -226,7 +226,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         char buf[4096];
         while(1) {
             ssize_t r;
-            while ((r = read(mFD, buf, sizeof(buf))) == -1 && errno == EINTR);
+            while ((r = ::read(mFD, buf, sizeof(buf))) == -1 && errno == EINTR);
             if (r <= 0) {
                 Log::error("Read error happened for %s: %zd %d %s", mUrl.c_str(), r, errno, strerror(errno));
                 return false;
@@ -369,4 +369,69 @@ void WebSocket::close(const char *reason)
 {
     wslay_event_queue_close(mContext, 1000, reinterpret_cast<const uint8_t *>(reason), reason ? strlen(reason) : 0);
     wslay_event_send(mContext);
+}
+
+unsigned int WebSocket::mode() const
+{
+    unsigned int ret = Read;
+    if (wslay_event_want_write(mContext) || !mSendBuffer.empty()) {
+        ret |= Write;
+    }
+    return ret;
+}
+
+void WebSocket::onWrite()
+{
+    send();
+}
+
+void WebSocket::onRead()
+{
+    const bool sendBufferWasEmpty = mSendBuffer.empty();
+    while (true) {
+        char buf[BUFSIZ];
+        const ssize_t r = ::read(mFD, buf, sizeof(buf));
+        printf("Read %zd bytes\n", r);
+        if (!r) {
+            mClosed = true;
+            break;
+        } else if (r > 0) {
+            mRecvBuffer.insert(mRecvBuffer.end(), buf, buf + r);
+        } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            break;
+        } else {
+            mError = true;
+            break;
+        }
+    }
+
+    while (true) {
+        const size_t last = mRecvBuffer.size();
+        wslay_event_recv(mContext);
+        if (mRecvBuffer.empty() || last == mRecvBuffer.size())
+            break;
+    }
+
+    if (sendBufferWasEmpty && !mSendBuffer.empty())
+        send();
+}
+
+void WebSocket::send()
+{
+    size_t sendBufferOffset = 0;
+    while (sendBufferOffset < mSendBuffer.size()) {
+        const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
+        printf("Wrote %zd bytes\n", r);
+        if (r > 0) {
+            sendBufferOffset += r;
+        } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            break;
+        } else {
+            mError = true;
+            break;
+        }
+    }
+    if (sendBufferOffset) {
+        mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + sendBufferOffset);
+    }
 }

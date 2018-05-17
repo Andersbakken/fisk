@@ -10,9 +10,17 @@
 struct Socket
 {
     virtual ~Socket() {}
+    enum Mode {
+        None = 0x0,
+        Read = 0x1,
+        Write = 0x2
+    };
     virtual int fd() const = 0;
-    virtual std::function<void()> write() const = 0;
-    virtual std::function<void()> read() const = 0;
+    virtual unsigned int mode() const = 0;
+    virtual void onWrite() = 0;
+    virtual void onRead() = 0;
+    virtual void onTimeout() = 0;
+    virtual int timeout() const = 0;
 };
 
 class Select
@@ -28,19 +36,21 @@ public:
         FD_ZERO(&r);
         FD_ZERO(&w);
         int max = -1;
-        std::map<int, std::pair<std::function<void()>, std::function<void()> > > fds;
         for (Socket *socket : mSockets) {
-            auto read = socket->read();
-            auto write = socket->read();
-            if (!read && !write)
-                continue;
+            const int to = socket->timeout();
+            if (to != -1 && (timeoutMs == -1 || to < timeoutMs))
+                timeoutMs = to;
             const int fd = socket->fd();
+            if (fd == -1)
+                continue;
+            const unsigned int mode = socket->mode();
+            if (!mode)
+                continue;
             max = std::max(fd, max);
-            fds[fd] = std::make_pair(std::move(read), std::move(write));
-            if (read) {
+            if (mode & Socket::Read) {
                 FD_SET(fd, &r);
             }
-            if (write) {
+            if (mode & Socket::Write) {
                 FD_SET(fd, &w);
             }
         }
@@ -59,18 +69,18 @@ public:
             return -1;
         }
 
-        if (ret) {
-            for (const auto &fd : fds) {
-                if (FD_ISSET(fd.first, &r)) {
-                    assert(fd.second.first);
-                    fd.second.first();
-                }
-                if (FD_ISSET(fd.first, &w)) {
-                    assert(fd.second.second);
-                    fd.second.second();
-                }
+        for (Socket *socket : mSockets) {
+            if (!ret) {
+                socket->onTimeout();
+            } else {
+                const int fd = socket->fd();
+                if (FD_ISSET(fd, &r))
+                    socket->onRead();
+                if (FD_ISSET(fd, &w))
+                    socket->onWrite();
             }
         }
+
         return ret;
     }
 private:

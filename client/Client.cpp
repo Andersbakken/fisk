@@ -2,6 +2,8 @@
 
 #include "Log.h"
 #include "CompilerArgs.h"
+#include "Select.h"
+#include "SlotAcquirer.h"
 #include "Config.h"
 #include <unistd.h>
 #include <climits>
@@ -367,36 +369,14 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
         return slot;
     }
 
-#ifdef __linux__
-    int inotifyFD = inotify_init1(IN_CLOEXEC);
-    if (inotifyFD == -1) {
-        Log::error("Failed to inotify_init1 %d %s", errno, strerror(errno));
-        return std::make_unique<Slot>(-1, std::string());
-    }
-
-    const int watch = inotify_add_watch(inotifyFD, dir.c_str(), IN_DELETE|IN_DELETE_SELF|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
-    if (watch == -1) {
-        Log::error("inotify_add_watch() '%s' (%d) %s",
-                   dir.c_str(), errno, strerror(errno));
-        ::close(inotifyFD);
-        return std::make_unique<Slot>(-1, std::string());
-    }
+    SlotAcquirer slotAcquirer(dir, [&slot, &check]() -> void {
+            slot = check();
+        });
+    Select select;
+    select.add(&slotAcquirer);
     do {
-        fd_set r;
-        FD_ZERO(&r);
-        FD_SET(inotifyFD, &r);
-        timeval timeout = { 1, 0 };
-        select(inotifyFD + 1, &r, 0, 0, &timeout);
-        slot = check();
+        select.exec();
     } while (!slot);
-
-    ::close(inotifyFD);
-#elif __APPLE__
-    do {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        slot = check();
-    } while (!slot);
-#endif
 
     return slot;
 }
