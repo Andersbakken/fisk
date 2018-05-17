@@ -96,8 +96,10 @@ WebSocket::~WebSocket()
         ::close(mFD);
 }
 
-bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers)
+bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers,
+                        std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
 {
+    mOnMessage = std::move(onMessage);
     mUrl = std::move(url);
     LUrlParser::clParseURL parsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
     if (!parsedUrl.IsValid()) {
@@ -148,7 +150,6 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
 
         if (mFD == -1)
             continue;
-
 
         sockaddr_in *sockAddr = reinterpret_cast<sockaddr_in *>(addr->ai_addr);
         sockAddr->sin_port = htons(port);
@@ -279,7 +280,7 @@ bool WebSocket::send(Mode mode, const void *msg, size_t len)
     return !wslay_event_queue_msg(mContext, &wmsg) && !wslay_event_send(mContext);
 }
 
-
+#if 0
 bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
 {
     mExit = false;
@@ -359,11 +360,7 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
     mOnMessage = nullptr;
     return !error;
 }
-
-void WebSocket::exit()
-{
-    mExit = true;
-}
+#endif
 
 void WebSocket::close(const char *reason)
 {
