@@ -23,7 +23,7 @@ public:
             return;
         }
 
-        const int watch = inotify_add_watch(inotifyFD, dir.c_str(), IN_DELETE|IN_DELETE_SELF|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
+        const int watch = inotify_add_watch(mFD, dir.c_str(), IN_DELETE|IN_DELETE_SELF|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
         if (watch == -1) {
             Log::error("inotify_add_watch() '%s' (%d) %s",
                        dir.c_str(), errno, strerror(errno));
