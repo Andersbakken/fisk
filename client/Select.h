@@ -3,6 +3,8 @@
 
 #include <set>
 #include <map>
+#include <errno.h>
+#include <string.h>
 #include <functional>
 #include <sys/select.h>
 #include "Log.h"
