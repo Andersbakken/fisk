@@ -2,6 +2,7 @@
 #include "CompilerArgs.h"
 #include "Config.h"
 #include "Log.h"
+#include "Select.h"
 #include "Watchdog.h"
 #include "WebSocket.h"
 #include <json11.hpp>
@@ -16,6 +17,7 @@ static std::string resolvedCompiler; // this one resolves g++ to gcc and is used
 static int argc = 0;
 static char **argv = 0;;
 static std::string hash;
+
 int main(int argcIn, char **argvIn)
 {
     Config::init();
