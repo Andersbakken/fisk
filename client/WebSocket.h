@@ -18,10 +18,9 @@ public:
         Text,
         Binary
     };
-    bool connect(std::string &&url, const std::map<std::string, std::string> &headers);
+    bool connect(std::string &&url, const std::map<std::string, std::string> &headers,
+                 std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
     bool send(Mode mode, const void *data, size_t len);
-    bool exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
-    void exit();
     void close(const char *reason);
 
 protected:
@@ -41,7 +40,6 @@ private:
     wslay_event_context *mContext { 0 };
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
-    bool mExit { false };
     bool mError { false };
     bool mClosed { false };
 };

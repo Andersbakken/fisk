@@ -5,6 +5,7 @@
 #include "Select.h"
 #include "Watchdog.h"
 #include "WebSocket.h"
+#include "SlotAcquirer.h"
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
@@ -101,12 +102,21 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
+    std::unique_ptr<SlotAcquirer> slotAcquirer;
     if (!Config::noLocal()) {
         std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
         if (slot) {
             Client::runLocal(compiler, argc, argv, std::move(slot));
             return 0; // unreachable
         }
+        std::string dir;
+        Config::localSlots(&dir);
+        slotAcquirer.reset(new SlotAcquirer(dir, []() -> void {
+                    std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
+                    if (slot) {
+                        Client::runLocal(compiler, argc, argv, std::move(slot));
+                    }
+                }));
     }
     Watchdog::start(compiler, argc, argv);
     WebSocket websocket;
@@ -139,72 +149,70 @@ int main(int argcIn, char **argvIn)
         if (!hostname.empty())
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
-    if (!websocket.connect(Config::scheduler() + "/compile", headers)) {
+    std::string slaveIp;
+    uint16_t slavePort = 0;
+    auto wsOnMessage = [&slavePort, &slaveIp](WebSocket::Mode type, const void *data, size_t len) {
+        if (type == WebSocket::Text) {
+            std::string err;
+            json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
+            if (!err.empty()) {
+                Log::error("Failed to parse json from scheduler: %s", err.c_str());
+                Watchdog::stop();
+                Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                return;
+            }
+            Log::debug("GOT JSON\n%s", msg.dump().c_str());
+            const std::string type = msg["type"].string_value();
+            if (type == "needsEnvironment") {
+                const std::string execPath = Client::findExecutablePath(argv[0]);
+                std::string dirname;
+                Client::parsePath(execPath.c_str(), 0, &dirname);
+                if (execPath.empty() || dirname.empty()) {
+                    Log::error("Failed to get current directory");
+                    Watchdog::stop();
+                    Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                    return;
+                }
+#ifdef __APPLE__
+                const char *host = "Darwin x86_64";
+#elif defined(__linux__) && defined(__i686)
+                const char *host = "Linux i686"
+#elif defined(__linux__) && defined(__x86_64)
+                const char *host = "Linux x86_64";
+#else
+#error unsupported platform
+#endif
+
+                std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
+                                                     dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
+
+                Log::debug("system(\"%s\")", command.c_str());
+                system(command.c_str());
+                Watchdog::stop();
+                Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+            } else if (type == "slave") {
+                slaveIp = msg["ip"].string_value();
+                slavePort = msg["port"].int_value();
+                Log::debug("type %d", msg["port"].type());
+                Log::debug("Got here %s:%d", slaveIp.c_str(), slavePort);
+            } else {
+                Log::error("Unexpected message type: %s", type.c_str());
+            }
+            // } else {
+            //     printf("Got binary message: %zu bytes\n", len);
+        }
+    };
+    if (!websocket.connect(Config::scheduler() + "/compile", headers, std::move(wsOnMessage))) {
         Log::debug("Have to run locally because no server");
         Watchdog::stop();
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
 
-    std::string slaveIp;
-    uint16_t slavePort = 0;
-
-    if (!websocket.exec([&slavePort, &slaveIp, &websocket](WebSocket::Mode type, const void *data, size_t len) {
-                if (type == WebSocket::Text) {
-                    std::string err;
-                    json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
-                    if (!err.empty()) {
-                        Log::error("Failed to parse json from scheduler: %s", err.c_str());
-                        Watchdog::stop();
-                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-                        return;
-                    }
-                    Log::debug("GOT JSON\n%s", msg.dump().c_str());
-                    const std::string type = msg["type"].string_value();
-                    if (type == "needsEnvironment") {
-                        const std::string execPath = Client::findExecutablePath(argv[0]);
-                        std::string dirname;
-                        Client::parsePath(execPath.c_str(), 0, &dirname);
-                        if (execPath.empty() || dirname.empty()) {
-                            Log::error("Failed to get current directory");
-                            Watchdog::stop();
-                            Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-                            return;
-                        }
-#ifdef __APPLE__
-                        const char *host = "Darwin x86_64";
-#elif defined(__linux__) && defined(__i686)
-                        const char *host = "Linux i686"
-#elif defined(__linux__) && defined(__x86_64)
-                        const char *host = "Linux x86_64";
-#else
-#error unsupported platform
-#endif
-
-                        std::string command = Client::format("bash -c \"cd %s/../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
-                                                             dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), host, hash.c_str(), resolvedCompiler.c_str());
-
-                        Log::debug("system(\"%s\")", command.c_str());
-                        system(command.c_str());
-                        Watchdog::stop();
-                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-                    } else if (type == "slave") {
-                        slaveIp = msg["ip"].string_value();
-                        slavePort = msg["port"].int_value();
-                        Log::debug("type %d", msg["port"].type());
-                        Log::debug("Got here %s:%d", slaveIp.c_str(), slavePort);
-                        websocket.exit();
-                    } else {
-                        Log::error("Unexpected message type: %s", type.c_str());
-                    }
-                    // } else {
-                    //     printf("Got binary message: %zu bytes\n", len);
-                }
-            })) {
-        Watchdog::stop();
-        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
-        return 0; // unreachable
-    }
+    Select select;
+    if (slotAcquirer)
+        select.add(slotAcquirer.get());
+    select.add(&websocket);
 
     if (slaveIp.empty() || !slavePort) {
         Log::debug("Have to run locally because no slave");
