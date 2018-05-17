@@ -282,6 +282,7 @@ bool WebSocket::send(Mode mode, const void *msg, size_t len)
 
 bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
 {
+    mExit = false;
     mOnMessage = std::move(onMessage);
     bool closed = false;
     bool error = false;
@@ -292,16 +293,22 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
             FD_ZERO(&r);
             FD_ZERO(&w);
             FD_SET(mFD, &r);
-            if (wslay_event_want_write(mContext) || !mSendBuffer.empty())
+            if (wslay_event_want_write(mContext) || !mSendBuffer.empty()) {
+                printf("WRITEY SHIT %lu\n", mSendBuffer.size());
                 FD_SET(mFD, &w);
+            }
+            errno = 0;
             ret = select(mFD + 1, &r, &w, 0, 0);
         } while (ret == -1 && errno == EINTR);
+
+        printf("Select woke up %d %d %s\n", ret, errno, strerror(errno));
 
         const bool sendBufferWasEmpty = mSendBuffer.empty();
         if (FD_ISSET(mFD, &r)) {
             while (true) {
                 char buf[BUFSIZ];
                 const ssize_t r = ::read(mFD, buf, sizeof(buf));
+                printf("Read %zd bytes\n", r);
                 if (!r) {
                     closed = true;
                     break;
@@ -328,6 +335,7 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
             size_t sendBufferOffset = 0;
             while (sendBufferOffset < mSendBuffer.size()) {
                 const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
+                printf("Wrote %zd bytes\n", r);
                 if (r > 0) {
                     sendBufferOffset += r;
                 } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -342,8 +350,9 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
             }
         }
 
-        if (error)
+        if (error) {
             break;
+        }
         if (mExit && mSendBuffer.empty()) {
             break;
         }
@@ -355,4 +364,10 @@ bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)
 void WebSocket::exit()
 {
     mExit = true;
+}
+
+void WebSocket::close(const char *reason)
+{
+    wslay_event_queue_close(mContext, 1000, reinterpret_cast<const uint8_t *>(reason), reason ? strlen(reason) : 0);
+    wslay_event_send(mContext);
 }

@@ -21,6 +21,7 @@ public:
     bool send(Mode mode, const void *data, size_t len);
     bool exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
     void exit();
+    void close(const char *reason);
 private:
     std::function<void(Mode mode, const void *data, size_t len)> mOnMessage;
 
