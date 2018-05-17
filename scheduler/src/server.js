@@ -96,8 +96,8 @@ class Server extends EventEmitter {
 
             client = new Client({ws: ws, ip: ip, type: Client.Type.Compile });
             this.emit("compile", client);
-            ws.on('close', event => {
-                console.log("Got close", event);
+            ws.on('close', (status, reason) => {
+                console.log("Got close", status, reason);
             });
 
             process.nextTick(() => {
@@ -214,11 +214,11 @@ class Server extends EventEmitter {
             return;
         }
 
-        ws.on("close", () => {
+        ws.on("close", (code, reason) => {
             if (remaining.bytes)
                 client.emit("error", "Got close while reading a binary message");
             if (client)
-                client.emit("close");
+                client.emit("close", { code: code, reason: reason });
             ws.removeAllListeners();
         });
     }

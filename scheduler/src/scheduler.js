@@ -117,18 +117,18 @@ server.on("compile", function(compile) {
             compile.send("slave", {});
         }
     });
-    compile.on("error", function(msg) {
+    compile.on("error", msg => {
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
-    compile.on("close", function() {
+    compile.on("close", event => {
         compile.removeAllListeners();
     });
 });
 
-server.on("uploadEnvironment", function(upload) {
+server.on("uploadEnvironment", upload => {
     let file;
     let hash;
-    upload.on("environment", function(environment) {
+    upload.on("environment", environment => {
         file = Environments.prepare(environment);
         console.log("Got environment message", environment, typeof file);
         if (!file) {
@@ -140,7 +140,7 @@ server.on("uploadEnvironment", function(upload) {
             hash = environment.hash;
         }
     });
-    upload.on("environmentdata", function(environment) {
+    upload.on("environmentdata", environment => {
         if (!file) {
             console.error("no pending file");
             upload.send({ error: "no pending file" });
@@ -161,14 +161,14 @@ server.on("uploadEnvironment", function(upload) {
             file = undefined;
         });
     });
-    upload.on("error", function(msg) {
+    upload.on("error", msg => {
         console.error(`upload error '${msg}' from ${upload.ip}`);
         if (file) {
             file.discard();
             file = undefined;
         }
     });
-    upload.on("close", function() {
+    upload.on("close", () => {
         upload.removeAllListeners();
         if (file) {
             file.discard();
@@ -177,7 +177,7 @@ server.on("uploadEnvironment", function(upload) {
     });
 });
 
-server.on("error", function(err) {
+server.on("error", err => {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 

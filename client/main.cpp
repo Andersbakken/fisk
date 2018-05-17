@@ -226,8 +226,8 @@ int main(int argcIn, char **argvIn)
         Watchdog::stop();
         Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
         return 0; // unreachable
-
     }
+
     Watchdog::transition(Watchdog::ConnectedToSlave);
     args[0] = slaveCompiler;
     json11::Json::object msg {
@@ -354,6 +354,7 @@ int main(int argcIn, char **argvIn)
                 slaveWS.exit();
         };
     };
+
     if (!slaveWS.exec(process)) { // ### This could happen even if we've already written all the data
         Log::debug("Have to run locally because failed to get message from slave");
         Watchdog::stop();
@@ -361,5 +362,7 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
     Watchdog::stop();
+    websocket.close("slaved");
+    websocket.exec([](WebSocket::Mode, const void *, size_t) {});
     return exitCode;
 }
