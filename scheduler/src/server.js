@@ -105,8 +105,8 @@ class Server extends EventEmitter {
             });
             break;
         case "/slave":
-            if (!("x-fisk-slave-port" in req.headers)) {
-                error("No x-fisk-slave-port header");
+            if (!("x-fisk-port" in req.headers)) {
+                error("No x-fisk-port header");
                 return;
             }
 
@@ -114,16 +114,26 @@ class Server extends EventEmitter {
                 error("No x-fisk-slave-environment header");
                 return;
             }
-            const slavePort = parseInt(req.headers["x-fisk-slave-port"]);
+
+            if (!("x-fisk-slots" in req.headers) || !parseInt(req.headers["x-fisk-slots"])) {
+                error("No x-fisk-slots header");
+                return;
+            }
+
+            const port = parseInt(req.headers["x-fisk-port"]);
             const name = req.headers["x-fisk-slave-name"];
             const hostname = req.headers["x-fisk-slave-hostname"];
             const arch = req.headers["x-fisk-architecture"];
+            const slots = parseInt(req.headers["x-fisk-slots"]);
+            const environments = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
             client = new Client({ ws: ws,
                                   ip: ip,
-                                  slavePort: slavePort,
+                                  port: port,
                                   type: Client.Type.Slave,
                                   name: name,
+                                  slots: slots,
                                   hostname: hostname,
+                                  environments: environments,
                                   architecture: arch });
             ws.on("message", msg => {
                 let json;
@@ -140,9 +150,8 @@ class Server extends EventEmitter {
                     client.emit(json.type, json);
                 }
             });
-            let envs = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
             // console.log("Got dude", envs);
-            this.emit("slave", client, envs);
+            this.emit("slave", client);
             break;
         case "/uploadenvironment":
             client = new Client({ws: ws, ip: ip, type: Client.Type.UploadEnvironment});

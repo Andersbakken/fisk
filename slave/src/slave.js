@@ -4,7 +4,6 @@ const option = require("@jhanssen/options")("fisk/slave");
 const common = require('../../common')(option);
 const Server = require("./server");
 const Client = require("./client");
-const load = require("./load");
 const Compile = require("./compile");
 const fs = require('fs-extra');
 const path = require('path');
@@ -173,12 +172,7 @@ client.on("connect", () => {
         clearInterval(connectInterval);
         connectInterval = undefined;
     }
-    load.start(option("loadInterval", 1000));
-});
-
-load.on("data", (data) => {
-    // console.log("sending load", data);
-    client.send("load", data);
+    // load.start(option("loadInterval", 1000));
 });
 
 client.on("error", (err) => {
@@ -187,8 +181,8 @@ client.on("error", (err) => {
 
 client.on("close", () => {
     console.log("client closed");
-    if (load.running())
-        load.stop();
+    // if (load.running())
+    //     load.stop();
     if (!connectInterval) {
         connectInterval = setInterval(() => {
             console.log("Reconnecting...");

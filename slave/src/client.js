@@ -10,6 +10,7 @@ class Client extends EventEmitter {
         this.serverPort = option.int("port", 8096);
         this.hostname = option("hostname");
         this.name = option("name");
+        this.slots = option.int("slots", os.cpus().length);
         if (!this.name) {
             if (this.hostname) {
                 this.name = this.hostname;
@@ -36,10 +37,11 @@ class Client extends EventEmitter {
         default: console.error("Unknown architecture", os.arch()); break;
         }
         let headers = {
-            "x-fisk-slave-port": this.serverPort,
+            "x-fisk-port": this.serverPort,
             "x-fisk-environments": environments.join(";"),
             "x-fisk-slave-name": this.name,
-            "x-fisk-architecture": arch
+            "x-fisk-architecture": arch,
+            "x-fisk-slots": this.slots
         };
         if (this.hostname)
             headers["x-fisk-slave-hostname"] = this.hostname;
