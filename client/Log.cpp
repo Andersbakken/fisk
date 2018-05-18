@@ -1,7 +1,7 @@
 #include "Log.h"
 #include "Client.h"
 
-static Log::Level sLevel = Log::Silent;
+static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = 0;
 static const unsigned long long sStart = Client::mono();
 std::string sLogFileName;
