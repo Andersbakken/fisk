@@ -9,7 +9,11 @@
 class SlaveWebSocket : public WebSocket
 {
 public:
-    virtual void onMessage(Mode type, const void *data, size_t len) override
+    virtual void onConected() override
+    {
+        Watchdog::transition(Watchdog::ConnectedToSlave);
+    }
+    virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
         Log::debug("GOT MESSAGE %s %zu bytes", type == WebSocket::Text ? "text" : "binary", len);
         if (type == WebSocket::Text) {

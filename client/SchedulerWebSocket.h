@@ -8,7 +8,11 @@
 class SchedulerWebSocket : public WebSocket
 {
 public:
-    virtual void onMessage(Mode type, const void *data, size_t len) override
+    virtual void onConected() override
+    {
+        Watchdog::transition(Watchdog::ConnectedToScheduler);
+    }
+    virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
         if (type == WebSocket::Text) {
             std::string err;

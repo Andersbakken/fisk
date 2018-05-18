@@ -4,6 +4,7 @@
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = 0;
 static const unsigned long long sStart = Client::mono();
+static std::mutex sMutex;
 std::string sLogFileName;
 
 Log::Level Log::logLevel()
@@ -52,6 +53,8 @@ void Log::log(Level level, const std::string &string)
 {
     if (level < sLevel && !sLogFile)
         return;
+
+    std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - sStart;
     fprintf(stderr, "%llu.%03llu: ", elapsed / 1000, elapsed % 1000);
