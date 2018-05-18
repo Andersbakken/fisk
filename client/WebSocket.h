@@ -18,11 +18,12 @@ public:
         Text,
         Binary
     };
-    bool connect(std::string &&url, const std::map<std::string, std::string> &headers,
-                 std::function<void(Mode mode, const void *data, size_t len)> &&onMessage);
+    bool connect(std::string &&url, const std::map<std::string, std::string> &headers);
     bool send(Mode mode, const void *data, size_t len);
     void close(const char *reason);
+    bool hasPendingOutput() const { return !mSendBuffer.empty(); }
 
+    virtual void onMessage(Mode mode, const void *data, size_t len) = 0;
 protected:
     virtual unsigned int mode() const override;
     virtual int timeout() const override { return -1; }
@@ -32,8 +33,6 @@ protected:
     virtual void onTimeout() override {}
 private:
     void send();
-    std::function<void(Mode mode, const void *data, size_t len)> mOnMessage;
-
     std::string mUrl;
     int mFD { -1 };
     wslay_event_callbacks mCallbacks { 0 };

@@ -28,7 +28,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
     if (!Config::watchdog())
         return;
 
-    sThread = std::thread([compiler, argc, argv]() {
+    sThread = std::thread([]() {
             while (true) {
                 std::unique_lock<std::mutex> lock(Client::mutex());
                 unsigned long long timeout;
@@ -59,7 +59,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     if (timedOut) {
                         Log::warning("Timed out waiting for %s (%llums), running locally", stageName(next), timeout);
                         // printf("GOT HERE\n");
-                        Client::runLocal(compiler, argc, argv, Client::acquireSlot(Client::Wait));
+                        Client::runLocal(Client::acquireSlot(Client::Wait));
                         return;
                     }
                 } while (sStage < next);

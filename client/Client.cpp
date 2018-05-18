@@ -23,6 +23,12 @@
 #include <mach/mach_time.h>
 #endif
 
+static Client::Data sData;
+Client::Data &Client::data()
+{
+    return sData;
+}
+
 static std::mutex sMutex;
 std::mutex &Client::mutex()
 {
@@ -64,7 +70,7 @@ static std::string resolveSymlink(const std::string &link, const std::function<C
     return l;
 }
 
-std::string Client::findCompiler(const char *argv0, const char *preresolved, std::string *resolvedCompiler, std::string *slaveCompiler)
+bool Client::findCompiler(const char *preresolved)
 {
     // printf("PATH %s\n", path);
     std::string exec;
@@ -74,21 +80,20 @@ std::string Client::findCompiler(const char *argv0, const char *preresolved, std
             std::string self, basename;
             const char *begin = path, *end = 0;
             // printf("trying realpath [%s]\n", argv[0]);
-            std::string rp = Client::realpath(argv0);
+            std::string rp = Client::realpath(sData.argv[0]);
             // printf("REALPATH %s %s\n", argv[0], rp.c_str());
             if (!rp.empty()) {
                 std::string dirname;
                 parsePath(rp, 0, &dirname);
-                parsePath(argv0, &basename, 0);
+                parsePath(sData.argv[0], &basename, 0);
                 self = dirname + basename;
-            } else if (strchr(argv0, '/')) {
-                return std::string();
+            } else if (strchr(sData.argv[0], '/')) {
+                return false;
             } else {
-                basename = argv0;
+                basename = sData.argv[0];
             }
 
             // printf("self %s argv[0] %s basename %s\n", self.c_str(), argv[0], basename.c_str());
-
             // printf("realPath %s dirname %s argv[0] %s basename %s\n", rp.c_str(), dirname.c_str(), argv[0], basename.c_str());
             do {
                 end = strchr(begin, ':');
@@ -134,7 +139,9 @@ std::string Client::findCompiler(const char *argv0, const char *preresolved, std
         exec = preresolved;
     }
 
-    *resolvedCompiler = resolveSymlink(exec, [](const std::string &p) -> CheckResult {
+    if (exec.empty())
+        return false;
+    sData.resolvedCompiler = resolveSymlink(exec, [](const std::string &p) -> CheckResult {
             std::string base;
             parsePath(p, &base, 0);
             if (base.find("g++") != std::numeric_limits<size_t>::max()|| base.find("gcc") != std::numeric_limits<size_t>::max())
@@ -143,20 +150,20 @@ std::string Client::findCompiler(const char *argv0, const char *preresolved, std
         });
     // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
 
-    *slaveCompiler = *resolvedCompiler;
-    const size_t slash = resolvedCompiler->rfind('/');
+    sData.slaveCompiler = sData.resolvedCompiler;
+    const size_t slash = sData.resolvedCompiler.rfind('/');
     if (slash != std::string::npos) {
-        for (size_t i=slash + 2; i<resolvedCompiler->size(); ++i) {
-            if ((*resolvedCompiler)[i] == '+' && (*resolvedCompiler)[i - 1] == '+') {
-                if ((*resolvedCompiler)[i - 2] == 'c') {
-                    (*resolvedCompiler)[i - 1] = 'c';
-                    resolvedCompiler->erase(i);
-                } else if ((*resolvedCompiler)[i - 2] == 'g') {
-                    if (i > 6 && !strncmp(resolvedCompiler->c_str() + i - 6, "clang", 5)) {
-                        resolvedCompiler->erase(resolvedCompiler->begin() + i - 1, resolvedCompiler->begin() + i + 1);
+        for (size_t i=slash + 2; i<sData.resolvedCompiler.size(); ++i) {
+            if (sData.resolvedCompiler[i] == '+' && sData.resolvedCompiler[i - 1] == '+') {
+                if (sData.resolvedCompiler[i - 2] == 'c') {
+                    sData.resolvedCompiler[i - 1] = 'c';
+                    sData.resolvedCompiler.erase(i);
+                } else if (sData.resolvedCompiler[i - 2] == 'g') {
+                    if (i > 6 && !strncmp(sData.resolvedCompiler.c_str() + i - 6, "clang", 5)) {
+                        sData.resolvedCompiler.erase(sData.resolvedCompiler.begin() + i - 1, sData.resolvedCompiler.begin() + i + 1);
                     } else {
-                        (*resolvedCompiler)[i - 1] = 'c';
-                        (*resolvedCompiler)[i] = 'c';
+                        sData.resolvedCompiler[i - 1] = 'c';
+                        sData.resolvedCompiler[i] = 'c';
                     }
                 }
             }
@@ -164,7 +171,8 @@ std::string Client::findCompiler(const char *argv0, const char *preresolved, std
     }
     // printf("RESULT %s\n", resolvedCompiler->c_str());
 
-    return exec;
+    sData.compiler = std::move(exec);
+    return true;
 }
 
 void Client::parsePath(const char *path, std::string *basename, std::string *dirname)
@@ -381,17 +389,17 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
     return slot;
 }
 
-void Client::runLocal(const std::string &exec, int argc, char **argv, std::unique_ptr<Slot> &&slot)
+void Client::runLocal(std::unique_ptr<Slot> &&slot)
 {
-    auto run = [&exec, argc, argv]() {
-        char **argvCopy = new char*[argc + 1];
-        argvCopy[0] = strdup(exec.c_str());
-        for (int i=1; i<argc; ++i) {
-            argvCopy[i] = argv[i];
+    auto run = []() {
+        char **argvCopy = new char*[sData.argc + 1];
+        argvCopy[0] = strdup(sData.compiler.c_str());
+        for (int i=1; i<sData.argc; ++i) {
+            argvCopy[i] = sData.argv[i];
         }
-        argvCopy[argc] = 0;
-        ::execv(exec.c_str(), argvCopy);
-        Log::error("fisk: Failed to exec %s (%d %s)", exec.c_str(), errno, strerror(errno));
+        argvCopy[sData.argc] = 0;
+        ::execv(sData.compiler.c_str(), argvCopy);
+        Log::error("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
     const pid_t pid = fork();
@@ -575,3 +583,4 @@ std::string Client::findExecutablePath(const char *argv0)
 
     return std::string();
 }
+

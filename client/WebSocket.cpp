@@ -71,13 +71,12 @@ WebSocket::WebSocket()
                                          void *user_data) -> void {
         WebSocket *ws = static_cast<WebSocket *>(user_data);
         assert(ws);
-        assert(ws->mOnMessage);
         switch (arg->opcode) {
         case WSLAY_TEXT_FRAME:
-            ws->mOnMessage(Text, arg->msg, arg->msg_length);
+            ws->onMessage(Text, arg->msg, arg->msg_length);
             break;
         case WSLAY_BINARY_FRAME:
-            ws->mOnMessage(Binary, arg->msg, arg->msg_length);
+            ws->onMessage(Binary, arg->msg, arg->msg_length);
             break;
         case WSLAY_PING:
         case WSLAY_PONG:
@@ -96,10 +95,8 @@ WebSocket::~WebSocket()
         ::close(mFD);
 }
 
-bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers,
-                        std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
+bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers)
 {
-    mOnMessage = std::move(onMessage);
     mUrl = std::move(url);
     LUrlParser::clParseURL parsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
     if (!parsedUrl.IsValid()) {
@@ -122,6 +119,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
     if (!port)
         port = 80;
 
+#warning should support ipv4 literals
     // ### should support literals maybe
     // in_addr literal;
     // addrinfo *addr;
@@ -280,88 +278,6 @@ bool WebSocket::send(Mode mode, const void *msg, size_t len)
     return !wslay_event_queue_msg(mContext, &wmsg) && !wslay_event_send(mContext);
 }
 
-#if 0
-bool WebSocket::exec(std::function<void(Mode mode, const void *data, size_t len)> &&onMessage)
-{
-    mExit = false;
-    mOnMessage = std::move(onMessage);
-    bool closed = false;
-    bool error = false;
-    while (true) {
-        fd_set r, w;
-        int ret;
-        do {
-            FD_ZERO(&r);
-            FD_ZERO(&w);
-            FD_SET(mFD, &r);
-            if (wslay_event_want_write(mContext) || !mSendBuffer.empty()) {
-                FD_SET(mFD, &w);
-            }
-            errno = 0;
-            ret = select(mFD + 1, &r, &w, 0, 0);
-        } while (ret == -1 && errno == EINTR);
-
-        // printf("Select woke up %d %d %s\n", ret, errno, strerror(errno));
-
-        const bool sendBufferWasEmpty = mSendBuffer.empty();
-        if (FD_ISSET(mFD, &r)) {
-            while (true) {
-                char buf[BUFSIZ];
-                const ssize_t r = ::read(mFD, buf, sizeof(buf));
-                printf("Read %zd bytes\n", r);
-                if (!r) {
-                    closed = true;
-                    break;
-                } else if (r > 0) {
-                    mRecvBuffer.insert(mRecvBuffer.end(), buf, buf + r);
-                } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                    break;
-                } else {
-                    error = true;
-                    break;
-                }
-            }
-        }
-        if (closed)
-            break;
-        while (true) {
-            const size_t last = mRecvBuffer.size();
-            wslay_event_recv(mContext);
-            if (!mRecvBuffer.empty() || last == mRecvBuffer.size())
-                break;
-        }
-
-        if (FD_ISSET(mFD, &w) || (!mSendBuffer.empty() && sendBufferWasEmpty)) {
-            size_t sendBufferOffset = 0;
-            while (sendBufferOffset < mSendBuffer.size()) {
-                const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
-                printf("Wrote %zd bytes\n", r);
-                if (r > 0) {
-                    sendBufferOffset += r;
-                } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                    break;
-                } else {
-                    error = true;
-                    break;
-                }
-            }
-            if (sendBufferOffset) {
-                mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + sendBufferOffset);
-            }
-        }
-
-        if (error) {
-            break;
-        }
-        if (mExit && mSendBuffer.empty()) {
-            break;
-        }
-    }
-    mOnMessage = nullptr;
-    return !error;
-}
-#endif
-
 void WebSocket::close(const char *reason)
 {
     wslay_event_queue_close(mContext, 1000, reinterpret_cast<const uint8_t *>(reason), reason ? strlen(reason) : 0);
@@ -388,7 +304,7 @@ void WebSocket::onRead()
     while (true) {
         char buf[BUFSIZ];
         const ssize_t r = ::read(mFD, buf, sizeof(buf));
-        printf("Read %zd bytes\n", r);
+        Log::debug("Read %zd bytes", r);
         if (!r) {
             mClosed = true;
             break;
@@ -418,7 +334,7 @@ void WebSocket::send()
     size_t sendBufferOffset = 0;
     while (sendBufferOffset < mSendBuffer.size()) {
         const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
-        printf("Wrote %zd bytes\n", r);
+        Log::debug("Wrote %zd bytes\n", r);
         if (r > 0) {
             sendBufferOffset += r;
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
