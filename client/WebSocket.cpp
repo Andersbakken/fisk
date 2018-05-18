@@ -130,7 +130,9 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         sockaddr_in *sockAddr = static_cast<sockaddr_in *>(calloc(1, sizeof(sockaddr_in)));
         res->ai_addr = reinterpret_cast<sockaddr *>(sockAddr);
         res->ai_addrlen = sizeof(sockaddr_in);
+#ifdef __APPLE__
         sockAddr->sin_len = sizeof(sockaddr_in);
+#endif
         sockAddr->sin_family = AF_INET;
         sockAddr->sin_addr = literal;
     } else {
