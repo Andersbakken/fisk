@@ -17,8 +17,25 @@
 
 struct CompilerArgs;
 namespace Client {
+struct Data
+{
+    ~Data() { delete[] argv; }
+
+    int argc { 0 };
+    char **argv { 0 };
+    std::string compiler; // this is the next one on the path and the one we will exec if we run locally
+    std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
+    std::string slaveCompiler; // this is the one that actually will exist on the slave
+    std::string hash;
+    int exitCode { 0 };
+
+    std::string slaveIp;
+    uint16_t slavePort { 0 };
+};
+Data &data();
+
 std::mutex &mutex();
-std::string findCompiler(const char *argv0, const char *preresolved, std::string *resolvedCompiler, std::string *slaveCompiler);
+bool findCompiler(const char *preresolved);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
@@ -42,7 +59,7 @@ enum AcquireSlotMode {
     Wait
 };
 std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
-[[noreturn]] void runLocal(const std::string &compiler, int argc, char **argv, std::unique_ptr<Slot> &&slot);
+[[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
