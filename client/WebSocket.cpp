@@ -119,27 +119,36 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
     if (!port)
         port = 80;
 
-#warning should support ipv4 literals
-    // ### should support literals maybe
-    // in_addr literal;
-    // addrinfo *addr;
-    // if (inet_aton(host.c_str(), &literal)) {
-    //     Log::debug("Got literal ip address: %s", host.c_str());
-    // }
+    int inet_aton(const char *cp, struct in_addr *inp);
 
-    addrinfo hints, *res;
+    printf("GOT host %s\n", host.c_str());
+    addrinfo *res = 0;
+    in_addr literal;
+    int ret;
+    if (inet_aton(host.c_str(), &literal)) {
+        Log::debug("Got literal ip address: %s", host.c_str());
+        res = static_cast<addrinfo *>(calloc(1, sizeof(addrinfo)));
+        res->ai_family = PF_INET;
+        res->ai_socktype = SOCK_STREAM;
+        res->ai_protocol = 0;
+        sockaddr_in *sockAddr = static_cast<sockaddr_in *>(calloc(1, sizeof(sockaddr_in)));
+        res->ai_addr = reinterpret_cast<sockaddr *>(sockAddr);
+        sockAddr->sin_len = sizeof(sockaddr_in);
+        sockAddr->sin_family = AF_INET;
+        sockAddr->sin_addr = literal;
+    } else {
+        addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = PF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags |= AI_CANONNAME;
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags |= AI_CANONNAME;
-
-
-    int ret = getaddrinfo(host.c_str(), nullptr, &hints, &res);
-    Log::debug("Getting addresses for %s -> %d", host.c_str(), ret);
-    if (ret != 0) {
-        Log::error("Couldn't resolve host %s", host.c_str());
-        return false;
+        int ret = getaddrinfo(host.c_str(), nullptr, &hints, &res);
+        Log::debug("Getting addresses for %s -> %d", host.c_str(), ret);
+        if (ret != 0) {
+            Log::error("Couldn't resolve host %s", host.c_str());
+            return false;
+        }
     }
 
     for (addrinfo *addr = res; addr; addr = addr->ai_next) {
