@@ -89,7 +89,7 @@ std::string Config::scheduler()
 
 unsigned long long Config::schedulerConnectTimeout()
 {
-    json11::Json val = value("scheduler_connect_timeout");
+    json11::Json val = value("scheduler-connect-timeout");
     if (val.is_number())
         return val.int_value();
 
@@ -98,7 +98,7 @@ unsigned long long Config::schedulerConnectTimeout()
 
 unsigned long long Config::acquiredSlaveTimeout()
 {
-    json11::Json val = value("acquired_slave_timeout");
+    json11::Json val = value("acquired-slave-timeout");
     if (val.is_number())
         return val.int_value();
 
@@ -107,7 +107,7 @@ unsigned long long Config::acquiredSlaveTimeout()
 
 unsigned long long Config::slaveConnectTimeout()
 {
-    json11::Json val = value("slave_connect_timeout");
+    json11::Json val = value("slave-connect-timeout");
     if (val.is_number())
         return val.int_value();
 
@@ -116,7 +116,7 @@ unsigned long long Config::slaveConnectTimeout()
 
 unsigned long long Config::responseTimeout()
 {
-    json11::Json val = value("response_timeout");
+    json11::Json val = value("response-timeout");
     if (val.is_number())
         return val.int_value();
 
@@ -125,7 +125,7 @@ unsigned long long Config::responseTimeout()
 
 std::string Config::clientName()
 {
-    json11::Json val = value("clientName");
+    json11::Json val = value("client-name");
     if (val.is_string())
         return val.string_value();
 
@@ -139,7 +139,7 @@ std::string Config::clientName()
 
 std::string Config::cacheDir()
 {
-    json11::Json val = value("cache_dir");
+    json11::Json val = value("cache-dir");
     if (val.is_string()) {
         std::string ret = val.string_value();
         if (!ret.empty()) {
@@ -156,7 +156,7 @@ std::string Config::cacheDir()
 
 size_t Config::localSlots(std::string *dir)
 {
-    json11::Json val = value("local_slots");
+    json11::Json val = value("local-slots");
     size_t ret;
     if (val.is_number()) {
         ret = val.int_value();
@@ -171,7 +171,7 @@ size_t Config::localSlots(std::string *dir)
 
 bool Config::noLocal()
 {
-    json11::Json val = value("no_local");
+    json11::Json val = value("no-local");
     if (val.is_bool()) {
         return val.bool_value();
     }
@@ -197,7 +197,7 @@ bool Config::watchdog()
 
 std::string Config::nodePath()
 {
-    json11::Json val = value("node_path");
+    json11::Json val = value("node-path");
     if (val.is_string())
         return val.string_value();
     return "node";
@@ -228,7 +228,7 @@ std::string Config::name()
 std::vector<std::string> Config::compatibleHashes(const std::string &hash)
 {
     std::vector<std::string> ret;
-    json11::Json val = value("compatible_hashes");
+    json11::Json val = value("compatible-hashes");
     if (val.is_object()) {
         const json11::Json &value = val[hash];
         if (value.is_string()) {
@@ -244,7 +244,7 @@ std::vector<std::string> Config::compatibleHashes(const std::string &hash)
 
 std::string Config::logFile()
 {
-    json11::Json val = value("log_file");
+    json11::Json val = value("log-file");
     if (val.is_string())
         return val.string_value();
 
@@ -253,7 +253,7 @@ std::string Config::logFile()
 
 std::string Config::logLevel()
 {
-    json11::Json val = value("log_level");
+    json11::Json val = value("log-level");
     if (val.is_string())
         return val.string_value();
 

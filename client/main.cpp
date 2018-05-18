@@ -184,6 +184,9 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
+    while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket)
+        select.exec();
+
     args[0] = data.slaveCompiler;
     json11::Json::object msg {
         { "commandLine", args },
@@ -194,7 +197,7 @@ int main(int argcIn, char **argvIn)
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     slaveWebSocket.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
 
-    while (!slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
+    while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
     Watchdog::transition(Watchdog::WaitingForResponse);
 

@@ -239,7 +239,7 @@ bool WebSocket::requestUpgrade()
 
 void WebSocket::acceptUpgrade()
 {
-    printf("[WebSocket.cpp:%d]: void WebSocket::acceptUpgrade()\n", __LINE__); fflush(stdout);
+    Log::debug("Accept upgrade %zu bytes", mRecvBuffer.size());
     char *ch = reinterpret_cast<char *>(&mRecvBuffer[0]);
     std::string headers;
     for (size_t i=0; i<mRecvBuffer.size() - 3; ++i) {
@@ -276,6 +276,7 @@ void WebSocket::acceptUpgrade()
     }
     assert(mContext);
     mState = ConnectedWebSocket;
+    onConected();
 }
 
 bool WebSocket::send(MessageType type, const void *msg, size_t len)
