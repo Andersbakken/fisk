@@ -10,15 +10,41 @@ const server = new Server(option);
 
 const slaves = {};
 
+function slaveKey() {
+    if (arguments.length == 1) {
+        return arguments[0].ip + " " + arguments[0].port;
+    } else {
+        return arguments[0] + " " + arguments[1];
+    }
+}
+
+function insertSlave(slave) {
+    slaves[slaveKey(slave)] = slave;
+}
+
+function forEachSlave(cb) {
+    for (let key in slaves) {
+        cb(slaves[key]);
+    }
+}
+
+function removeSlave(slave) {
+    delete slaves[slaveKey(slave)];
+}
+
+function findSlave(ip, port) {
+    return slaves(slaveKey(ip, port));
+}
+
 function distribute(conf)
 {
-    let ips;
+    let keys;
     if (conf && conf.slave) {
         if (conf.pendingEnvironments)
             return;
-        ips = [ conf.slave.ip ];
+        keys = [ slaveKey(conf.slave) ];
     } else {
-        ips = Object.keys(slaves);
+        keys = Object.keys(slaves);
     }
     let hashes;
     if (conf && conf.hash) {
@@ -26,17 +52,16 @@ function distribute(conf)
     } else {
         hashes = Object.keys(Environments.environments);
     }
-    console.log("distribute", ips, hashes);
+    console.log("distribute", keys, hashes);
     for (let h=0; h<hashes.length; ++h) {
         let hash = hashes[h];
-        for (let i=0; i<ips.length; ++i) {
-            let ip = ips[i];
-            let slave = slaves[ip];
+        for (let i=0; i<keys.length; ++i) {
+            let key = keys[i];
+            let slave = slaves[key];
             if (!slave.pendingEnvironments && slave.environments && slave.environments.indexOf(hash) === -1) {
-                console.log("sending", hash, "to", ip);
+                console.log("sending", hash, "to", key);
                 Environments.environment(hash).send(slave);
                 slave.pendingEnvironments = true;
-                break;
             }
         }
     }
@@ -51,6 +76,7 @@ server.express.get("/slaves", (req, res, next) => {
             ip: s.ip,
             name: s.name,
             slots: s.slots,
+            port: s.port,
             activeClients: s.activeClients,
             jobsScheduled: s.jobsScheduled,
             jobsPerformed: s.jobsPerformed,
@@ -67,11 +93,11 @@ server.on("slave", function(slave) {
     console.log("slave connected", slave.ip, slave.environments);
     slave.activeClients = 0;
     slave.pendingEnvironments = false;
-    slaves[slave.ip] = slave;
+    insertSlave(slave);
     distribute({slave: slave});
 
     slave.on('environments', function(message) {
-        slaves[slave.ip].environments = message.environments;
+        slave.environments = message.environments;
         slave.pendingEnvironments = false;
         distribute({slave: slave});
     });
@@ -80,7 +106,7 @@ server.on("slave", function(slave) {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
     slave.on("close", function() {
-        delete slaves[slave.ip];
+        removeSlave(slave);
         slave.removeAllListeners();
     });
 
@@ -101,17 +127,15 @@ server.on("compile", function(compile) {
         }
 
         function score(s) { if (!s) return -Infinity; return s.slots - s.activeClients; }
-        for (let ip in slaves) {
-            let s = slaves[ip];
-            console.log(Object.keys(s));
-            console.log(s.environments, request.environment, score(s), score(slave), s.slots, s.activeClients);
+        forEachSlave(s => {
             if (s.environments.indexOf(request.environment) !== -1 && score(s) > score(slave)) {
                 slave = s;
             }
-        }
+        });
         if (slave) {
             console.log("Got best", slave.ip, score(slave));
             ++slave.activeClients;
+            ++slave.jobsScheduled;
             compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
         } else {
             compile.send("slave", {});

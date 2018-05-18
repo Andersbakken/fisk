@@ -8,13 +8,7 @@ const socket = {
     enqueue(client, hash, file, skip) {
         socket._queue.push({ client: client, hash: hash, file: file, skip });
         if (!socket._sending) {
-            socket._next().then(() => {
-                if (socket._queue.length > 0) {
-                    process.nextTick(socket._next);
-                }
-            }).catch(e => {
-                console.error(e);
-            });
+            socket._next();
         }
     },
 
@@ -22,46 +16,46 @@ const socket = {
         socket._sending = true;
         const q = socket._queue.shift();
         let size;
-        return new Promise((resolve, reject) => {
-            fs.stat(q.file).then(st => {
-                if (!st.isFile())
-                    throw new Error(`${q.file} not a file`);
-                size = st.size;
-                return fs.open(q.file, "r");
-            }).then(fd => {
-                let remaining = size;
-                if (q.skip) {
-                    let buf = Buffer.allocUnsafe(q.skip);
-                    fs.readSync(fd, buf, 0, q.skip);
-                    remaining -= q.skip;
+        console.log("ABOUT TO SEND", q.file, "to", q.client.ip, q.client.port);
+        fs.stat(q.file).then(st => {
+            if (!st.isFile())
+                throw new Error(`${q.file} not a file`);
+            size = st.size;
+            return fs.open(q.file, "r");
+        }).then(fd => {
+            let remaining = size;
+            if (q.skip) {
+                let buf = Buffer.allocUnsafe(q.skip);
+                fs.readSync(fd, buf, 0, q.skip);
+                remaining -= q.skip;
+            }
+            // send file size to client
+            q.client.send({ type: "environment", bytes: remaining, hash: q.hash });
+            // read file in chunks and send
+            let idx = 0;
+            let last = undefined;
+            const readNext = () => {
+                if (!remaining) {
+                    socket._sending = false;
+                    if (socket._queue.length)
+                        process.nextTick(socket._next);
+                    return;
                 }
-                // send file size to client
-                q.client.send({ type: "environment", bytes: remaining, hash: q.hash });
-                // read file in chunks and send
-                let idx = 0;
-                let last = undefined;
-                const readNext = () => {
-                    if (!remaining) {
-                        socket._sending = false;
-                        resolve();
-                        return;
-                    }
-                    const bytes = Math.min(32768, remaining);
-                    const buf = Buffer.allocUnsafe(bytes);
+                const bytes = Math.min(32768, remaining);
+                const buf = Buffer.allocUnsafe(bytes);
 
-                    remaining -= bytes;
-                    fs.read(fd, buf, 0, bytes).then(() => {
-                        q.client.send(buf);
-                        readNext();
-                    }).catch(e => {
-                        throw e;
-                    });
-                };
-                readNext();
-            }).catch(e => {
-                socket._sending = false;
-                reject(e);
-            });
+                remaining -= bytes;
+                fs.read(fd, buf, 0, bytes).then(() => {
+                    q.client.send(buf);
+                    readNext();
+                }).catch(e => {
+                    throw e;
+                });
+            };
+            readNext();
+        }).catch(e => {
+            socket._sending = false;
+            console.error("Got error when sending", e.message, e.stack);
         });
     }
 };

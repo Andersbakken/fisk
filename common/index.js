@@ -6,7 +6,7 @@ const Version = 2;
 
 function cacheDir(option)
 {
-    let dir = option("cache_dir");
+    let dir = option("cache-dir");
     if (!dir) {
         dir = path.join(os.homedir(), ".cache", "fisk", path.basename(option.prefix));
     }
