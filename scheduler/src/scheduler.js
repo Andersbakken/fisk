@@ -34,7 +34,7 @@ function distribute(conf)
             let slave = slaves[ip];
             if (!slave.pendingEnvironments && slave.environments && slave.environments.indexOf(hash) === -1) {
                 console.log("sending", hash, "to", ip);
-                Environments.environment(hash).send(slave.client);
+                Environments.environment(hash).send(slave);
                 slave.pendingEnvironments = true;
                 break;
             }
@@ -47,23 +47,27 @@ server.express.get("/slaves", (req, res, next) => {
     for (let ip in slaves) {
         let s = slaves[ip];
         ret.push({
-            architecture: s.client.architecture,
-            ip: s.client.ip,
-            name: s.client.name,
-            jobsScheduled: s.client.jobsScheduled,
-            jobsPerformed: s.client.jobsPerformed,
-            hostname: s.client.hostname,
-            name: s.client.name,
-            created: s.client.created,
+            architecture: s.architecture,
+            ip: s.ip,
+            name: s.name,
+            slots: s.slots,
+            activeClients: s.activeClients,
+            jobsScheduled: s.jobsScheduled,
+            jobsPerformed: s.jobsPerformed,
+            hostname: s.hostname,
+            name: s.name,
+            created: s.created,
             environments: s.environments
         });
     }
     res.send(ret);
 });
 
-server.on("slave", function(slave, environments) {
-    console.log("slave connected", slave.ip, environments);
-    slaves[slave.ip] = { client: slave, environments: environments, pendingEnvironments: false };
+server.on("slave", function(slave) {
+    console.log("slave connected", slave.ip, slave.environments);
+    slave.activeClients = 0;
+    slave.pendingEnvironments = false;
+    slaves[slave.ip] = slave;
     distribute({slave: slave});
 
     slave.on('environments', function(message) {
@@ -72,10 +76,6 @@ server.on("slave", function(slave, environments) {
         distribute({slave: slave});
     });
 
-    slave.on("load", function(load) {
-        // console.log("slave load", load);
-        slaves[slave.ip].load = load.message;
-    });
     slave.on("error", function(msg) {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
@@ -92,6 +92,7 @@ server.on("slave", function(slave, environments) {
 
 server.on("compile", function(compile) {
     let file;
+    let slave;
     compile.on("job", function(request) {
         console.log("request", request.environment);
         if (!Environments.hasEnvironment(request.environment)) {
@@ -99,29 +100,37 @@ server.on("compile", function(compile) {
             return;
         }
 
-        let best = { load: Infinity };
+        function score(s) { if (!s) return -Infinity; return s.slots - s.activeClients; }
         for (let ip in slaves) {
-            let slave = slaves[ip];
-            if ("load" in slave && "environments" in slave) {
-                if (slave.environments.indexOf(request.environment) !== -1 && slave.load < best.load) {
-                    best.load = slave.load;
-                    best.client = slave.client;
-                }
+            let s = slaves[ip];
+            console.log(Object.keys(s));
+            console.log(s.environments, request.environment, score(s), score(slave), s.slots, s.activeClients);
+            if (s.environments.indexOf(request.environment) !== -1 && score(s) > score(slave)) {
+                slave = s;
             }
         }
-        console.log("best", best);
-        if (best.load < Infinity) {
-            ++best.client.jobsScheduled;
-            compile.send("slave", { ip: best.client.ip, hostname: best.client.hostname, port: best.client.slavePort });
+        if (slave) {
+            console.log("Got best", slave.ip, score(slave));
+            ++slave.activeClients;
+            compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
         } else {
             compile.send("slave", {});
         }
     });
     compile.on("error", msg => {
+        if (slave) {
+            --slave.activeClients;
+            slave = undefined;
+        }
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
+        console.log("CLIENT DISAPPEARED");
         compile.removeAllListeners();
+        if (slave) {
+            --slave.activeClients;
+            slave = undefined;
+        }
     });
 });
 
