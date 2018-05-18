@@ -39,7 +39,7 @@ class VM
         fs.remove(path.join(root, 'compiles'));
 
         let args = [ `--root=${root}`, `--hash=${hash}` ];
-        let user = option("vm_user");
+        let user = option("vm-user");
         if (user)
             args.push(`--user=${user}`);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
