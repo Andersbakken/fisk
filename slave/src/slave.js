@@ -46,6 +46,23 @@ function loadEnvironments()
             if (err) {
                 if (err.code == "ENOENT") {
                     fs.mkdirp(environmentsRoot).then(() => {
+                        // let user = option("fisk-user");
+                        // let split = environmentsRoot.split('/');
+                        // if (!user) {
+                        //     if (split[0] == 'home' || split[0] == 'Users') {
+                        //         user = split[1];
+                        //     } else if (split[0] == 'usr' && split[1] == 'home') {
+                        //         user = split[2];
+                        //     }
+                        // }
+                        // if (!user) {
+                        //     user = process.env["SUDO_USER"];
+                        // }
+                        // if (user) {
+                        //     let p = "";
+                        //     split.forEach(element => {
+                        //         p += "/" + element;
+                        // });
                         resolve();
                     }).catch((err) => {
                         reject(new Error("Failed to create directory " + err.message));
