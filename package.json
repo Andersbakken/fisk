@@ -1,0 +1,42 @@
+{
+  "name": "fisk",
+  "version": "1.0.0",
+  "description": "Fisk, a distributed compile system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Andersbakken/fisk.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Andersbakken/fisk/issues"
+  },
+  "homepage": "https://github.com/Andersbakken/fisk#readme",
+  "dependencies": {
+    "@angular-devkit/build-angular": "^0.6.3",
+    "@angular/animations": "^6.0.2",
+    "@angular/cli": "^6.0.3",
+    "@angular/common": "^6.0.2",
+    "@angular/compiler": "^6.0.2",
+    "@angular/compiler-cli": "^6.0.2",
+    "@angular/core": "^6.0.2",
+    "@angular/forms": "^6.0.2",
+    "@angular/http": "^6.0.2",
+    "@angular/language-service": "^6.0.2",
+    "@angular/platform-browser": "^6.0.2",
+    "@angular/platform-browser-dynamic": "^6.0.2",
+    "@angular/router": "^6.0.2",
+    "@jhanssen/options": "^1.0.9",
+    "fs-extra": "^6.0.1",
+    "minimist": "^1.2.0",
+    "mktemp": "^0.4.0",
+    "posix": "^4.1.2",
+    "rxjs": "^6.1.0",
+    "ws": "^5.1.1",
+    "zone.js": "^0.8.26"
+  }
+}
