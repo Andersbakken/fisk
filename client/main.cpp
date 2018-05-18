@@ -129,6 +129,7 @@ int main(int argcIn, char **argvIn)
     }
 
     data.hash = Client::environmentHash(data.resolvedCompiler);
+    printf("SHIT %s\n", data.hash.c_str());
     std::vector<std::string> compatibleHashes = Config::compatibleHashes(data.hash);
     std::string hashes = data.hash;
     for (const std::string &compatibleHash : compatibleHashes) {
@@ -155,7 +156,7 @@ int main(int argcIn, char **argvIn)
         select.add(slotAcquirer.get());
     select.add(&schedulerWebsocket);
 
-    while (!schedulerWebsocket.done)
+    while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
 
     if (data.slaveIp.empty() || !data.slavePort) {
@@ -183,7 +184,6 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    Watchdog::transition(Watchdog::ConnectedToSlave);
     args[0] = data.slaveCompiler;
     json11::Json::object msg {
         { "commandLine", args },
@@ -194,7 +194,7 @@ int main(int argcIn, char **argvIn)
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     slaveWebSocket.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
 
-    while (!slaveWebSocket.hasPendingOutput())
+    while (!slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
     Watchdog::transition(Watchdog::WaitingForResponse);
 
