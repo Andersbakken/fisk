@@ -4,6 +4,7 @@ const fs = require('fs');
 const child_process = require('child_process');
 const WebSocket = require('ws');
 const os = require('os');
+const path = require('path');
 
 const argv = require('minimist')(process.argv.slice(2));
 const silent = argv.silent;
@@ -54,7 +55,8 @@ function makeTarball()
         let out = "";
         let err = "";
 
-        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: os.tmpdir() });
+        const cwd = os.tmpdir();
+        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: cwd });
         createEnvProc.stdout.on('data', (data) => { out += data; });
         createEnvProc.stderr.on('data', (data) => { err += data; });
         createEnvProc.on('close', (code) => {
@@ -67,8 +69,8 @@ function makeTarball()
                 let line = lines[lines.length - 1];
                 tarball = line.split(" ")[1];
                 if (!silent)
-                    console.log("git tarball", tarball);
-                resolve(`/tmp/${tarball}`);
+                    console.log("got tarball", tarball);
+                resolve(path.join(cwd, tarball));
             } else {
                 die(`icecc-create-env exited with code: ${code}\n${err}`);
             }
@@ -100,7 +102,7 @@ function connectWs()
         });
         ws.on('error', err => {
             if (!silent)
-                console.error("Got error", err);
+                console.error("Got error", err.message, err.stack);
         });
         ws.on('close', () => {
             process.exit();
@@ -114,7 +116,7 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
     try {
         size = fs.statSync(data[0]).size;
     } catch (err) {
-        die("Got error ", err.toString());
+        die("Got error ", data[0], err.message, err.stack);
     }
     // console.log("Got data", data, size);
     let f = fs.openSync(data[0], "r");
