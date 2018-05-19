@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Andersbakken/fisk#readme",
   "dependencies": {
     "@angular/animations": "^6.0.2",
+    "@angular/cdk": "^6.0.2",
     "@angular/common": "^6.0.2",
     "@angular/compiler": "^6.0.2",
     "@angular/core": "^6.0.2",
@@ -27,6 +28,7 @@
     "@angular/platform-browser-dynamic": "^6.0.2",
     "@angular/router": "^6.0.2",
     "@jhanssen/options": "^1.0.9",
+    "@swimlane/ngx-charts": "^8.0.0",
     "fs-extra": "^6.0.1",
     "minimist": "^1.2.0",
     "mktemp": "^0.4.0",
@@ -44,6 +46,7 @@
     "@types/jasminewd2": "^2.0.3",
     "@types/node": "^10.1.1",
     "codelyzer": "^4.3.0",
+    "jasmine": "^3.1.0",
     "jasmine-core": "^3.1.0",
     "jasmine-spec-reporter": "^4.2.1",
     "karma": "^2.0.2",
