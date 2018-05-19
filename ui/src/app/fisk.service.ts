@@ -1,92 +1,67 @@
 import { Injectable } from '@angular/core';
+import { WebSocketService } from './websocket.service';
+import { BackoffService } from './backoff.service';
 
 @Injectable({
     providedIn: 'root'
 })
-
 export class FiskService {
-    private socket: WebSocket;
-    private pending: Array<string>;
-    private messageListeners: { (data: any): void; } [];
-    private errorListeners: { (data: any): void; } [];
-    private closeListeners: { (): void; } [];
-    private openListeners: { (): void; } [];
-    private isopen: boolean;
+    private pendingConnect: Array<any> = [];
+    private dataListeners: { (data: any): void; } [] = [];
 
-    constructor() {
-        this.reset();
+    constructor(private ws: WebSocketService, private backoff: BackoffService) {
     }
 
     open(host: string, port: number) {
-        if (this.isopen) {
-            return;
-        }
-        this.socket = new WebSocket(`ws://${host}:${port}`);
-
-        this.socket.addEventListener('open', event => {
-            this.isopen = true;
-            // send all the pending stuff
-            for (let i = 0; i < this.pending.length; ++i) {
-                this.socket.send(this.pending[i]);
-            }
-            this.pending = undefined;
-
-            for (let i = 0; i < this.openListeners.length; ++i) {
-                this.openListeners[i]();
+        this.ws.on("message", (data: any) => {
+            console.log("hey", data);
+            if (data.type == "data") {
+                this.emit(this.dataListeners, data);
+            } else {
+                this.ws.send({ ting: "tang" });
             }
         });
-        this.socket.addEventListener('message', event => {
-            let data: any;
-            try {
-                data = JSON.parse(event.data);
-            } catch (e) {
-                console.error("unable to parse json", event.data);
+        this.ws.on("close", () => {
+            // let's retry with an exponential backoff
+            if (this.backoff.running("app")) {
+                this.resolvePending(false);
                 return;
             }
-            for (let i = 0; i < this.messageListeners.length; ++i) {
-                this.messageListeners[i](data);
-            }
+            const when = (next: number): number => {
+                if (!next)
+                    return 1000;
+                return Math.min(30000, next * 2);
+            };
+            this.backoff.backoff("app", when, (): Promise<any> => {
+                return new Promise<any>((resolve, reject) => {
+                    this.pendingConnect.push({ resolve: resolve, reject: reject });
+                    this.open(host, port);
+                });
+            });
         });
-        this.socket.addEventListener('close', () => {
-            for (let i = 0; i < this.closeListeners.length; ++i) {
-                this.closeListeners[i]();
-            }
-            this.reset();
+        this.ws.on("open", () => {
+            this.resolvePending(true);
+            console.log("ok");
         });
-        this.socket.addEventListener('error', (err) => {
-            for (let i = 0; i < this.errorListeners.length; ++i) {
-                this.errorListeners[i](err);
-            }
-        });
+        this.ws.open("localhost", 8999);
     }
 
-    on(name: string, on: { (data?: any): void; }) {
-        if (name == "message") {
-            this.messageListeners.push(on);
-        } else if (name == "open") {
-            this.openListeners.push(on);
-        } else if (name == "close") {
-            this.closeListeners.push(on);
-        } else if (name == "error") {
-            this.errorListeners.push(on);
+    on(name: string, on: { (data: any): void; }) {
+        if (name == "data") {
+            this.dataListeners.push(on);
         }
     }
 
-    send(data: any) {
-        if (this.isopen) {
-            this.socket.send(JSON.stringify(data));
-        } else {
-            this.pending.push(JSON.stringify(data));
+    private resolvePending(ok: boolean) {
+        if (this.pendingConnect.length > 0) {
+            const pending = this.pendingConnect.shift();
+            pending.resolve(ok);
         }
     }
 
-    private reset() {
-        this.socket = undefined;
-        this.pending = [];
-        this.messageListeners = [];
-        this.closeListeners = [];
-        this.errorListeners = [];
-        this.openListeners = [];
-        this.isopen = false;
+    private emit(listeners: { (data: any): void; } [], data: any) {
+        for (let i = 0; i < listeners.length; ++i) {
+            listeners[i](data);
+        }
     }
 }
