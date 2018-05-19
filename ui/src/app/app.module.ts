@@ -4,6 +4,7 @@ import { NgModule } from '@angular/core';
 import { AppComponent } from './app.component';
 
 import { FiskService } from './fisk.service';
+import { BackoffService } from './backoff.service';
 
 @NgModule({
     declarations: [
@@ -12,7 +13,7 @@ import { FiskService } from './fisk.service';
     imports: [
         BrowserModule
     ],
-    providers: [FiskService],
+    providers: [FiskService, BackoffService],
     bootstrap: [AppComponent]
 })
 export class AppModule { }
