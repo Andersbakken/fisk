@@ -16,7 +16,7 @@ export class FiskService {
         this.ws.on("message", (data: any) => {
             console.log("hey", data);
             if (data.type == "data") {
-                this.emit(this.dataListeners, data);
+                this.emit(this.dataListeners, data.data);
             } else {
                 this.ws.send({ ting: "tang" });
             }
