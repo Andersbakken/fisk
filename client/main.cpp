@@ -129,7 +129,6 @@ int main(int argcIn, char **argvIn)
     }
 
     data.hash = Client::environmentHash(data.resolvedCompiler);
-    printf("SHIT %s\n", data.hash.c_str());
     std::vector<std::string> compatibleHashes = Config::compatibleHashes(data.hash);
     std::string hashes = data.hash;
     for (const std::string &compatibleHash : compatibleHashes) {
