@@ -22,7 +22,7 @@ class Client extends EventEmitter {
 
     connect(environments) {
         const url = `${this.scheduler}/slave`;
-        console.log("connecting to", this.scheduler);
+        console.log("connecting to", url);
 
         let remaining = 0;
         let arch;
