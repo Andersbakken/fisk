@@ -30,8 +30,7 @@ class CompileJob extends EventEmitter
 
 class VM
 {
-    constructor(option, root, hash) {
-        this.option = option;
+    constructor(root, hash, user) {
         this.root = root;
         this.hash = hash;
         this.compiles = {};
@@ -39,7 +38,6 @@ class VM
         fs.remove(path.join(root, 'compiles'));
 
         let args = [ `--root=${root}`, `--hash=${hash}` ];
-        let user = option("vm-user");
         if (user)
             args.push(`--user=${user}`);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
