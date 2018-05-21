@@ -100,7 +100,7 @@ if (ports.length) {
                                 } catch (err) {
                                 }
                                 if (env && env.hash) {
-                                    environments[env.hash] = new VM(dir, env.hash);
+                                    environments[env.hash] = new VM(option, dir, env.hash);
                                 } else {
                                     console.log("Removing directory", dir);
                                     fs.removeSync(dir);

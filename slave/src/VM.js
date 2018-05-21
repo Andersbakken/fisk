@@ -1,6 +1,5 @@
 const EventEmitter = require('events');
 const child_process = require('child_process');
-const option = require("@jhanssen/options")("fisk-slave");
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -31,7 +30,8 @@ class CompileJob extends EventEmitter
 
 class VM
 {
-    constructor(root, hash) {
+    constructor(option, root, hash) {
+        this.option = option;
         this.root = root;
         this.hash = hash;
         this.compiles = {};
