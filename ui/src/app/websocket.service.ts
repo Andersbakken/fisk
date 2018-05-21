@@ -21,7 +21,7 @@ export class WebSocketService {
         if (this.isopen) {
             return;
         }
-        this.socket = new WebSocket(`ws://${host}:${port}`);
+        this.socket = new WebSocket(`ws://${host}:${port}/events`);
 
         this.socket.addEventListener('open', event => {
             this.isopen = true;

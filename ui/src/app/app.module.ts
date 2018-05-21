@@ -8,10 +8,12 @@ import { AppComponent } from './app.component';
 import { WebSocketService } from './websocket.service';
 import { BackoffService } from './backoff.service';
 import { FiskService } from './fisk.service';
+import { ConfigComponent } from './config/config.component';
 
 @NgModule({
     declarations: [
-        AppComponent
+        AppComponent,
+        ConfigComponent
     ],
     imports: [
         BrowserModule,

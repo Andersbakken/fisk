@@ -14,12 +14,7 @@ export class FiskService {
 
     open(host: string, port: number) {
         this.ws.on("message", (data: any) => {
-            console.log("hey", data);
-            if (data.type == "data") {
-                this.emit(this.dataListeners, data.data);
-            } else {
-                this.ws.send({ ting: "tang" });
-            }
+            this.emit(this.dataListeners, data);
         });
         this.ws.on("close", () => {
             // let's retry with an exponential backoff
@@ -43,7 +38,7 @@ export class FiskService {
             this.resolvePending(true);
             console.log("ok");
         });
-        this.ws.open("localhost", 8999);
+        this.ws.open(host, port);
     }
 
     on(name: string, on: { (data: any): void; }) {
