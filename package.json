@@ -1,6 +1,6 @@
 {
   "name": "dcfisk",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Fisk, a distributed compile system",
   "main": "index.js",
   "scripts": {
