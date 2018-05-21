@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, NgZone } from '@angular/core';
 import { NgxChartsModule } from '@swimlane/ngx-charts';
 import { FiskService } from './fisk.service';
 
@@ -24,36 +24,36 @@ export class AppComponent {
     showYAxisLabel = true;
     yAxisLabel = 'Population';
 
-    constructor(private fisk: FiskService, private ref: ChangeDetectorRef) {
+    constructor(private fisk: FiskService, private ngZone: NgZone) {
         fisk.open("192.168.1.46", 8097);
         fisk.on("data", (data: any) => {
-            switch (data.type) {
-            case "slaves":
-                this.data = data.slaves.map(e => { return {
-                    value: e.activeClients,
-                    name: e.name
-                } });
-                break;
-            case "slaveRemoved":
-                for (let i = 0; i < this.data.length; ++i) {
-                    if (this.data[i].name == data.name) {
-                        this.data.splice(i, 1);
-                        break;
+            this._ngZone.run(() => {
+                switch (data.type) {
+                case "slaves":
+                    this.data = data.slaves.map(e => { return {
+                        value: e.activeClients,
+                        name: e.name
+                    } });
+                    break;
+                case "slaveRemoved":
+                    for (let i = 0; i < this.data.length; ++i) {
+                        if (this.data[i].name == data.name) {
+                            this.data.splice(i, 1);
+                            break;
+                        }
                     }
-                }
-                break;
-            case "slave":
-                for (let i = 0; i < this.data.length; ++i) {
-                    if (this.data[i].name == data.slave.name) {
-                        this.data[i] = data.slave;
-                        break;
+                    break;
+                case "slave":
+                    for (let i = 0; i < this.data.length; ++i) {
+                        if (this.data[i].name == data.slave.name) {
+                            this.data[i] = data.slave;
+                            break;
+                        }
                     }
+                    break;
                 }
-                break;
-            }
-            console.log("got data", this.data);
-
-            this.ref.detectChanges();
+                console.log("got data", this.data);
+            });
         });
     }
 
