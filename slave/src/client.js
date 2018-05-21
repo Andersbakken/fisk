@@ -6,7 +6,7 @@ class Client extends EventEmitter {
     constructor(option) {
         super();
 
-        this.scheduler = option("scheduler", "localhost:8097");
+        this.scheduler = option("scheduler", "ws://localhost:8097");
         this.serverPort = option.int("port", 8096);
         this.hostname = option("hostname");
         this.name = option("name");
@@ -21,7 +21,7 @@ class Client extends EventEmitter {
     }
 
     connect(environments) {
-        const url = `ws://${this.scheduler}/slave`;
+        const url = `${this.scheduler}/slave`;
         console.log("connecting to", this.scheduler);
 
         let remaining = 0;
