@@ -1,5 +1,5 @@
 {
-  "name": "fisk",
+  "name": "dcfisk",
   "version": "1.0.0",
   "description": "Fisk, a distributed compile system",
   "main": "index.js",
