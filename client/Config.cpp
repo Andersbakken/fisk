@@ -50,9 +50,9 @@ void Config::init()
         sJSON.push_back(std::move(parsed));
     };
     if (const char *home = getenv("HOME")) {
-        load(std::string(home) + "/.config/fisk/client.json");
+        load(std::string(home) + "/.config/fisk/client.conf");
     }
-    load("/etc/fisk/client.json");
+    load("/etc/fisk/client.conf");
 
     const std::string dir = cacheDir();
     std::string versionFile = dir;
