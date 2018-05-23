@@ -21,7 +21,12 @@ export class WebSocketService {
         if (this.isopen) {
             return;
         }
-        this.socket = new WebSocket(`ws://${host}:${port}/events`);
+        try {
+            this.socket = new WebSocket(`ws://${host}:${port}/events`);
+        } catch (e) {
+            console.error("websocket error", e.message);
+            return;
+        }
 
         this.socket.addEventListener('open', event => {
             this.isopen = true;
@@ -77,6 +82,13 @@ export class WebSocketService {
             this.socket.send(JSON.stringify(data));
         } else {
             this.pending.push(JSON.stringify(data));
+        }
+    }
+
+    close(code?: number, reason?: string) {
+        if (this.isopen) {
+            this.socket.close(code, reason);
+            this.reset();
         }
     }
 

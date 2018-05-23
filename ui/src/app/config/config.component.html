@@ -1,0 +1,8 @@
+<div class="space">
+  <mat-form-field class="full-width">
+    <input matInput placeholder="Host" [ngModel]="host" (ngModelChange)="update('host', $event)">
+  </mat-form-field>
+  <mat-form-field class="full-width">
+    <input matInput type="number" max="65536" placeholder="Port" [ngModel]="port" (ngModelChange)="updateInt('port', $event)">
+  </mat-form-field>
+</div>

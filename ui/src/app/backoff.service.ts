@@ -5,31 +5,41 @@ import { Injectable } from '@angular/core';
 })
 
 export class BackoffService {
-    private backoffs: { [key: string]: boolean } = {};
+    private backoffs: { [key: string]: number } = {};
 
     constructor() { }
 
     backoff(id: string, next: { (next: number): number; }, run: { (): Promise<any>; }) {
-        if (this.backoffs[id])
+        if (id in this.backoffs)
             return false;
-        this.backoffs[id] = true;
+        this.backoffs[id] = -1;
         const go = (when) => {
             console.log("reconnecting", when);
             run().then((ok: boolean) => {
                 if (!ok) {
                     const n = next(when);
-                    setTimeout(() => { go(n); }, n);
+                    this.backoffs[id] = setTimeout(() => { go(n); }, n);
                 } else {
-                    this.backoffs[id] = false;
+                    delete this.backoffs[id];
                 }
             }).catch(() => {
-                this.backoffs[id] = false;
+                delete this.backoffs[id];
             });
         };
         go(0);
     }
 
+    stop(id: string) {
+        if (id in this.backoffs) {
+            let t = this.backoffs[id];
+            if (t !== -1) {
+                clearTimeout(t);
+            }
+            delete this.backoffs[id];
+        }
+    }
+
     running(id: string): boolean {
-        return id in this.backoffs && this.backoffs[id];
+        return id in this.backoffs;
     }
 }

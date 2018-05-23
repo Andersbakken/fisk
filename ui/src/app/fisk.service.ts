@@ -18,7 +18,7 @@ export class FiskService {
         });
         this.ws.on("close", () => {
             // let's retry with an exponential backoff
-            if (this.backoff.running("app")) {
+            if (this.backoff.running("fisk")) {
                 this.resolvePending(false);
                 return;
             }
@@ -27,7 +27,7 @@ export class FiskService {
                     return 1000;
                 return Math.min(30000, next * 2);
             };
-            this.backoff.backoff("app", when, (): Promise<any> => {
+            this.backoff.backoff("fisk", when, (): Promise<any> => {
                 return new Promise<any>((resolve, reject) => {
                     this.pendingConnect.push({ resolve: resolve, reject: reject });
                     this.open(host, port);
@@ -39,6 +39,11 @@ export class FiskService {
             console.log("ok");
         });
         this.ws.open(host, port);
+    }
+
+    close(code?: number, reason?: string) {
+        this.backoff.stop("fisk");
+        this.ws.close(code, reason);
     }
 
     on(name: string, on: { (data: any): void; }) {
