@@ -2,6 +2,7 @@ import { Component, OnInit, NgZone } from '@angular/core';
 import { NgxChartsModule } from '@swimlane/ngx-charts';
 import { FiskService } from '../fisk.service';
 import { ConfigService } from '../config.service';
+import { MessageService } from '../message.service';
 
 @Component({
   selector: 'app-chart',
@@ -9,6 +10,9 @@ import { ConfigService } from '../config.service';
   styleUrls: ['./chart.component.css']
 })
 export class ChartComponent implements OnInit {
+    private host: string;
+    private port: number;
+
     title = 'app';
     data: any = undefined;
 
@@ -25,7 +29,8 @@ export class ChartComponent implements OnInit {
     showYAxisLabel = true;
     yAxisLabel = 'Population';
 
-    constructor(private fisk: FiskService, private ngZone: NgZone, private config: ConfigService) {
+    constructor(private fisk: FiskService, private ngZone: NgZone,
+                private config: ConfigService, private message: MessageService) {
         this.fisk.on("data", (data: any) => {
             this.ngZone.run(() => {
                 switch (data.type) {
@@ -55,6 +60,9 @@ export class ChartComponent implements OnInit {
                 console.log("got data", this.data);
             });
         });
+        this.fisk.on("open", () => {
+            this.message.showMessage("connected to " + this.host + ":" + this.port);
+        });
         this.config.onChange((key: string) => {
             switch (key) {
             case "host":
@@ -70,6 +78,9 @@ export class ChartComponent implements OnInit {
     }
 
     private reconnect(host: string, port: number) {
+        this.host = host;
+        this.port = port;
+
         this.fisk.close();
         this.fisk.open(host, port);
     }
