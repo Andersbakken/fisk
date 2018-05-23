@@ -8,6 +8,7 @@ import { BackoffService } from './backoff.service';
 export class FiskService {
     private pendingConnect: Array<any> = [];
     private dataListeners: { (data: any): void; } [] = [];
+    private openListeners: { (): void; } [] = [];
 
     constructor(private ws: WebSocketService, private backoff: BackoffService) {
     }
@@ -35,6 +36,8 @@ export class FiskService {
             });
         });
         this.ws.on("open", () => {
+            this.emit(this.openListeners);
+
             this.resolvePending(true);
             console.log("ok");
         });
@@ -46,9 +49,14 @@ export class FiskService {
         this.ws.close(code, reason);
     }
 
-    on(name: string, on: { (data: any): void; }) {
-        if (name == "data") {
+    on(name: string, on: { (data?: any): void; }) {
+        switch (name) {
+        case "data":
             this.dataListeners.push(on);
+            break;
+        case "open":
+            this.openListeners.push(on);
+            break;
         }
     }
 
@@ -59,7 +67,7 @@ export class FiskService {
         }
     }
 
-    private emit(listeners: { (data: any): void; } [], data: any) {
+    private emit(listeners: { (data: any): void; } [], data?: any) {
         for (let i = 0; i < listeners.length; ++i) {
             listeners[i](data);
         }
