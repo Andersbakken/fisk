@@ -11,7 +11,7 @@ export class ConfigComponent implements OnInit {
     port: number;
 
     constructor(private config: ConfigService) {
-        this.host = config.get("host", location.host);
+        this.host = config.get("host", location.hostname);
         this.port = config.get("port", location.port || 80);
 
         this.config.onChange((key: string) => {

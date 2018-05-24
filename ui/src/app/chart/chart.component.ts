@@ -67,7 +67,7 @@ export class ChartComponent implements OnInit {
             switch (key) {
             case "host":
             case "port":
-                this.reconnect(this.config.get("host", location.host), this.config.get("port", location.port || 80));
+                this.reconnect(this.config.get("host", location.hostname), this.config.get("port", location.port || 80));
                 break;
             }
         });
