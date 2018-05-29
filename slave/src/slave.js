@@ -25,14 +25,14 @@ if (ports.length) {
         return ret;
     });
 } else {
-    let environments = {};
-    const client = new Client(option);
-    const environmentsRoot = path.join(common.cacheDir(), "environments");
-
     if (process.getuid() !== 0) {
         console.error("fisk slave needs to run as root to be able to chroot");
         process.exit(1);
     }
+
+    let environments = {};
+    const client = new Client(option);
+    const environmentsRoot = path.join(common.cacheDir(), "environments");
 
     function exec(command, options)
     {
@@ -118,6 +118,11 @@ if (ports.length) {
 
     let pendingEnvironment;
     let connectInterval;
+    client.on('quit', message => {
+        console.log(`Server wants us to quit: ${message.code || 0}`);
+        process.exit(message.code);
+    });
+
     client.on("environment", message => {
         if (pendingEnvironment) {
             throw new Error("We already have a pending environment");
