@@ -213,6 +213,7 @@ if (ports.length) {
 
 
     const server = new Server(option);
+    let jobQueue = [];
 
     server.on("job", (job) => {
         let vm = environments[job.hash];
@@ -220,31 +221,65 @@ if (ports.length) {
             console.error("No vm for this hash", job.hash);
             return;
         }
-        console.log("job", job.argv0, Object.keys(job));
-        let op = vm.startCompile(job.commandLine, job.argv0);
-        op.on('stdout', data => job.send({ type: 'stdout', data: data }));
-        op.on('stderr', data => job.send({ type: 'stderr', data: data }));
-        op.on('finished', event => {
-            // this can't be async, the directory is removed after the event is fired
-            let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
-            job.send({
-                type: 'response',
-                index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
-                exitCode: event.exitCode,
-            });
 
-            for (let i=0; i<contents.length; ++i) {
-                job.send(contents[i].contents);
+        var j = {
+            job: job,
+            op: undefined,
+            done: false,
+            start: function() {
+                let job = this.job;
+                console.log("job", job.argv0, Object.keys(job));
+                let op = vm.startCompile(job.commandLine, job.argv0);
+                this.op = op;
+                op.on('stdout', data => job.send({ type: 'stdout', data: data }));
+                op.on('stderr', data => job.send({ type: 'stderr', data: data }));
+                op.on('finished', event => {
+                    // this can't be async, the directory is removed after the event is fired
+                    let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
+                    job.send({
+                        type: 'response',
+                        index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
+                        exitCode: event.exitCode,
+                    });
+
+                    for (let i=0; i<contents.length; ++i) {
+                        job.send(contents[i].contents);
+                    }
+                    this.done = true;
+                    job.close();
+                    client.send("jobFinished", { client: { ip: job.ip, name: job.clientName }, sourceFile: event.sourceFile });
+                    for (let idx=0; idx<jobQueue.length; ++idx) {
+                        let jj = jobQueue[idx];
+                        if (!jj.op) {
+                            jj.start();
+                            break;
+                        }
+                    }
+                });
+                job.on("data", data => op.feed(data.data, data.last));
+                job.on("error", (err) => {
+                    console.error("compile error", err);
+                });
+                job.on("close", () => {
+                    job.removeAllListeners();
+                });
+            },
+            cancel: function() {
+                if (!this.done && this.op) {
+                    this.op.cancel();
+                }
             }
-            job.close();
-            client.send("jobFinished", { client: { ip: job.ip, name: job.clientName }, sourceFile: event.sourceFile });
-        });
-        job.on("data", data => op.feed(data.data, data.last));
-        job.on("error", (err) => {
-            console.error("compile error", err);
-        });
+        };
+
+        jobQueue.push(j);
+        if (jobQueue.length <= client.slots)
+            j.start();
         job.on("close", () => {
-            job.removeAllListeners();
+            let idx = jobQueue.indexOf(job);
+            if (idx != -1) {
+                let j = jobQueue.splice(idx, 1)[0];
+                j.cancel();
+            }
         });
     });
 

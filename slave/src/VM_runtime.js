@@ -32,7 +32,7 @@ if (pwd) {
     process.setuid(pwd.uid);
 }
 
-let compiles = [];
+let compiles = {};
 let stopping = false;
 
 process.on('message', (msg) => {
@@ -41,23 +41,23 @@ process.on('message', (msg) => {
         if (!compiles.length)
             process.exit();
         break;
+    case 'cancel':
+        let c = compiles[msg.id];
+        if (c)
+            c.kill();
+        break;
     case 'compile':
         console.log("GOT COMPILE", msg);
         let compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
         compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
         compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));
         compile.on('exit', event => {
-            let idx = compiles.indexOf(compile);
-            if (idx == -1) {
-                console.error("Can't find compile");
-            } else {
-                compiles.splice(idx, 1);
-            }
+            delete compiles[msg.id];
             process.send({type: 'compileFinished', id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
             if (stopping && !compiles.length)
                 process.exit();
         });
-        compiles.push(compile);
+        compiles[msg.id] = compile;
         break;
     }
 });
