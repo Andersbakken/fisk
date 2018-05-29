@@ -136,6 +136,7 @@ class Compile extends EventEmitter {
             args.push('-fpreprocessed'); // this is not good for clang
         console.log("CALLING " + compiler + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
+        this.proc = proc;
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
 
@@ -150,7 +151,6 @@ class Compile extends EventEmitter {
         });
 
         proc.on('exit', (exitCode) => {
-
             // try {
             let files = [];
             function addDir(dir, prefix) {
@@ -181,6 +181,9 @@ class Compile extends EventEmitter {
             addDir(dir, dir);
             this.emit('exit', { exitCode: exitCode, files: files, sourceFile: sourceFile });
         });
+    }
+    kill() {
+        this.proc.kill();
     }
 }
 

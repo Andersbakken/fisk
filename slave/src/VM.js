@@ -26,6 +26,10 @@ class CompileJob extends EventEmitter
             this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir});
         }
     }
+
+    cancel() {
+        this.vm.child.send({ type: "cancel", id: this.id});
+    }
 };
 
 class VM
