@@ -125,7 +125,11 @@ class Server extends EventEmitter {
             const hostname = req.headers["x-fisk-slave-hostname"];
             const arch = req.headers["x-fisk-architecture"];
             const slots = parseInt(req.headers["x-fisk-slots"]);
-            const environments = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
+            let environments = {};
+            req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
+                if (env)
+                    environments[env] = true;
+            });
             client = new Client({ ws: ws,
                                   ip: ip,
                                   port: port,

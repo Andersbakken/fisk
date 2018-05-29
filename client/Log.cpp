@@ -1,9 +1,11 @@
 #include "Log.h"
 #include "Client.h"
+#include <unistd.h>
 
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = 0;
 static const unsigned long long sStart = Client::mono();
+static const pid_t sPid = getpid();
 static std::mutex sMutex;
 std::string sLogFileName;
 
@@ -57,10 +59,15 @@ void Log::log(Level level, const std::string &string)
     std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - sStart;
-    fprintf(stderr, "%llu.%03llu: ", elapsed / 1000, elapsed % 1000);
+#ifdef __linux__
+    const char *format = "%05d %llu.%03llu: ";
+#else
+    const char *format = "%08d %llu.%03llu: ";
+#endif
+    fprintf(stderr, format, sPid, elapsed / 1000, elapsed % 1000);
     fwrite(string.c_str(), 1, string.size(), stderr);
     if (sLogFile) {
-        fprintf(sLogFile, "%llu.%03llu: ", elapsed / 1000, elapsed % 1000);
+        fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (string.at(string.size() - 1) != '\n') {
