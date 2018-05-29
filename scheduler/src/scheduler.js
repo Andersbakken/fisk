@@ -89,6 +89,18 @@ server.express.get("/slaves", (req, res, next) => {
     res.send(ret);
 });
 
+server.express.get("/quit-slaves", (req, res, next) => {
+    res.send(200);
+    const msg = {
+        type: quit,
+        code: req.query.code || 0
+    };
+    console.log("Sending quit message to slaves", Object.keys(slaves));
+    for (let ip in slaves) {
+        slaves[ip].send(msg);
+    }
+});
+
 server.on("slave", function(slave) {
     console.log("slave connected", slave.ip, slave.environments);
     slave.activeClients = 0;
