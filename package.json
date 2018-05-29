@@ -1,5 +1,5 @@
 {
-  "name": "dcfisk",
+  "name": "@andersbakken/fisk",
   "version": "1.0.10",
   "description": "Fisk, a distributed compile system",
   "main": "index.js",
