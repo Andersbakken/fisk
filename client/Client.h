@@ -31,6 +31,8 @@ struct Data
 
     std::string slaveIp;
     uint16_t slavePort { 0 };
+
+    std::shared_ptr<CompilerArgs> compilerArgs;
 };
 Data &data();
 

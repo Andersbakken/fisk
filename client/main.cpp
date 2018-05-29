@@ -84,14 +84,14 @@ int main(int argcIn, char **argvIn)
         // printf("%zu: %s\n", i, argv[i]);
         args[i] = data.argv[i];
     }
-    std::shared_ptr<CompilerArgs> compilerArgs = CompilerArgs::create(args);
-    if (!compilerArgs
-        || compilerArgs->mode != CompilerArgs::Compile
-        || compilerArgs->flags & CompilerArgs::StdinInput
-        || compilerArgs->sourceFileIndexes.size() != 1) {
+    data.compilerArgs = CompilerArgs::create(args);
+    if (!data.compilerArgs
+        || data.compilerArgs->mode != CompilerArgs::Compile
+        || data.compilerArgs->flags & CompilerArgs::StdinInput
+        || data.compilerArgs->sourceFileIndexes.size() != 1) {
         Log::debug("Have to run locally because mode %s - flags 0x%x - source files: %zu",
-                   CompilerArgs::modeName(compilerArgs ? compilerArgs->mode : CompilerArgs::Invalid),
-                   compilerArgs ? compilerArgs->flags : 0, compilerArgs ? compilerArgs->sourceFileIndexes.size() : 0);
+                   CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
+                   data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -120,7 +120,7 @@ int main(int argcIn, char **argvIn)
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, 0);
 
-    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, compilerArgs);
+    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
     if (!preprocessed) {
         Log::error("Failed to preprocess");
         Watchdog::stop();
