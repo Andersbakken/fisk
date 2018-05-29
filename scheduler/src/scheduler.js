@@ -58,7 +58,7 @@ function distribute(conf)
         for (let i=0; i<keys.length; ++i) {
             let key = keys[i];
             let slave = slaves[key];
-            if (!slave.pendingEnvironments && slave.environments && slave.environments.indexOf(hash) === -1) {
+            if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
                 console.log("sending", hash, "to", key);
                 Environments.environment(hash).send(slave);
                 slave.pendingEnvironments = true;
@@ -83,16 +83,16 @@ server.express.get("/slaves", (req, res, next) => {
             hostname: s.hostname,
             name: s.name,
             created: s.created,
-            environments: s.environments
+            environments: Object.keys(s.environments)
         });
     }
     res.send(ret);
 });
 
 server.express.get("/quit-slaves", (req, res, next) => {
-    res.send(200);
+    res.sendStatus(200);
     const msg = {
-        type: quit,
+        type: "quit",
         code: req.query.code || 0
     };
     console.log("Sending quit message to slaves", Object.keys(slaves));
@@ -102,14 +102,15 @@ server.express.get("/quit-slaves", (req, res, next) => {
 });
 
 server.on("slave", function(slave) {
-    console.log("slave connected", slave.ip, slave.environments);
+    console.log("slave connected", slave.ip, Object.keys(slave.environments));
     slave.activeClients = 0;
     slave.pendingEnvironments = false;
     insertSlave(slave);
     distribute({slave: slave});
 
     slave.on('environments', function(message) {
-        slave.environments = message.environments;
+        slave.environments = {};
+        message.environments.forEach(env => slave.environments[env] = true);
         slave.pendingEnvironments = false;
         distribute({slave: slave});
     });
@@ -140,7 +141,7 @@ server.on("compile", function(compile) {
 
         function score(s) { if (!s) return -Infinity; return s.slots - s.activeClients; }
         forEachSlave(s => {
-            if (s.environments.indexOf(request.environment) !== -1 && score(s) > score(slave)) {
+            if (request.environment in s.environments && score(s) > score(slave)) {
                 slave = s;
             }
         });
