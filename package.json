@@ -1,6 +1,6 @@
 {
   "name": "@andersbakken/fisk",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Fisk, a distributed compile system",
   "main": "index.js",
   "scripts": {
