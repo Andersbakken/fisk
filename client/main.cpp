@@ -113,7 +113,7 @@ int main(int argcIn, char **argvIn)
     if (!noLocal) {
         std::string dir;
         const size_t desiredSlots = Config::localSlots(&dir).first;
-        printf("BALLS %zu\n", desiredSlots);
+        // printf("BALLS %zu\n", desiredSlots);
         if (desiredSlots) {
             std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
             if (slot) { // we have a local slot to run
