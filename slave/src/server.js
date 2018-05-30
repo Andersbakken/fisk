@@ -143,7 +143,7 @@ class Server extends EventEmitter {
             }
         });
         ws.on("close", () => {
-            console.log("GOT WS CLOSE");
+            // console.log("GOT WS CLOSE");
             if (bytes)
                 client.emit("error", "Got close while reading a binary message");
             if (client)
@@ -151,7 +151,7 @@ class Server extends EventEmitter {
             ws.removeAllListeners();
         });
         ws.on('error', (error) => {
-            console.log("GOT WS ERROR");
+            // console.log("GOT WS ERROR");
             if (client)
                 client.emit('error', error);
         });
