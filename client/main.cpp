@@ -76,7 +76,8 @@ int main(int argcIn, char **argvIn)
     }
     Log::debug("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
                data.argv[0], preresolved ? preresolved : "",
-               data.compiler.c_str(), data.resolvedCompiler.c_str(), data.slaveCompiler.c_str());
+               data.compiler.c_str(), data.resolvedCompiler.c_str(),
+               data.slaveCompiler.c_str());
 
     if (disabled) {
         Log::debug("Have to run locally because we're disabled");
