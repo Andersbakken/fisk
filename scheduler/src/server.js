@@ -13,6 +13,7 @@ class Client extends EventEmitter {
         if (obj.type == Client.Type.Slave) {
             this.jobsPerformed = 0;
             this.jobsScheduled = 0;
+            this.lastJob = 0;
         }
     }
 

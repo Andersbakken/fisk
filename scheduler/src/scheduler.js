@@ -79,6 +79,7 @@ server.express.get("/slaves", (req, res, next) => {
             port: s.port,
             activeClients: s.activeClients,
             jobsScheduled: s.jobsScheduled,
+            lastJob: new Date(s.lastJob).toString(),
             jobsPerformed: s.jobsPerformed,
             hostname: s.hostname,
             name: s.name,
@@ -139,16 +140,27 @@ server.on("compile", function(compile) {
             return;
         }
 
-        function score(s) { if (!s) return -Infinity; return s.slots - s.activeClients; }
+        function score(s) {
+            if (!s)
+                return -Infinity;
+            return Math.min(4, s.slots - s.activeClients);
+        }
+        let bestScore = -Infinity;
         forEachSlave(s => {
-            if (request.environment in s.environments && score(s) > score(slave)) {
+            if (!(request.environment in s.environments))
+                return;
+
+            let slaveScore = score(s);
+            if (s > bestScore || (s == bestScore && s.lastJob < slave.lastJob)) {
+                bestScore = s;
                 slave = s;
             }
         });
         if (slave) {
-            console.log("Got best", slave.ip, score(slave));
+            console.log("Got best", slave.ip, bestScore, slave.lastJob);
             ++slave.activeClients;
             ++slave.jobsScheduled;
+            slave.lastJob = Date.now();
             compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
         } else {
             compile.send("slave", {});
@@ -162,7 +174,7 @@ server.on("compile", function(compile) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
-        console.log("CLIENT DISAPPEARED");
+        console.log("Client disappeared");
         compile.removeAllListeners();
         if (slave) {
             --slave.activeClients;
