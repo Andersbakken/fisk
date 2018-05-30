@@ -93,17 +93,24 @@ class Server extends EventEmitter {
                 error("No x-fisk-environments header");
                 return;
             }
-            const environment = req.headers["x-fisk-environments"];
+            const compileEnvironments = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
 
-            client = new Client({ws: ws, ip: ip, type: Client.Type.Compile });
+            let data = {
+                ws: ws,
+                ip: ip,
+                type: Client.Type.Compile,
+                environments: compileEnvironments
+            };
+            const preferredSlave = req.headers["x-fisk-slave"];
+            if (preferredSlave)
+                data.slave = preferredSlave;
+
+            client = new Client(data);
             this.emit("compile", client);
             ws.on('close', (status, reason) => {
                 console.log("Got close", status, reason);
             });
 
-            process.nextTick(() => {
-                client.emit("job", { environment: environment });
-            });
             break;
         case "/slave":
             if (!("x-fisk-port" in req.headers)) {

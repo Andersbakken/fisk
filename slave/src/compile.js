@@ -64,6 +64,7 @@ class Compile extends EventEmitter {
             case '-include':
             case '-iprefix':
             case '-isysroot':
+            case '-isystem':
             case '-ivfsoverlay':
             case '-iwithprefix':
             case '-iwithprefixbefore':

@@ -79,7 +79,7 @@ server.express.get("/slaves", (req, res, next) => {
             port: s.port,
             activeClients: s.activeClients,
             jobsScheduled: s.jobsScheduled,
-            lastJob: new Date(s.lastJob).toString(),
+            lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
             jobsPerformed: s.jobsPerformed,
             hostname: s.hostname,
             name: s.name,
@@ -131,41 +131,60 @@ server.on("slave", function(slave) {
 });
 
 server.on("compile", function(compile) {
+    console.log("request", compile.environments);
+    let found = false;
+    for (let i=0; i<compile.environments.length; ++i) {
+        if (Environments.hasEnvironment(compile.environments[i])) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        compile.send({ type: "needsEnvironment", environments: compile.environments });
+        return;
+    }
+
+    function score(s) {
+        return Math.min(4, s.slots - s.activeClients);
+    }
     let file;
     let slave;
-    compile.on("job", function(request) {
-        console.log("request", request.environment);
-        if (!Environments.hasEnvironment(request.environment)) {
-            compile.send({ type: "needsEnvironment" });
-            return;
+    let bestScore;
+    forEachSlave(s => {
+        found = false;
+        for (let i=0; i<compile.environments.length; ++i) {
+            if (compile.environments[i] in s.environments) {
+                found = true;
+                break;
+            }
         }
 
-        function score(s) {
-            if (!s)
-                return -Infinity;
-            return Math.min(4, s.slots - s.activeClients);
-        }
-        let bestScore = -Infinity;
-        forEachSlave(s => {
-            if (!(request.environment in s.environments))
-                return;
-
-            let slaveScore = score(s);
-            if (s > bestScore || (s == bestScore && s.lastJob < slave.lastJob)) {
-                bestScore = s;
+        if (found) {
+            let slaveScore;
+            console.log("Got compile.slave", compile.slave, s.ip);
+            if (compile.slave == s.ip) {
+                slaveScore = Infinity;
+            } else {
+                slaveScore = score(s);
+            }
+            console.log("comparing", slaveScore, bestScore);
+            if (!slave || slaveScore > bestScore || (slaveScore == bestScore && s.lastJob < slave.lastJob)) {
+                bestScore = slaveScore;
                 slave = s;
             }
-        });
-        if (slave) {
-            console.log("Got best", slave.ip, bestScore, slave.lastJob);
-            ++slave.activeClients;
-            ++slave.jobsScheduled;
-            slave.lastJob = Date.now();
-            compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
         } else {
-            compile.send("slave", {});
+            console.log("Dude doesn't have the compiler", s.ip);
         }
     });
+    if (slave) {
+        console.log("Got best", slave.ip, typeof slave.ip, bestScore, typeof bestScore, slave.lastJob, typeof slave.lastJob);
+        ++slave.activeClients;
+        ++slave.jobsScheduled;
+        slave.lastJob = Date.now();
+        compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
+    } else {
+        compile.send("slave", {});
+    }
     compile.on("error", msg => {
         if (slave) {
             --slave.activeClients;
