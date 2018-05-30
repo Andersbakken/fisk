@@ -10,11 +10,6 @@ class Client extends EventEmitter {
         for (let key in obj)
             this[key] = obj[key];
         this.created = new Date();
-        if (obj.type == Client.Type.Slave) {
-            this.jobsPerformed = 0;
-            this.jobsScheduled = 0;
-            this.lastJob = 0;
-        }
     }
 
     send(type, msg) {
@@ -67,13 +62,14 @@ class Server extends EventEmitter {
     get express() { return this.app; }
 
     _handleConnection(ws, req) {
-        console.log("_handleConnection");
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         let ip = req.connection.remoteAddress;
         if (ip.substr(0, 7) == "::ffff:") {
             ip = ip.substr(7);
         }
+
+        console.log("_handleConnection", ip);
 
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
@@ -107,10 +103,8 @@ class Server extends EventEmitter {
 
             client = new Client(data);
             this.emit("compile", client);
-            ws.on('close', (status, reason) => {
-                console.log("Got close", status, reason);
-            });
-
+            ws.on('close', (status, reason) => client.emit('close', status, reason));
+            ws.on('error', err => client.emit('error', err));
             break;
         case "/slave":
             if (!("x-fisk-port" in req.headers)) {
@@ -144,6 +138,9 @@ class Server extends EventEmitter {
                                   type: Client.Type.Slave,
                                   name: name,
                                   slots: slots,
+                                  jobsPerformed: 0,
+                                  jobsScheduled: 0,
+                                  lastJob: 0,
                                   hostname: hostname,
                                   environments: environments,
                                   architecture: arch });

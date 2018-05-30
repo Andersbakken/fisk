@@ -103,7 +103,7 @@ server.express.get("/quit-slaves", (req, res, next) => {
 });
 
 server.on("slave", function(slave) {
-    console.log("slave connected", slave.ip, Object.keys(slave.environments));
+    console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments));
     slave.activeClients = 0;
     slave.pendingEnvironments = false;
     insertSlave(slave);
@@ -120,6 +120,7 @@ server.on("slave", function(slave) {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
     slave.on("close", function() {
+        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostName || "");
         removeSlave(slave);
         slave.removeAllListeners();
     });
@@ -161,19 +162,19 @@ server.on("compile", function(compile) {
 
         if (found) {
             let slaveScore;
-            console.log("Got compile.slave", compile.slave, s.ip);
+            // console.log("Got compile.slave", compile.slave, s.ip);
             if (compile.slave == s.ip) {
                 slaveScore = Infinity;
             } else {
                 slaveScore = score(s);
             }
-            console.log("comparing", slaveScore, bestScore);
+            // console.log("comparing", slaveScore, bestScore);
             if (!slave || slaveScore > bestScore || (slaveScore == bestScore && s.lastJob < slave.lastJob)) {
                 bestScore = slaveScore;
                 slave = s;
             }
-        } else {
-            console.log("Dude doesn't have the compiler", s.ip);
+        // } else {
+        //     console.log("Dude doesn't have the compiler", s.ip);
         }
     });
     if (slave) {
@@ -193,7 +194,7 @@ server.on("compile", function(compile) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
-        console.log("Client disappeared");
+        // console.log("Client disappeared");
         compile.removeAllListeners();
         if (slave) {
             --slave.activeClients;

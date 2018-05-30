@@ -20,13 +20,13 @@ public:
 #ifdef __linux__
         mFD = inotify_init1(IN_CLOEXEC);
         if (mFD == -1) {
-            Log::error("Failed to inotify_init1 %d %s", errno, strerror(errno));
+            ERROR("Failed to inotify_init1 %d %s", errno, strerror(errno));
             return;
         }
 
         const int watch = inotify_add_watch(mFD, dir.c_str(), IN_DELETE|IN_DELETE_SELF|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
         if (watch == -1) {
-            Log::error("inotify_add_watch() '%s' (%d) %s",
+            ERROR("inotify_add_watch() '%s' (%d) %s",
                        dir.c_str(), errno, strerror(errno));
             ::close(mFD);
             mFD = -1;
@@ -68,7 +68,7 @@ public:
             while (idx < read) {
                 inotify_event *event = reinterpret_cast<inotify_event*>(buf + idx);
                 idx += sizeof(inotify_event) + event->len;
-                Log::debug("inotify_event %s 0x%x", event->name, event->mask);
+                DEBUG("inotify_event %s 0x%x", event->name, event->mask);
                 // if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {
                 //     printf("[SlotAcquirer.h:%d]: if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {\n", __LINE__); fflush(stdout);
                 // } else if (event->mask & (IN_CREATE|IN_MOVED_TO)) {

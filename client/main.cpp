@@ -87,7 +87,7 @@ int main(int argcIn, char **argvIn)
         bool ok;
         level = Log::stringToLevel(logLevel.c_str(), &ok);
         if (!ok) {
-            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warning\", \"Error\" or \"Silent\")\n", logLevel.c_str());
+            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warn\", \"Error\" or \"Silent\")\n", logLevel.c_str());
             return 1;
         }
     }
@@ -95,16 +95,16 @@ int main(int argcIn, char **argvIn)
     Log::init(level, std::move(logFile), logFileMode);
 
     if (!Client::findCompiler(preresolved)) {
-        Log::error("Can't find executable for %s", data.argv[0]);
+        ERROR("Can't find executable for %s", data.argv[0]);
         return 1;
     }
-    Log::debug("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
+    DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
                data.argv[0], preresolved ? preresolved : "",
                data.compiler.c_str(), data.resolvedCompiler.c_str(),
                data.slaveCompiler.c_str());
 
     if (disabled) {
-        Log::debug("Have to run locally because we're disabled");
+        DEBUG("Have to run locally because we're disabled");
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -119,7 +119,7 @@ int main(int argcIn, char **argvIn)
         || data.compilerArgs->mode != CompilerArgs::Compile
         || data.compilerArgs->flags & CompilerArgs::StdinInput
         || data.compilerArgs->sourceFileIndexes.size() != 1) {
-        Log::debug("Have to run locally because mode %s - flags 0x%x - source files: %zu",
+        DEBUG("Have to run locally because mode %s - flags 0x%x - source files: %zu",
                    CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
                    data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
         Client::runLocal(Client::acquireSlot(Client::Wait));
@@ -134,7 +134,7 @@ int main(int argcIn, char **argvIn)
         if (desiredSlots) {
             std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
             if (slot) { // we have a local slot to run
-                Log::debug("Got a local slot, lets do it");
+                DEBUG("Got a local slot, lets do it");
                 Client::runLocal(std::move(slot));
                 return 0; // unreachable
             }
@@ -157,7 +157,7 @@ int main(int argcIn, char **argvIn)
 
     std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
     if (!preprocessed) {
-        Log::error("Failed to preprocess");
+        ERROR("Failed to preprocess");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
@@ -169,7 +169,7 @@ int main(int argcIn, char **argvIn)
     for (const std::string &compatibleHash : compatibleHashes) {
         hashes += ";" + compatibleHash;
     }
-    Log::debug("Got hashes %s for %s", hashes.c_str(), data.resolvedCompiler.c_str());
+    DEBUG("Got hashes %s for %s", hashes.c_str(), data.resolvedCompiler.c_str());
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = hashes;
     headers["x-fisk-client-name"] = Config::name();
@@ -181,7 +181,7 @@ int main(int argcIn, char **argvIn)
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
     if (!schedulerWebsocket.connect(Config::scheduler() + "/compile", headers)) {
-        Log::debug("Have to run locally because no server");
+        DEBUG("Have to run locally because no server");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
@@ -196,7 +196,7 @@ int main(int argcIn, char **argvIn)
         select.exec();
 
     if (data.slaveIp.empty() || !data.slavePort) {
-        Log::debug("Have to run locally because no slave");
+        DEBUG("Have to run locally because no slave");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
@@ -204,7 +204,7 @@ int main(int argcIn, char **argvIn)
 
     preprocessed->wait();
     if (preprocessed->exitStatus != 0) {
-        Log::error("Failed to preprocess. Running locally");
+        ERROR("Failed to preprocess. Running locally");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
@@ -214,7 +214,7 @@ int main(int argcIn, char **argvIn)
     SlaveWebSocket slaveWebSocket;
     select.add(&slaveWebSocket);
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile", data.slaveIp.c_str(), data.slavePort), headers)) {
-        Log::debug("Have to run locally because no slave connection");
+        DEBUG("Have to run locally because no slave connection");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable

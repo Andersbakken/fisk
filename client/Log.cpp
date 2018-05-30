@@ -11,6 +11,9 @@ static const pid_t sPid = getpid();
 static std::mutex sMutex;
 std::string sLogFileName;
 
+namespace Log {
+Level minLogLevel = Log::Silent;
+}
 Log::Level Log::logLevel()
 {
     return sLevel;
@@ -28,12 +31,20 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
     if (!file.empty() && sLogFileMode == Overwrite) {
         sLogFile = fopen(file.c_str(), "w");
         if (!sLogFile) {
-            Log::error("Couldn't open log file %s for writing", file.c_str());
+            ERROR("Couldn't open log file %s for writing", file.c_str());
         } else {
             sLogFileName = std::move(file);
             std::atexit([]() { fclose(sLogFile); });
         }
+    } else if (!file.empty()) {
+        sLogFileName = std::move(file);
     }
+    if (!sLogFileName.empty()) {
+        minLogLevel = Debug;
+    } else {
+        minLogLevel = level;
+    }
+
 }
 
 Log::Level Log::stringToLevel(const char *str, bool *ok)
@@ -42,8 +53,8 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
         *ok = true;
     if (!strcasecmp("Debug", str)) {
         return Debug;
-    } else if (!strcasecmp("Warning", str)) {
-        return Warning;
+    } else if (!strcasecmp("Warn", str)) {
+        return Warn;
     } else if (!strcasecmp("Error", str)) {
         return Error;
     } else if (!strcasecmp("Silent", str)) {
@@ -110,11 +121,11 @@ void Log::debug(const char *fmt, ...)
     va_end(args);
 }
 
-void Log::warning(const char *fmt, ...)
+void Log::warn(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    log(Warning, fmt, args);
+    log(Warn, fmt, args);
     va_end(args);
 }
 

@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <thread>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/file.h>
 
 static std::vector<json11::Json> sJSON;
 static json11::Json value(const std::string &key)
@@ -37,14 +39,14 @@ void Config::init()
         const size_t read = fread(&contents[0], 1, size, f);
         fclose(f);
         if (read != static_cast<size_t>(size)) {
-            Log::error("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
+            ERROR("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
             return;
         }
 
         std::string err;
         json11::Json parsed = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
-            Log::error("Failed to parse json from %s: %s", path.c_str(), err.c_str());
+            ERROR("Failed to parse json from %s: %s", path.c_str(), err.c_str());
             return;
         }
         sJSON.push_back(std::move(parsed));
@@ -55,26 +57,31 @@ void Config::init()
     load("/etc/fisk/client.conf");
 
     const std::string dir = cacheDir();
-    std::string versionFile = dir;
-    if (!versionFile.empty()) {
-        versionFile += "version";
-        if (FILE *f = fopen(versionFile.c_str(), "r")) {
-            uint32_t version;
-            if (fread(&version, 1, sizeof(version) - 1, f) == 4) {
-                if (htonl(version) == Version) {
-                    fclose(f);
-                    return;
-                }
+    std::string versionFile = dir + "version";
+    int fd = open(versionFile.c_str(), O_RDONLY|O_CLOEXEC);
+    if (fd != -1) {
+        flock(fd, LOCK_SH); // what if it fails?
+        uint32_t version;
+        if (read(fd, &version, sizeof(version)) == sizeof(version)) {
+            flock(fd, LOCK_UN); // what if it fails?
+            ::close(fd);
+            if (version == htonl(Version)) {
+                return;
             }
-            fclose(f);
         }
     }
     Client::recursiveRmdir(dir);
     Client::recursiveMkdir(dir);
-    if (FILE *f = fopen(versionFile.c_str(), "w")) {
+
+    fd = open(versionFile.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+    if (fd != -1) {
+        flock(fd, LOCK_EX); // what if it fails?
         const uint32_t version = htonl(Version);
-        fwrite(&version, 1, sizeof(version), f);
-        fclose(f);
+        if (write(fd, &version, sizeof(version)) != sizeof(version)) {
+            ERROR("Failed to log");
+        }
+        flock(fd, LOCK_UN);
+        ::close(fd);
     }
 }
 
@@ -142,7 +149,7 @@ std::string Config::clientName()
     if (!gethostname(buf, sizeof(buf)))
         return buf;
 
-    Log::error("Unable to retrieve client name %d %s", errno, strerror(errno));
+    ERROR("Unable to retrieve client name %d %s", errno, strerror(errno));
     return "unknown";
 }
 
@@ -281,6 +288,6 @@ std::string Config::logLevel()
 #ifdef NDEBUG
     return "silent";
 #else
-    return "warning";
+    return "warn";
 #endif
 }

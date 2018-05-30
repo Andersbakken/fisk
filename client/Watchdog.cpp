@@ -19,7 +19,7 @@ using namespace std::chrono_literals;
 void Watchdog::transition(Stage stage)
 {
     std::unique_lock<std::mutex> lock(Client::mutex());
-    Log::debug("Watchdog transition from %s to %s", stageName(sStage), stageName(stage));
+    DEBUG("Watchdog transition from %s to %s", stageName(sStage), stageName(stage));
     assert(sStage != stage);
     sStage = stage;
     sCond.notify_one();
@@ -55,14 +55,14 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                 }
                 auto now = std::chrono::system_clock::now();
                 const Stage next = static_cast<Stage>(sStage + 1);
-                Log::debug("Waiting for %s %llu\n", stageName(next), timeout);
+                DEBUG("Waiting for %s %llu\n", stageName(next), timeout);
                 const auto absTime = now + (timeout * 1ms);
                 do {
                     const bool timedOut = sCond.wait_until(lock, absTime) == std::cv_status::timeout;
                     if (sStopped)
                         return;
                     if (timedOut) {
-                        Log::warning("Timed out waiting for %s (%llums), running locally", stageName(next), timeout);
+                        WARN("Timed out waiting for %s (%llums), running locally", stageName(next), timeout);
                         // printf("GOT HERE\n");
                         sTimedOut = true;
                         lock.unlock();
@@ -78,7 +78,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
 
 void Watchdog::stop()
 {
-    Log::debug("Watchdog stop\n");
+    DEBUG("Watchdog stop\n");
     if (!Config::watchdog())
         return;
 
