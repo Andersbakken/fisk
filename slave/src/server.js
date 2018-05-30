@@ -13,21 +13,24 @@ class Job extends EventEmitter {
     }
 
     send(type, msg) {
-        if (msg === undefined) {
-            if (type instanceof Buffer) {
-                this.ws.send(type);
+        try {
+            if (msg === undefined) {
+                if (type instanceof Buffer) {
+                    this.ws.send(type);
+                } else {
+                    this.ws.send(JSON.stringify(type));
+                }
             } else {
-                this.ws.send(JSON.stringify(type));
+                let tosend;
+                if (typeof msg === "object") {
+                    tosend = msg;
+                    tosend.type = type;
+                } else {
+                    tosend = { type: type, message: msg };
+                }
+                this.ws.send(JSON.stringify(tosend));
             }
-        } else {
-            let tosend;
-            if (typeof msg === "object") {
-                tosend = msg;
-                tosend.type = type;
-            } else {
-                tosend = { type: type, message: msg };
-            }
-            this.ws.send(JSON.stringify(tosend));
+        } catch (err) {
         }
     }
 
@@ -56,10 +59,6 @@ class Server extends EventEmitter {
         let client = undefined;
         let bytes = undefined;
         let ip = req.connection.remoteAddress;
-        if (ip.substr(0, 7) == "::ffff:") {
-            ip = ip.substr(7);
-        }
-
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
             ws.close();
@@ -69,6 +68,15 @@ class Server extends EventEmitter {
                 this.emit("error", { ip: ip, message: msg });
             }
         };
+
+        if (!ip) {
+            error("No ip");
+            return;
+        }
+        if (ip.substr(0, 7) == "::ffff:") {
+            ip = ip.substr(7);
+        }
+
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
@@ -135,6 +143,7 @@ class Server extends EventEmitter {
             }
         });
         ws.on("close", () => {
+            console.log("GOT WS CLOSE");
             if (bytes)
                 client.emit("error", "Got close while reading a binary message");
             if (client)
@@ -142,6 +151,7 @@ class Server extends EventEmitter {
             ws.removeAllListeners();
         });
         ws.on('error', (error) => {
+            console.log("GOT WS ERROR");
             if (client)
                 client.emit('error', error);
         });

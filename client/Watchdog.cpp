@@ -3,6 +3,7 @@
 #include "Client.h"
 #include "Log.h"
 #include <assert.h>
+#include <atomic>
 #include <thread>
 #include <chrono>
 #include <condition_variable>
@@ -11,6 +12,7 @@ static std::condition_variable sCond;
 static std::thread sThread;
 static Watchdog::Stage sStage = Watchdog::Initial;
 static bool sStopped = false;
+static std::atomic<bool> sTimedOut(false);
 
 using namespace std::chrono_literals;
 
@@ -43,9 +45,10 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     timeout = Config::slaveConnectTimeout();
                     break;
                 case ConnectedToSlave:
+                case WaitingForResponse:
                     timeout = Config::responseTimeout();
                     break;
-                case WaitingForResponse:
+                case Finished:
                     return;
                 }
                 auto now = std::chrono::system_clock::now();
@@ -59,6 +62,8 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     if (timedOut) {
                         Log::warning("Timed out waiting for %s (%llums), running locally", stageName(next), timeout);
                         // printf("GOT HERE\n");
+                        sTimedOut = true;
+                        lock.unlock();
                         Client::runLocal(Client::acquireSlot(Client::Wait));
                         return;
                     }
@@ -82,4 +87,9 @@ void Watchdog::stop()
         sCond.notify_one();
     }
     sThread.join();
+}
+
+bool Watchdog::timedOut()
+{
+    return sTimedOut;
 }

@@ -1,9 +1,11 @@
 #include "Log.h"
 #include "Client.h"
 #include <unistd.h>
+#include <sys/file.h>
 
 static Log::Level sLevel = Log::Error;
-static FILE *sLogFile = 0;
+static FILE *sLogFile = nullptr;
+static Log::LogFileMode sLogFileMode = Log::Overwrite;
 static const unsigned long long sStart = Client::mono();
 static const pid_t sPid = getpid();
 static std::mutex sMutex;
@@ -19,10 +21,11 @@ std::string Log::logFileName()
     return sLogFileName;
 }
 
-void Log::init(Log::Level level, std::string &&file)
+void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
 {
     sLevel = level;
-    if (!file.empty()) {
+    sLogFileMode = mode;
+    if (!file.empty() && sLogFileMode == Overwrite) {
         sLogFile = fopen(file.c_str(), "w");
         if (!sLogFile) {
             Log::error("Couldn't open log file %s for writing", file.c_str());
@@ -66,6 +69,15 @@ void Log::log(Level level, const std::string &string)
 #endif
     fprintf(stderr, format, sPid, elapsed / 1000, elapsed % 1000);
     fwrite(string.c_str(), 1, string.size(), stderr);
+    int fd = -1;
+    if (!sLogFileName.empty() && sLogFileMode == Append) {
+        sLogFile = fopen(sLogFileName.c_str(), "a");
+        fd = fileno(sLogFile);
+        if (fd != -1) {
+            flock(LOCK_EX, fd);
+        }
+    }
+
     if (sLogFile) {
         fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
@@ -75,8 +87,14 @@ void Log::log(Level level, const std::string &string)
         if (sLogFile)
             fwrite("\n", 1, 1, sLogFile);
     }
-    if (sLogFile)
+    if (sLogFile) {
         fflush(sLogFile);
+        if (fd != -1) {
+            flock(LOCK_UN, fd);
+            fclose(sLogFile);
+            sLogFile = nullptr;
+        }
+    }
 }
 
 void Log::log(Level level, const char *fmt, va_list args)

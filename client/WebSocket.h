@@ -46,6 +46,7 @@ protected:
     virtual void onRead() override;
     virtual void onTimeout() override {}
 private:
+    bool timedOut();
     bool requestUpgrade();
     void acceptUpgrade();
     void send();
@@ -56,6 +57,7 @@ private:
     int mFD { -1 };
     wslay_event_callbacks mCallbacks { 0 };
     wslay_event_context *mContext { 0 };
+    bool mWatchDogTimedOut { false };
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
     State mState { None };

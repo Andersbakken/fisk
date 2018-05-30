@@ -251,6 +251,15 @@ std::string Config::logFile()
     return std::string();
 }
 
+bool Config::logFileAppend()
+{
+    json11::Json val = value("log-file-append");
+    if (val.is_bool()) {
+        return val.bool_value();
+    }
+    return false;
+}
+
 std::string Config::logLevel()
 {
     json11::Json val = value("log-level");
