@@ -25,6 +25,10 @@ int main(int argcIn, char **argvIn)
         logLevel = env;
     } else if ((env = getenv("FISK_DEBUG"))) {
         logLevel = env;
+    } else if ((env = getenv("FISK_VERBOSE"))) {
+        if (!*env || !strcmp(env, "1")) {
+            logLevel = "Debug";
+        }
     }
 
     if ((env = getenv("FISK_LOG_FILE"))) {
@@ -127,9 +131,10 @@ int main(int argcIn, char **argvIn)
     }
 
     std::unique_ptr<SlotAcquirer> slotAcquirer;
-    if (!noLocal || slave) {
+    if (!noLocal && !slave) {
         std::string dir;
         const size_t desiredSlots = Config::localSlots(&dir).first;
+        DEBUG("Looking for local slots: %zu %s", desiredSlots, dir.c_str());
         // printf("BALLS %zu\n", desiredSlots);
         if (desiredSlots) {
             std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
@@ -192,8 +197,10 @@ int main(int argcIn, char **argvIn)
         select.add(slotAcquirer.get());
     select.add(&schedulerWebsocket);
 
+    DEBUG("Starting schedulerWebsocket");
     while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+    DEBUG("Finished schedulerWebsocket");
 
     if (data.slaveIp.empty() || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
@@ -202,7 +209,10 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
+    DEBUG("Waiting for preprocessed");
     preprocessed->wait();
+    DEBUG("Preprocessed finished");
+
     if (preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
         Watchdog::stop();
