@@ -52,30 +52,40 @@ process.on('exit', () => {
 function makeTarball()
 {
     return new Promise((resolve, reject) => {
-        let out = "";
-        let err = "";
+        let dashV = child_process.spawn(argv.compiler, [ "-v" ]);
+        let dashVOut = "";
 
-        const cwd = os.tmpdir();
-        createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler ], { cwd: cwd });
-        createEnvProc.stdout.on('data', (data) => { out += data; });
-        createEnvProc.stderr.on('data', (data) => { err += data; });
-        createEnvProc.on('close', (code) => {
-            if (!code) {
-                let lines = out.split('\n').filter(x => x);
-                if (!silent) {
-                    console.log("output:\n" + out);
+        dashV.stdout.on('data', (data) => { dashVOut += data; });
+        dashV.stderr.on('data', (data) => { dashVOut += data; });
+
+        dashV.on('close', () => {
+            let out = "";
+            let err = "";
+
+            const cwd = os.tmpdir();
+            const info = path.join(cwd, "compiler-info_" + argv.hash);
+            fs.writeFileSync(info, dashVOut);
+            createEnvProc = child_process.spawn("bash", [ `${__dirname}/icecc-create-env`, argv.compiler, "--addfile", info + ":/etc/compiler_info" ], { cwd: cwd });
+            createEnvProc.stdout.on('data', (data) => { out += data; });
+            createEnvProc.stderr.on('data', (data) => { err += data; });
+            createEnvProc.on('close', (code) => {
+                if (!code) {
+                    let lines = out.split('\n').filter(x => x);
+                    if (!silent) {
+                        console.log("output:\n" + out);
+                    }
+
+                    let line = lines[lines.length - 1];
+                    tarball = line.split(" ")[1];
+                    if (!silent)
+                        console.log("got tarball", tarball);
+                    resolve(path.join(cwd, tarball));
+                } else {
+                    die(`icecc-create-env exited with code: ${code}\n${err}`);
                 }
-
-                let line = lines[lines.length - 1];
-                tarball = line.split(" ")[1];
                 if (!silent)
-                    console.log("got tarball", tarball);
-                resolve(path.join(cwd, tarball));
-            } else {
-                die(`icecc-create-env exited with code: ${code}\n${err}`);
-            }
-            if (!silent)
-                console.log(`child process exited with code ${code}`);
+                    console.log(`child process exited with code ${code}`);
+            });
         });
     });
 }

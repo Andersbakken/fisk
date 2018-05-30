@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 
-const Version = 2;
+const Version = 3;
 
 function cacheDir(option)
 {
@@ -17,7 +17,7 @@ function validateCache(option)
 {
     const dir = cacheDir(option);
     const file = path.join(dir, 'version');
-    console.log(dir);
+    // console.log(dir);
     try {
         let version = fs.readFileSync(file);
         if (version.readUInt32BE() == Version) {

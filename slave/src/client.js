@@ -116,7 +116,8 @@ class Client extends EventEmitter {
             if (remaining.bytes)
                 this.emit("error", "Got close while reading a binary message");
             this.emit("close");
-            this.ws.removeAllListeners();
+            if (this.ws)
+                this.ws.removeAllListeners();
             this.ws = undefined;
         });
     }
