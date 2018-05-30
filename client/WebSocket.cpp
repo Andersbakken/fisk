@@ -1,5 +1,6 @@
 #include "WebSocket.h"
 #include "Log.h"
+#include "Watchdog.h"
 #include "Client.h"
 
 #include <arpa/inet.h>
@@ -324,6 +325,8 @@ unsigned int WebSocket::mode() const
 
 void WebSocket::onWrite()
 {
+    if (timedOut())
+        return;
     if (mState == ConnectingTCP) {
         int err;
         socklen_t size = sizeof(err);
@@ -349,6 +352,8 @@ void WebSocket::onWrite()
 
 void WebSocket::onRead()
 {
+    if (timedOut())
+        return;
     const bool sendBufferWasEmpty = mSendBuffer.empty();
     while (true) {
         char buf[BUFSIZ];
@@ -385,6 +390,8 @@ void WebSocket::onRead()
 
 void WebSocket::send()
 {
+    if (timedOut())
+        return;
     size_t sendBufferOffset = 0;
     while (sendBufferOffset < mSendBuffer.size()) {
         const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
@@ -401,4 +408,19 @@ void WebSocket::send()
     if (sendBufferOffset) {
         mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + sendBufferOffset);
     }
+}
+
+bool WebSocket::timedOut()
+{
+    if (Watchdog::timedOut()) {
+        if (!mWatchDogTimedOut) {
+            mWatchDogTimedOut = true;
+            if (mFD != -1) {
+                ::close(mFD);
+                mFD = -1;
+            }
+        }
+        return true;
+    }
+    return false;
 }

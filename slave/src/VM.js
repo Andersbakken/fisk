@@ -46,15 +46,23 @@ class VM
             args.push(`--user=${user}`);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         this.child.on('message', (msg) => {
+            let that;
             switch (msg.type) {
             case 'compileStdOut':
-                this.compiles[msg.id].emit('stdout', msg.data);
+                that = this.compiles[msg.id];
+                if (that)
+                    that.emit('stdout', msg.data);
                 break;
             case 'compileStdErr':
-                this.compiles[msg.id].emit('stderr', msg.data);
+                that = this.compiles[msg.id];
+                if (that)
+                    that.emit('stderr', msg.data);
                 break;
             case 'compileFinished':
-                this.compiles[msg.id].emit('finished', {
+                that = this.compiles[msg.id];
+                if (!that)
+                    return;
+                that.emit('finished', {
                     exitCode: msg.exitCode,
                     sourceFile: msg.sourceFile,
                     files: msg.files.map(file => {

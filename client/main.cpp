@@ -31,6 +31,11 @@ int main(int argcIn, char **argvIn)
         logFile = env;
     }
 
+    Log::LogFileMode logFileMode = Log::Overwrite;
+    if ((env = getenv("FISK_LOG_APPEND"))) {
+        logFileMode = Log::Append;
+    }
+
     bool disabled = false;
     if ((env = getenv("FISK_DISABLED"))) {
         disabled = strlen(env) && !strcmp(env, "0");
@@ -63,7 +68,7 @@ int main(int argcIn, char **argvIn)
         }
     }
 
-    Log::init(level, std::move(logFile));
+    Log::init(level, std::move(logFile), logFileMode);
 
     if (!Client::findCompiler(preresolved)) {
         Log::error("Can't find executable for %s", data.argv[0]);
@@ -202,7 +207,7 @@ int main(int argcIn, char **argvIn)
 
     while (!slaveWebSocket.done)
         select.exec();
-
+    Watchdog::transition(Watchdog::Finished);
     Watchdog::stop();
     schedulerWebsocket.close("slaved");
     return data.exitCode;

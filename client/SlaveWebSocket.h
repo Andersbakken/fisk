@@ -133,7 +133,6 @@ public:
     std::vector<File> files;
     FILE *f { 0 };
     bool done { false };
-
 };
 
 

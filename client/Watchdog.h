@@ -10,7 +10,8 @@ enum Stage {
     ConnectedToScheduler,
     AcquiredSlave,
     ConnectedToSlave,
-    WaitingForResponse
+    WaitingForResponse,
+    Finished
 };
 inline const char *stageName(Stage stage)
 {
@@ -20,6 +21,7 @@ inline const char *stageName(Stage stage)
     case AcquiredSlave: return "AcquiredSlave";
     case ConnectedToSlave: return "ConnectedToSlave";
     case WaitingForResponse: return "WaitingForResponse";
+    case Finished: return "Finished";
     }
     assert(0);
     return "";
@@ -27,6 +29,7 @@ inline const char *stageName(Stage stage)
 void transition(Stage stage);
 void start(const std::string &compiler, int argc, char **argv);
 void stop();
+bool timedOut();
 };
 
 #endif /* WATCHDOG_H */

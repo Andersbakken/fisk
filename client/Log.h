@@ -18,7 +18,11 @@ enum Level {
 };
 Level logLevel();
 std::string logFileName();
-void init(Level level, std::string &&logFile);
+enum LogFileMode {
+    Overwrite,
+    Append
+};
+void init(Level level, std::string &&logFile, LogFileMode mode);
 Level stringToLevel(const char *str, bool *ok);
 
 void log(Level level, const std::string &string);

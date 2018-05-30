@@ -220,6 +220,19 @@ if (ports.length) {
     const server = new Server(option);
     let jobQueue = [];
 
+    function startPending()
+    {
+        for (let idx=0; idx<jobQueue.length; ++idx) {
+            let jj = jobQueue[idx];
+            if (!jj.op) {
+                console.log("starting jj", idx);
+                jj.start();
+                break;
+            }
+        }
+    }
+
+
     server.on("job", (job) => {
         let vm = environments[job.hash];
         if (!vm) {
@@ -233,12 +246,22 @@ if (ports.length) {
             done: false,
             start: function() {
                 let job = this.job;
-                console.log("job", job.argv0, Object.keys(job));
+                console.log("starting job", job.argv0, Object.keys(job));
                 let op = vm.startCompile(job.commandLine, job.argv0);
                 this.op = op;
                 op.on('stdout', data => job.send({ type: 'stdout', data: data }));
                 op.on('stderr', data => job.send({ type: 'stderr', data: data }));
                 op.on('finished', event => {
+                    this.done = true;
+                    let idx = jobQueue.indexOf(j);
+                    console.log("Job finished", idx, jobQueue.length, client.slots);
+                    if (idx != -1) {
+                        jobQueue.splice(idx, 1);
+                    } else {
+                        // console.error("Can't find j?");
+                        return;
+                    }
+
                     // this can't be async, the directory is removed after the event is fired
                     let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
                     job.send({
@@ -250,16 +273,9 @@ if (ports.length) {
                     for (let i=0; i<contents.length; ++i) {
                         job.send(contents[i].contents);
                     }
-                    this.done = true;
-                    job.close();
+                    // job.close();
                     client.send("jobFinished", { client: { ip: job.ip, name: job.clientName }, sourceFile: event.sourceFile });
-                    for (let idx=0; idx<jobQueue.length; ++idx) {
-                        let jj = jobQueue[idx];
-                        if (!jj.op) {
-                            jj.start();
-                            break;
-                        }
-                    }
+                    startPending();
                 });
                 job.on("data", data => op.feed(data.data, data.last));
                 job.on("error", (err) => {
@@ -267,6 +283,12 @@ if (ports.length) {
                 });
                 job.on("close", () => {
                     job.removeAllListeners();
+                    let idx = jobQueue.indexOf(j);
+                    if (idx != -1) {
+                        jobQueue.splice(idx, 1);
+                        j.cancel();
+                        startPending();
+                    }
                 });
             },
             cancel: function() {
@@ -277,15 +299,12 @@ if (ports.length) {
         };
 
         jobQueue.push(j);
-        if (jobQueue.length <= client.slots)
+        if (jobQueue.length <= client.slots) {
+            console.log("starting j");
             j.start();
-        job.on("close", () => {
-            let idx = jobQueue.indexOf(job);
-            if (idx != -1) {
-                let j = jobQueue.splice(idx, 1)[0];
-                j.cancel();
-            }
-        });
+        } else {
+            console.log("j is backlogged", jobQueue.length, client.slots);
+        }
     });
 
     server.on("error", (err) => {
