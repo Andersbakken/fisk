@@ -47,16 +47,33 @@ int main(int argcIn, char **argvIn)
     }
 
     const char *preresolved = getenv("FISK_COMPILER");
+    const char *slave = getenv("FISK_SLAVE");
 
     Client::Data &data = Client::data();
     data.argv = new char *[argcIn + 1];
     for (int i=0; i<argcIn; ++i) {
-        if (!strncmp("--fisk-log-level=", argvIn[i], 17) || !strncmp("--fisk-log-debug=", argvIn[i], 17)) {
-            logLevel = argvIn[i] + 17;
+        if (!strncmp("--fisk-log-level=", argvIn[i], 17)
+            || !strncmp("--fisk-log=", argvIn[i], 11)
+            || !strncmp("--fisk-debug-level=", argvIn[i], 19)
+            || !strncmp("--fisk-debug=", argvIn[i], 13)) {
+            logLevel = strchr(argvIn[i], '=') + 1;
+        } else if (i + 1 < argcIn && (!strcmp("--fisk-log-level", argvIn[i])
+                                      || !strcmp("--fisk-log-level", argvIn[i])
+                                      || !strcmp("--fisk-log", argvIn[i])
+                                      || !strcmp("--fisk-debug", argvIn[i]))) {
+            logLevel = argvIn[++i];
         } else if (!strncmp("--fisk-log-file=", argvIn[i], 16)) {
             logFile = argvIn[i] + 16;
+        } else if (i + 1 < argcIn && !strcmp("--fisk-log-file", argvIn[i])) {
+            logFile = argvIn[++i];
         } else if (!strncmp("--fisk-compiler=", argvIn[i], 16)) {
             preresolved = argvIn[i] + 16;
+        } else if (i + 1 < argcIn && !strcmp("--fisk-compiler", argvIn[i])) {
+            preresolved = argvIn[++i];
+        } else if (!strncmp("--fisk-slave=", argvIn[i], 13)) {
+            slave = argvIn[i] + 13;
+        } else if (i + 1 < argcIn && !strcmp("--fisk-slave", argvIn[i])) {
+            slave = argvIn[++i];
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
         } else if (!strcmp("--fisk-no-local", argvIn[i])) {
@@ -110,7 +127,7 @@ int main(int argcIn, char **argvIn)
     }
 
     std::unique_ptr<SlotAcquirer> slotAcquirer;
-    if (!noLocal) {
+    if (!noLocal || slave) {
         std::string dir;
         const size_t desiredSlots = Config::localSlots(&dir).first;
         // printf("BALLS %zu\n", desiredSlots);
@@ -156,6 +173,8 @@ int main(int argcIn, char **argvIn)
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = hashes;
     headers["x-fisk-client-name"] = Config::name();
+    if (slave)
+        headers["x-fisk-slave"] = slave;
     {
         std::string hostname = Config::hostname();
         if (!hostname.empty())
