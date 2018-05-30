@@ -17,6 +17,7 @@
 #include <string.h>
 
 static const char *argOptions[] = {
+    "--param",
     "-D",
     "-I",
     "-MQ",

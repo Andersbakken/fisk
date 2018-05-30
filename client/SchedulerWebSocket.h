@@ -18,12 +18,12 @@ public:
             std::string err;
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
             if (!err.empty()) {
-                Log::error("Failed to parse json from scheduler: %s", err.c_str());
+                ERROR("Failed to parse json from scheduler: %s", err.c_str());
                 Watchdog::stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
-            Log::debug("GOT JSON\n%s", msg.dump().c_str());
+            DEBUG("GOT JSON\n%s", msg.dump().c_str());
             const std::string type = msg["type"].string_value();
             Client::Data &data = Client::data();
             if (type == "needsEnvironment") {
@@ -31,7 +31,7 @@ public:
                 std::string dirname;
                 Client::parsePath(execPath.c_str(), 0, &dirname);
                 if (execPath.empty() || dirname.empty()) {
-                    Log::error("Failed to get current directory");
+                    ERROR("Failed to get current directory");
                     Watchdog::stop();
                     Client::runLocal(Client::acquireSlot(Client::Wait));
                     return;
@@ -50,19 +50,19 @@ public:
                                                      dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), host,
                                                      data.hash.c_str(), data.resolvedCompiler.c_str());
 
-                Log::debug("system(\"%s\")", command.c_str());
+                DEBUG("system(\"%s\")", command.c_str());
                 const int ret = system(command.c_str());
-                Log::debug("system -> %d", ret);
+                DEBUG("system -> %d", ret);
                 Watchdog::stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
             } else if (type == "slave") {
                 data.slaveIp = msg["ip"].string_value();
                 data.slavePort = msg["port"].int_value();
-                Log::debug("type %d", msg["port"].type());
-                Log::debug("Got here %s:%d", data.slaveIp.c_str(), data.slavePort);
+                DEBUG("type %d", msg["port"].type());
+                DEBUG("Got here %s:%d", data.slaveIp.c_str(), data.slavePort);
                 done = true;
             } else {
-                Log::error("Unexpected message type: %s", type.c_str());
+                ERROR("Unexpected message type: %s", type.c_str());
             }
             // } else {
             //     printf("Got binary message: %zu bytes\n", len);

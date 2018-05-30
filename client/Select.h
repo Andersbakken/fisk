@@ -67,7 +67,7 @@ public:
             ret = select(max + 1, &r, &w, 0, timeout);
         } while (ret == EINTR);
         if (ret == -1) {
-            Log::error("Select failed %d %s", errno, strerror(errno));
+            ERROR("Select failed %d %s", errno, strerror(errno));
             return -1;
         }
 

@@ -12,7 +12,7 @@ namespace Log
 
 enum Level {
     Debug,
-    Warning,
+    Warn,
     Error,
     Silent
 };
@@ -23,13 +23,21 @@ enum LogFileMode {
     Append
 };
 void init(Level level, std::string &&logFile, LogFileMode mode);
+extern Level minLogLevel;
 Level stringToLevel(const char *str, bool *ok);
 
 void log(Level level, const std::string &string);
 void log(Level level, const char *fmt, va_list args);
 void debug(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
-void warning(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+void warn(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void error(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+
+#define DEBUG(...) if (Log::minLogLevel <= Log::Debug)  \
+        Log::debug(__VA_ARGS__)
+#define WARN(...) if (Log::minLogLevel <= Log::Warn)    \
+        Log::warn(__VA_ARGS__)
+#define ERROR(...) if (Log::minLogLevel <= Log::Error)  \
+        Log::error(__VA_ARGS__)
 
 class Stream
 {

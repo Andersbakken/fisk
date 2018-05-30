@@ -24,13 +24,13 @@ static inline size_t random(void *data, size_t len)
 {
     FILE *f = fopen("/dev/urandom", "r");
     if (!f) {
-        Log::error("Can't open /dev/urandom for reading %d %s", errno, strerror(errno));
+        ERROR("Can't open /dev/urandom for reading %d %s", errno, strerror(errno));
         return 0;
     }
 
     size_t ret = fread(data, 1, len, f);
     if (ret != len) {
-        Log::error("Can't read from /dev/urandom %d %s", errno, strerror(errno));
+        ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
     }
     fclose(f);
@@ -101,18 +101,18 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
     mHeaders = std::move(headers);
     mParsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
     if (!mParsedUrl.IsValid()) {
-        Log::error("Bad url %s", mUrl.c_str());
+        ERROR("Bad url %s", mUrl.c_str());
         return false;
     }
 
     if (mParsedUrl.m_Scheme != "ws") {
-        Log::error("Bad scheme %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
+        ERROR("Bad scheme %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
         return false;
     }
 
     mHost = mParsedUrl.m_Host;
     if (!mParsedUrl.GetPort(&mPort)) {
-        Log::error("Bad port %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
+        ERROR("Bad port %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
         return false;
     }
 
@@ -124,7 +124,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
     sockaddr_in literalSockAddr = { 0 };
     int ret;
     if (inet_aton(mHost.c_str(), &literal)) {
-        Log::debug("Got literal ip address: %s", mHost.c_str());
+        DEBUG("Got literal ip address: %s", mHost.c_str());
         res = static_cast<addrinfo *>(calloc(1, sizeof(addrinfo)));
         res->ai_family = PF_INET;
         res->ai_socktype = SOCK_STREAM;
@@ -144,27 +144,27 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         hints.ai_flags |= AI_CANONNAME;
 
         ret = getaddrinfo(mHost.c_str(), nullptr, &hints, &res);
-        Log::debug("Getting addresses for %s -> %d", mHost.c_str(), ret);
+        DEBUG("Getting addresses for %s -> %d", mHost.c_str(), ret);
         if (ret != 0) {
-            Log::error("Couldn't resolve host %s", mHost.c_str());
+            ERROR("Couldn't resolve host %s", mHost.c_str());
             return false;
         }
     }
 
     for (addrinfo *addr = res; addr; addr = addr->ai_next) {
         mFD = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        Log::debug("Opening socket for for %s -> %d", mHost.c_str(), ret);
+        DEBUG("Opening socket for for %s -> %d", mHost.c_str(), ret);
 
         if (mFD == -1)
             continue;
 
         sockaddr_in *sockAddr = reinterpret_cast<sockaddr_in *>(addr->ai_addr);
         sockAddr->sin_port = htons(mPort);
-        Log::debug("Connecting socket %s (%s:%d)", mHost.c_str(),
+        DEBUG("Connecting socket %s (%s:%d)", mHost.c_str(),
                    inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
 
         if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
-            Log::error("Failed to make socket non blocking %d %s", errno, strerror(errno));
+            ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
             ::close(mFD);
             mFD = -1;
             continue;
@@ -175,13 +175,13 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         } while (ret == -1 && errno == EINTR);
 
         if (!ret) {
-            Log::debug("Connected to server %s (%s:%d)", mHost.c_str(),
+            DEBUG("Connected to server %s (%s:%d)", mHost.c_str(),
                        inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
             ::close(mFD);
-            Log::error("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
+            ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
                        inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
                        mPort, errno, strerror(errno));
             mFD = -1;
@@ -193,7 +193,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
     freeaddrinfo(res);
 
     if (mFD == -1) {
-        Log::error("Couldn't connect to host %s", mHost.c_str());
+        ERROR("Couldn't connect to host %s", mHost.c_str());
         return false;
     } else if (mState == ConnectingTCP) {
         return true;
@@ -211,7 +211,7 @@ bool WebSocket::requestUpgrade()
 
     {
         char reqHeader[4096];
-        Log::debug("Writing HTTP handshake");
+        DEBUG("Writing HTTP handshake");
         std::string extraHeaders;
         extraHeaders.reserve(1024);
         for (const std::pair<std::string, std::string> &header : mHeaders) {
@@ -228,7 +228,7 @@ bool WebSocket::requestUpgrade()
                                               "\r\n",
                                               mParsedUrl.m_Path.c_str(), mHost.c_str(), mPort,
                                               mClientKey.c_str(), extraHeaders.c_str());
-        Log::debug("Sending headers:\n%s", reqHeader);
+        DEBUG("Sending headers:\n%s", reqHeader);
 
         assert(mSendBuffer.empty());
         mSendBuffer = std::vector<unsigned char>(reqHeader, reqHeader + reqHeaderSize);
@@ -240,7 +240,7 @@ bool WebSocket::requestUpgrade()
 
 void WebSocket::acceptUpgrade()
 {
-    Log::debug("Accept upgrade %zu bytes", mRecvBuffer.size());
+    DEBUG("Accept upgrade %zu bytes", mRecvBuffer.size());
     char *ch = reinterpret_cast<char *>(&mRecvBuffer[0]);
     std::string headers;
     for (size_t i=0; i<mRecvBuffer.size() - 3; ++i) {
@@ -252,10 +252,10 @@ void WebSocket::acceptUpgrade()
         ++ch;
     }
     if (!headers.empty()) {
-        Log::debug("Got response headers %zu bytes", headers.size());
+        DEBUG("Got response headers %zu bytes", headers.size());
         size_t keyhdstart;
         if ((keyhdstart = headers.find("Sec-WebSocket-Accept: ")) == std::string::npos) {
-            Log::error("http_upgrade: missing required headers");
+            ERROR("http_upgrade: missing required headers");
             mState = Error;
             return;
         }
@@ -263,7 +263,7 @@ void WebSocket::acceptUpgrade()
         const size_t keyhdend = headers.find("\r\n", keyhdstart);
         const std::string accept_key = headers.substr(keyhdstart, keyhdend - keyhdstart);
         if (accept_key != create_acceptkey(mClientKey)) {
-            Log::error("Invalid accept key, expected %s, got %s",
+            ERROR("Invalid accept key, expected %s, got %s",
                        create_acceptkey(mClientKey).c_str(), accept_key.c_str());
             mState = Error;
             return;
@@ -271,7 +271,7 @@ void WebSocket::acceptUpgrade()
     }
     const int ret = wslay_event_context_client_init(&mContext, &mCallbacks, this);
     if (ret != 0) {
-        Log::error("Failed to initialize wslay context: %d", ret);
+        ERROR("Failed to initialize wslay context: %d", ret);
         mState = Error;
         return;
     }
@@ -334,15 +334,15 @@ void WebSocket::onWrite()
 
         if (e == -1) {
             mState = Error;
-            Log::error("Failed to getsockopt (%d %s)", errno, strerror(errno));
+            ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
             return;
         }
         if (err) {
-            Log::error("Failed to connect to host %s:%d", mHost.c_str(), mPort);
+            ERROR("Failed to connect to host %s:%d", mHost.c_str(), mPort);
             mState = Error;
             return;
         }
-        Log::debug("Asynchronously connected to host %s:%d", mHost.c_str(), mPort);
+        DEBUG("Asynchronously connected to host %s:%d", mHost.c_str(), mPort);
         mState = ConnectedTCP;
         if (!requestUpgrade())
             return;
@@ -358,7 +358,7 @@ void WebSocket::onRead()
     while (true) {
         char buf[BUFSIZ];
         const ssize_t r = ::read(mFD, buf, sizeof(buf));
-        Log::debug("Read %zd bytes", r);
+        DEBUG("Read %zd bytes", r);
         if (!r) {
             mState = Closed;
             break;
@@ -395,7 +395,7 @@ void WebSocket::send()
     size_t sendBufferOffset = 0;
     while (sendBufferOffset < mSendBuffer.size()) {
         const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
-        Log::debug("Wrote %zd bytes\n", r);
+        DEBUG("Wrote %zd bytes\n", r);
         if (r > 0) {
             sendBufferOffset += r;
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {

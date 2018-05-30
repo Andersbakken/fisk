@@ -50,7 +50,7 @@ static std::string resolveSymlink(const std::string &link, const std::function<C
         // printf("resolved %s to %s -> %zd %d %s\n", l.c_str(), ret > 0 ? std::string(buf, ret).c_str() : "<nut>", ret, errno, strerror(errno));
         if (ret == -1) {
             if (errno != EINVAL) {
-                Log::error("Failed to resolve symlink %s (%d %s)", link.c_str(), errno, strerror(errno));
+                ERROR("Failed to resolve symlink %s (%d %s)", link.c_str(), errno, strerror(errno));
             }
             break;
         }
@@ -115,7 +115,7 @@ bool Client::findCompiler(const char *preresolved)
                                 char link[PATH_MAX + 1];
                                 const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
                                 if (len < 0) {
-                                    Log::error("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
+                                    ERROR("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
                                     exec.clear();
                                     continue;
                                 }
@@ -157,22 +157,51 @@ bool Client::findCompiler(const char *preresolved)
                 return Continue;
             });
     }
-    // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
-
-    sData.slaveCompiler = sData.resolvedCompiler;
-    const size_t slash = sData.resolvedCompiler.rfind('/');
-    if (slash != std::string::npos) {
-        for (size_t i=slash + 2; i<sData.resolvedCompiler.size(); ++i) {
-            if (sData.resolvedCompiler[i] == '+' && sData.resolvedCompiler[i - 1] == '+') {
-                if (sData.resolvedCompiler[i - 2] == 'c') {
-                    sData.resolvedCompiler[i - 1] = 'c';
-                    sData.resolvedCompiler.erase(i);
-                } else if (sData.resolvedCompiler[i - 2] == 'g') {
-                    if (i > 6 && !strncmp(sData.resolvedCompiler.c_str() + i - 6, "clang", 5)) {
-                        sData.resolvedCompiler.erase(sData.resolvedCompiler.begin() + i - 1, sData.resolvedCompiler.begin() + i + 1);
+    {
+        size_t slash = exec.rfind('/');
+        if (slash == std::string::npos)
+            slash = 0;
+        const char *ch = &exec[slash];
+        while (*ch) {
+            if (*ch == 'g') {
+                if (!strncmp(ch + 1, "++", 2)) {
+                    sData.slaveCompiler =  "/usr/bin/g++";
+                    break;
+                } else if (!strncmp(ch + 1, "cc", 2)) {
+                    sData.slaveCompiler =  "/usr/bin/gcc";
+                    break;
+                }
+            } else if (*ch == 'c') {
+                if (!strncmp(ch + 1, "lang", 4)) {
+                    if (!strncmp(ch + 5, "++", 2)) {
+                        sData.slaveCompiler =  "/usr/bin/clang++";
+                        break;
                     } else {
+                        sData.slaveCompiler =  "/usr/bin/clang";
+                        break;
+                    }
+                }
+            }
+            ++ch;
+        }
+
+        // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
+    }
+    {
+        const size_t slash = sData.resolvedCompiler.rfind('/');
+        if (slash != std::string::npos) {
+            for (size_t i=slash + 2; i<sData.resolvedCompiler.size(); ++i) {
+                if (sData.resolvedCompiler[i] == '+' && sData.resolvedCompiler[i - 1] == '+') {
+                    if (sData.resolvedCompiler[i - 2] == 'c') {
                         sData.resolvedCompiler[i - 1] = 'c';
-                        sData.resolvedCompiler[i] = 'c';
+                        sData.resolvedCompiler.erase(i);
+                    } else if (sData.resolvedCompiler[i - 2] == 'g') {
+                        if (i > 6 && !strncmp(sData.resolvedCompiler.c_str() + i - 6, "clang", 5)) {
+                            sData.resolvedCompiler.erase(sData.resolvedCompiler.begin() + i - 1, sData.resolvedCompiler.begin() + i + 1);
+                        } else {
+                            sData.resolvedCompiler[i - 1] = 'c';
+                            sData.resolvedCompiler[i] = 'c';
+                        }
                     }
                 }
             }
@@ -207,7 +236,7 @@ Client::Slot::Slot(int fd, std::string &&path)
 Client::Slot::~Slot()
 {
     if (mFD != -1) {
-        Log::debug("Dropping lock on %s for %s", mPath.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+        DEBUG("Dropping lock on %s for %s", mPath.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
         flock(mFD, LOCK_UN);
         unlink(mPath.c_str());
     }
@@ -218,13 +247,13 @@ bool Client::setFlag(int fd, int flag)
     int flags, r;
     while ((flags = fcntl(fd, F_GETFL, 0)) == -1 && errno == EINTR);
     if (flags == -1) {
-        Log::error("Failed to read flags from %d %d %s", fd, errno, strerror(errno));
+        ERROR("Failed to read flags from %d %d %s", fd, errno, strerror(errno));
         return false;
     }
     while ((r = fcntl(fd, F_SETFL, flags | flag)) == -1 && errno == EINTR);
 
     if (r == -1) {
-        Log::error("Failed to set flag 0x%x on socket %d %d %s", flag, fd, errno, strerror(errno));
+        ERROR("Failed to set flag 0x%x on socket %d %d %s", flag, fd, errno, strerror(errno));
         return false;
     }
     return true;
@@ -371,11 +400,11 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
             std::string path = dir + std::to_string(i) + ".lock";
             int fd = open(path.c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
             if (fd == -1) {
-                Log::error("Failed to open file %s %d %s", path.c_str(), errno, strerror(errno));
+                ERROR("Failed to open file %s %d %s", path.c_str(), errno, strerror(errno));
                 continue;
             }
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                Log::debug("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+                DEBUG("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
                 return std::make_unique<Slot>(fd, std::move(path));
             }
             ::close(fd);
@@ -409,12 +438,12 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         }
         argvCopy[sData.argc] = 0;
         ::execv(sData.compiler.c_str(), argvCopy);
-        Log::error("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
+        ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
     const pid_t pid = fork();
     if (pid == -1) { // errpr
-        Log::error("Failed to fork: %d %s", errno, strerror(errno));
+        ERROR("Failed to fork: %d %s", errno, strerror(errno));
         run();
         exit(101);
     } else if (pid == 0) { // child
@@ -485,7 +514,7 @@ std::string Client::environmentHash(const std::string &compiler)
                                      });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
-            Log::error("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
+            ERROR("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
             return std::string();
         }
 
@@ -497,41 +526,52 @@ std::string Client::environmentHash(const std::string &compiler)
 
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
     json11::Json::object json;
-    FILE *f = fopen(cache.c_str(), "r");
-    if (f) {
-        fseek(f, 0, SEEK_END);
-        const long size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (size) {
-            std::string contents(size, ' ');
-            const size_t read = fread(&contents[0], 1, size, f);
-            fclose(f);
-            if (read != static_cast<size_t>(size)) {
-                Log::error("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
-            } else {
-                std::string err;
-                json11::Json obj = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
-                if (!err.empty()) {
-                    Log::error("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
-                }
-                if (obj.is_object()) {
-                    json11::Json value = obj[key];
-                    if (value.is_string()) {
-                        Log::debug("Cache hit for compiler %s", key.c_str());
-                        return value.string_value();
+    int fd; 
+    if ((fd = open(cache.c_str(), O_CLOEXEC|O_RDONLY)) != -1) {
+        struct stat st;
+        if (flock(fd, LOCK_SH)) {
+            ERROR("Failed to flock shared %s (%d %s)", cache.c_str(), errno, strerror(errno));
+            ::close(fd);
+        } else if (fstat(fd, &st)) {
+            ERROR("Failed to fstat %s (%d %s)", cache.c_str(), errno, strerror(errno));
+            flock(fd, LOCK_UN);
+            ::close(fd);
+        } else { 
+            const long size = st.st_size;
+            if (size) {
+                std::string contents(size, ' ');
+                const size_t read = ::read(fd, &contents[0], size);
+                flock(fd, LOCK_UN);
+                ::close(fd);
+                if (read != static_cast<size_t>(size)) {
+                    ERROR("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
+                } else {
+                    std::string err;
+                    json11::Json obj = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
+                    if (!err.empty()) {
+                        ERROR("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
                     }
-                    json = obj.object_items();
-                    auto it = json.begin();
-                    while (it != json.end()) {
-                        if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
-                            json.erase(it++);
-                        } else {
-                            ++it;
+                    if (obj.is_object()) {
+                        json11::Json value = obj[key];
+                        if (value.is_string()) {
+                            DEBUG("Cache hit for compiler %s", key.c_str());
+                            return value.string_value();
+                        }
+                        json = obj.object_items();
+                        auto it = json.begin();
+                        while (it != json.end()) {
+                            if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
+                                json.erase(it++);
+                            } else {
+                                ++it;
+                            }
                         }
                     }
                 }
             }
         }
+    } else {
+        DEBUG("Can't open %s for reading (%d %s)", cache.c_str(), errno, strerror(errno));
     }
     const std::string ret = readSignature();
     if (!ret.empty()) {
@@ -539,15 +579,25 @@ std::string Client::environmentHash(const std::string &compiler)
         std::string dirname;
         parsePath(cache.c_str(), 0, &dirname);
         recursiveMkdir(dirname);
-        FILE *f = fopen(cache.c_str(), "w");
-        if (f) {
+        if ((fd = open(cache.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH)) != -1) {
             std::string str = json11::Json(json).dump();
-            if (fwrite(str.c_str(), 1, str.size(), f) != str.size()) {
-                Log::error("Failed to write to file %s - %d %s", cache.c_str(), errno, strerror(errno));
+            if (flock(fd, LOCK_EX|LOCK_NB)) {
+                DEBUG("Failed to flock exclusive %s (%d %s)", cache.c_str(), errno, strerror(errno));
+                ::close(fd);
+                return ret;
             }
-            fclose(f);
+            if (write(fd, str.c_str(), str.size()) != static_cast<ssize_t>(str.size())) {
+                ERROR("Failed to write to file %s - %d %s", cache.c_str(), errno, strerror(errno));
+                unlink(cache.c_str());
+            } else {
+                if (ftruncate(fd, str.size())) {
+                    ERROR("Failed to truncate file %s (%d %s)", cache.c_str(), errno, strerror(errno));
+                }
+            }
+            flock(fd, LOCK_UN);
+            ::close(fd);
         } else {
-            Log::error("Failed to open %s for writing %d %s", cache.c_str(), errno, strerror(errno));
+            ERROR("Failed to open %s for writing %d %s", cache.c_str(), errno, strerror(errno));
         }
     }
     return ret;
