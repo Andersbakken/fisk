@@ -41,6 +41,11 @@ int main(int argcIn, char **argvIn)
         disabled = !strlen(env) || !strcmp(env, "1");
     }
 
+    bool noLocal = false;
+    if ((env = getenv("FISK_NO_LOCAL"))) {
+        noLocal = !strlen(env) || !strcmp(env, "1");
+    }
+
     const char *preresolved = getenv("FISK_COMPILER");
 
     Client::Data &data = Client::data();
@@ -54,6 +59,8 @@ int main(int argcIn, char **argvIn)
             preresolved = argvIn[i] + 16;
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
+        } else if (!strcmp("--fisk-no-local", argvIn[i])) {
+            noLocal = true;
         } else {
             data.argv[data.argc++] = argvIn[i];
         }
@@ -103,20 +110,25 @@ int main(int argcIn, char **argvIn)
     }
 
     std::unique_ptr<SlotAcquirer> slotAcquirer;
-    if (!Config::noLocal()) {
-        std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
-        if (slot) { // we have a local slot to run
-            Client::runLocal(std::move(slot));
-            return 0; // unreachable
-        }
+    if (!noLocal) {
         std::string dir;
-        Config::localSlots(&dir);
-        slotAcquirer.reset(new SlotAcquirer(dir, []() -> void {
-                    std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
-                    if (slot) {
-                        Client::runLocal(std::move(slot));
-                    }
-                }));
+        const size_t desiredSlots = Config::localSlots(&dir).first;
+        printf("BALLS %zu\n", desiredSlots);
+        if (desiredSlots) {
+            std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
+            if (slot) { // we have a local slot to run
+                Log::debug("Got a local slot, lets do it");
+                Client::runLocal(std::move(slot));
+                return 0; // unreachable
+            }
+            slotAcquirer.reset(new SlotAcquirer(dir, []() -> void {
+                        std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
+                        if (slot) {
+                            // printf("GOT ONE FROM SELECT\n");
+                            Client::runLocal(std::move(slot));
+                        }
+                    }));
+        }
     }
     Watchdog::start(data.compiler, data.argc, data.argv);
     SchedulerWebSocket schedulerWebsocket;
@@ -204,7 +216,7 @@ int main(int argcIn, char **argvIn)
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
-    Watchdog::transition(Watchdog::WaitingForResponse);
+    Watchdog::transition(Watchdog::UploadedJob);
 
     while (!slaveWebSocket.done)
         select.exec();

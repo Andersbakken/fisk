@@ -33,7 +33,7 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
     sThread = std::thread([]() {
             while (true) {
                 std::unique_lock<std::mutex> lock(Client::mutex());
-                unsigned long long timeout;
+                unsigned long long timeout = 0;
                 switch (sStage) {
                 case Initial:
                     timeout = Config::schedulerConnectTimeout();
@@ -45,7 +45,9 @@ void Watchdog::start(const std::string &compiler, int argc, char **argv)
                     timeout = Config::slaveConnectTimeout();
                     break;
                 case ConnectedToSlave:
-                case WaitingForResponse:
+                    timeout = Config::uploadJobTimeout();
+                    break;
+                case UploadedJob:
                     timeout = Config::responseTimeout();
                     break;
                 case Finished:

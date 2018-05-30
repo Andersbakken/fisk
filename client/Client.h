@@ -139,7 +139,10 @@ inline std::string base64(const std::string &src)
     BIO_flush(b64);
     const char *encoded;
     const long len = BIO_get_mem_data(sink, &encoded);
-    return std::string(encoded, len);
+    std::string ret(encoded, len);
+    BIO_free(b64);
+    BIO_free(sink);
+    return ret;
 }
 
 inline std::string toHex(const std::string &src)

@@ -121,6 +121,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
 
     addrinfo *res = 0;
     in_addr literal;
+    sockaddr_in literalSockAddr = { 0 };
     int ret;
     if (inet_aton(mHost.c_str(), &literal)) {
         Log::debug("Got literal ip address: %s", mHost.c_str());
@@ -128,14 +129,13 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         res->ai_family = PF_INET;
         res->ai_socktype = SOCK_STREAM;
         res->ai_protocol = 0;
-        sockaddr_in *sockAddr = static_cast<sockaddr_in *>(calloc(1, sizeof(sockaddr_in)));
-        res->ai_addr = reinterpret_cast<sockaddr *>(sockAddr);
+        res->ai_addr = reinterpret_cast<sockaddr *>(&literalSockAddr);
         res->ai_addrlen = sizeof(sockaddr_in);
 #ifdef __APPLE__
         sockAddr->sin_len = sizeof(sockaddr_in);
 #endif
-        sockAddr->sin_family = AF_INET;
-        sockAddr->sin_addr = literal;
+        literalSockAddr.sin_family = AF_INET;
+        literalSockAddr.sin_addr = literal;
     } else {
         addrinfo hints;
         memset(&hints, 0, sizeof(hints));

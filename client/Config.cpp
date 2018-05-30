@@ -102,7 +102,7 @@ unsigned long long Config::acquiredSlaveTimeout()
     if (val.is_number())
         return val.int_value();
 
-    return 1000;
+    return 2000;
 }
 
 unsigned long long Config::slaveConnectTimeout()
@@ -112,6 +112,15 @@ unsigned long long Config::slaveConnectTimeout()
         return val.int_value();
 
     return 1000;
+}
+
+unsigned long long Config::uploadJobTimeout()
+{
+    json11::Json val = value("upload-job-timeout");
+    if (val.is_number())
+        return val.int_value();
+
+    return 5000;
 }
 
 unsigned long long Config::responseTimeout()
@@ -154,28 +163,31 @@ std::string Config::cacheDir()
     return std::string();
 }
 
-size_t Config::localSlots(std::string *dir)
+std::pair<size_t, size_t> Config::localSlots(std::string *dir)
 {
-    json11::Json val = value("local-slots");
-    size_t ret;
-    if (val.is_number()) {
-        ret = val.int_value();
-    } else {
-        ret = std::thread::hardware_concurrency();
-    }
     if (dir) {
-        *dir = cacheDir() + "/slots";
+        *dir = cacheDir() + "slots";
+    }
+    {
+        json11::Json val = value("slots");
+        if (val.is_number())
+            return std::make_pair<size_t, size_t>(val.int_value(), val.int_value());
+    }
+    std::pair<size_t, size_t> ret = { std::thread::hardware_concurrency(), std::thread::hardware_concurrency() };
+    {
+        json11::Json val = value("desired-slots");
+        if (val.is_number()) {
+            ret.first = val.int_value();
+        }
+    }
+
+    {
+        json11::Json val = value("allowed-slots");
+        if (val.is_number()) {
+            ret.second = val.int_value();
+        }
     }
     return ret;
-}
-
-bool Config::noLocal()
-{
-    json11::Json val = value("no-local");
-    if (val.is_bool()) {
-        return val.bool_value();
-    }
-    return false;
 }
 
 std::string Config::envCache()

@@ -353,7 +353,8 @@ void Client::Preprocessed::wait()
 std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
 {
     std::string dir;
-    const size_t slots = Config::localSlots(&dir);
+    const std::pair<size_t, size_t> s = Config::localSlots(&dir);
+    const size_t slots = mode == Try ? s.first : s.second;
     if (dir.empty() || !slots) {
         return std::make_unique<Slot>(-1, std::string());
     }
