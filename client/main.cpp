@@ -38,7 +38,7 @@ int main(int argcIn, char **argvIn)
 
     bool disabled = false;
     if ((env = getenv("FISK_DISABLED"))) {
-        disabled = strlen(env) && !strcmp(env, "0");
+        disabled = !strlen(env) || !strcmp(env, "1");
     }
 
     const char *preresolved = getenv("FISK_COMPILER");
