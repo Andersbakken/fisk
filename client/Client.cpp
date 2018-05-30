@@ -346,6 +346,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 commandLine += '\'';
             }
             commandLine += " '-E'";
+            DEBUG("Running preprocess: %s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {
                                              ptr->stdOut.append(bytes, n);
