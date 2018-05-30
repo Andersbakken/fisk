@@ -371,7 +371,11 @@ if test -n "$clang"; then
 fi
 
 for extrafile in $extrafiles; do
-    add_file $extrafile
+    if echo $extrafile | grep -q ".:."; then
+        add_file `echo $extrafile | awk -F: '{print $1}'` `echo $extrafile | awk -F: '{print $2}'`
+    else
+        add_file $extrafile
+    fi
 done
 
 if test "$is_darwin" = 1; then
