@@ -141,13 +141,22 @@ bool Client::findCompiler(const char *preresolved)
 
     if (exec.empty())
         return false;
-    sData.resolvedCompiler = resolveSymlink(exec, [](const std::string &p) -> CheckResult {
-            std::string base;
-            parsePath(p, &base, 0);
-            if (base.find("g++") != std::numeric_limits<size_t>::max()|| base.find("gcc") != std::numeric_limits<size_t>::max())
-                return Stop;
-            return Continue;
-        });
+
+    std::string base;
+    parsePath(exec, &base, 0);
+    if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
+        sData.resolvedCompiler = exec;
+    } else {
+        resolveSymlink(exec, [](const std::string &p) -> CheckResult {
+                std::string base;
+                parsePath(p, &base, 0);
+                // Log::debug("GOT BASE %s", base.c_str());
+                if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
+                    return Stop;
+                }
+                return Continue;
+            });
+    }
     // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
 
     sData.slaveCompiler = sData.resolvedCompiler;
