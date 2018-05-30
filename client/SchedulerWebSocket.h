@@ -51,7 +51,8 @@ public:
                                                      data.hash.c_str(), data.resolvedCompiler.c_str());
 
                 Log::debug("system(\"%s\")", command.c_str());
-                system(command.c_str());
+                const int ret = system(command.c_str());
+                Log::debug("system -> %d", ret);
                 Watchdog::stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
             } else if (type == "slave") {

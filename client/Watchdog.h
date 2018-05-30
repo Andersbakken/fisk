@@ -10,7 +10,7 @@ enum Stage {
     ConnectedToScheduler,
     AcquiredSlave,
     ConnectedToSlave,
-    WaitingForResponse,
+    UploadedJob,
     Finished
 };
 inline const char *stageName(Stage stage)
@@ -20,7 +20,7 @@ inline const char *stageName(Stage stage)
     case ConnectedToScheduler: return "ConnectedToScheduler";
     case AcquiredSlave: return "AcquiredSlave";
     case ConnectedToSlave: return "ConnectedToSlave";
-    case WaitingForResponse: return "WaitingForResponse";
+    case UploadedJob: return "UploadedJob";
     case Finished: return "Finished";
     }
     assert(0);
