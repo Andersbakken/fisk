@@ -135,6 +135,7 @@ server.on("slave", function(slave) {
     });
 });
 
+let pendingEnvironments = {};
 server.on("compile", function(compile) {
     console.log("request", compile.environments);
     let found = false;
@@ -145,7 +146,23 @@ server.on("compile", function(compile) {
         }
     }
     if (!found) {
-        compile.send({ type: "needsEnvironment", environments: compile.environments });
+        let needed = [];
+        compile.environments.forEach(env => {
+            // console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
+            if (!(env in pendingEnvironments)) {
+                needed.push(env);
+                pendingEnvironments[env] = setTimeout(() => {
+                    delete pendingEnvironments[env];
+                }, 60000);
+            }
+        });
+        if (needed.length) {
+            console.log(`Asking ${compile.name} ${compile.ip} to upload ${needed}`);
+            compile.send({ type: "needsEnvironment", environments: needed });
+        } else {
+            console.log(`We're already waiting for ${compile.environments}`);
+            compile.send("slave", {});
+        }
         return;
     }
 
@@ -220,6 +237,10 @@ server.on("uploadEnvironment", upload => {
             upload.close();
         } else {
             hash = environment.hash;
+            if (hash in pendingEnvironments) {
+                clearTimeout(pendingEnvironments[hash]);
+                delete pendingEnvironments[hash];
+            }
         }
     });
     upload.on("environmentdata", environment => {

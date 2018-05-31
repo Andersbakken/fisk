@@ -1,10 +1,11 @@
 #!/bin/bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd $DIR/../slave
 while true; do
+    cd /
+    npm cache clear --force
     npm install --unsafe-perm -g @andersbakken/fisk &> /var/log/fisk-slave.log
-    cd "$PWD"
+    cd $DIR/../slave
     node ./index.js &>> /var/log/fisk-slave.log
 done
 
