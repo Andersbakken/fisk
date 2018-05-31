@@ -139,12 +139,9 @@ Promise.all([ makeTarball(), connectWs() ]).then((data) => {
         console.log("sent text message", size);
     const chunkSize = 64 * 1024;
     let sent = 0;
-    let buf = Buffer.allocUnsafe(chunkSize);
     for (let i=0; i<size; i += chunkSize) {
         let s = Math.min(size - i, chunkSize);
-        if (s < chunkSize) {
-            buf = Buffer.alloc(s);
-        }
+        let buf = Buffer.allocUnsafe(s);
         if (fs.readSync(f, buf, 0, s) != s) {
             die("Failed to read bytes from enviroment");
         }
