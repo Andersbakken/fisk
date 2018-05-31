@@ -13,21 +13,25 @@ class Client extends EventEmitter {
     }
 
     send(type, msg) {
-        if (msg === undefined) {
-            if (type instanceof Buffer) {
-                this.ws.send(type);
+        try {
+            if (msg === undefined) {
+                if (type instanceof Buffer) {
+                    this.ws.send(type);
+                } else {
+                    this.ws.send(JSON.stringify(type));
+                }
             } else {
-                this.ws.send(JSON.stringify(type));
+                let tosend;
+                if (typeof msg === "object") {
+                    tosend = msg;
+                    tosend.type = type;
+                } else {
+                    tosend = { type: type, message: msg };
+                }
+                this.ws.send(JSON.stringify(tosend));
             }
-        } else {
-            let tosend;
-            if (typeof msg === "object") {
-                tosend = msg;
-                tosend.type = type;
-            } else {
-                tosend = { type: type, message: msg };
-            }
-            this.ws.send(JSON.stringify(tosend));
+        } catch (err) {
+
         }
     }
 
