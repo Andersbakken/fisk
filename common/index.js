@@ -25,7 +25,8 @@ function validateCache(option)
         }
     } catch (err) {
     }
-    fs.remove(dir);
+    console.log(`Wrong version. Destroying cache ${dir}`);
+    fs.removeSync(dir);
     fs.mkdirpSync(dir);
     let buf = Buffer.allocUnsafe(4);
     buf.writeUInt32BE(Version);
