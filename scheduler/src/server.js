@@ -129,7 +129,7 @@ class Server extends EventEmitter {
             const port = parseInt(req.headers["x-fisk-port"]);
             const name = req.headers["x-fisk-slave-name"];
             const hostname = req.headers["x-fisk-slave-hostname"];
-            const arch = req.headers["x-fisk-system"];
+            const system = req.headers["x-fisk-system"];
             const slots = parseInt(req.headers["x-fisk-slots"]);
             let environments = {};
             req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
@@ -147,7 +147,7 @@ class Server extends EventEmitter {
                                   lastJob: 0,
                                   hostname: hostname,
                                   environments: environments,
-                                  architecture: arch });
+                                  system: system });
             ws.on("message", msg => {
                 let json;
                 try {

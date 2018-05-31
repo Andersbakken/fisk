@@ -85,6 +85,7 @@ server.express.get("/slaves", (req, res, next) => {
             lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
             jobsPerformed: s.jobsPerformed,
             hostname: s.hostname,
+            system: s.system,
             name: s.name,
             created: s.created,
             environments: Object.keys(s.environments)
