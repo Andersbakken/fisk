@@ -37,22 +37,22 @@ public:
                     return;
                 }
 #ifdef __APPLE__
-                const char *host = "Darwin x86_64";
+                const char *system = "Darwin x86_64";
 #elif defined(__linux__) && defined(__i686)
-                const char *host = "Linux i686"
+                const char *system = "Linux i686"
 #elif defined(__linux__) && defined(__x86_64)
-                const char *host = "Linux x86_64";
+                const char *system = "Linux x86_64";
 #else
 #error unsupported platform
 #endif
 
                 assert(dirname.size() && dirname[dirname.size() - 1] == '/');
-                std::string command = Client::format("bash -c \"cd %s../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--host=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
-                                                     dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), host,
+                std::string command = Client::format("bash -c \"cd %s../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
+                                                     dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), system,
                                                      data.hash.c_str(), data.resolvedCompiler.c_str());
 
                 DEBUG("system(\"%s\")", command.c_str());
-                const int ret = system(command.c_str());
+                const int ret = ::system(command.c_str());
                 DEBUG("system -> %d", ret);
                 Watchdog::stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
