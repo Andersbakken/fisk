@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 
-const Version = 3;
+const Version = 4;
 
 function cacheDir(option)
 {
