@@ -59,9 +59,12 @@ function distribute(conf)
             let key = keys[i];
             let slave = slaves[key];
             if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
-                console.log("sending", hash, "to", key);
-                Environments.environment(hash).send(slave);
-                slave.pendingEnvironments = true;
+                let e = Environments.environment(hash);
+                if (e.canRun(slave.architecture)) {
+                    console.log("sending", hash, "to", key);
+                    Environments.environment(hash).send(slave);
+                    slave.pendingEnvironments = true;
+                }
             }
         }
     }

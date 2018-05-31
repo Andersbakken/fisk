@@ -5,9 +5,9 @@ const socket = {
     _queue: [],
     _sending: false,
 
-    enqueue(client, hash, host, file) {
+    enqueue(client, hash, system, file) {
         // console.log("queuing", file, hash);
-        socket._queue.push({ client: client, hash: hash, host: host, file: file });
+        socket._queue.push({ client: client, hash: hash, system: system, file: file });
         if (!socket._sending) {
             socket._next();
         }
@@ -26,7 +26,7 @@ const socket = {
         }).then(fd => {
             let remaining = size;
             // send file size to client
-            q.client.send({ type: "environment", bytes: remaining, hash: q.hash, host: q.host });
+            q.client.send({ type: "environment", bytes: remaining, hash: q.hash, system: q.system });
             // read file in chunks and send
             let idx = 0;
             let last = undefined;
@@ -57,44 +57,52 @@ const socket = {
 };
 
 class Environment {
-    constructor(path, hash, host) {
-        this._path = path;
-        this._hash = hash;
-        this._host = host;
+    constructor(path, hash, system) {
+        this.path = path;
+        this.hash = hash;
+        this.system = system;
         console.log("Created environment", JSON.stringify(this));
     }
 
-    get hash() {
-        return this._hash;
-    }
-
-    get host() {
-        return this._host;
-    }
 
     get file() {
-        return `${this._hash}_${this._host}.tar.gz`;
+        return `${this.hash}_${this.system}.tar.gz`;
     }
 
     send(client) {
-        socket.enqueue(client, this.hash, this.host, this._path);
+        socket.enqueue(client, this.hash, this.system, this.path);
+    }
+
+    canRun(system) {
+        switch (system) {
+        case 'Linux i686':
+        case 'Darwin i686': // ### this is not really a thing
+            return this.system == system;
+        case 'Linux x86_64':
+            return !!/^Linux /.exec(this.system);
+        case 'Darwin x86_64':
+            return !!/^Darwin /.exec(this.system);
+        default:
+            console.error("Unknown system", system);
+            return false;
+        }
     }
 }
 
 class File {
-    constructor(path, hash, host) {
+    constructor(path, hash, system) {
         this._fd = fs.openSync(path, "w");
         this._pending = [];
         this._writing = false;
 
         this.path = path;
         this.hash = hash;
-        this.host = host;
+        this.system = system;
     }
 
     save(data) {
         if (!this._fd)
-            throw new Error(`No fd for ${this._path}`);
+            throw new Error(`No fd for ${this.path}`);
         return new Promise((resolve, reject) => {
             this._pending.push({ data: data, resolve: resolve, reject: reject });
             if (!this._writing) {
@@ -106,14 +114,14 @@ class File {
 
     discard() {
         if (!this._fd)
-            throw new Error(`No fd for ${this._path}`);
+            throw new Error(`No fd for ${this.path}`);
         fs.closeSync(this._fd);
-        fs.unlinkSync(this._path);
+        fs.unlinkSync(this.path);
     }
 
     close() {
         if (!this._fd)
-            throw new Error(`No fd for ${this._path}`);
+            throw new Error(`No fd for ${this.path}`);
         fs.closeSync(this._fd);
         this._fd = undefined;
     }
@@ -188,11 +196,11 @@ const environments = {
         if (environment.hash in environments._data)
             return undefined;
         fs.mkdirpSync(environments._path);
-        return new File(path.join(environments._path, `${environment.hash}_${environment.host}.tar.gz`), environment.hash, environment.host);
+        return new File(path.join(environments._path, `${environment.hash}_${environment.system}.tar.gz`), environment.hash, environment.system);
     },
 
     complete(file) {
-        environments._data[file.hash] = new Environment(file.path, file.hash, file.host);
+        environments._data[file.hash] = new Environment(file.path, file.hash, file.system);
     },
 
     hasEnvironment(hash) {
@@ -239,8 +247,8 @@ const environments = {
                             throw new Error(`Bad env name: ${env}`);
                         }
                         const hash = match[1];
-                        const host = match[2];
-                        environments._data[hash] = new Environment(path.join(p, env), hash, host);
+                        const system = match[2];
+                        environments._data[hash] = new Environment(path.join(p, env), hash, system);
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {

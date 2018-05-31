@@ -25,22 +25,22 @@ class Client extends EventEmitter {
         console.log("connecting to", url);
 
         let remaining = 0;
-        let arch;
+        let system;
         switch (os.platform()) {
-        case 'darwin': arch = "Darwin"; break;
-        case 'linux': arch = "Linux"; break;
+        case 'darwin': system = "Darwin"; break;
+        case 'linux': system = "Linux"; break;
         default: console.error("Unknown platform", os.platform()); break;
         }
         switch (os.arch()) {
-        case 'ia32': arch += " i686"; break;
-        case 'x64': arch += " x86_64"; break;
+        case 'ia32': system += " i686"; break;
+        case 'x64': system += " x86_64"; break;
         default: console.error("Unknown architecture", os.arch()); break;
         }
         let headers = {
             "x-fisk-port": this.serverPort,
             "x-fisk-environments": environments.join(";"),
             "x-fisk-slave-name": this.name,
-            "x-fisk-architecture": arch,
+            "x-fisk-system": system,
             "x-fisk-slots": this.slots
         };
         if (this.hostname)
