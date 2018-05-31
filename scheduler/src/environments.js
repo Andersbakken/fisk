@@ -5,8 +5,9 @@ const socket = {
     _queue: [],
     _sending: false,
 
-    enqueue(client, hash, file, skip) {
-        socket._queue.push({ client: client, hash: hash, file: file, skip });
+    enqueue(client, hash, host, file) {
+        // console.log("queuing", file, hash);
+        socket._queue.push({ client: client, hash: hash, host: host, file: file });
         if (!socket._sending) {
             socket._next();
         }
@@ -16,7 +17,7 @@ const socket = {
         socket._sending = true;
         const q = socket._queue.shift();
         let size;
-        console.log("ABOUT TO SEND", q.file, "to", q.client.ip, q.client.port);
+        console.log("About to send", q.file, "to", q.client.ip, q.client.port);
         fs.stat(q.file).then(st => {
             if (!st.isFile())
                 throw new Error(`${q.file} not a file`);
@@ -24,13 +25,8 @@ const socket = {
             return fs.open(q.file, "r");
         }).then(fd => {
             let remaining = size;
-            if (q.skip) {
-                let buf = Buffer.allocUnsafe(q.skip);
-                fs.readSync(fd, buf, 0, q.skip);
-                remaining -= q.skip;
-            }
             // send file size to client
-            q.client.send({ type: "environment", bytes: remaining, hash: q.hash });
+            q.client.send({ type: "environment", bytes: remaining, hash: q.hash, host: q.host });
             // read file in chunks and send
             let idx = 0;
             let last = undefined;
@@ -61,11 +57,10 @@ const socket = {
 };
 
 class Environment {
-    constructor(path, hash, host, hostlen) {
+    constructor(path, hash, host) {
         this._path = path;
         this._hash = hash;
         this._host = host;
-        this._hostlen = hostlen;
         console.log("Created environment", JSON.stringify(this));
     }
 
@@ -78,25 +73,23 @@ class Environment {
     }
 
     get file() {
-        return this._hash + ".tar.gz";
+        return `${this._hash}_${this._host}.tar.gz`;
     }
 
     send(client) {
-        socket.enqueue(client, this.hash, this._path, this._hostlen + 4);
+        socket.enqueue(client, this.hash, this.host, this._path);
     }
 }
 
 class File {
     constructor(path, hash, host) {
         this._fd = fs.openSync(path, "w");
-        this._headerWritten = false;
         this._pending = [];
         this._writing = false;
 
         this.path = path;
         this.hash = hash;
         this.host = host;
-        this.hostlen = undefined;
     }
 
     save(data) {
@@ -127,49 +120,19 @@ class File {
 
     _write() {
         const pending = this._pending.shift();
-        this._writeHeader().then(() => {
-            fs.write(this._fd, pending.data).then(() => {
-                pending.resolve();
+        fs.write(this._fd, pending.data).then(() => {
+            pending.resolve();
 
-                if (this._pending.length > 0) {
-                    process.nextTick(() => { this._write(); });
-                } else {
-                    this._writing = false;
-                }
-            }).catch(e => {
-                fs.closeSync(this._fd);
-                this._fd = undefined;
-                pending.reject(e);
-                this._clearPending(e);
-            });
+            if (this._pending.length > 0) {
+                process.nextTick(() => { this._write(); });
+            } else {
+                this._writing = false;
+            }
         }).catch(e => {
             fs.closeSync(this._fd);
             this._fd = undefined;
             pending.reject(e);
             this._clearPending(e);
-        });
-    }
-
-    _writeHeader() {
-        return new Promise((resolve, reject) => {
-            if (this._headerWritten) {
-                resolve();
-                return;
-            }
-            this._headerWritten = true;
-
-            const buf = Buffer.from(this.host, "utf8");
-            const hdr = Buffer.alloc(4);
-
-            this.hostlen = buf.length;
-
-            hdr.writeUInt32LE(buf.length, 0);
-            // console.log("writing header", buf.length + 4);
-            fs.write(this._fd, Buffer.concat([hdr, buf], buf.length + 4)).then(() => {
-                resolve();
-            }).catch(e => {
-                reject(e);
-            });
         });
     }
 
@@ -225,14 +188,11 @@ const environments = {
         if (environment.hash in environments._data)
             return undefined;
         fs.mkdirpSync(environments._path);
-        return new File(path.join(environments._path, environment.hash + ".tar.gz"), environment.hash, environment.host);
+        return new File(path.join(environments._path, `${environment.hash}_${environment.host}.tar.gz`), environment.hash, environment.host);
     },
 
     complete(file) {
-        if (file.hostlen === undefined) {
-            throw new Error("File hostlen undefined");
-        }
-        environments._data[file.hash] = new Environment(file.path, file.hash, file.host, file.hostlen);
+        environments._data[file.hash] = new Environment(file.path, file.hash, file.host);
     },
 
     hasEnvironment(hash) {
@@ -267,17 +227,20 @@ const environments = {
                         return fs.read(fd, data.buf, 0, 1024);
                     }).then(bytes => {
                         if (bytes < 4) {
-                            throw `Read ${bytes} from ${env}`;
+                            throw new Error(`Read ${bytes} from ${env}`);
                         }
                         data.bytes = bytes;
                         const fd = data.fd;
                         data.fd = undefined;
                         return fs.close(fd);
                     }).then(() => {
-                        const hostlen = data.buf.readUInt32LE(0);
-                        const host = data.buf.toString("utf8", 4, hostlen + 4);
-                        const hash = env.substr(0, env.length - 7);
-                        environments._data[hash] = new Environment(path.join(p, env), hash, host, hostlen);
+                        let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(env);
+                        if (!match) {
+                            throw new Error(`Bad env name: ${env}`);
+                        }
+                        const hash = match[1];
+                        const host = match[2];
+                        environments._data[hash] = new Environment(path.join(p, env), hash, host);
                         process.nextTick(next);
                     }).catch(e => {
                         if (data.fd) {

@@ -13,10 +13,11 @@ const VM = require('./VM');
 
 let ports = ("" + option("ports", "")).split(',').filter(x => x).map(x => parseInt(x));
 if (ports.length) {
+    var name = option("name") || option("hostname") || os.hostname();
     var children = ports.map(port => {
         let ret = child_process.fork(__filename, [
             "--port", port,
-            "--name", option("name") + "_" + port,
+            "--name", name + "_" + port,
             "--cache-dir", path.join(common.cacheDir(), "" + port),
             "--slots", Math.round(os.cpus().length / ports.length)
         ]);
@@ -166,8 +167,8 @@ if (ports.length) {
 
         exec("tar xf '" + pendingEnvironment.file + "'", { cwd: pendingEnvironment.dir }).
             then(() => {
-                console.log("STEP 1");
-                return exec(path.join(pendingEnvironment.dir, "bin", "true"), { cwd: pendingEnvironment.dir });
+                console.log("STEP 1", path.join(pendingEnvironment.dir, "bin", "true"));
+                return exec(`"${path.join(pendingEnvironment.dir, "bin", "true")}"`, { cwd: pendingEnvironment.dir });
             }).then(() => {
                 console.log("STEP 2");
                 return fs.writeFile(path.join(pendingEnvironment.dir, "environment.json"), JSON.stringify({ hash: pendingEnvironment.hash, created: new Date().toString() }));
