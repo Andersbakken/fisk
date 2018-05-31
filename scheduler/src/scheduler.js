@@ -163,7 +163,7 @@ server.on("compile", function(compile) {
         if (found) {
             let slaveScore;
             // console.log("Got compile.slave", compile.slave, s.ip);
-            if (compile.slave == s.ip) {
+            if (compile.slave && (compile.slave == s.ip || compile.slave == s.name)) {
                 slaveScore = Infinity;
             } else {
                 slaveScore = score(s);
@@ -178,7 +178,7 @@ server.on("compile", function(compile) {
         }
     });
     if (slave) {
-        console.log("Got best", slave.ip, typeof slave.ip, bestScore, typeof bestScore, slave.lastJob, typeof slave.lastJob);
+        console.log(compile.name, "got slave", slave.name, slave.hostName || "", slave.ip, bestScore);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
