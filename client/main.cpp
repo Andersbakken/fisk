@@ -202,7 +202,7 @@ int main(int argcIn, char **argvIn)
         select.exec();
     DEBUG("Finished schedulerWebsocket");
 
-    if (data.slaveIp.empty() || !data.slavePort) {
+    if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
@@ -223,7 +223,9 @@ int main(int argcIn, char **argvIn)
     Watchdog::transition(Watchdog::AcquiredSlave);
     SlaveWebSocket slaveWebSocket;
     select.add(&slaveWebSocket);
-    if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile", data.slaveIp.c_str(), data.slavePort), headers)) {
+    if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
+                                               data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
+                                               data.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
         Watchdog::stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));

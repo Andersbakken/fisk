@@ -29,7 +29,7 @@ struct Data
     std::string hash;
     int exitCode { 0 };
 
-    std::string slaveIp;
+    std::string slaveIp, slaveHostname;
     uint16_t slavePort { 0 };
 
     std::shared_ptr<CompilerArgs> compilerArgs;

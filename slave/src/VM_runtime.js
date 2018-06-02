@@ -21,6 +21,7 @@ if (argv.user) {
 }
 
 try {
+    console.log("chrooting to", argv.root);
     posix.chroot(argv.root);
 } catch (err) {
     console.error('changing root or user failed', err);

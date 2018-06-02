@@ -527,7 +527,7 @@ std::string Client::environmentHash(const std::string &compiler)
 
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
     json11::Json::object json;
-    int fd; 
+    int fd;
     if ((fd = open(cache.c_str(), O_CLOEXEC|O_RDONLY)) != -1) {
         struct stat st;
         if (flock(fd, LOCK_SH)) {
@@ -537,7 +537,7 @@ std::string Client::environmentHash(const std::string &compiler)
             ERROR("Failed to fstat %s (%d %s)", cache.c_str(), errno, strerror(errno));
             flock(fd, LOCK_UN);
             ::close(fd);
-        } else { 
+        } else {
             const long size = st.st_size;
             if (size) {
                 std::string contents(size, ' ');
