@@ -60,7 +60,7 @@ function distribute(conf)
             let slave = slaves[key];
             if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
                 let e = Environments.environment(hash);
-                if (e.canRun(slave.architecture)) {
+                if (e.canRun(slave.system)) {
                     console.log("sending", hash, "to", key);
                     Environments.environment(hash).send(slave);
                     slave.pendingEnvironments = true;
@@ -75,7 +75,6 @@ server.express.get("/slaves", (req, res, next) => {
     for (let ip in slaves) {
         let s = slaves[ip];
         ret.push({
-            architecture: s.architecture,
             ip: s.ip,
             name: s.name,
             slots: s.slots,

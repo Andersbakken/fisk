@@ -131,6 +131,7 @@ class Server extends EventEmitter {
             const hostname = req.headers["x-fisk-slave-hostname"];
             const system = req.headers["x-fisk-system"];
             const slots = parseInt(req.headers["x-fisk-slots"]);
+            console.log(req.headers);
             let environments = {};
             req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
                 if (env)
