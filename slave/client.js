@@ -1,6 +1,8 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const os = require('os');
+const path = require('path');
+const fs = require('fs');
 
 class Client extends EventEmitter {
     constructor(option) {
@@ -11,6 +13,10 @@ class Client extends EventEmitter {
         this.hostname = option("hostname");
         this.name = option("name");
         this.slots = option.int("slots", os.cpus().length);
+        try {
+            this.version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+        } catch (err) {
+        }
         if (!this.name) {
             if (this.hostname) {
                 this.name = this.hostname;
@@ -41,7 +47,8 @@ class Client extends EventEmitter {
             "x-fisk-environments": environments.join(";"),
             "x-fisk-slave-name": this.name,
             "x-fisk-system": system,
-            "x-fisk-slots": this.slots
+            "x-fisk-slots": this.slots,
+            "x-fisk-npm-version": this.version
         };
         if (this.hostname)
             headers["x-fisk-slave-hostname"] = this.hostname;

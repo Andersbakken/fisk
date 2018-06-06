@@ -52,7 +52,7 @@ function distribute(conf)
     } else {
         hashes = Object.keys(Environments.environments);
     }
-    console.log("distribute", keys, hashes);
+    // console.log("distribute", keys, hashes);
     for (let h=0; h<hashes.length; ++h) {
         let hash = hashes[h];
         for (let i=0; i<keys.length; ++i) {
@@ -87,6 +87,8 @@ server.express.get("/slaves", (req, res, next) => {
             system: s.system,
             name: s.name,
             created: s.created,
+            load: s.load,
+            version: s.version,
             environments: Object.keys(s.environments)
         });
     }
@@ -135,13 +137,13 @@ server.on("slave", function(slave) {
 
     slave.on("jobFinished", function(job) {
         ++slave.jobsPerformed;
-        console.log("slave", slave.ip, "performed a job", job);
+        // console.log("slave", slave.ip, "performed a job", job);
     });
 });
 
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
-    console.log("request", compile.environments);
+    // console.log("request", compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
         if (Environments.hasEnvironment(compile.environments[i])) {

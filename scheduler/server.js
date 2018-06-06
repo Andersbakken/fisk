@@ -73,7 +73,7 @@ class Server extends EventEmitter {
             ip = ip.substr(7);
         }
 
-        console.log("_handleConnection", ip);
+        // console.log("_handleConnection", ip);
 
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
@@ -133,7 +133,8 @@ class Server extends EventEmitter {
             const hostname = req.headers["x-fisk-slave-hostname"];
             const system = req.headers["x-fisk-system"];
             const slots = parseInt(req.headers["x-fisk-slots"]);
-            console.log(req.headers);
+            const version = parseInt(req.headers["x-fisk-npm-version"]);
+            // console.log(req.headers);
             let environments = {};
             req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
                 if (env)
@@ -149,6 +150,7 @@ class Server extends EventEmitter {
                                   jobsScheduled: 0,
                                   lastJob: 0,
                                   load: 0,
+                                  version: version,
                                   hostname: hostname,
                                   environments: environments,
                                   system: system });

@@ -120,7 +120,7 @@ class Server extends EventEmitter {
                 break;
             case "object":
                 if (msg instanceof Buffer) {
-                    console.log("Got binary", msg.length, bytes);
+                    // console.log("Got binary", msg.length, bytes);
                     if (!msg.length) {
                         // no data?
                         error("No data in buffer");
@@ -136,7 +136,7 @@ class Server extends EventEmitter {
                         return;
                     }
                     bytes -= msg.length;
-                    console.log("Emitting", 'data', { data: msg.length, last: !bytes });
+                    // console.log("Emitting", 'data', { data: msg.length, last: !bytes });
                     client.emit('data', { data: msg, last: !bytes });
                 }
                 break;
