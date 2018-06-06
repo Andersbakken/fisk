@@ -103,9 +103,9 @@ int main(int argcIn, char **argvIn)
         return 1;
     }
     DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
-               data.argv[0], preresolved ? preresolved : "",
-               data.compiler.c_str(), data.resolvedCompiler.c_str(),
-               data.slaveCompiler.c_str());
+          data.argv[0], preresolved ? preresolved : "",
+          data.compiler.c_str(), data.resolvedCompiler.c_str(),
+          data.slaveCompiler.c_str());
 
     if (disabled) {
         DEBUG("Have to run locally because we're disabled");
@@ -124,8 +124,8 @@ int main(int argcIn, char **argvIn)
         || data.compilerArgs->flags & CompilerArgs::StdinInput
         || data.compilerArgs->sourceFileIndexes.size() != 1) {
         DEBUG("Have to run locally because mode %s - flags 0x%x - source files: %zu",
-                   CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
-                   data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
+              CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
+              data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
