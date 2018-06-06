@@ -10,6 +10,7 @@ const path = require('path');
 const os = require('os');
 const child_process = require('child_process');
 const VM = require('./VM');
+const load = require('./load');
 
 let ports = ("" + option("ports", "")).split(',').filter(x => x).map(x => parseInt(x));
 if (ports.length) {
@@ -198,7 +199,7 @@ if (ports.length) {
             clearInterval(connectInterval);
             connectInterval = undefined;
         }
-        // load.start(option("loadInterval", 1000));
+        load.start(option("loadInterval", 1000));
     });
 
     client.on("error", (err) => {
@@ -207,8 +208,8 @@ if (ports.length) {
 
     client.on("close", () => {
         console.log("client closed");
-        // if (load.running())
-        //     load.stop();
+        if (load.running())
+            load.stop();
         if (!connectInterval) {
             connectInterval = setInterval(() => {
                 console.log("Reconnecting...");
@@ -323,5 +324,12 @@ if (ports.length) {
             setTimeout(start, 1000);
         });
     }
+    load.on("data", measure => {
+        // console.log("Got load", measure);
+        try {
+            client.send("load", { measure: measure });
+        } catch (err) {
+        }
+    });
     start();
 }

@@ -128,6 +128,11 @@ server.on("slave", function(slave) {
         slave.removeAllListeners();
     });
 
+    slave.on("load", message => {
+        slave.load = message.measure;
+        // console.log(message);
+    });
+
     slave.on("jobFinished", function(job) {
         ++slave.jobsPerformed;
         console.log("slave", slave.ip, "performed a job", job);
@@ -166,7 +171,8 @@ server.on("compile", function(compile) {
     }
 
     function score(s) {
-        return Math.min(4, s.slots - s.activeClients);
+        let available = Math.min(4, s.slots - s.activeClients);
+        return available * (1 - s.load);
     }
     let file;
     let slave;

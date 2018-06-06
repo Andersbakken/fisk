@@ -46,7 +46,7 @@ function measure() {
     //Calculate the average percentage CPU usage
     const percentageCPU = 100 - ~~(100 * idleDifference / totalDifference);
 
-    return percentageCPU;
+    return percentageCPU / 100;
 };
 
 class Load extends EventEmitter {

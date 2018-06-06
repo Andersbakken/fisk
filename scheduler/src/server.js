@@ -148,6 +148,7 @@ class Server extends EventEmitter {
                                   jobsPerformed: 0,
                                   jobsScheduled: 0,
                                   lastJob: 0,
+                                  load: 0,
                                   hostname: hostname,
                                   environments: environments,
                                   system: system });
