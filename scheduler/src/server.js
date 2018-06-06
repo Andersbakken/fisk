@@ -104,7 +104,9 @@ class Server extends EventEmitter {
             const preferredSlave = req.headers["x-fisk-slave"];
             if (preferredSlave)
                 data.slave = preferredSlave;
-
+            const clientName = req.headers["x-fisk-client-name"];
+            if (clientName)
+                data.name = clientName;
             client = new Client(data);
             this.emit("compile", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));

@@ -198,7 +198,7 @@ server.on("compile", function(compile) {
         }
     });
     if (slave) {
-        console.log(compile.name, "got slave", slave.name, slave.hostName || "", slave.ip, bestScore);
+        console.log(compile.name, compile.ip, "got slave", slave.name, slave.hostName || "", slave.ip, "score", bestScore);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
