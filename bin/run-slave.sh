@@ -6,6 +6,6 @@ while true; do
     npm cache clear --force
     npm install --unsafe-perm -g @andersbakken/fisk &> /var/log/fisk-slave.log
     cd $DIR/../slave
-    node ./index.js &>> /var/log/fisk-slave.log
+    node ./fisk-slave.js &>> /var/log/fisk-slave.log
 done
 
