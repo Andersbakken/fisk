@@ -127,17 +127,21 @@ class Client extends EventEmitter {
             this.emit("error", "No connected websocket");
             return;
         }
-        if (msg === undefined) {
-            this.ws.send(JSON.stringify(type));
-        } else {
-            let tosend;
-            if (typeof msg === "object") {
-                tosend = msg;
-                tosend.type = type;
+        try {
+            if (msg === undefined) {
+                this.ws.send(JSON.stringify(type));
             } else {
-                tosend = { type: type, message: msg };
+                let tosend;
+                if (typeof msg === "object") {
+                    tosend = msg;
+                    tosend.type = type;
+                } else {
+                    tosend = { type: type, message: msg };
+                }
+                this.ws.send(JSON.stringify(tosend));
             }
-            this.ws.send(JSON.stringify(tosend));
+        } catch (err) {
+            this.emit("err", err.toString());
         }
     }
 }
