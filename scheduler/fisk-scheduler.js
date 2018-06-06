@@ -4,7 +4,7 @@ const path = require("path");
 const os = require("os");
 const option = require("@jhanssen/options")("fisk/scheduler");
 const Server = require("./server");
-const common = require('../../common')(option);
+const common = require('../common')(option);
 const Environments = require("./environments");
 const server = new Server(option);
 

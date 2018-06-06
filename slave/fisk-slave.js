@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const option = require("@jhanssen/options")("fisk/slave");
-const common = require('../../common')(option);
+const common = require('../common')(option);
 const Server = require("./server");
 const Client = require("./client");
 const Compile = require("./compile");
