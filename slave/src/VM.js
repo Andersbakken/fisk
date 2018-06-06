@@ -38,6 +38,7 @@ class VM
         this.root = root;
         this.hash = hash;
         this.compiles = {};
+        this.compileCount = 0;
 
         fs.remove(path.join(root, 'compiles'));
 
@@ -74,6 +75,8 @@ class VM
 
                 fs.remove(this.compiles[msg.id].dir);
                 delete this.compiles[msg.id];
+                if (!--this.compileCount)
+                    id = 0;
                 break;
             }
         });
@@ -90,6 +93,7 @@ class VM
     startCompile(commandLine, argv0) {
         let compile = new CompileJob(commandLine, argv0, this);
         this.compiles[compile.id] = compile;
+        ++this.compileCount;
         return compile;
     }
 };
