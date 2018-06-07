@@ -13,6 +13,8 @@ enum Stage {
     UploadedJob,
     Finished
 };
+
+extern unsigned long long timings[Finished + 1];
 inline const char *stageName(Stage stage)
 {
     switch (stage) {

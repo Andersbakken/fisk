@@ -36,6 +36,8 @@ struct Data
 };
 Data &data();
 
+extern const unsigned long long started;
+
 std::mutex &mutex();
 bool findCompiler(const char *preresolved);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
@@ -71,20 +73,18 @@ std::string realpath(const std::string &path);
 class Preprocessed
 {
 public:
-    Preprocessed()
-        : exitStatus(-1), mDone(false), mJoined(false)
-    {}
     ~Preprocessed();
     void wait();
 
     std::string stdOut, stdErr;
-    int exitStatus;
+    int exitStatus { -1 };
+    unsigned long long duration { 0 };
 private:
     std::mutex mMutex;
     std::condition_variable mCond;
     std::thread mThread;
-    bool mDone;
-    bool mJoined;
+    bool mDone { false };
+    bool mJoined { false };
     friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 };
 std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);

@@ -121,7 +121,14 @@ if (ports.length) {
     let pendingEnvironment;
     let connectInterval;
     client.on('quit', message => {
-        console.log(`Server wants us to quit: ${message.code || 0}`);
+        console.log(`Server wants us to quit: ${message.code || 0} purge environments: ${message.purgeEnvironments}`);
+        if (message.purgeEnvironments) {
+            try {
+                fs.removeSync(environmentsRoot);
+            } catch (err) {
+                console.error("Failed to remove environments", environmentsRoot);
+            }
+        }
         process.exit(message.code);
     });
 

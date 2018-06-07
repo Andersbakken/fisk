@@ -13,13 +13,19 @@ static std::thread sThread;
 static Watchdog::Stage sStage = Watchdog::Initial;
 static bool sStopped = false;
 static std::atomic<bool> sTimedOut(false);
+unsigned long long Watchdog::timings[Watchdog::Finished + 1] = {};
 
 using namespace std::chrono_literals;
 
 void Watchdog::transition(Stage stage)
 {
+    if (!Watchdog::timings[Initial]) {
+        Watchdog::timings[Initial] = Client::started;
+    }
+    assert(stage > 0);
+    Watchdog::timings[stage] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
-    DEBUG("Watchdog transition from %s to %s", stageName(sStage), stageName(stage));
+    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(sStage), stageName(stage), Watchdog::timings[stage]);
     assert(sStage != stage);
     sStage = stage;
     sCond.notify_one();

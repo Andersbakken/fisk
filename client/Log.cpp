@@ -6,7 +6,6 @@
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
-static const unsigned long long sStart = Client::mono();
 static const pid_t sPid = getpid();
 static std::mutex sMutex;
 std::string sLogFileName;
@@ -44,7 +43,6 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
     } else {
         minLogLevel = level;
     }
-
 }
 
 Log::Level Log::stringToLevel(const char *str, bool *ok)
@@ -72,7 +70,7 @@ void Log::log(Level level, const std::string &string)
 
     std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
-    const unsigned long long elapsed = Client::mono() - sStart;
+    const unsigned long long elapsed = Client::mono() - Client::started;
 #ifdef __linux__
     const char *format = "%05d %llu.%03llu: ";
 #else

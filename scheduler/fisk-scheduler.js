@@ -9,6 +9,8 @@ const Environments = require("./environments");
 const server = new Server(option);
 
 const slaves = {};
+let slaveCount = 0;
+let activeJobs = 0;
 
 function slaveKey() {
     if (arguments.length == 1) {
@@ -20,6 +22,7 @@ function slaveKey() {
 
 function insertSlave(slave) {
     slaves[slaveKey(slave)] = slave;
+    ++slaveCount;
 }
 
 function forEachSlave(cb) {
@@ -29,6 +32,7 @@ function forEachSlave(cb) {
 }
 
 function removeSlave(slave) {
+    --slaveCount;
     delete slaves[slaveKey(slave)];
 }
 
@@ -99,19 +103,20 @@ server.express.get("/quit-slaves", (req, res, next) => {
     res.sendStatus(200);
     const msg = {
         type: "quit",
-        code: req.query.code || 0
+        code: req.query.code || 0,
+        purgeEnvironments: "purgeEnvironments" in ret.query
     };
-    console.log("Sending quit message to slaves", Object.keys(slaves));
+    console.log("Sending quit message to slaves", msg, Object.keys(slaves));
     for (let ip in slaves) {
         slaves[ip].send(msg);
     }
 });
 
 server.on("slave", function(slave) {
-    console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments));
     slave.activeClients = 0;
     slave.pendingEnvironments = false;
     insertSlave(slave);
+    console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     distribute({slave: slave});
 
     slave.on('environments', function(message) {
@@ -125,8 +130,8 @@ server.on("slave", function(slave) {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
     slave.on("close", function() {
-        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostName || "");
         removeSlave(slave);
+        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostName || "", "slaveCount is", slaveCount);
         slave.removeAllListeners();
     });
 
@@ -143,6 +148,7 @@ server.on("slave", function(slave) {
 
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
+    let arrived = Date.now();
     // console.log("request", compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
@@ -206,7 +212,10 @@ server.on("compile", function(compile) {
         }
     });
     if (slave) {
-        console.log(compile.name, compile.ip, "got slave", slave.name, slave.hostName || "", slave.ip, "score", bestScore);
+        ++activeJobs;
+        let sendTime = Date.now();
+        console.log(compile.name, compile.ip, "got slave", slave.name, slave.hostName || "", slave.ip, "score",
+                    bestScore, "activeJobs is", activeJobs, "arrived", arrived, "chewing for", sendTime - arrived);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
@@ -217,6 +226,7 @@ server.on("compile", function(compile) {
     compile.on("error", msg => {
         if (slave) {
             --slave.activeClients;
+            --activeJobs;
             slave = undefined;
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
@@ -226,6 +236,7 @@ server.on("compile", function(compile) {
         compile.removeAllListeners();
         if (slave) {
             --slave.activeClients;
+            --activeJobs;
             slave = undefined;
         }
     });

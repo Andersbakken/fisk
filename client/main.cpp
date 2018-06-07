@@ -14,9 +14,22 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-
+static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
+static unsigned long long preprocessedDuration = 0;
 int main(int argcIn, char **argvIn)
 {
+    // usleep(500 * 1000);
+    // return 0;
+    std::atexit([]() {
+            if (Log::minLogLevel <= Log::Warn) {
+                std::string str = Client::format("since epoch: %llu preprocess time: %llu", milliseconds_since_epoch, preprocessedDuration);
+                for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
+                    str += Client::format(" %s: %llu (%llu)", stageName(static_cast<Watchdog::Stage>(i)), Watchdog::timings[i] - Watchdog::timings[i - 1], Watchdog::timings[i] - Client::started);
+                }
+                Log::log(Log::Warn, str);
+            }
+        });
+
     Config::init();
     std::string logLevel = Config::logLevel();
     std::string logFile = Config::logFile();
@@ -192,15 +205,17 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    Select select;
-    if (slotAcquirer)
-        select.add(slotAcquirer.get());
-    select.add(&schedulerWebsocket);
+    {
+        Select select;
+        if (slotAcquirer)
+            select.add(slotAcquirer.get());
+        select.add(&schedulerWebsocket);
 
-    DEBUG("Starting schedulerWebsocket");
-    while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
-        select.exec();
-    DEBUG("Finished schedulerWebsocket");
+        DEBUG("Starting schedulerWebsocket");
+        while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
+            select.exec();
+        DEBUG("Finished schedulerWebsocket");
+    }
 
     if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
@@ -209,19 +224,10 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    DEBUG("Waiting for preprocessed");
-    preprocessed->wait();
-    DEBUG("Preprocessed finished");
-
-    if (preprocessed->exitStatus != 0) {
-        ERROR("Failed to preprocess. Running locally");
-        Watchdog::stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
-        return 0; // unreachable
-    }
     // usleep(1000 * 1000 * 16);
     Watchdog::transition(Watchdog::AcquiredSlave);
     SlaveWebSocket slaveWebSocket;
+    Select select;
     select.add(&slaveWebSocket);
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
                                                data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
@@ -234,6 +240,18 @@ int main(int argcIn, char **argvIn)
 
     while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+
+    DEBUG("Waiting for preprocessed");
+    preprocessed->wait();
+    DEBUG("Preprocessed finished");
+    preprocessedDuration = preprocessed->duration;
+
+    if (preprocessed->exitStatus != 0) {
+        ERROR("Failed to preprocess. Running locally");
+        Watchdog::stop();
+        Client::runLocal(Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
+    }
 
     args[0] = data.slaveCompiler;
     json11::Json::object msg {
@@ -249,6 +267,8 @@ int main(int argcIn, char **argvIn)
         select.exec();
     Watchdog::transition(Watchdog::UploadedJob);
 
+    // usleep(1000 * 500);
+    // return 0;
     while (!slaveWebSocket.done)
         select.exec();
     Watchdog::transition(Watchdog::Finished);

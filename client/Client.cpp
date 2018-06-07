@@ -24,6 +24,7 @@
 #endif
 
 static Client::Data sData;
+const unsigned long long Client::started = Client::mono();
 Client::Data &Client::data()
 {
     return sData;
@@ -185,7 +186,6 @@ bool Client::findCompiler(const char *preresolved)
             ++ch;
         }
 
-        // printf("SHIT %s|%s\n", exec.c_str(), resolvedCompiler->c_str());
     }
     {
         const size_t slash = sData.resolvedCompiler.rfind('/');
@@ -320,9 +320,10 @@ bool Client::recursiveRmdir(const std::string &dir)
 
 std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
 {
+    const unsigned long long started = Client::mono();
     Preprocessed *ptr = new Preprocessed;
     std::unique_ptr<Client::Preprocessed> ret(ptr);
-    ret->mThread = std::thread([ptr, args, compiler] {
+    ret->mThread = std::thread([ptr, args, compiler, started] {
             assert(args->mode == CompilerArgs::Compile);
             std::string out, err;
             ptr->stdOut.reserve(1024 * 1024);
@@ -356,6 +357,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             ptr->exitStatus = proc.get_exit_status();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
+            ptr->duration = Client::mono() - started;
             ptr->mCond.notify_one();
         });
     return ret;
