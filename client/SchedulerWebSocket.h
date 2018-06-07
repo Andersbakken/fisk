@@ -47,7 +47,7 @@ public:
 #endif
 
                 assert(dirname.size() && dirname[dirname.size() - 1] == '/');
-                std::string command = Client::format("bash -c \"cd %s../envuploader && '%s' './envuploader.js' '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
+                std::string command = Client::format("bash -c \"cd %s../envuploader && '%s' './fisk-envuploader.js' '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
                                                      dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), system,
                                                      data.hash.c_str(), data.resolvedCompiler.c_str());
 

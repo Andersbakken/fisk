@@ -104,7 +104,7 @@ server.express.get("/quit-slaves", (req, res, next) => {
     const msg = {
         type: "quit",
         code: req.query.code || 0,
-        purgeEnvironments: "purgeEnvironments" in ret.query
+        purgeEnvironments: "purge_environments" in req.query
     };
     console.log("Sending quit message to slaves", msg, Object.keys(slaves));
     for (let ip in slaves) {
