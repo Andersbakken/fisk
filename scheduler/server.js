@@ -69,14 +69,6 @@ class Server extends EventEmitter {
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         let ip = req.connection.remoteAddress;
-        if (!ip) {
-            error("No ip for some reason");
-            return;
-        }
-        if (ip.substr(0, 7) == "::ffff:") {
-            ip = ip.substr(7);
-        }
-
         // console.log("_handleConnection", ip);
 
         const error = msg => {
@@ -91,6 +83,14 @@ class Server extends EventEmitter {
             } catch (err) {
             }
         };
+
+        if (!ip) {
+            error("No ip for some reason");
+            return;
+        }
+        if (ip.substr(0, 7) == "::ffff:") {
+            ip = ip.substr(7);
+        }
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
