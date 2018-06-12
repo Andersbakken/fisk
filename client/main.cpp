@@ -11,9 +11,10 @@
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
-#include <string.h>
+#include <cstring>
 #include <unistd.h>
-#include <signal.h>
+#include <csignal>
+
 static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 static unsigned long long preprocessedDuration = 0;
 int main(int argcIn, char **argvIn)
@@ -21,6 +22,9 @@ int main(int argcIn, char **argvIn)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
+            if (!Client::data().lockFilePath.empty()) {
+                unlink(Client::data().lockFilePath.c_str());
+            }
             if (Log::minLogLevel <= Log::Warn) {
                 std::string str = Client::format("since epoch: %llu preprocess time: %llu", milliseconds_since_epoch, preprocessedDuration);
                 for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
@@ -67,6 +71,7 @@ int main(int argcIn, char **argvIn)
     const char *slave = getenv("FISK_SLAVE");
 
     Client::Data &data = Client::data();
+    std::signal(SIGINT, [](int) { exit(1); });
     data.argv = new char *[argcIn + 1];
     for (int i=0; i<argcIn; ++i) {
         if (!strncmp("--fisk-log-level=", argvIn[i], 17)
@@ -190,6 +195,7 @@ int main(int argcIn, char **argvIn)
     DEBUG("Got hashes %s for %s", hashes.c_str(), data.resolvedCompiler.c_str());
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = hashes;
+    Client::parsePath(data.compilerArgs->sourceFile(0), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name();
     if (slave)
         headers["x-fisk-slave"] = slave;

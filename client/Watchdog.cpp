@@ -25,7 +25,7 @@ void Watchdog::transition(Stage stage)
     assert(stage > 0);
     Watchdog::timings[stage] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
-    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(sStage), stageName(stage), Watchdog::timings[stage]);
+    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(sStage), stageName(stage), Watchdog::timings[stage] - Watchdog::timings[stage - 1]);
     assert(sStage != stage);
     sStage = stage;
     sCond.notify_one();

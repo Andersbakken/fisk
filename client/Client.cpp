@@ -237,6 +237,7 @@ Client::Slot::~Slot()
 {
     if (mFD != -1) {
         DEBUG("Dropping lock on %s for %s", mPath.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+        sData.lockFilePath.clear();
         flock(mFD, LOCK_UN);
         unlink(mPath.c_str());
     }
@@ -407,6 +408,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
                 continue;
             }
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
+                sData.lockFilePath = path;
                 DEBUG("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
                 return std::make_unique<Slot>(fd, std::move(path));
             }

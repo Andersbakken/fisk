@@ -43,7 +43,8 @@ function findSlave(ip, port) {
 function distribute(conf)
 {
     let keys;
-    if (conf && conf.slave) {
+    if (conf
+        && conf.slave) {
         if (conf.pendingEnvironments)
             return;
         keys = [ slaveKey(conf.slave) ];
@@ -65,7 +66,7 @@ function distribute(conf)
             if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
                 let e = Environments.environment(hash);
                 if (e.canRun(slave.system)) {
-                    console.log("sending", hash, "to", key);
+                    // console.log("sending", hash, "to", key);
                     Environments.environment(hash).send(slave);
                     slave.pendingEnvironments = true;
                 }
@@ -73,6 +74,10 @@ function distribute(conf)
         }
     }
 }
+
+server.express.get("/environments", (req, res, next) => {
+    res.send(Object.keys(Environments.environments));
+});
 
 server.express.get("/slaves", (req, res, next) => {
     let ret = [];
@@ -214,8 +219,7 @@ server.on("compile", function(compile) {
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
-        console.log(compile.name, compile.ip, "got slave", slave.name, slave.hostName || "", slave.ip, "score",
-                    bestScore, "activeJobs is", activeJobs, "arrived", arrived, "chewing for", sendTime - arrived);
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} achive jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();

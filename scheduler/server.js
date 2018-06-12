@@ -60,7 +60,7 @@ class Server extends EventEmitter {
         const port = this.option.int("port", 8097);
         this.server.listen(port, this.option.int("backlog", 50));
         console.log("listening on", port);
-        this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
+        this.ws.on("connection", this._handleConnection.bind(this));
     }
 
     get express() { return this.app; }
@@ -69,6 +69,10 @@ class Server extends EventEmitter {
         let client = undefined;
         let remaining = { bytes: undefined, type: undefined };
         let ip = req.connection.remoteAddress;
+        if (!ip) {
+            error("No ip for some reason");
+            return;
+        }
         if (ip.substr(0, 7) == "::ffff:") {
             ip = ip.substr(7);
         }
@@ -76,12 +80,15 @@ class Server extends EventEmitter {
         // console.log("_handleConnection", ip);
 
         const error = msg => {
+            try {
             ws.send(`{"error": "${msg}"}`);
             ws.close();
             if (client) {
                 client.emit("error", msg);
             } else {
                 this.emit("error", { ip: ip, message: msg });
+            }
+            } catch (err) {
             }
         };
 
@@ -99,7 +106,8 @@ class Server extends EventEmitter {
                 ws: ws,
                 ip: ip,
                 type: Client.Type.Compile,
-                environments: compileEnvironments
+                environments: compileEnvironments,
+                sourceFile: req.headers["x-fisk-sourcefile"]
             };
             const preferredSlave = req.headers["x-fisk-slave"];
             if (preferredSlave)

@@ -2,22 +2,27 @@ const fs = require("fs-extra");
 const path = require("path");
 
 const socket = {
-    _queue: [],
-    _sending: false,
+    _queue: new Map(),
 
     enqueue(client, hash, system, file) {
-        // console.log("queuing", file, hash);
-        socket._queue.push({ client: client, hash: hash, system: system, file: file });
-        if (!socket._sending) {
-            socket._next();
+        // console.log("queuing", file, hash, "for", client.ip);
+        var key = client.ip + " " + client.port;
+        if (!socket._queue[key])
+            socket._queue[key] = { client: client, sending: false, messages: [] };
+
+        socket._queue[key].messages.push({ hash: hash, system: system, file: file });
+        if (!socket._queue[key].sending) {
+            socket._next(key);
         }
     },
 
-    _next() {
-        socket._sending = true;
-        const q = socket._queue.shift();
+    _next(key) {
+        let data = socket._queue[key];
+        data.sending = true;
+        let client = data.client;
+        const q = data.messages.shift();
         let size;
-        console.log("About to send", q.file, "to", q.client.ip, q.client.port);
+        // console.log("About to send", q.file, "to", client.ip, ":", client.port);
         fs.stat(q.file).then(st => {
             if (!st.isFile())
                 throw new Error(`${q.file} not a file`);
@@ -26,15 +31,19 @@ const socket = {
         }).then(fd => {
             let remaining = size;
             // send file size to client
-            q.client.send({ type: "environment", bytes: remaining, hash: q.hash, system: q.system });
+            client.send({ type: "environment", bytes: remaining, hash: q.hash, system: q.system });
             // read file in chunks and send
             let idx = 0;
             let last = undefined;
             const readNext = () => {
                 if (!remaining) {
-                    socket._sending = false;
-                    if (socket._queue.length)
-                        process.nextTick(socket._next);
+                    data.sending = false;
+                    // console.log("Finished sending env", q.file, data.messages.length, client.ip);
+                    if (data.messages.length) {
+                        process.nextTick(socket._next, key);
+                    } else {
+                        delete socket._queue[key];
+                    }
                     return;
                 }
                 const bytes = Math.min(32768, remaining);
@@ -42,7 +51,7 @@ const socket = {
 
                 remaining -= bytes;
                 fs.read(fd, buf, 0, bytes).then(() => {
-                    q.client.send(buf);
+                    client.send(buf);
                     readNext();
                 }).catch(e => {
                     throw e;
@@ -50,7 +59,7 @@ const socket = {
             };
             readNext();
         }).catch(e => {
-            socket._sending = false;
+            data.sending = false;
             console.error("Got error when sending", e.message, e.stack);
         });
     }

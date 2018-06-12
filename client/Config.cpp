@@ -288,6 +288,6 @@ std::string Config::logLevel()
 #ifdef NDEBUG
     return "silent";
 #else
-    return "warn";
+    return "error";
 #endif
 }

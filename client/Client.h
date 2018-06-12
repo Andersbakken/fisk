@@ -27,6 +27,7 @@ struct Data
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave
     std::string hash;
+    std::string lockFilePath;
     int exitCode { 0 };
 
     std::string slaveIp, slaveHostname;
