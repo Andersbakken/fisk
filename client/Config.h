@@ -19,6 +19,7 @@ unsigned long long responseTimeout();
 std::string clientName();
 std::string cacheDir();
 std::pair<size_t, size_t> localSlots(std::string *dir = 0);
+size_t cppSlots(std::string *dir = 0);
 std::string envCache();
 bool watchdog();
 std::string nodePath();

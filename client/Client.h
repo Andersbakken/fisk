@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <memory>
+#include <set>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
@@ -27,7 +28,7 @@ struct Data
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave
     std::string hash;
-    std::string lockFilePath;
+    std::set<std::string> lockFilePaths;
     int exitCode { 0 };
 
     std::string slaveIp, slaveHostname;
@@ -64,6 +65,7 @@ enum AcquireSlotMode {
     Wait
 };
 std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
+std::unique_ptr<Slot> acquireCppSlot(AcquireSlotMode mode);
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
 bool setFlag(int fd, int flag);

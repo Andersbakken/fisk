@@ -231,13 +231,15 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
 Client::Slot::Slot(int fd, std::string &&path)
     : mFD(fd), mPath(std::move(path))
 {
+    if (!mPath.empty())
+        sData.lockFilePaths.insert(path);
 }
 
 Client::Slot::~Slot()
 {
     if (mFD != -1) {
         DEBUG("Dropping lock on %s for %s", mPath.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-        sData.lockFilePath.clear();
+        sData.lockFilePaths.erase(mPath);
         flock(mFD, LOCK_UN);
         unlink(mPath.c_str());
     }
@@ -331,6 +333,25 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             std::string commandLine = compiler;
             const size_t count = args->commandLine.size();
             auto append = [&commandLine](const std::string &arg) {
+                // std::string copy;
+                // size_t slashes = 0;
+                // for (size_t i=0; i<arg.size(); ++i) {
+                //     const char ch = arg.at(i);
+                //     if (ch == '\\') {
+                //         ++slashes;
+                //         continue;
+                //     }
+                //     if (ch == '\'') {
+                //         if (slashes % 2 == 0) {
+                //             if (copy.empty()) {
+                //                 copy.assign(arg.c_str(), i);
+                //             } else {
+
+                //             }
+                //         }
+                //     }
+                //     slashes = 0;
+                // }
                 const size_t idx = arg.find('\'');
                 if (idx != std::string::npos) {
                     // ### gotta escape quotes
@@ -349,12 +370,14 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             }
             commandLine += " '-E'";
             DEBUG("Running preprocess: %s", commandLine.c_str());
+            std::shared_ptr<Client::Slot> slot = Client::acquireCppSlot(Client::Wait);
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {
                                              ptr->stdOut.append(bytes, n);
                                          }, [ptr](const char *bytes, size_t n) {
                                              ptr->stdErr.append(bytes, n);
                                          });
+            slot.reset();
             ptr->exitStatus = proc.get_exit_status();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
@@ -408,8 +431,56 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
                 continue;
             }
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                sData.lockFilePath = path;
+                sData.lockFilePaths.insert(path);
                 DEBUG("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+                return std::make_unique<Slot>(fd, std::move(path));
+            }
+            ::close(fd);
+        }
+        return std::unique_ptr<Slot>();
+    };
+    std::unique_ptr<Slot> slot = check();
+    if (slot || mode == Try) {
+        return slot;
+    }
+
+    SlotAcquirer slotAcquirer(dir, [&slot, &check]() -> void {
+            slot = check();
+        });
+    Select select;
+    select.add(&slotAcquirer);
+    do {
+        select.exec();
+    } while (!slot);
+
+    return slot;
+}
+
+std::unique_ptr<Client::Slot> Client::acquireCppSlot(Client::AcquireSlotMode mode)
+{
+    std::string dir;
+    const size_t slots = Config::cppSlots(&dir);
+    if (dir.empty() || !slots) {
+        return std::make_unique<Slot>(-1, std::string());
+    }
+
+    if (!recursiveMkdir(dir)) {
+        return std::make_unique<Slot>(-1, std::string());
+    }
+
+    if (dir.at(dir.size() - 1) != '/')
+        dir += '/';
+
+    auto check = [&dir, slots]() -> std::unique_ptr<Client::Slot> {
+        for (size_t i=0; i<slots; ++i) {
+            std::string path = dir + std::to_string(i) + ".lock";
+            int fd = open(path.c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+            if (fd == -1) {
+                ERROR("cpp: Failed to open file %s %d %s", path.c_str(), errno, strerror(errno));
+                continue;
+            }
+            if (!flock(fd, LOCK_EX|LOCK_NB)) {
+                DEBUG("cpp: Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
                 return std::make_unique<Slot>(fd, std::move(path));
             }
             ::close(fd);

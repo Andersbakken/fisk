@@ -22,8 +22,8 @@ int main(int argcIn, char **argvIn)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
-            if (!Client::data().lockFilePath.empty()) {
-                unlink(Client::data().lockFilePath.c_str());
+            for (const std::string &path : Client::data().lockFilePaths) {
+                unlink(path.c_str());
             }
             if (Log::minLogLevel <= Log::Warn) {
                 std::string str = Client::format("since epoch: %llu preprocess time: %llu", milliseconds_since_epoch, preprocessedDuration);

@@ -197,6 +197,19 @@ std::pair<size_t, size_t> Config::localSlots(std::string *dir)
     return ret;
 }
 
+size_t Config::cppSlots(std::string *dir)
+{
+    if (dir) {
+        *dir = cacheDir() + "cpp-slots";
+    }
+    {
+        json11::Json val = value("cpp-slots");
+        if (val.is_number())
+            return val.int_value();
+    }
+    return std::thread::hardware_concurrency() * 2;
+}
+
 std::string Config::envCache()
 {
     std::string ret = cacheDir();
