@@ -147,7 +147,7 @@ server.on("slave", function(slave) {
 
     slave.on("jobFinished", function(job) {
         ++slave.jobsPerformed;
-        // console.log("slave", slave.ip, "performed a job", job);
+        console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
     });
 });
 

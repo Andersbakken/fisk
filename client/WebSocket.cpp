@@ -185,6 +185,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
                        inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
                        mPort, errno, strerror(errno));
             mFD = -1;
+            mState = Error;
+            break;
         } else {
             mState = ConnectingTCP;
             break; // async connect
