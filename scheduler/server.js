@@ -74,13 +74,13 @@ class Server extends EventEmitter {
 
         const error = msg => {
             try {
-            ws.send(`{"error": "${msg}"}`);
-            ws.close();
-            if (client) {
-                client.emit("error", msg);
-            } else {
-                this.emit("error", { ip: ip, message: msg });
-            }
+                ws.send(`{"error": "${msg}"}`);
+                ws.close();
+                if (client) {
+                    client.emit("error", msg);
+                } else {
+                    this.emit("error", { ip: ip, message: msg });
+                }
             } catch (err) {
             }
         };
