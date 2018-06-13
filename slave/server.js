@@ -11,6 +11,7 @@ class Job extends EventEmitter {
         this.hash = hash;
         this.clientName = clientName;
         this.sourceFile = sourceFile;
+        // setTimeout(() => { console.log("closing him"); ws.close(); }, 200);
     }
 
     send(type, msg) {

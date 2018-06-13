@@ -371,6 +371,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             commandLine += " '-E'";
             DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
             std::shared_ptr<Client::Slot> slot = Client::acquireCppSlot(Client::Wait);
+            ptr->slotDuration = Client::mono() - started;
             DEBUG("Running preprocess: %s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {

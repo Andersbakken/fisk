@@ -292,6 +292,7 @@ if (ports.length) {
                         cppSize: event.cppSize,
                         compileDuration: event.compileDuration,
                         compileSpeed: (event.cppSize / event.compileDuration),
+                        uploadDuration: uploadDuration,
                         uploadSpeed: (event.cppSize / uploadDuration)
                     });
                     startPending();

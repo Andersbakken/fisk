@@ -381,12 +381,14 @@ void WebSocket::onRead()
         while (true) {
             const size_t last = mRecvBuffer.size();
             wslay_event_recv(mContext);
+#warning should handle error
             if (mRecvBuffer.empty() || last == mRecvBuffer.size())
                 break;
         }
 
         if (sendBufferWasEmpty && !mSendBuffer.empty())
             send();
+        wslay_event_send(mContext);
     }
 }
 

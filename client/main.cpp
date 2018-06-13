@@ -17,6 +17,7 @@
 
 static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 static unsigned long long preprocessedDuration = 0;
+static unsigned long long preprocessedSlotDuration = 0;
 int main(int argcIn, char **argvIn)
 {
     // usleep(500 * 1000);
@@ -26,7 +27,8 @@ int main(int argcIn, char **argvIn)
                 unlink(path.c_str());
             }
             if (Log::minLogLevel <= Log::Warn) {
-                std::string str = Client::format("since epoch: %llu preprocess time: %llu", milliseconds_since_epoch, preprocessedDuration);
+                std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
+                                                 milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
                 for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
                     str += Client::format(" %s: %llu (%llu)", stageName(static_cast<Watchdog::Stage>(i)), Watchdog::timings[i] - Watchdog::timings[i - 1], Watchdog::timings[i] - Client::started);
                 }
@@ -251,6 +253,7 @@ int main(int argcIn, char **argvIn)
     preprocessed->wait();
     DEBUG("Preprocessed finished");
     preprocessedDuration = preprocessed->duration;
+    preprocessedSlotDuration = preprocessed->slotDuration;
 
     if (preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
@@ -271,14 +274,27 @@ int main(int argcIn, char **argvIn)
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+    if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+        DEBUG("Have to run locally because something went wrong with the slave");
+        Watchdog::stop();
+        Client::runLocal(Client::acquireSlot(Client::Wait));
+        return 0; // unreachable
+    }
     Watchdog::transition(Watchdog::UploadedJob);
 
     // usleep(1000 * 500);
     // return 0;
-    while (!slaveWebSocket.done)
+    while (!slaveWebSocket.done && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
-    Watchdog::transition(Watchdog::Finished);
+    if (slaveWebSocket.done) {
+        Watchdog::transition(Watchdog::Finished);
+        Watchdog::stop();
+        schedulerWebsocket.close("slaved");
+        return data.exitCode;
+    }
+
+    DEBUG("Have to run locally because something went wrong with the slave, part deux");
     Watchdog::stop();
-    schedulerWebsocket.close("slaved");
-    return data.exitCode;
+    Client::runLocal(Client::acquireSlot(Client::Wait));
+    return 0; // unreachable
 }
