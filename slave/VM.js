@@ -16,11 +16,16 @@ class CompileJob extends EventEmitter
         this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
         this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
+        this.cppSize = 0;
+        this.startCompile = undefined;
     }
+
 
     feed(data, last) {
         fs.writeSync(this.fd, data);
+        this.cppSize += data.length;
         if (last) {
+            this.startCompile = Date.now();
             fs.close(this.fd);
             this.fd = undefined;
             this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir});
@@ -63,7 +68,10 @@ class VM
                 that = this.compiles[msg.id];
                 if (!that)
                     return;
+                const now = Date.now();
                 that.emit('finished', {
+                    cppSize: that.cppSize,
+                    compileDuration: (now - that.startCompile),
                     exitCode: msg.exitCode,
                     sourceFile: msg.sourceFile,
                     files: msg.files.map(file => {

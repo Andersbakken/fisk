@@ -4,12 +4,13 @@ const WebSocket = require("ws");
 const Url = require("url");
 
 class Job extends EventEmitter {
-    constructor(ws, ip, hash, clientName) {
+    constructor(ws, ip, hash, clientName, sourceFile) {
         super();
         this.ws = ws;
         this.ip = ip;
         this.hash = hash;
         this.clientName = clientName;
+        this.sourceFile = sourceFile;
     }
 
     send(type, msg) {
@@ -56,6 +57,7 @@ class Server extends EventEmitter {
     }
 
     _handleConnection(ws, req) {
+        const connectTime = Date.now();
         let client = undefined;
         let bytes = undefined;
         let ip = req.connection.remoteAddress;
@@ -87,7 +89,7 @@ class Server extends EventEmitter {
                 return;
             }
             const name = req.headers["x-fisk-client-name"];
-            client = new Job(ws, ip, hash, name);
+            client = new Job(ws, ip, hash, name, req.headers["x-fisk-sourcefile"]);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
@@ -97,7 +99,7 @@ class Server extends EventEmitter {
         ws.on("message", msg => {
             switch (typeof msg) {
             case "string":
-                console.log("Got message", msg);
+                // console.log("Got message", msg);
                 if (bytes) {
                     // bad, client have to send all the data in a binary message before sending JSON
                     error(`Got JSON message while ${bytes} bytes remained of a binary message`);
@@ -116,7 +118,8 @@ class Server extends EventEmitter {
                 bytes = json.bytes;
                 client.commandLine = json.commandLine;
                 client.argv0 = json.argv0;
-                this.emit('job', client);
+                client.connectTime = connectTime;
+                this.emit("job", client);
                 break;
             case "object":
                 if (msg instanceof Buffer) {
@@ -136,8 +139,8 @@ class Server extends EventEmitter {
                         return;
                     }
                     bytes -= msg.length;
-                    // console.log("Emitting", 'data', { data: msg.length, last: !bytes });
-                    client.emit('data', { data: msg, last: !bytes });
+                    // console.log("Emitting", "data", { data: msg.length, last: !bytes });
+                    client.emit("data", { data: msg, last: !bytes });
                 }
                 break;
             }
@@ -150,10 +153,10 @@ class Server extends EventEmitter {
                 client.emit("close");
             ws.removeAllListeners();
         });
-        ws.on('error', (error) => {
+        ws.on("error", (error) => {
             // console.log("GOT WS ERROR");
             if (client)
-                client.emit('error', error);
+                client.emit("error", error);
         });
     }
 }

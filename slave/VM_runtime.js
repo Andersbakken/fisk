@@ -48,7 +48,7 @@ process.on('message', (msg) => {
             c.kill();
         break;
     case 'compile':
-        console.log("GOT COMPILE", msg);
+        // console.log("compiling for );
         let compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
         compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
         compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));

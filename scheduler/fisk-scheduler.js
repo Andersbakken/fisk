@@ -9,6 +9,7 @@ const Environments = require("./environments");
 const server = new Server(option);
 
 const slaves = {};
+const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
 
@@ -92,6 +93,7 @@ server.express.get("/slaves", (req, res, next) => {
             jobsScheduled: s.jobsScheduled,
             lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
             jobsPerformed: s.jobsPerformed,
+            compileSpeed: s.jobsPerformed / s.totalCompileSpeed,
             hostname: s.hostname,
             system: s.system,
             name: s.name,
@@ -147,7 +149,10 @@ server.on("slave", function(slave) {
 
     slave.on("jobFinished", function(job) {
         ++slave.jobsPerformed;
-        // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
+        slave.totalCompileSpeed += job.compileSpeed;
+        console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
+        job.type = "jobPerformed";
+        monitors.forEach(monitor => monitor.send(job));
     });
 });
 
@@ -219,7 +224,7 @@ server.on("compile", function(compile) {
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} achive jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
+        // console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
@@ -300,6 +305,20 @@ server.on("uploadEnvironment", upload => {
             file = undefined;
         }
     });
+});
+
+server.on("monitor", client => {
+    monitors.push(client);
+    function remove()
+    {
+        var idx = monitors.indexOf(client);
+        if (idx != -1) {
+            monitors.splice(idx, 1);
+        }
+        client.removeAllListeners();
+    }
+    client.on("close", remove);
+    client.on("error", remove);
 });
 
 server.on("error", err => {

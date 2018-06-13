@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
 const option = require("@jhanssen/options")("fisk/slave");
-const common = require('../common')(option);
+const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
 const Compile = require("./compile");
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const child_process = require('child_process');
-const VM = require('./VM');
-const load = require('./load');
+const fs = require("fs-extra");
+const path = require("path");
+const os = require("os");
+const child_process = require("child_process");
+const VM = require("./VM");
+const load = require("./load");
 
-let ports = ("" + option("ports", "")).split(',').filter(x => x).map(x => parseInt(x));
+let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
 if (ports.length) {
     var name = option("name") || option("hostname") || os.hostname();
     var children = ports.map(port => {
@@ -22,8 +22,8 @@ if (ports.length) {
             "--cache-dir", path.join(common.cacheDir(), "" + port),
             "--slots", Math.round(os.cpus().length / ports.length)
         ]);
-        // ret.stdout.on('data', output => console.log(port, output));
-        // ret.stderr.on('data', output => console.error(port, output));
+        // ret.stdout.on("data", output => console.log(port, output));
+        // ret.stderr.on("data", output => console.error(port, output));
         return ret;
     });
 } else {
@@ -62,11 +62,11 @@ if (ports.length) {
                     if (err.code == "ENOENT") {
                         fs.mkdirp(environmentsRoot).then(() => {
                             // let user = option("fisk-user");
-                            // let split = environmentsRoot.split('/');
+                            // let split = environmentsRoot.split("/");
                             // if (!user) {
-                            //     if (split[0] == 'home' || split[0] == 'Users') {
+                            //     if (split[0] == "home" || split[0] == "Users") {
                             //         user = split[1];
-                            //     } else if (split[0] == 'usr' && split[1] == 'home') {
+                            //     } else if (split[0] == "usr" && split[1] == "home") {
                             //         user = split[2];
                             //     }
                             // }
@@ -120,7 +120,7 @@ if (ports.length) {
 
     let pendingEnvironment;
     let connectInterval;
-    client.on('quit', message => {
+    client.on("quit", message => {
         console.log(`Server wants us to quit: ${message.code || 0} purge environments: ${message.purgeEnvironments}`);
         if (message.purgeEnvironments) {
             try {
@@ -248,6 +248,7 @@ if (ports.length) {
             console.error("No vm for this hash", job.hash);
             return;
         }
+        const jobStartTime = Date.now();
 
         var j = {
             job: job,
@@ -255,15 +256,15 @@ if (ports.length) {
             done: false,
             start: function() {
                 let job = this.job;
-                console.log("starting job", job.argv0, Object.keys(job));
+                console.log("starting job", job.sourceFile, job.ip, job.clientName);
                 let op = vm.startCompile(job.commandLine, job.argv0);
                 this.op = op;
-                op.on('stdout', data => job.send({ type: 'stdout', data: data }));
-                op.on('stderr', data => job.send({ type: 'stderr', data: data }));
-                op.on('finished', event => {
+                op.on("stdout", data => job.send({ type: "stdout", data: data }));
+                op.on("stderr", data => job.send({ type: "stderr", data: data }));
+                op.on("finished", event => {
                     this.done = true;
                     let idx = jobQueue.indexOf(j);
-                    console.log("Job finished", idx, jobQueue.length, client.slots);
+                    console.log("Job finished", job.sourceFile, job.ip, job.clientName);
                     if (idx != -1) {
                         jobQueue.splice(idx, 1);
                     } else {
@@ -274,16 +275,23 @@ if (ports.length) {
                     // this can't be async, the directory is removed after the event is fired
                     let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
                     job.send({
-                        type: 'response',
+                        type: "response",
                         index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
-                        exitCode: event.exitCode,
+                        exitCode: event.exitCode
                     });
 
                     for (let i=0; i<contents.length; ++i) {
                         job.send(contents[i].contents);
                     }
                     // job.close();
-                    client.send("jobFinished", { client: { ip: job.ip, name: job.clientName }, sourceFile: event.sourceFile });
+                    const end = Date.now();
+                    client.send("jobFinished", {
+                        client: { ip: job.ip, name: job.clientName },
+                        sourceFile: event.sourceFile,
+                        cppSize: event.cppSize,
+                        compileDuration: event.compileDuration,
+                        compileSpeed: (event.cppSize / event.compileDuration)
+                    });
                     startPending();
                 });
                 job.on("data", data => op.feed(data.data, data.last));
@@ -309,7 +317,7 @@ if (ports.length) {
 
         jobQueue.push(j);
         if (jobQueue.length <= client.slots) {
-            console.log("starting j");
+            // console.log("starting j");
             j.start();
         } else {
             console.log("j is backlogged", jobQueue.length, client.slots);

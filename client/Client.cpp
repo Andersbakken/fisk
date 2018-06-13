@@ -369,16 +369,17 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 commandLine += '\'';
             }
             commandLine += " '-E'";
-            DEBUG("Running preprocess: %s", commandLine.c_str());
+            DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
             std::shared_ptr<Client::Slot> slot = Client::acquireCppSlot(Client::Wait);
+            DEBUG("Running preprocess: %s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {
                                              ptr->stdOut.append(bytes, n);
                                          }, [ptr](const char *bytes, size_t n) {
                                              ptr->stdErr.append(bytes, n);
                                          });
-            slot.reset();
             ptr->exitStatus = proc.get_exit_status();
+            slot.reset();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
             ptr->duration = Client::mono() - started;
@@ -406,17 +407,14 @@ void Client::Preprocessed::wait()
     mThread.join();
 }
 
-std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
+static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots, Client::AcquireSlotMode mode)
 {
-    std::string dir;
-    const std::pair<size_t, size_t> s = Config::localSlots(&dir);
-    const size_t slots = mode == Try ? s.first : s.second;
     if (dir.empty() || !slots) {
-        return std::make_unique<Slot>(-1, std::string());
+        return std::make_unique<Client::Slot>(-1, std::string());
     }
 
-    if (!recursiveMkdir(dir)) {
-        return std::make_unique<Slot>(-1, std::string());
+    if (!Client::recursiveMkdir(dir)) {
+        return std::make_unique<Client::Slot>(-1, std::string());
     }
 
     if (dir.at(dir.size() - 1) != '/')
@@ -433,14 +431,14 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
             if (!flock(fd, LOCK_EX|LOCK_NB)) {
                 sData.lockFilePaths.insert(path);
                 DEBUG("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                return std::make_unique<Slot>(fd, std::move(path));
+                return std::make_unique<Client::Slot>(fd, std::move(path));
             }
             ::close(fd);
         }
-        return std::unique_ptr<Slot>();
+        return std::unique_ptr<Client::Slot>();
     };
-    std::unique_ptr<Slot> slot = check();
-    if (slot || mode == Try) {
+    std::unique_ptr<Client::Slot> slot = check();
+    if (slot || mode == Client::Try) {
         return slot;
     }
 
@@ -456,52 +454,20 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
     return slot;
 }
 
+
+std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
+{
+    std::string dir;
+    const std::pair<size_t, size_t> s = Config::localSlots(&dir);
+    const size_t slots = mode == Try ? s.first : s.second;
+    return ::acquireSlot(std::move(dir), slots, mode);
+}
+
 std::unique_ptr<Client::Slot> Client::acquireCppSlot(Client::AcquireSlotMode mode)
 {
     std::string dir;
     const size_t slots = Config::cppSlots(&dir);
-    if (dir.empty() || !slots) {
-        return std::make_unique<Slot>(-1, std::string());
-    }
-
-    if (!recursiveMkdir(dir)) {
-        return std::make_unique<Slot>(-1, std::string());
-    }
-
-    if (dir.at(dir.size() - 1) != '/')
-        dir += '/';
-
-    auto check = [&dir, slots]() -> std::unique_ptr<Client::Slot> {
-        for (size_t i=0; i<slots; ++i) {
-            std::string path = dir + std::to_string(i) + ".lock";
-            int fd = open(path.c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-            if (fd == -1) {
-                ERROR("cpp: Failed to open file %s %d %s", path.c_str(), errno, strerror(errno));
-                continue;
-            }
-            if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                DEBUG("cpp: Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                return std::make_unique<Slot>(fd, std::move(path));
-            }
-            ::close(fd);
-        }
-        return std::unique_ptr<Slot>();
-    };
-    std::unique_ptr<Slot> slot = check();
-    if (slot || mode == Try) {
-        return slot;
-    }
-
-    SlotAcquirer slotAcquirer(dir, [&slot, &check]() -> void {
-            slot = check();
-        });
-    Select select;
-    select.add(&slotAcquirer);
-    do {
-        select.exec();
-    } while (!slot);
-
-    return slot;
+    return ::acquireSlot(std::move(dir), slots, mode);
 }
 
 void Client::runLocal(std::unique_ptr<Slot> &&slot)

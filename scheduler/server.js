@@ -43,7 +43,8 @@ class Client extends EventEmitter {
 Client.Type = {
     Slave: 0,
     Compile: 1,
-    UploadEnvironment: 2
+    UploadEnvironment: 2,
+    Monitor: 3
 };
 
 class Server extends EventEmitter {
@@ -156,6 +157,7 @@ class Server extends EventEmitter {
                                   slots: slots,
                                   jobsPerformed: 0,
                                   jobsScheduled: 0,
+                                  totalCompileSpeed: 0,
                                   lastJob: 0,
                                   load: 0,
                                   version: version,
@@ -243,7 +245,12 @@ class Server extends EventEmitter {
                     break;
                 }
             });
-
+            break;
+        case "/monitor":
+            client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
+            this.emit("monitor", client);
+            ws.on('close', (status, reason) => client.emit('close', status, reason));
+            ws.on('error', err => client.emit('error', err));
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
