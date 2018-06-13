@@ -94,6 +94,7 @@ server.express.get("/slaves", (req, res, next) => {
             lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
             jobsPerformed: s.jobsPerformed,
             compileSpeed: s.jobsPerformed / s.totalCompileSpeed,
+            uploadSpeed: s.jobsPerformed / s.totalUploadSpeed,
             hostname: s.hostname,
             system: s.system,
             name: s.name,
@@ -150,6 +151,7 @@ server.on("slave", function(slave) {
     slave.on("jobFinished", function(job) {
         ++slave.jobsPerformed;
         slave.totalCompileSpeed += job.compileSpeed;
+        slave.totalUploadSpeed += job.uploadSpeed;
         console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
         job.type = "jobPerformed";
         monitors.forEach(monitor => monitor.send(job));

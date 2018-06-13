@@ -158,6 +158,7 @@ class Server extends EventEmitter {
                                   jobsPerformed: 0,
                                   jobsScheduled: 0,
                                   totalCompileSpeed: 0,
+                                  totalUploadSpeed: 0,
                                   lastJob: 0,
                                   load: 0,
                                   version: version,

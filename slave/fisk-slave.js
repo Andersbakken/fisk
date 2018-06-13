@@ -249,6 +249,7 @@ if (ports.length) {
             return;
         }
         const jobStartTime = Date.now();
+        let uploadDuration;
 
         var j = {
             job: job,
@@ -256,7 +257,7 @@ if (ports.length) {
             done: false,
             start: function() {
                 let job = this.job;
-                console.log("starting job", job.sourceFile, job.ip, job.clientName);
+                console.log("Starting job", job.sourceFile, "for", job.ip, job.clientName);
                 let op = vm.startCompile(job.commandLine, job.argv0);
                 this.op = op;
                 op.on("stdout", data => job.send({ type: "stdout", data: data }));
@@ -264,7 +265,7 @@ if (ports.length) {
                 op.on("finished", event => {
                     this.done = true;
                     let idx = jobQueue.indexOf(j);
-                    console.log("Job finished", job.sourceFile, job.ip, job.clientName);
+                    console.log("Job finished", job.sourceFile, "for", job.ip, job.clientName);
                     if (idx != -1) {
                         jobQueue.splice(idx, 1);
                     } else {
@@ -290,11 +291,16 @@ if (ports.length) {
                         sourceFile: event.sourceFile,
                         cppSize: event.cppSize,
                         compileDuration: event.compileDuration,
-                        compileSpeed: (event.cppSize / event.compileDuration)
+                        compileSpeed: (event.cppSize / event.compileDuration),
+                        uploadSpeed: (event.cppSize / uploadDuration)
                     });
                     startPending();
                 });
-                job.on("data", data => op.feed(data.data, data.last));
+                job.on("data", data => {
+                    if (data.last) 
+                        uploadDuration = Date.now() - jobStartTime;
+                    op.feed(data.data, data.last);
+                });
                 job.on("error", (err) => {
                     console.error("compile error", err);
                 });
