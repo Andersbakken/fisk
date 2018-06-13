@@ -18,14 +18,16 @@ function validateCache(option)
     const dir = cacheDir(option);
     const file = path.join(dir, 'version');
     // console.log(dir);
+    let version;
     try {
-        let version = fs.readFileSync(file);
+        version = fs.readFileSync(file);
         if (version.readUInt32BE() == Version) {
             return;
         }
     } catch (err) {
     }
-    console.log(`Wrong version. Destroying cache ${dir}`);
+    if (version)
+        console.log(`Wrong version. Destroying cache ${dir}`);
     fs.removeSync(dir);
     fs.mkdirpSync(dir);
     let buf = Buffer.allocUnsafe(4);
