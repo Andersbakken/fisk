@@ -421,25 +421,36 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     if (dir.at(dir.size() - 1) != '/')
         dir += '/';
 
-    auto check = [&dir, slots]() -> std::unique_ptr<Client::Slot> {
+    std::vector<int> fds;
+    std::vector<std::string> paths;
+    auto close = [&fds]() {
+        for (int fd : fds) {
+            if (fd != -1)
+                ::close(fd);
+        }
+    };
+    auto check = [&dir, &fds, &paths, slots]() -> std::unique_ptr<Client::Slot> {
         for (size_t i=0; i<slots; ++i) {
-            std::string path = dir + std::to_string(i) + ".lock";
-            int fd = open(path.c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-            if (fd == -1) {
-                ERROR("Failed to open file %s %d %s", path.c_str(), errno, strerror(errno));
-                continue;
+            if (fds.empty() || fds[i] == -1) {
+                paths[i] = dir + std::to_string(i) + ".lock";
+
+                fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+                if (fds[i] == -1) {
+                    ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
+                    continue;
+                }
             }
-            if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                sData.lockFilePaths.insert(path);
-                DEBUG("Acquiredlock on %s for %s", path.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                return std::make_unique<Client::Slot>(fd, std::move(path));
+            if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
+                sData.lockFilePaths.insert(paths[i]);
+                DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+                return std::make_unique<Client::Slot>(fds[i], std::move(paths[i]));
             }
-            ::close(fd);
         }
         return std::unique_ptr<Client::Slot>();
     };
     std::unique_ptr<Client::Slot> slot = check();
     if (slot || mode == Client::Try) {
+        close();
         return slot;
     }
 
@@ -451,6 +462,7 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     do {
         select.exec();
     } while (!slot);
+    close();
 
     return slot;
 }
