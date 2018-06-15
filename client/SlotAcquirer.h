@@ -69,6 +69,7 @@ public:
                 inotify_event *event = reinterpret_cast<inotify_event*>(buf + idx);
                 idx += sizeof(inotify_event) + event->len;
                 DEBUG("inotify_event %s 0x%x", event->name, event->mask);
+#warning should only check for the file(s) that is modified
                 // if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {
                 //     printf("[SlotAcquirer.h:%d]: if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {\n", __LINE__); fflush(stdout);
                 // } else if (event->mask & (IN_CREATE|IN_MOVED_TO)) {

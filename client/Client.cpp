@@ -429,10 +429,13 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
                 ::close(fd);
         }
     };
+    fds.resize(slots, -1);
+    paths.resize(slots);
     auto check = [&dir, &fds, &paths, slots]() -> std::unique_ptr<Client::Slot> {
         for (size_t i=0; i<slots; ++i) {
-            if (fds.empty() || fds[i] == -1) {
-                paths[i] = dir + std::to_string(i) + ".lock";
+            if (fds[i] == -1) {
+                if (paths[i].empty())
+                    paths[i] = dir + std::to_string(i) + ".lock";
 
                 fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
                 if (fds[i] == -1) {
