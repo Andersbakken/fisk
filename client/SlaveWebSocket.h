@@ -11,7 +11,7 @@ class SlaveWebSocket : public WebSocket
 public:
     virtual void onConected() override
     {
-        Watchdog::transition(Watchdog::ConnectedToSlave);
+        Client::data().watchdog->transition(Watchdog::ConnectedToSlave);
     }
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
@@ -22,7 +22,7 @@ public:
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
             if (!err.empty()) {
                 ERROR("Failed to parse json from slave: %s", err.c_str());
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
@@ -47,7 +47,7 @@ public:
 
             if (type != "response") {
                 ERROR("Unexpected message type %s. Wanted \"response\"", msg["type"].string_value().c_str());
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
@@ -56,7 +56,7 @@ public:
             Client::data().exitCode = msg["exitCode"].int_value();
             if (index.empty()) {
                 ERROR("No files?");
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
@@ -67,7 +67,7 @@ public:
                 ff.remaining = index[i]["bytes"].int_value();
                 if (ff.path.empty()) {
                     ERROR("No file for idx: %zu", i);
-                    Watchdog::stop();
+                    Client::data().watchdog->stop();
                     Client::runLocal(Client::acquireSlot(Client::Wait));
                     return;
                 }
@@ -79,7 +79,7 @@ public:
             DEBUG("Got binary data: %zu bytes", len);
             if (files.empty()) {
                 ERROR("Unexpected binary data (%zu bytes)", len);
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
@@ -100,7 +100,7 @@ public:
             if (b) {
                 if (fwrite(data + offset, 1, b, f) != b) {
                     ERROR("Failed to write to file %s (%d %s)", front->path.c_str(), errno, strerror(errno));
-                    Watchdog::stop();
+                    Client::data().watchdog->stop();
                     Client::runLocal(Client::acquireSlot(Client::Wait));
                     return;
                 }
@@ -120,7 +120,7 @@ public:
         } while (offset < bytes);
         if (offset < bytes) {
             ERROR("Extraneous bytes. Abandon ship (%zu/%zu)", offset, bytes);
-            Watchdog::stop();
+            Client::data().watchdog->stop();
             Client::runLocal(Client::acquireSlot(Client::Wait));
         }
     }

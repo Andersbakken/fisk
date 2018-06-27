@@ -46,7 +46,6 @@ protected:
     virtual void onRead() override;
     virtual void onTimeout() override {}
 private:
-    bool timedOut();
     bool requestUpgrade();
     void acceptUpgrade();
     void send();

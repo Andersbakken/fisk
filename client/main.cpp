@@ -26,13 +26,17 @@ int main(int argcIn, char **argvIn)
             for (sem_t *semaphore : Client::data().semaphores) {
                 sem_post(semaphore);
             }
-            if (Log::minLogLevel <= Log::Warn) {
-                std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
-                                                 milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
-                for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
-                    str += Client::format(" %s: %llu (%llu)", stageName(static_cast<Watchdog::Stage>(i)), Watchdog::timings[i] - Watchdog::timings[i - 1], Watchdog::timings[i] - Client::started);
+            if (Watchdog *watchdog = Client::data().watchdog) {
+                if (Log::minLogLevel <= Log::Warn) {
+                    std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
+                                                     milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
+                    for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
+                        str += Client::format(" %s: %llu (%llu)", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
+                                              watchdog->timings[i] - watchdog->timings[i - 1],
+                                              watchdog->timings[i] - Client::started);
+                    }
+                    Log::log(Log::Warn, str);
                 }
-                Log::log(Log::Warn, str);
             }
         });
 
@@ -72,7 +76,9 @@ int main(int argcIn, char **argvIn)
     const char *preresolved = getenv("FISK_COMPILER");
     const char *slave = getenv("FISK_SLAVE");
 
+    Watchdog watchdog;
     Client::Data &data = Client::data();
+    data.watchdog = &watchdog;
     auto signalHandler = [](int) { exit(1); };
     for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
         std::signal(signal, signalHandler);
@@ -197,7 +203,6 @@ int main(int argcIn, char **argvIn)
                     }));
         }
     }
-    Watchdog::start(data.compiler, data.argc, data.argv);
     SchedulerWebSocket schedulerWebsocket;
 
     struct sigaction act;
@@ -208,7 +213,7 @@ int main(int argcIn, char **argvIn)
     std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
     if (!preprocessed) {
         ERROR("Failed to preprocess");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -233,7 +238,7 @@ int main(int argcIn, char **argvIn)
     }
     if (!schedulerWebsocket.connect(Config::scheduler() + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -242,6 +247,7 @@ int main(int argcIn, char **argvIn)
         Select select;
         if (slotAcquirer)
             select.add(slotAcquirer.get());
+        select.add(&watchdog);
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
@@ -252,21 +258,22 @@ int main(int argcIn, char **argvIn)
 
     if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
 
     // usleep(1000 * 1000 * 16);
-    Watchdog::transition(Watchdog::AcquiredSlave);
+    watchdog.transition(Watchdog::AcquiredSlave);
     SlaveWebSocket slaveWebSocket;
     Select select;
     select.add(&slaveWebSocket);
+    select.add(&watchdog);
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
                                                data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
                                                data.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -282,7 +289,7 @@ int main(int argcIn, char **argvIn)
 
     if (preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
@@ -301,25 +308,25 @@ int main(int argcIn, char **argvIn)
         select.exec();
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
-        Watchdog::stop();
+        watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
-    Watchdog::transition(Watchdog::UploadedJob);
+    watchdog.transition(Watchdog::UploadedJob);
 
     // usleep(1000 * 500);
     // return 0;
     while (!slaveWebSocket.done && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
     if (slaveWebSocket.done) {
-        Watchdog::transition(Watchdog::Finished);
-        Watchdog::stop();
+        watchdog.transition(Watchdog::Finished);
+        watchdog.stop();
         schedulerWebsocket.close("slaved");
         return data.exitCode;
     }
 
     DEBUG("Have to run locally because something went wrong with the slave, part deux");
-    Watchdog::stop();
+    watchdog.stop();
     Client::runLocal(Client::acquireSlot(Client::Wait));
     return 0; // unreachable
 }

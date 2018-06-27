@@ -10,7 +10,7 @@ class SchedulerWebSocket : public WebSocket
 public:
     virtual void onConected() override
     {
-        Watchdog::transition(Watchdog::ConnectedToScheduler);
+        Client::data().watchdog->transition(Watchdog::ConnectedToScheduler);
     }
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
@@ -19,7 +19,7 @@ public:
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
             if (!err.empty()) {
                 ERROR("Failed to parse json from scheduler: %s", err.c_str());
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
                 return;
             }
@@ -28,7 +28,7 @@ public:
             Client::Data &data = Client::data();
             if (type == "needsEnvironment") {
                 Client::uploadEnvironment();
-                Watchdog::stop();
+                Client::data().watchdog->stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
             } else if (type == "slave") {
                 data.slaveIp = msg["ip"].string_value();

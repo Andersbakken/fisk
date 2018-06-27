@@ -1,37 +1,53 @@
 #ifndef WATCHDOG_H
 #define WATCHDOG_H
 
-#include <string>
+#include "Client.h"
+#include "Select.h"
 #include <assert.h>
+#include <assert.h>
+#include <atomic>
+#include <string>
 
-namespace Watchdog {
-enum Stage {
-    Initial,
-    ConnectedToScheduler,
-    AcquiredSlave,
-    ConnectedToSlave,
-    UploadedJob,
-    Finished
-};
-
-extern unsigned long long timings[Finished + 1];
-inline const char *stageName(Stage stage)
+class Watchdog : public Socket
 {
-    switch (stage) {
-    case Initial: return "Initial";
-    case ConnectedToScheduler: return "ConnectedToScheduler";
-    case AcquiredSlave: return "AcquiredSlave";
-    case ConnectedToSlave: return "ConnectedToSlave";
-    case UploadedJob: return "UploadedJob";
-    case Finished: return "Finished";
+public:
+    Watchdog();
+    enum Stage {
+        Initial,
+        ConnectedToScheduler,
+        AcquiredSlave,
+        ConnectedToSlave,
+        UploadedJob,
+        Finished
+    };
+
+    unsigned long long timings[Finished + 1] { 0 };
+    static inline const char *stageName(Stage stage)
+    {
+        switch (stage) {
+        case Initial: return "Initial";
+        case ConnectedToScheduler: return "ConnectedToScheduler";
+        case AcquiredSlave: return "AcquiredSlave";
+        case ConnectedToSlave: return "ConnectedToSlave";
+        case UploadedJob: return "UploadedJob";
+        case Finished: return "Finished";
+        }
+        assert(0);
+        return "";
     }
-    assert(0);
-    return "";
-}
-void transition(Stage stage);
-void start(const std::string &compiler, int argc, char **argv);
-void stop();
-bool timedOut();
+    void transition(Stage stage);
+    void stop();
+protected:
+    virtual int fd() const override { return -1; }
+    virtual unsigned int mode() const override { return None; }
+    virtual void onWrite() override {}
+    virtual void onRead() override {}
+    virtual void onTimeout() override;
+    virtual int timeout() const override;
+private:
+    Watchdog::Stage mStage { Watchdog::Initial };
+    bool mStopped;
+    unsigned long long mTransitionTime { Client::mono() };
 };
 
 #endif /* WATCHDOG_H */

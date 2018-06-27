@@ -20,6 +20,7 @@
 #include <thread>
 #include <vector>
 
+class Watchdog;
 struct CompilerArgs;
 namespace Client {
 struct Data
@@ -39,6 +40,7 @@ struct Data
     uint16_t slavePort { 0 };
 
     std::shared_ptr<CompilerArgs> compilerArgs;
+    Watchdog *watchdog { 0 };
 };
 Data &data();
 

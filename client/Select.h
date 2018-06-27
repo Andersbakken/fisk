@@ -8,6 +8,7 @@
 #include <functional>
 #include <sys/select.h>
 #include "Log.h"
+#include "Client.h"
 
 struct Socket
 {
@@ -38,10 +39,13 @@ public:
         FD_ZERO(&r);
         FD_ZERO(&w);
         int max = -1;
+        std::vector<int> timeouts;
+        const unsigned long long before = Client::mono();
         for (Socket *socket : mSockets) {
             const int to = socket->timeout();
             if (to != -1 && (timeoutMs == -1 || to < timeoutMs))
                 timeoutMs = to;
+            timeouts.push_back(to);
             const int fd = socket->fd();
             if (fd == -1)
                 continue;
@@ -71,9 +75,13 @@ public:
             return -1;
         }
 
+        const unsigned long long after = ret ? 0 : Client::mono();
+        size_t idx = 0;
         for (Socket *socket : mSockets) {
             if (!ret) {
-                socket->onTimeout();
+                const unsigned long long socketTimeout = timeouts[idx++] + before;
+                if (after >= socketTimeout)
+                    socket->onTimeout();
             } else {
                 const int fd = socket->fd();
                 if (FD_ISSET(fd, &r))

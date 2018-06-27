@@ -67,9 +67,11 @@ function distribute(conf)
             if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
                 let e = Environments.environment(hash);
                 if (e.canRun(slave.system)) {
-                    // console.log("sending", hash, "to", key);
+                    console.log("sending", hash, "to", key);
                     Environments.environment(hash).send(slave);
                     slave.pendingEnvironments = true;
+                // } else {
+                //     console.log("slave can't run this environment", key, hash);
                 }
             }
         }
@@ -205,6 +207,8 @@ server.on("compile", function(compile) {
                 break;
             }
         }
+
+        // console.log(`Any finds for ${compile.environments} ${found}`);
 
         if (found) {
             let slaveScore;

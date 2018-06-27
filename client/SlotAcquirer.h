@@ -19,7 +19,11 @@ public:
         : mOnAcquired(onAcquired), mType(type)
     {
         mSemaphore = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, slots);
-        pipe(mPipe);
+        if (pipe(mPipe) != 0) {
+            mPipe[0] = mPipe[1] = -1;
+            ERROR("Failed to create pipe %d %s", errno, strerror(errno));
+            return;
+        }
         mThread = std::thread([this]() {
                 while (true) {
                     struct timespec ts;
