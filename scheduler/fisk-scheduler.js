@@ -7,6 +7,7 @@ const Server = require("./server");
 const common = require('../common')(option);
 const Environments = require("./environments");
 const server = new Server(option);
+const fs = require("fs-extra");
 
 const slaves = {};
 const monitors = [];
