@@ -125,6 +125,12 @@ server.express.get("/quit-slaves", (req, res, next) => {
 
 server.express.get("/quit", (req, res, next) => {
     console.log("quitting");
+    if ("purge_environments" in req.query) {
+        try {
+            fs.removeSync(path.join(common.cacheDir(), "environments"));
+        } catch (err) {
+        }
+    }
     res.sendStatus(200);
     setTimeout(() => process.exit(), 100);
 });
