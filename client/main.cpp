@@ -23,8 +23,8 @@ int main(int argcIn, char **argvIn)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
-            for (const std::string &path : Client::data().lockFilePaths) {
-                unlink(path.c_str());
+            for (sem_t *semaphore : Client::data().semaphores) {
+                sem_post(semaphore);
             }
             if (Log::minLogLevel <= Log::Warn) {
                 std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
@@ -73,7 +73,10 @@ int main(int argcIn, char **argvIn)
     const char *slave = getenv("FISK_SLAVE");
 
     Client::Data &data = Client::data();
-    std::signal(SIGINT, [](int) { exit(1); });
+    auto signalHandler = [](int) { exit(1); };
+    for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
+        std::signal(signal, signalHandler);
+    }
     data.argv = new char *[argcIn + 1];
     for (int i=0; i<argcIn; ++i) {
         if (!strncmp("--fisk-log-level=", argvIn[i], 17)
@@ -102,6 +105,30 @@ int main(int argcIn, char **argvIn)
             disabled = true;
         } else if (!strcmp("--fisk-no-local", argvIn[i])) {
             noLocal = true;
+        } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
+            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
+                if (sem_unlink(Client::Slot::typeToString(type))) {
+                    fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
+                            Client::Slot::typeToString(type), errno, strerror(errno));
+                }
+            }
+            return 0;
+        } else if (!strcmp("--fisk-dump-semaphores", argvIn[i])) {
+            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
+                sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
+                if (!sem) {
+                    fprintf(stderr, "Failed to open semaphore %s slots: %zu: %d %s\n",
+                            Client::Slot::typeToString(type), Client::Slot::slots(type),
+                            errno, strerror(errno));
+                    continue;
+                }
+                int val = -1;
+                sem_getvalue(sem, &val);
+                printf("%s %d/%zu\n", Client::Slot::typeToString(type), val, Client::Slot::slots(type));
+                sem_close(sem);
+            }
+
+            return 0;
         } else {
             data.argv[data.argc++] = argvIn[i];
         }
@@ -152,9 +179,8 @@ int main(int argcIn, char **argvIn)
 
     std::unique_ptr<SlotAcquirer> slotAcquirer;
     if (!noLocal && !slave) {
-        std::string dir;
-        const size_t desiredSlots = Config::localSlots(&dir).first;
-        DEBUG("Looking for local slots: %zu %s", desiredSlots, dir.c_str());
+        const size_t desiredSlots = Config::localSlots().first;
+        DEBUG("Looking for local slots: %zu %s", desiredSlots, Client::Slot::typeToString(Client::Slot::Compile));
         // printf("BALLS %zu\n", desiredSlots);
         if (desiredSlots) {
             std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
@@ -163,8 +189,7 @@ int main(int argcIn, char **argvIn)
                 Client::runLocal(std::move(slot));
                 return 0; // unreachable
             }
-            slotAcquirer.reset(new SlotAcquirer(dir, [](const std::string &file) -> void {
-                        std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
+            slotAcquirer.reset(new SlotAcquirer(Client::Slot::Compile, desiredSlots, [](std::unique_ptr<Client::Slot> &&slot) -> void {
                         if (slot) {
                             // printf("GOT ONE FROM SELECT\n");
                             Client::runLocal(std::move(slot));

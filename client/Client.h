@@ -1,20 +1,24 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include <string>
-#include <cstdarg>
+#include "Config.h"
 #include <assert.h>
-#include <sys/stat.h>
-#include <memory>
-#include <set>
-#include <mutex>
 #include <condition_variable>
-#include <thread>
-#include <string.h>
-#include <vector>
+#include <cstdarg>
+#include <fcntl.h>
+#include <memory>
+#include <mutex>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <semaphore.h>
+#include <set>
+#include <string.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/stat.h>
+#include <thread>
+#include <vector>
 
 struct CompilerArgs;
 namespace Client {
@@ -28,8 +32,8 @@ struct Data
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave
     std::string hash;
-    std::set<std::string> lockFilePaths;
     int exitCode { 0 };
+    std::set<sem_t *> semaphores;
 
     std::string slaveIp, slaveHostname;
     uint16_t slavePort { 0 };
@@ -50,21 +54,34 @@ inline void parsePath(const std::string &path, std::string *basename, std::strin
 class Slot
 {
 public:
-    Slot(int fd, std::string &&path);
+    enum Type {
+        Compile,
+        Cpp
+    };
+
+    Slot(Type type, sem_t *sem);
    ~Slot();
+    static const char *typeToString(Type type)
+    {
+        return type == Compile ? "/fisk.compile" : "/fisk.cpp";
+    }
+    static size_t slots(Type type)
+    {
+        return type == Compile ? Config::localSlots().second : Config::cppSlots();
+    }
 private:
     Slot(const Slot &) = delete;
     Slot &operator=(const Slot &) = delete;
 
-    const int mFD;
-    const std::string mPath;
+    const Type mType;
+    sem_t *mSemaphore;
 };
 
 enum AcquireSlotMode {
     Try,
     Wait
 };
-std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode, const std::string &file = std::string());
+std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
 std::unique_ptr<Slot> acquireCppSlot(AcquireSlotMode mode);
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();

@@ -236,20 +236,23 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-Client::Slot::Slot(int fd, std::string &&path)
-    : mFD(fd), mPath(std::move(path))
+Client::Slot::Slot(Type type, sem_t *semaphore)
+    : mType(type), mSemaphore(semaphore)
 {
-    if (!mPath.empty())
-        sData.lockFilePaths.insert(path);
+    if (semaphore) {
+        sData.semaphores.insert(semaphore);
+        DEBUG("Acquired %s semaphore on %s", typeToString(type), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+    } else {
+        DEBUG("Acquired %s slot without semaphore for %s", typeToString(type), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+    }
 }
 
 Client::Slot::~Slot()
 {
-    if (mFD != -1) {
-        DEBUG("Dropping lock on %s for %s", mPath.c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-        sData.lockFilePaths.erase(mPath);
-        flock(mFD, LOCK_UN);
-        unlink(mPath.c_str());
+    if (mSemaphore) {
+        DEBUG("Dropping %s semaphore on %s", typeToString(mType), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+        sem_post(mSemaphore);
+        sData.semaphores.erase(mSemaphore);
     }
 }
 
@@ -416,101 +419,57 @@ void Client::Preprocessed::wait()
     mThread.join();
 }
 
-static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots,
-                                                 Client::AcquireSlotMode mode,
-                                                 const std::string &file = std::string())
+static std::unique_ptr<Client::Slot> acquireSlot(Client::Slot::Type type, size_t slots, Client::AcquireSlotMode mode)
 {
-    assert(file.empty() || mode == Client::Try);
-    if (dir.empty() || !slots) {
-        return std::make_unique<Client::Slot>(-1, std::string());
+    if (!slots) {
+        return std::make_unique<Client::Slot>(type, nullptr);
     }
 
-    if (!Client::recursiveMkdir(dir)) {
-        return std::make_unique<Client::Slot>(-1, std::string());
+    sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, slots);
+    if (!sem) {
+        ERROR("Failed to open semaphore %s for %zu slots: %d %s",
+              Client::Slot::typeToString(type), slots, errno, strerror(errno));
+        return std::make_unique<Client::Slot>(type, nullptr);
+    }
+    if (Log::minLogLevel <= Log::Debug) {
+        int val = -1;
+        sem_getvalue(sem, &val);
+        Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
     }
 
-    if (dir.at(dir.size() - 1) != '/')
-        dir += '/';
 
-    std::vector<std::string> paths;
-    paths.resize(slots);
-    auto check = [&dir, &paths, slots](const std::string &path = std::string()) -> std::unique_ptr<Client::Slot> {
-        if (path.empty()) {
-            DEBUG("CHECKING %zu slots", slots);
-            for (size_t i=0; i<slots; ++i) {
-                if (paths[i].empty())
-                    paths[i] = dir + std::to_string(i) + ".lock";
-
-                const int fd = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-                if (fd == -1) {
-                    ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
-                    continue;
-                }
-                if (!flock(fd, LOCK_EX|LOCK_NB)) {
-                    sData.lockFilePaths.insert(paths[i]);
-                    DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                    return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
-                } else {
-                    ::close(fd);
-                    DEBUG("Failed to lock fd: %d %s", fd, paths[i].c_str());
-                }
-            }
+    if (mode == Client::Try) {
+        int ret;
+        do {
+            ret = sem_trywait(sem);
+        } while (ret == -1 && errno == EINTR);
+        if (!ret) {
+            return std::make_unique<Client::Slot>(type, sem);
+        } else {
+            sem_close(sem);
             return std::unique_ptr<Client::Slot>();
         }
-        DEBUG("Checking file %s %d", path.c_str(), std::isdigit(path[0]));
-        if (!std::isdigit(path[0]))
-            return std::unique_ptr<Client::Slot>();
-
-        const size_t i = atoi(path.c_str());
-        if (i >= slots) {
-            return std::unique_ptr<Client::Slot>();
-        }
-
-        if (paths[i].empty())
-            paths[i] = dir + std::to_string(i) + ".lock";
-        const int fd = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-        if (fd == -1) {
-            ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
-            return std::unique_ptr<Client::Slot>();
-        }
-        if (!flock(fd, LOCK_EX|LOCK_NB)) {
-            sData.lockFilePaths.insert(paths[i]);
-            DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-            return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
-        }
-        return std::unique_ptr<Client::Slot>();
-    };
-    std::unique_ptr<Client::Slot> slot = check(file);
-    if (slot || mode == Client::Try) {
-        return slot;
     }
 
-    SlotAcquirer slotAcquirer(dir, [&slot, &check](const std::string &file) -> void {
-            slot = check(file);
-        });
-    Select select;
-    select.add(&slotAcquirer);
+    int ret;
     do {
-        select.exec();
-    } while (!slot);
-
-    return slot;
+        ret = sem_wait(sem);
+    } while (ret == -1 && errno == EINTR);
+    assert(!ret);
+    return std::make_unique<Client::Slot>(type, sem);
 }
 
-std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode, const std::string &file)
+std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
 {
-    std::string dir;
-    const std::pair<size_t, size_t> s = Config::localSlots(&dir);
+    const std::pair<size_t, size_t> s = Config::localSlots();
     const size_t slots = mode == Try ? s.first : s.second;
-    assert(file.empty() || mode == Try);
-    return ::acquireSlot(std::move(dir), slots, mode, file);
+    return ::acquireSlot(Client::Slot::Compile, slots, mode);
 }
 
 std::unique_ptr<Client::Slot> Client::acquireCppSlot(Client::AcquireSlotMode mode)
 {
-    std::string dir;
-    const size_t slots = Config::cppSlots(&dir);
-    return ::acquireSlot(std::move(dir), slots, mode);
+    const size_t slots = Config::cppSlots();
+    return ::acquireSlot(Client::Slot::Cpp, slots, mode);
 }
 
 void Client::runLocal(std::unique_ptr<Slot> &&slot)

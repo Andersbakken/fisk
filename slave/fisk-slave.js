@@ -270,7 +270,7 @@ if (ports.length) {
                     if (idx != -1) {
                         jobQueue.splice(idx, 1);
                     } else {
-                        // console.error("Can't find j?");
+                        console.error("Can't find j?");
                         return;
                     }
 

@@ -170,11 +170,8 @@ std::string Config::cacheDir()
     return std::string();
 }
 
-std::pair<size_t, size_t> Config::localSlots(std::string *dir)
+std::pair<size_t, size_t> Config::localSlots()
 {
-    if (dir) {
-        *dir = cacheDir() + "slots";
-    }
     {
         json11::Json val = value("slots");
         if (val.is_number())
@@ -187,7 +184,6 @@ std::pair<size_t, size_t> Config::localSlots(std::string *dir)
             ret.first = val.int_value();
         }
     }
-
     {
         json11::Json val = value("allowed-slots");
         if (val.is_number()) {
@@ -197,11 +193,8 @@ std::pair<size_t, size_t> Config::localSlots(std::string *dir)
     return ret;
 }
 
-size_t Config::cppSlots(std::string *dir)
+size_t Config::cppSlots()
 {
-    if (dir) {
-        *dir = cacheDir() + "cpp-slots";
-    }
     {
         json11::Json val = value("cpp-slots");
         if (val.is_number())
