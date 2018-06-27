@@ -123,6 +123,12 @@ server.express.get("/quit-slaves", (req, res, next) => {
     }
 });
 
+server.express.get("/quit", (req, res, next) => {
+    console.log("quitting");
+    res.sendStatus(200);
+    setTimeout(() => process.exit(), 100);
+});
+
 server.on("slave", function(slave) {
     slave.activeClients = 0;
     slave.pendingEnvironments = false;
