@@ -48,7 +48,7 @@ int main(int argcIn, char **argvIn)
     } else if ((env = getenv("FISK_DEBUG"))) {
         logLevel = env;
     } else if ((env = getenv("FISK_VERBOSE"))) {
-        if (!*env || !strcmp(env, "1")) {
+        if (!*env || strcmp(env, "0")) {
             logLevel = "Debug";
         }
     }
@@ -78,11 +78,67 @@ int main(int argcIn, char **argvIn)
         std::signal(signal, signalHandler);
     }
     data.argv = new char *[argcIn + 1];
+    bool noMoreFiskOptions = false;
     for (int i=0; i<argcIn; ++i) {
-        if (!strncmp("--fisk-log-level=", argvIn[i], 17)
-            || !strncmp("--fisk-log=", argvIn[i], 11)
-            || !strncmp("--fisk-debug-level=", argvIn[i], 19)
-            || !strncmp("--fisk-debug=", argvIn[i], 13)) {
+        if (noMoreFiskOptions) {
+            data.argv[data.argc++] = argvIn[i];
+        } else if (!strcmp("--", argvIn[i])) {
+            noMoreFiskOptions = true;
+        } else if (!strcmp("--help", argvIn[i]) || !strcmp("--fisk-help", argvIn[i])) {
+            std::string filename;
+            Client::parsePath(argvIn[0], &filename, 0);
+            if (!strcmp("--fisk-help", argvIn[i]) || filename == "fiskc") {
+                printf("Usage: fiskc [...options...]\n"
+                       "Options:\n"
+                       "  --help                             Display this help (if argv0 is fiskc)\n"
+                       "\n"
+                       "  --fisk-help                        Display this help\n"
+                       "\n"
+                       "  --fisk-log-level=[loglevel]        Set log level\n"
+                       "  --fisk-log=[loglevel]              Level can be: \"debug\", \"warn\", \"error\" or \"silent\"\n"
+                       "  --fisk-debug-level=[loglevel]\n"
+                       "  --fisk-debug=[loglevel]\n"
+                       "  --fisk-log-level [loglevel]\n"
+                       "  --fisk-log [loglevel]\n"
+                       "  --fisk-debug-level [loglevel]\n"
+                       "  --fisk-debug [loglevel]\n"
+                       "\n"
+                       "  --fisk-verbose                     Set log level to \"debug\"\n"
+                       "\n"
+                       "  --fisk-log-file=[file]             Log to file\n"
+                       "  --fisk-log-file [file]\n"
+                       "  --fisk-log-file-append\n           Append to log file\n"
+                       "\n"
+                       "  --fisk-compiler=[compiler]         Set fisk's resolved compiler to [compiler]\n"
+                       "  --fisk-compiler [compiler]\n"
+                       "\n"
+                       "  --fisk-slave=[ip address]          Set fisk's preferred slave\n"
+                       "  --fisk-slave [ip address]\n"
+                       "\n"
+                       "  --fisk-disabled                    Run all jobs locally\n"
+                       "\n"
+                       "  --fisk-clean-semaphores            Drop semaphores. This could be useful if fiskc has crashed while holding a semaphore\n"
+                       "\n"
+                       "  --fisk-dump-semaphores             Dump info about semaphores\n"
+                       "  --                                 Pass all remaining arguments directly to the compiler\n"
+                       "\n"
+                       "Environment variables:\n"
+                       "  FISK_LOG                           Set log level\n"
+                       "  FISK_DEBUG                         Set log level\n"
+                       "  FISK_VERBOSE                       Set log level to \"debug\" if value != \"0\"\n"
+                       "  FISK_LOG_FILE                      Set log file\n"
+                       "  FISK_LOG_APPEND                    Append to log file\n"
+                       "  FISK_DISABLED                      Run all jobs locally\n"
+                       "  FISK_COMPILER                      Set resolved compiler\n"
+                       "  FISK_SLAVE                         Set preferred slave\n");
+                return 0;
+            } else {
+                data.argv[data.argc++] = argvIn[i];
+            }
+        } else if (!strncmp("--fisk-log-level=", argvIn[i], 17)
+                   || !strncmp("--fisk-log=", argvIn[i], 11)
+                   || !strncmp("--fisk-debug-level=", argvIn[i], 19)
+                   || !strncmp("--fisk-debug=", argvIn[i], 13)) {
             logLevel = strchr(argvIn[i], '=') + 1;
         } else if (i + 1 < argcIn && (!strcmp("--fisk-log-level", argvIn[i])
                                       || !strcmp("--fisk-log-level", argvIn[i])
@@ -93,6 +149,8 @@ int main(int argcIn, char **argvIn)
             logFile = argvIn[i] + 16;
         } else if (i + 1 < argcIn && !strcmp("--fisk-log-file", argvIn[i])) {
             logFile = argvIn[++i];
+        } else if (!strcmp("--fisk-log-file-append", argvIn[i])) {
+            logFileMode = Log::Append;
         } else if (!strncmp("--fisk-compiler=", argvIn[i], 16)) {
             preresolved = argvIn[i] + 16;
         } else if (i + 1 < argcIn && !strcmp("--fisk-compiler", argvIn[i])) {
