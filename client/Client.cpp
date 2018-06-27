@@ -1,6 +1,7 @@
 #include "Client.h"
 
 #include "Log.h"
+#include <unistd.h>
 #include "CompilerArgs.h"
 #include "Select.h"
 #include "SlotAcquirer.h"
@@ -153,39 +154,45 @@ bool Client::findCompiler(const char *preresolved)
                 parsePath(p, &base, 0);
                 // Log::debug("GOT BASE %s", base.c_str());
                 if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
+                    sData.resolvedCompiler = p;
                     return Stop;
                 }
                 return Continue;
             });
     }
     {
-        size_t slash = exec.rfind('/');
-        if (slash == std::string::npos)
-            slash = 0;
-        const char *ch = &exec[slash];
-        while (*ch) {
-            if (*ch == 'g') {
-                if (!strncmp(ch + 1, "++", 2)) {
-                    sData.slaveCompiler =  "/usr/bin/g++";
-                    break;
-                } else if (!strncmp(ch + 1, "cc", 2)) {
-                    sData.slaveCompiler =  "/usr/bin/gcc";
-                    break;
-                }
-            } else if (*ch == 'c') {
-                if (!strncmp(ch + 1, "lang", 4)) {
-                    if (!strncmp(ch + 5, "++", 2)) {
-                        sData.slaveCompiler =  "/usr/bin/clang++";
-                        break;
-                    } else {
-                        sData.slaveCompiler =  "/usr/bin/clang";
-                        break;
+        auto findSlaveCompiler = [](const std::string &path) {
+            size_t slash = path.rfind('/');
+            if (slash == std::string::npos)
+                slash = 0;
+            const char *ch = &path[slash];
+            while (*ch) {
+                if (*ch == 'g') {
+                    if (!strncmp(ch + 1, "++", 2)) {
+                        sData.slaveCompiler =  "/usr/bin/g++";
+                        return true;
+                    } else if (!strncmp(ch + 1, "cc", 2)) {
+                        sData.slaveCompiler =  "/usr/bin/gcc";
+                        return true;
+                    }
+                } else if (*ch == 'c') {
+                    if (!strncmp(ch + 1, "lang", 4)) {
+                        if (!strncmp(ch + 5, "++", 2)) {
+                            sData.slaveCompiler =  "/usr/bin/clang++";
+                            return true;
+                        } else {
+                            sData.slaveCompiler =  "/usr/bin/clang";
+                            return true;
+                        }
                     }
                 }
+                ++ch;
             }
-            ++ch;
+            return false;
+        };
+        if (!findSlaveCompiler(exec) && !findSlaveCompiler(sData.resolvedCompiler)) {
+            sData.slaveCompiler = exec;
         }
-
     }
     {
         const size_t slash = sData.resolvedCompiler.rfind('/');
