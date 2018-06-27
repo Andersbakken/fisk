@@ -15,8 +15,6 @@
 #include <algorithm>
 #ifdef __linux__
 #include <sys/inotify.h>
-#else
-#define CACHE_FDS
 #endif
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -434,38 +432,27 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     if (dir.at(dir.size() - 1) != '/')
         dir += '/';
 
-    std::vector<int> fds;
     std::vector<std::string> paths;
-    auto close = [&fds]() {
-        for (int fd : fds) {
-            if (fd != -1)
-                ::close(fd);
-        }
-    };
-    fds.resize(slots, -1);
     paths.resize(slots);
-    auto check = [&dir, &fds, &paths, slots](const std::string &path = std::string()) -> std::unique_ptr<Client::Slot> {
+    auto check = [&dir, &paths, slots](const std::string &path = std::string()) -> std::unique_ptr<Client::Slot> {
         if (path.empty()) {
             DEBUG("CHECKING %zu slots", slots);
             for (size_t i=0; i<slots; ++i) {
-                if (fds[i] == -1) {
-                    if (paths[i].empty())
-                        paths[i] = dir + std::to_string(i) + ".lock";
+                if (paths[i].empty())
+                    paths[i] = dir + std::to_string(i) + ".lock";
 
-                    fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-                    if (fds[i] == -1) {
-                        ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
-                        continue;
-                    }
+                const int fd = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+                if (fd == -1) {
+                    ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
+                    continue;
                 }
-                if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
+                if (!flock(fd, LOCK_EX|LOCK_NB)) {
                     sData.lockFilePaths.insert(paths[i]);
                     DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                    const int fd = fds[i];
-                    fds[i] = -1;
                     return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
                 } else {
-                    DEBUG("Failed to lock %d %s", fds[i], paths[i].c_str());
+                    ::close(fd);
+                    DEBUG("Failed to lock fd: %d %s", fd, paths[i].c_str());
                 }
             }
             return std::unique_ptr<Client::Slot>();
@@ -475,32 +462,26 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
             return std::unique_ptr<Client::Slot>();
 
         const size_t i = atoi(path.c_str());
-        printf("INDEX %zu\n", i);
-        if (i >= fds.size()) {
+        if (i >= slots) {
             return std::unique_ptr<Client::Slot>();
         }
 
-        if (fds[i] == -1) {
-            if (paths[i].empty())
-                dir + std::to_string(i) + ".lock";
-            fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
-            if (fds[i] == -1) {
-                ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
-                return std::unique_ptr<Client::Slot>();
-            }
+        if (paths[i].empty())
+            paths[i] = dir + std::to_string(i) + ".lock";
+        const int fd = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+        if (fd == -1) {
+            ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
+            return std::unique_ptr<Client::Slot>();
         }
-        if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
+        if (!flock(fd, LOCK_EX|LOCK_NB)) {
             sData.lockFilePaths.insert(paths[i]);
             DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-            const int fd = fds[i];
-            fds[i] = -1;
             return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
         }
         return std::unique_ptr<Client::Slot>();
     };
     std::unique_ptr<Client::Slot> slot = check(file);
     if (slot || mode == Client::Try) {
-        close();
         return slot;
     }
 
@@ -512,7 +493,6 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     do {
         select.exec();
     } while (!slot);
-    close();
 
     return slot;
 }
