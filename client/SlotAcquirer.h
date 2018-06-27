@@ -14,9 +14,10 @@
 class SlotAcquirer : public Socket
 {
 public:
-    SlotAcquirer(const std::string &dir, std::function<void()> &&onRead)
-        : mOnRead(onRead)
+    SlotAcquirer(const std::string &dir, std::function<void(const std::string &)> &&onRead)
+        : mDir(dir), mOnRead(onRead)
     {
+        assert(!dir.empty() && dir[dir.size() - 1] == '/');
 #ifdef __linux__
         mFD = inotify_init1(IN_CLOEXEC);
         if (mFD == -1) {
@@ -27,7 +28,7 @@ public:
         const int watch = inotify_add_watch(mFD, dir.c_str(), IN_DELETE|IN_DELETE_SELF|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
         if (watch == -1) {
             ERROR("inotify_add_watch() '%s' (%d) %s",
-                       dir.c_str(), errno, strerror(errno));
+                  dir.c_str(), errno, strerror(errno));
             ::close(mFD);
             mFD = -1;
         }
@@ -55,6 +56,76 @@ public:
     virtual void onRead() override
     {
 #ifdef __linux__
+        auto dumpEvent = [](int mask) -> std::string {
+            std::string ret;
+            if (mask & IN_ACCESS) {
+                ret += "IN_ACCESS|";
+            }
+            if (mask & IN_MODIFY) {
+                ret += "IN_MODIFY|";
+            }
+            if (mask & IN_ATTRIB) {
+                ret += "IN_ATTRIB|";
+            }
+            if (mask & IN_CLOSE_WRITE) {
+                ret += "IN_CLOSE_WRITE|";
+            }
+            if (mask & IN_CLOSE_NOWRITE) {
+                ret += "IN_CLOSE_NOWRITE|";
+            }
+            if (mask & IN_OPEN) {
+                ret += "IN_OPEN|";
+            }
+            if (mask & IN_MOVED_FROM) {
+                ret += "IN_MOVED_FROM|";
+            }
+            if (mask & IN_MOVED_TO) {
+                ret += "IN_MOVED_TO|";
+            }
+            if (mask & IN_CREATE) {
+                ret += "IN_CREATE|";
+            }
+            if (mask & IN_DELETE) {
+                ret += "IN_DELETE|";
+            }
+            if (mask & IN_DELETE_SELF) {
+                ret += "IN_DELETE_SELF|";
+            }
+            if (mask & IN_MOVE_SELF) {
+                ret += "IN_MOVE_SELF|";
+            }
+            if (mask & IN_UNMOUNT) {
+                ret += "IN_UNMOUNT|";
+            }
+            if (mask & IN_Q_OVERFLOW) {
+                ret += "IN_Q_OVERFLOW|";
+            }
+            if (mask & IN_IGNORED) {
+                ret += "IN_IGNORED|";
+            }
+            if (mask & IN_ONLYDIR) {
+                ret += "IN_ONLYDIR|";
+            }
+            if (mask & IN_DONT_FOLLOW) {
+                ret += "IN_DONT_FOLLOW|";
+            }
+            if (mask & IN_EXCL_UNLINK) {
+                ret += "IN_EXCL_UNLINK|";
+            }
+            if (mask & IN_MASK_ADD) {
+                ret += "IN_MASK_ADD|";
+            }
+            if (mask & IN_ISDIR) {
+                ret += "IN_ISDIR|";
+            }
+            if (mask & IN_ONESHOT) {
+                ret += "IN_ONESHOT|";
+            }
+            if (!ret.empty()) {
+                ret.resize(ret.size() - 1);
+            }
+            return ret;
+        };
         if (mFD != -1) {
             int s = 0;
             ioctl(mFD, FIONREAD, &s);
@@ -68,25 +139,22 @@ public:
             while (idx < read) {
                 inotify_event *event = reinterpret_cast<inotify_event*>(buf + idx);
                 idx += sizeof(inotify_event) + event->len;
-                DEBUG("inotify_event %s 0x%x", event->name, event->mask);
-#warning should only check for the file(s) that is modified
-                // if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {
-                //     printf("[SlotAcquirer.h:%d]: if (event->mask & (IN_DELETE_SELF|IN_MOVE_SELF|IN_UNMOUNT)) {\n", __LINE__); fflush(stdout);
-                // } else if (event->mask & (IN_CREATE|IN_MOVED_TO)) {
-                //     printf("[SlotAcquirer.h:%d]: } else if (event->mask & (IN_CREATE|IN_MOVED_TO)) {\n", __LINE__); fflush(stdout);
-                // } else if (event->mask & (IN_DELETE|IN_MOVED_FROM)) {
-                //     printf("[SlotAcquirer.h:%d]: } else if (event->mask & (IN_DELETE|IN_MOVED_FROM)) {\n", __LINE__); fflush(stdout);
-                // } else if (event->mask & (IN_ATTRIB|IN_CLOSE_WRITE)) {
-                //     printf("[SlotAcquirer.h:%d]: } else if (event->mask & (IN_ATTRIB|IN_CLOSE_WRITE)) {\n", __LINE__); fflush(stdout);
-                // }
+                DEBUG("inotify_event %s 0x%x %s\n", event->name, event->mask, dumpEvent(event->mask).c_str());
+                if (event->mask & IN_CLOSE) {
+                    mOnRead(event->name);
+                }
             }
+            return;
         }
+#else
+#warning need to write this code on mac
 #endif
-        mOnRead();
+        printf("CALLING onread\n");
+        mOnRead(std::string());
     }
     virtual void onTimeout() override
     {
-        mOnRead();
+        mOnRead(std::string());
     }
     virtual unsigned int mode() const override
     {
@@ -94,8 +162,9 @@ public:
     }
 
 private:
+    std::string mDir;
     int mFD { -1 };
-    std::function<void()> mOnRead;
+    std::function<void(const std::string &)> mOnRead;
 };
 
 

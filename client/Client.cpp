@@ -12,8 +12,11 @@
 #include <string.h>
 #include <sys/file.h>
 #include <dirent.h>
+#include <algorithm>
 #ifdef __linux__
 #include <sys/inotify.h>
+#else
+#define CACHE_FDS
 #endif
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -415,8 +418,11 @@ void Client::Preprocessed::wait()
     mThread.join();
 }
 
-static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots, Client::AcquireSlotMode mode)
+static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots,
+                                                 Client::AcquireSlotMode mode,
+                                                 const std::string &file = std::string())
 {
+    assert(file.empty() || mode == Client::Try);
     if (dir.empty() || !slots) {
         return std::make_unique<Client::Slot>(-1, std::string());
     }
@@ -438,34 +444,68 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     };
     fds.resize(slots, -1);
     paths.resize(slots);
-    auto check = [&dir, &fds, &paths, slots]() -> std::unique_ptr<Client::Slot> {
-        for (size_t i=0; i<slots; ++i) {
-            if (fds[i] == -1) {
-                if (paths[i].empty())
-                    paths[i] = dir + std::to_string(i) + ".lock";
-
-                fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+    auto check = [&dir, &fds, &paths, slots](const std::string &path = std::string()) -> std::unique_ptr<Client::Slot> {
+        if (path.empty()) {
+            DEBUG("CHECKING %zu slots", slots);
+            for (size_t i=0; i<slots; ++i) {
                 if (fds[i] == -1) {
-                    ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
-                    continue;
+                    if (paths[i].empty())
+                        paths[i] = dir + std::to_string(i) + ".lock";
+
+                    fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+                    if (fds[i] == -1) {
+                        ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
+                        continue;
+                    }
+                }
+                if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
+                    sData.lockFilePaths.insert(paths[i]);
+                    DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+                    const int fd = fds[i];
+                    fds[i] = -1;
+                    return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
+                } else {
+                    DEBUG("Failed to lock %d %s", fds[i], paths[i].c_str());
                 }
             }
-            if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
-                sData.lockFilePaths.insert(paths[i]);
-                DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-                return std::make_unique<Client::Slot>(fds[i], std::move(paths[i]));
+            return std::unique_ptr<Client::Slot>();
+        }
+        DEBUG("Checking file %s %d", path.c_str(), std::isdigit(path[0]));
+        if (!std::isdigit(path[0]))
+            return std::unique_ptr<Client::Slot>();
+
+        const size_t i = atoi(path.c_str());
+        printf("INDEX %zu\n", i);
+        if (i >= fds.size()) {
+            return std::unique_ptr<Client::Slot>();
+        }
+
+        if (fds[i] == -1) {
+            if (paths[i].empty())
+                dir + std::to_string(i) + ".lock";
+            fds[i] = open(paths[i].c_str(), O_APPEND | O_CLOEXEC | O_CREAT, S_IRWXU);
+            if (fds[i] == -1) {
+                ERROR("Failed to open file %s %d %s", paths[i].c_str(), errno, strerror(errno));
+                return std::unique_ptr<Client::Slot>();
             }
+        }
+        if (!flock(fds[i], LOCK_EX|LOCK_NB)) {
+            sData.lockFilePaths.insert(paths[i]);
+            DEBUG("Acquiredlock on %s for %s", paths[i].c_str(), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
+            const int fd = fds[i];
+            fds[i] = -1;
+            return std::make_unique<Client::Slot>(fd, std::move(paths[i]));
         }
         return std::unique_ptr<Client::Slot>();
     };
-    std::unique_ptr<Client::Slot> slot = check();
+    std::unique_ptr<Client::Slot> slot = check(file);
     if (slot || mode == Client::Try) {
         close();
         return slot;
     }
 
-    SlotAcquirer slotAcquirer(dir, [&slot, &check]() -> void {
-            slot = check();
+    SlotAcquirer slotAcquirer(dir, [&slot, &check](const std::string &file) -> void {
+            slot = check(file);
         });
     Select select;
     select.add(&slotAcquirer);
@@ -477,13 +517,13 @@ static std::unique_ptr<Client::Slot> acquireSlot(std::string &&dir, size_t slots
     return slot;
 }
 
-
-std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
+std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode, const std::string &file)
 {
     std::string dir;
     const std::pair<size_t, size_t> s = Config::localSlots(&dir);
     const size_t slots = mode == Try ? s.first : s.second;
-    return ::acquireSlot(std::move(dir), slots, mode);
+    assert(file.empty() || mode == Try);
+    return ::acquireSlot(std::move(dir), slots, mode, file);
 }
 
 std::unique_ptr<Client::Slot> Client::acquireCppSlot(Client::AcquireSlotMode mode)
@@ -507,22 +547,22 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
     };
 
     const pid_t pid = fork();
-    if (pid == -1) { // errpr
-        ERROR("Failed to fork: %d %s", errno, strerror(errno));
-        run();
-        exit(101);
-    } else if (pid == 0) { // child
-        run();
-        exit(101);
-    } else { // paren
-        int status;
-        waitpid(pid, &status, 0);
-        slot.reset();
-        if (WIFEXITED(status))
-            _exit(WEXITSTATUS(status));
-        _exit(101);
-    }
-}
+                   if (pid == -1) { // errpr
+                   ERROR("Failed to fork: %d %s", errno, strerror(errno));
+                   run();
+                   exit(101);
+                   } else if (pid == 0) { // child
+                   run();
+                   exit(101);
+                   } else { // paren
+                   int status;
+                   waitpid(pid, &status, 0);
+                   slot.reset();
+                   if (WIFEXITED(status))
+                       _exit(WEXITSTATUS(status));
+                   _exit(101);
+                   }
+                   }
 
 bool gettime(timeval *time)
 {
@@ -752,4 +792,3 @@ void Client::uploadEnvironment()
         break;
     }
 }
-

@@ -64,7 +64,7 @@ enum AcquireSlotMode {
     Try,
     Wait
 };
-std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
+std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode, const std::string &file = std::string());
 std::unique_ptr<Slot> acquireCppSlot(AcquireSlotMode mode);
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();

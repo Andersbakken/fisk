@@ -163,7 +163,7 @@ int main(int argcIn, char **argvIn)
                 Client::runLocal(std::move(slot));
                 return 0; // unreachable
             }
-            slotAcquirer.reset(new SlotAcquirer(dir, []() -> void {
+            slotAcquirer.reset(new SlotAcquirer(dir, [](const std::string &file) -> void {
                         std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
                         if (slot) {
                             // printf("GOT ONE FROM SELECT\n");

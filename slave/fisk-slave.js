@@ -231,6 +231,7 @@ if (ports.length) {
 
     function startPending()
     {
+        console.log(`startPending called ${jobQueue.length}`);
         for (let idx=0; idx<jobQueue.length; ++idx) {
             let jj = jobQueue[idx];
             if (!jj.op) {
@@ -298,7 +299,7 @@ if (ports.length) {
                     startPending();
                 });
                 job.on("data", data => {
-                    if (data.last) 
+                    if (data.last)
                         uploadDuration = Date.now() - jobStartTime;
                     op.feed(data.data, data.last);
                 });
