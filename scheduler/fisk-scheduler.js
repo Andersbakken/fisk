@@ -115,6 +115,7 @@ server.express.get("/info", (req, res, next) => {
     try {
         this.version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
     } catch (err) {
+        console.log("Couldn't parse package json", err);
     }
 
     res.send({ version: version, environments: Object.keys(Environments.environments) });
@@ -134,7 +135,7 @@ server.express.get("/quit-slaves", (req, res, next) => {
 });
 
 server.express.get("/quit", (req, res, next) => {
-    console.log("quitting");
+    console.log("quitting", req.query);
     if ("purge_environments" in req.query) {
         try {
             fs.removeSync(path.join(common.cacheDir(), "environments"));
