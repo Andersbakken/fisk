@@ -319,6 +319,12 @@ int main(int argcIn, char **argvIn)
     while (!slaveWebSocket.done && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
     if (slaveWebSocket.done) {
+        if (!preprocessed->stdOut.empty()) {
+            fwrite(preprocessed->stdOut.c_str(), sizeof(char), preprocessed->stdOut.size(), stdout);
+        }
+        if (!preprocessed->stdErr.empty()) {
+            fwrite(preprocessed->stdErr.c_str(), sizeof(char), preprocessed->stdErr.size(), stderr);
+        }
         watchdog.transition(Watchdog::Finished);
         watchdog.stop();
         schedulerWebsocket.close("slaved");
