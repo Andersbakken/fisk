@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include "CompilerArgs.h"
 #include "Select.h"
-#include "SlotAcquirer.h"
 #include "Config.h"
 #include <unistd.h>
 #include <climits>
@@ -381,7 +380,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             }
             commandLine += " '-E'";
             DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
-            std::shared_ptr<Client::Slot> slot = Client::acquireCppSlot(Client::Wait);
+            std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
             ptr->slotDuration = Client::mono() - started;
             DEBUG("Running preprocess: %s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
@@ -419,8 +418,9 @@ void Client::Preprocessed::wait()
     mThread.join();
 }
 
-static std::unique_ptr<Client::Slot> acquireSlot(Client::Slot::Type type, size_t slots, Client::AcquireSlotMode mode)
+std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
 {
+    const size_t slots = type == Slot::Compile ? Config::compileSlots() : Config::cppSlots();
     if (!slots) {
         return std::make_unique<Client::Slot>(type, nullptr);
     }
@@ -437,20 +437,6 @@ static std::unique_ptr<Client::Slot> acquireSlot(Client::Slot::Type type, size_t
         Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
     }
 
-
-    if (mode == Client::Try) {
-        int ret;
-        do {
-            ret = sem_trywait(sem);
-        } while (ret == -1 && errno == EINTR);
-        if (!ret) {
-            return std::make_unique<Client::Slot>(type, sem);
-        } else {
-            sem_close(sem);
-            return std::unique_ptr<Client::Slot>();
-        }
-    }
-
     int ret;
     do {
         ret = sem_wait(sem);
@@ -459,18 +445,6 @@ static std::unique_ptr<Client::Slot> acquireSlot(Client::Slot::Type type, size_t
     return std::make_unique<Client::Slot>(type, sem);
 }
 
-std::unique_ptr<Client::Slot> Client::acquireSlot(Client::AcquireSlotMode mode)
-{
-    const std::pair<size_t, size_t> s = Config::localSlots();
-    const size_t slots = mode == Try ? s.first : s.second;
-    return ::acquireSlot(Client::Slot::Compile, slots, mode);
-}
-
-std::unique_ptr<Client::Slot> Client::acquireCppSlot(Client::AcquireSlotMode mode)
-{
-    const size_t slots = Config::cppSlots();
-    return ::acquireSlot(Client::Slot::Cpp, slots, mode);
-}
 
 void Client::runLocal(std::unique_ptr<Slot> &&slot)
 {

@@ -170,27 +170,12 @@ std::string Config::cacheDir()
     return std::string();
 }
 
-std::pair<size_t, size_t> Config::localSlots()
+size_t Config::compileSlots()
 {
-    {
-        json11::Json val = value("slots");
-        if (val.is_number())
-            return std::make_pair<size_t, size_t>(val.int_value(), val.int_value());
-    }
-    std::pair<size_t, size_t> ret = { std::thread::hardware_concurrency(), std::thread::hardware_concurrency() };
-    {
-        json11::Json val = value("desired-slots");
-        if (val.is_number()) {
-            ret.first = val.int_value();
-        }
-    }
-    {
-        json11::Json val = value("allowed-slots");
-        if (val.is_number()) {
-            ret.second = val.int_value();
-        }
-    }
-    return ret;
+    json11::Json val = value("slots");
+    if (val.is_number())
+        return val.int_value();
+    return std::thread::hardware_concurrency();
 }
 
 size_t Config::cppSlots()

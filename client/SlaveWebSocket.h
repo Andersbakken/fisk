@@ -24,7 +24,7 @@ public:
             if (!err.empty()) {
                 ERROR("Failed to parse json from slave: %s", err.c_str());
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                 return;
             }
 
@@ -55,7 +55,7 @@ public:
             if (type != "response") {
                 ERROR("Unexpected message type %s. Wanted \"response\"", msg["type"].string_value().c_str());
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                 return;
             }
 
@@ -64,7 +64,7 @@ public:
             if (index.empty()) {
                 ERROR("No files?");
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                 return;
             }
             files.resize(index.size());
@@ -75,7 +75,7 @@ public:
                 if (ff.path.empty()) {
                     ERROR("No file for idx: %zu", i);
                     Client::data().watchdog->stop();
-                    Client::runLocal(Client::acquireSlot(Client::Wait));
+                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                     return;
                 }
             }
@@ -87,7 +87,7 @@ public:
             if (files.empty()) {
                 ERROR("Unexpected binary data (%zu bytes)", len);
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                 return;
             }
             fill(reinterpret_cast<const unsigned char *>(data), len);
@@ -108,7 +108,7 @@ public:
                 if (fwrite(data + offset, 1, b, f) != b) {
                     ERROR("Failed to write to file %s (%d %s)", front->path.c_str(), errno, strerror(errno));
                     Client::data().watchdog->stop();
-                    Client::runLocal(Client::acquireSlot(Client::Wait));
+                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                     return;
                 }
                 offset += b;
@@ -128,7 +128,7 @@ public:
         if (offset < bytes) {
             ERROR("Extraneous bytes. Abandon ship (%zu/%zu)", offset, bytes);
             Client::data().watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Wait));
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         }
     }
 

@@ -70,7 +70,7 @@ public:
     }
     static size_t slots(Type type)
     {
-        return type == Compile ? Config::localSlots().second : Config::cppSlots();
+        return type == Compile ? Config::compileSlots() : Config::cppSlots();
     }
 private:
     Slot(const Slot &) = delete;
@@ -80,12 +80,7 @@ private:
     sem_t *mSemaphore;
 };
 
-enum AcquireSlotMode {
-    Try,
-    Wait
-};
-std::unique_ptr<Slot> acquireSlot(AcquireSlotMode mode);
-std::unique_ptr<Slot> acquireCppSlot(AcquireSlotMode mode);
+std::unique_ptr<Slot> acquireSlot(Slot::Type type);
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
 bool setFlag(int fd, int flag);

@@ -18,7 +18,7 @@ unsigned long long uploadJobTimeout();
 unsigned long long responseTimeout();
 std::string clientName();
 std::string cacheDir();
-std::pair<size_t, size_t> localSlots();
+size_t compileSlots();
 size_t cppSlots();
 std::string envCache();
 bool watchdog();

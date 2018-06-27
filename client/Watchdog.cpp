@@ -63,5 +63,5 @@ int Watchdog::timeout() const
 void Watchdog::onTimeout()
 {
     DEBUG("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
-    Client::runLocal(Client::acquireSlot(Client::Wait));
+    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
 }

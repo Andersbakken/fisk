@@ -20,7 +20,7 @@ public:
             if (!err.empty()) {
                 ERROR("Failed to parse json from scheduler: %s", err.c_str());
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                 return;
             }
             DEBUG("GOT JSON\n%s", msg.dump().c_str());
@@ -29,7 +29,7 @@ public:
             if (type == "needsEnvironment") {
                 Client::uploadEnvironment();
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Wait));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
             } else if (type == "slave") {
                 data.slaveIp = msg["ip"].string_value();
                 data.slaveHostname = msg["hostname"].string_value();

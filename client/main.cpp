@@ -7,7 +7,6 @@
 #include "Select.h"
 #include "Watchdog.h"
 #include "WebSocket.h"
-#include "SlotAcquirer.h"
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
@@ -68,11 +67,6 @@ int main(int argcIn, char **argvIn)
         disabled = !strlen(env) || !strcmp(env, "1");
     }
 
-    bool noLocal = false;
-    if ((env = getenv("FISK_NO_LOCAL"))) {
-        noLocal = !strlen(env) || !strcmp(env, "1");
-    }
-
     const char *preresolved = getenv("FISK_COMPILER");
     const char *slave = getenv("FISK_SLAVE");
 
@@ -109,8 +103,6 @@ int main(int argcIn, char **argvIn)
             slave = argvIn[++i];
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
-        } else if (!strcmp("--fisk-no-local", argvIn[i])) {
-            noLocal = true;
         } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
             for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
                 if (sem_unlink(Client::Slot::typeToString(type))) {
@@ -162,7 +154,7 @@ int main(int argcIn, char **argvIn)
 
     if (disabled) {
         DEBUG("Have to run locally because we're disabled");
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -179,30 +171,10 @@ int main(int argcIn, char **argvIn)
         DEBUG("Have to run locally because mode %s - flags 0x%x - source files: %zu",
               CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
               data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
-    std::unique_ptr<SlotAcquirer> slotAcquirer;
-    if (!noLocal && !slave) {
-        const size_t desiredSlots = Config::localSlots().first;
-        DEBUG("Looking for local slots: %zu %s", desiredSlots, Client::Slot::typeToString(Client::Slot::Compile));
-        // printf("BALLS %zu\n", desiredSlots);
-        if (desiredSlots) {
-            std::unique_ptr<Client::Slot> slot = Client::acquireSlot(Client::Try);
-            if (slot) { // we have a local slot to run
-                DEBUG("Got a local slot, lets do it");
-                Client::runLocal(std::move(slot));
-                return 0; // unreachable
-            }
-            slotAcquirer.reset(new SlotAcquirer(Client::Slot::Compile, desiredSlots, [](std::unique_ptr<Client::Slot> &&slot) -> void {
-                        if (slot) {
-                            // printf("GOT ONE FROM SELECT\n");
-                            Client::runLocal(std::move(slot));
-                        }
-                    }));
-        }
-    }
     SchedulerWebSocket schedulerWebsocket;
 
     struct sigaction act;
@@ -214,7 +186,7 @@ int main(int argcIn, char **argvIn)
     if (!preprocessed) {
         ERROR("Failed to preprocess");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -239,14 +211,12 @@ int main(int argcIn, char **argvIn)
     if (!schedulerWebsocket.connect(Config::scheduler() + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
     {
         Select select;
-        if (slotAcquirer)
-            select.add(slotAcquirer.get());
         select.add(&watchdog);
         select.add(&schedulerWebsocket);
 
@@ -259,7 +229,7 @@ int main(int argcIn, char **argvIn)
     if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -275,7 +245,7 @@ int main(int argcIn, char **argvIn)
                                                data.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -291,7 +261,7 @@ int main(int argcIn, char **argvIn)
     if (preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -313,7 +283,7 @@ int main(int argcIn, char **argvIn)
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             watchdog.stop();
-            Client::runLocal(Client::acquireSlot(Client::Wait));
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
             return 0; // unreachable
         }
     }
@@ -326,7 +296,7 @@ int main(int argcIn, char **argvIn)
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Wait));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
 
@@ -348,6 +318,6 @@ int main(int argcIn, char **argvIn)
 
     DEBUG("Have to run locally because something went wrong with the slave, part deux");
     watchdog.stop();
-    Client::runLocal(Client::acquireSlot(Client::Wait));
+    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
     return 0; // unreachable
 }
