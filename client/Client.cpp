@@ -486,22 +486,22 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
     };
 
     const pid_t pid = fork();
-                   if (pid == -1) { // errpr
-                   ERROR("Failed to fork: %d %s", errno, strerror(errno));
-                   run();
-                   exit(101);
-                   } else if (pid == 0) { // child
-                   run();
-                   exit(101);
-                   } else { // paren
-                   int status;
-                   waitpid(pid, &status, 0);
-                   slot.reset();
-                   if (WIFEXITED(status))
-                       _exit(WEXITSTATUS(status));
-                   _exit(101);
-                   }
-                   }
+    if (pid == -1) { // errpr
+        ERROR("Failed to fork: %d %s", errno, strerror(errno));
+        run();
+        exit(101);
+    } else if (pid == 0) { // child
+        run();
+        exit(101);
+    } else { // paren
+        int status;
+        waitpid(pid, &status, 0);
+        slot.reset();
+        if (WIFEXITED(status))
+            _exit(WEXITSTATUS(status));
+        _exit(101);
+    }
+}
 
 bool gettime(timeval *time)
 {

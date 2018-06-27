@@ -34,6 +34,7 @@ public:
                 data.slaveIp = msg["ip"].string_value();
                 data.slaveHostname = msg["hostname"].string_value();
                 data.slavePort = msg["port"].int_value();
+                data.jobId = msg["id"].int_value();
                 DEBUG("type %d", msg["port"].type());
                 DEBUG("Got here %s:%d", data.slaveIp.c_str(), data.slavePort);
                 done = true;

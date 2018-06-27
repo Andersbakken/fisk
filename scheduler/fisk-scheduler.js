@@ -12,6 +12,7 @@ const slaves = {};
 const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
+let jobId = 0;
 
 function slaveKey() {
     if (arguments.length == 1) {
@@ -234,7 +235,10 @@ server.on("compile", function(compile) {
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
-        compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port });
+        let id = ++jobId;
+        if (id == 2147483647)
+            id = 0;
+        compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port, id: id });
     } else {
         compile.send("slave", {});
     }

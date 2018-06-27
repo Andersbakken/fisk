@@ -9,6 +9,7 @@
 class SlaveWebSocket : public WebSocket
 {
 public:
+    bool wait { false };
     virtual void onConected() override
     {
         Client::data().watchdog->transition(Watchdog::ConnectedToSlave);
@@ -42,6 +43,12 @@ public:
                 if (!output.empty()) {
                     fwrite(output.c_str(), 1, output.size(), stdout);
                 }
+                return;
+            }
+
+            if (type == "resume") {
+                wait = false;
+                DEBUG("Resume happened. Let's upload data");
                 return;
             }
 

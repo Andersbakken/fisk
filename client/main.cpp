@@ -269,6 +269,7 @@ int main(int argcIn, char **argvIn)
     Select select;
     select.add(&slaveWebSocket);
     select.add(&watchdog);
+    headers["x-fisk-job-id"] = std::to_string(data.jobId);
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
                                                data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
                                                data.slavePort), headers)) {
@@ -295,13 +296,29 @@ int main(int argcIn, char **argvIn)
     }
 
     args[0] = data.slaveCompiler;
+    const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
     json11::Json::object msg {
         { "commandLine", args },
         { "argv0", data.compiler },
+        { "wait", wait },
         { "bytes", static_cast<int>(preprocessed->stdOut.size()) }
     };
+
     std::string json = json11::Json(msg).dump();
+    slaveWebSocket.wait = wait;
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
+    if (wait) {
+        while ((slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+            select.exec();
+        if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+            DEBUG("Have to run locally because something went wrong with the slave");
+            watchdog.stop();
+            Client::runLocal(Client::acquireSlot(Client::Wait));
+            return 0; // unreachable
+        }
+    }
+
+    assert(!slaveWebSocket.wait);
     slaveWebSocket.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
@@ -312,6 +329,7 @@ int main(int argcIn, char **argvIn)
         Client::runLocal(Client::acquireSlot(Client::Wait));
         return 0; // unreachable
     }
+
     watchdog.transition(Watchdog::UploadedJob);
 
     // usleep(1000 * 500);

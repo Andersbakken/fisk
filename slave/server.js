@@ -4,13 +4,14 @@ const WebSocket = require("ws");
 const Url = require("url");
 
 class Job extends EventEmitter {
-    constructor(ws, ip, hash, clientName, sourceFile) {
+    constructor(ws, ip, hash, clientName, sourceFile, wait) {
         super();
         this.ws = ws;
         this.ip = ip;
         this.hash = hash;
         this.clientName = clientName;
         this.sourceFile = sourceFile;
+        this.wait = undefined;
         // setTimeout(() => { console.log("closing him"); ws.close(); }, 200);
     }
 
@@ -55,6 +56,7 @@ class Server extends EventEmitter {
         });
         console.log("listening on", this.ws.options.port);
         this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
+        this.ws.on('headers', (headers, request) => this.emit('headers', headers, request));
     }
 
     _handleConnection(ws, req) {
@@ -79,7 +81,6 @@ class Server extends EventEmitter {
         if (ip.substr(0, 7) == "::ffff:") {
             ip = ip.substr(7);
         }
-
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
@@ -120,6 +121,7 @@ class Server extends EventEmitter {
                 client.commandLine = json.commandLine;
                 client.argv0 = json.argv0;
                 client.connectTime = connectTime;
+                client.wait = json.wait;
                 this.emit("job", client);
                 break;
             case "object":

@@ -229,20 +229,25 @@ if (ports.length) {
     const server = new Server(option);
     let jobQueue = [];
 
+    server.on('headers', (headers, request) => {
+        // console.log("request is", request.headers);
+        headers.push(`x-fisk-wait: ${jobQueue.length >= client.slots}`);
+    });
+
     function startPending()
     {
         console.log(`startPending called ${jobQueue.length}`);
         for (let idx=0; idx<jobQueue.length; ++idx) {
             let jj = jobQueue[idx];
             if (!jj.op) {
-                console.log("starting jj", idx);
+                console.log("starting jj", jj.id);
                 jj.start();
                 break;
             }
         }
     }
 
-
+    let nextJobId = 0;
     server.on("job", (job) => {
         let vm = environments[job.hash];
         if (!vm) {
@@ -253,20 +258,23 @@ if (ports.length) {
         let uploadDuration;
 
         var j = {
+            id: nextJobId++,
             job: job,
             op: undefined,
             done: false,
             start: function() {
                 let job = this.job;
-                console.log("Starting job", job.sourceFile, "for", job.ip, job.clientName);
-                let op = vm.startCompile(job.commandLine, job.argv0);
-                this.op = op;
-                op.on("stdout", data => job.send({ type: "stdout", data: data }));
-                op.on("stderr", data => job.send({ type: "stderr", data: data }));
-                op.on("finished", event => {
+                console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
+                this.op = vm.startCompile(job.commandLine, job.argv0);
+                if (job.wait) {
+                    job.send("resume", {});
+                }
+                this.op.on("stdout", data => job.send({ type: "stdout", data: data }));
+                this.op.on("stderr", data => job.send({ type: "stderr", data: data }));
+                this.op.on("finished", event => {
                     this.done = true;
                     let idx = jobQueue.indexOf(j);
-                    console.log("Job finished", job.sourceFile, "for", job.ip, job.clientName);
+                    console.log("Job finished", this.id, job.sourceFile, "for", job.ip, job.clientName);
                     if (idx != -1) {
                         jobQueue.splice(idx, 1);
                     } else {
@@ -298,23 +306,6 @@ if (ports.length) {
                     });
                     startPending();
                 });
-                job.on("data", data => {
-                    if (data.last)
-                        uploadDuration = Date.now() - jobStartTime;
-                    op.feed(data.data, data.last);
-                });
-                job.on("error", (err) => {
-                    console.error("compile error", err);
-                });
-                job.on("close", () => {
-                    job.removeAllListeners();
-                    let idx = jobQueue.indexOf(j);
-                    if (idx != -1) {
-                        jobQueue.splice(idx, 1);
-                        j.cancel();
-                        startPending();
-                    }
-                });
             },
             cancel: function() {
                 if (!this.done && this.op) {
@@ -323,12 +314,32 @@ if (ports.length) {
             }
         };
 
+        job.on("error", (err) => {
+            console.error("got error from job", err);
+        });
+        job.on("close", () => {
+            job.removeAllListeners();
+            let idx = jobQueue.indexOf(j);
+            if (idx != -1) {
+                jobQueue.splice(idx, 1);
+                j.cancel();
+                startPending();
+            }
+        });
+
+        job.on("data", data => {
+            console.log("got data", this.id, data.last, typeof j.op);
+            if (data.last)
+                uploadDuration = Date.now() - jobStartTime;
+            j.op.feed(data.data, data.last);
+        });
+
         jobQueue.push(j);
         if (jobQueue.length <= client.slots) {
-            // console.log("starting j");
+            console.log(`starting j ${j.id} because ${jobQueue.length} ${client.slots}`);
             j.start();
         } else {
-            console.log("j is backlogged", jobQueue.length, client.slots);
+            console.log(`j ${j.id} is backlogged`, jobQueue.length, client.slots);
         }
     });
 

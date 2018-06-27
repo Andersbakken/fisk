@@ -34,6 +34,21 @@ public:
     };
     State state() const { return mState; }
 
+    const std::vector<std::string> &handshakeResponseHeaders() const { return mHandshakeResponseHeaders; }
+    std::string handshakeResponseHeader(const std::string &name) const
+    {
+        for (const std::string &header : mHandshakeResponseHeaders) {
+            if (header.size() > name.size() + 2 && !strncasecmp(header.c_str(), name.c_str(), name.size()) && header[name.size()] == ':') {
+                const char *ch = &header[name.size() + 1];
+                while (isspace(*ch))
+                    ++ch;
+                if (!*ch)
+                    break;
+                return ch;
+            }
+        }
+        return std::string();
+    }
 protected:
     virtual void onMessage(MessageType mode, const void *data, size_t len) = 0;
     virtual void onConected() = 0;
@@ -56,9 +71,9 @@ private:
     int mFD { -1 };
     wslay_event_callbacks mCallbacks { 0 };
     wslay_event_context *mContext { 0 };
-    bool mWatchDogTimedOut { false };
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
+    std::vector<std::string> mHandshakeResponseHeaders;
     State mState { None };
 };
 

@@ -37,6 +37,7 @@ struct Data
     std::set<sem_t *> semaphores;
 
     std::string slaveIp, slaveHostname;
+    int jobId { 0 };
     uint16_t slavePort { 0 };
 
     std::shared_ptr<CompilerArgs> compilerArgs;

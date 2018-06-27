@@ -161,7 +161,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         sockaddr_in *sockAddr = reinterpret_cast<sockaddr_in *>(addr->ai_addr);
         sockAddr->sin_port = htons(mPort);
         DEBUG("Connecting socket %s (%s:%d)", mHost.c_str(),
-                   inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
+              inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
 
         if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
             ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
@@ -176,14 +176,14 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
 
         if (!ret) {
             DEBUG("Connected to server %s (%s:%d)", mHost.c_str(),
-                       inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
+                  inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
             ::close(mFD);
             ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
-                       inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
-                       mPort, errno, strerror(errno));
+                  inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
+                  mPort, errno, strerror(errno));
             mFD = -1;
             mState = Error;
             break;
@@ -254,7 +254,13 @@ void WebSocket::acceptUpgrade()
         ++ch;
     }
     if (!headers.empty()) {
+        mHandshakeResponseHeaders = Client::split(headers, "\r\n");
+        // for (size_t i=0; i<mHandshakeResponseHeaders.size(); ++i) {
+        //     printf("%zu/%zu: %s\n", i, mHandshakeResponseHeaders.size(), mHandshakeResponseHeaders[i].c_str());
+        // }
+
         DEBUG("Got response headers %zu bytes", headers.size());
+
         size_t keyhdstart;
         if ((keyhdstart = headers.find("Sec-WebSocket-Accept: ")) == std::string::npos) {
             ERROR("http_upgrade: missing required headers");
@@ -266,7 +272,7 @@ void WebSocket::acceptUpgrade()
         const std::string accept_key = headers.substr(keyhdstart, keyhdend - keyhdstart);
         if (accept_key != create_acceptkey(mClientKey)) {
             ERROR("Invalid accept key, expected %s, got %s",
-                       create_acceptkey(mClientKey).c_str(), accept_key.c_str());
+                  create_acceptkey(mClientKey).c_str(), accept_key.c_str());
             mState = Error;
             return;
         }
