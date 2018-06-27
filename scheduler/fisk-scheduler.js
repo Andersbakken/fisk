@@ -110,6 +110,16 @@ server.express.get("/slaves", (req, res, next) => {
     res.send(ret);
 });
 
+server.express.get("/info", (req, res, next) => {
+    let version = -1;
+    try {
+        this.version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+    } catch (err) {
+    }
+
+    res.send({ version: version, environments: Object.keys(Environments.environments) });
+});
+
 server.express.get("/quit-slaves", (req, res, next) => {
     res.sendStatus(200);
     const msg = {
