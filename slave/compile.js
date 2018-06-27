@@ -122,6 +122,13 @@ class Compile extends EventEmitter {
                 case '.mi':
                     args.unshift('objective-c-cpp-output');
                     break;
+                case '.s':
+                    args.unshift('assembler');
+                    break;
+                case '.sx':
+                case '.S':
+                    args.unshift('assembler-with-cpp');
+                    break;
                 case '.mm':
                 case '.M':
                 case '.mii':
