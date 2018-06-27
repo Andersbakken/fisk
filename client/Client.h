@@ -38,6 +38,7 @@ struct Data
 
     std::string slaveIp, slaveHostname;
     int jobId { 0 };
+    bool maintainSemaphores { false };
     uint16_t slavePort { 0 };
 
     std::shared_ptr<CompilerArgs> compilerArgs;

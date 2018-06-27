@@ -226,6 +226,21 @@ int main(int argcIn, char **argvIn)
         DEBUG("Finished schedulerWebsocket");
     }
 
+    if (data.maintainSemaphores) {
+        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
+            if (sem_unlink(Client::Slot::typeToString(type))) {
+                if (errno != ENOENT) {
+                    ERROR("Failed to unlink semaphore %s: %d %s",
+                          Client::Slot::typeToString(type), errno, strerror(errno));
+                } else {
+                    DEBUG("Semaphore %s didn't exist", Client::Slot::typeToString(type));
+                }
+            } else {
+                DEBUG("Destroyed semaphore %s", Client::Slot::typeToString(type));
+            }
+        }
+    }
+
     if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
         watchdog.stop();

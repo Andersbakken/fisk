@@ -161,6 +161,7 @@ server.on("slave", function(slave) {
     });
 });
 
+let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
@@ -228,6 +229,17 @@ server.on("compile", function(compile) {
         //     console.log("Dude doesn't have the compiler", s.ip);
         }
     });
+    let data = {};
+    // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
+    if (compile.ip in semaphoreMaintenanceTimers) {
+        clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
+    } else {
+        data["maintain_semaphores"] = true;
+    }
+    semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
+        delete semaphoreMaintenanceTimers[compile.ip];
+    }, 10 * 60000);
+
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
@@ -238,9 +250,13 @@ server.on("compile", function(compile) {
         let id = ++jobId;
         if (id == 2147483647)
             id = 0;
-        compile.send("slave", { ip: slave.ip, hostname: slave.hostname, port: slave.port, id: id });
+        data.id = id;
+        data.ip = slave.ip;
+        data.hostName = slave.hostName;
+        data.port = slave.port;
+        compile.send("slave", data);
     } else {
-        compile.send("slave", {});
+        compile.send("slave", data);
     }
     compile.on("error", msg => {
         if (slave) {
