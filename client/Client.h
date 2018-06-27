@@ -213,6 +213,7 @@ inline FileType fileType(const std::string &path, struct stat *st = 0)
 
 std::string environmentHash(const std::string &compiler);
 std::string findExecutablePath(const char *argv0);
+void uploadEnvironment();
 }
 
 #endif /* CLIENT_H */

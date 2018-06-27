@@ -702,3 +702,47 @@ std::string Client::findExecutablePath(const char *argv0)
     return std::string();
 }
 
+void Client::uploadEnvironment()
+{
+    const std::string execPath = Client::findExecutablePath(Client::data().argv[0]);
+    std::string dirname;
+    Client::parsePath(execPath.c_str(), 0, &dirname);
+    if (execPath.empty() || dirname.empty()) {
+        ERROR("Failed to get current directory");
+        return;
+    }
+    const std::string node = Config::nodePath();
+    const std::string scheduler = Config::scheduler();
+    const std::string hash = sData.hash;
+    const std::string resolvedCompiler = sData.resolvedCompiler;
+#ifdef __APPLE__
+    const char *system = "Darwin x86_64";
+#elif defined(__linux__) && defined(__i686)
+    const char *system = "Linux i686"
+#elif defined(__linux__) && defined(__x86_64)
+    const char *system = "Linux x86_64";
+#else
+#error unsupported platform
+#endif
+    const std::string commandLine = Client::format("%s ./fisk-envuploader.js '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' --silent",
+                                                   node.c_str(), scheduler.c_str(), system, hash.c_str(), resolvedCompiler.c_str());
+
+    const pid_t pid = fork();
+    switch (pid) {
+    case 0: { // child
+        assert(dirname.size() && dirname[dirname.size() - 1] == '/');
+        TinyProcessLib::Process proc(commandLine, dirname + "../envuploader",
+                                     [](const char *bytes, size_t n) {},
+                                     [](const char *bytes, size_t n) {});
+
+        exit(0);
+        break; }
+    case -1: // error
+        ERROR("Failed to fork %d %s", errno, strerror(errno));
+        break;
+    default: // parent, all good
+        DEBUG("Forked process %d -> %s", pid, commandLine.c_str());
+        break;
+    }
+}
+

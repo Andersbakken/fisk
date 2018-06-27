@@ -27,33 +27,7 @@ public:
             const std::string type = msg["type"].string_value();
             Client::Data &data = Client::data();
             if (type == "needsEnvironment") {
-                const std::string execPath = Client::findExecutablePath(Client::data().argv[0]);
-                std::string dirname;
-                Client::parsePath(execPath.c_str(), 0, &dirname);
-                if (execPath.empty() || dirname.empty()) {
-                    ERROR("Failed to get current directory");
-                    Watchdog::stop();
-                    Client::runLocal(Client::acquireSlot(Client::Wait));
-                    return;
-                }
-#ifdef __APPLE__
-                const char *system = "Darwin x86_64";
-#elif defined(__linux__) && defined(__i686)
-                const char *system = "Linux i686"
-#elif defined(__linux__) && defined(__x86_64)
-                const char *system = "Linux x86_64";
-#else
-#error unsupported platform
-#endif
-
-                assert(dirname.size() && dirname[dirname.size() - 1] == '/');
-                std::string command = Client::format("bash -c \"cd %s../envuploader && '%s' './fisk-envuploader.js' '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' '--silent' & disown\"",
-                                                     dirname.c_str(), Config::nodePath().c_str(), Config::scheduler().c_str(), system,
-                                                     data.hash.c_str(), data.resolvedCompiler.c_str());
-
-                DEBUG("system(\"%s\")", command.c_str());
-                const int ret = ::system(command.c_str());
-                DEBUG("system -> %d", ret);
+                Client::uploadEnvironment();
                 Watchdog::stop();
                 Client::runLocal(Client::acquireSlot(Client::Wait));
             } else if (type == "slave") {
