@@ -670,14 +670,14 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
     Client::parsePath(tarball, 0, &dir);
     if (!f) {
         ERROR("Failed to open %s for reading: %d %s", tarball.c_str(), errno, strerror(errno));
-        Client::recursiveMkdir(dir);
+        Client::recursiveRmdir(dir);
         return false;
     }
     struct stat st;
     if (stat(tarball.c_str(), &st)) {
         ERROR("Failed to stat %s: %d %s", tarball.c_str(), errno, strerror(errno));
         fclose(f);
-        Client::recursiveMkdir(dir);
+        Client::recursiveRmdir(dir);
         return false;
     }
     {
@@ -708,7 +708,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
                 fclose(f);
-                Client::recursiveMkdir(dir);
+                Client::recursiveRmdir(dir);
                 return false;
             }
             schedulerWebSocket->send(WebSocket::Binary, buf, chunkSize);
@@ -719,7 +719,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         } while (sent < static_cast<size_t>(st.st_size) && schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket);
     }
     fclose(f);
-    Client::recursiveMkdir(dir);
+    Client::recursiveRmdir(dir);
     return schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket;
 }
 
