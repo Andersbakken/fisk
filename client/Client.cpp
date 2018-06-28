@@ -46,12 +46,16 @@ enum CheckResult {
 void filterCOLLECT(std::string &output)
 {
     size_t i=0;
-    while ((i = output.find("COLLECT_")) != std::string::npos) {
-        size_t endLine = output.find("\n", i);
-        if (endLine == std::string::npos) {
-            output.erase(i);
+    while ((i = output.find("COLLECT_", i)) != std::string::npos) {
+        if (!i || output[i - 1] == '\n') {
+            size_t endLine = output.find("\n", i);
+            if (endLine == std::string::npos) {
+                output.erase(i);
+            } else {
+                output.erase(i, endLine - i + 1);
+            }
         } else {
-            output.erase(i, endLine - i + 1);
+            ++i;
         }
     }
 }
