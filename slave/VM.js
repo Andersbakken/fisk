@@ -37,13 +37,15 @@ class CompileJob extends EventEmitter
     }
 };
 
-class VM
+class VM extends EventEmitter
 {
     constructor(root, hash, user) {
+        super();
         this.root = root;
         this.hash = hash;
         this.compiles = {};
         this.compileCount = 0;
+        this.destroying = false;
 
         fs.remove(path.join(root, 'compiles'));
 
@@ -54,6 +56,9 @@ class VM
         this.child.on('message', (msg) => {
             let that;
             switch (msg.type) {
+            case 'ready':
+                this.emit('ready');
+                break;
             case 'compileStdOut':
                 that = this.compiles[msg.id];
                 if (that)
@@ -89,13 +94,17 @@ class VM
             }
         });
         this.child.on('exit', evt => {
-            console.log("Child going down", evt);
+            console.log("Child going down", evt, this.destroying);
+            if (this.destroying)
+                fs.remove(root);
             // ### need to handle the helper accidentally going down maybe?
+            this.emit("exit");
         });
     }
 
-    stop() {
-        this.send({type: 'stop'});
+    destroy() {
+        this.destroying = true;
+        this.child.send({type: 'destroy'});
     }
 
     startCompile(commandLine, argv0) {

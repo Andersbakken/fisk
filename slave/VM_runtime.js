@@ -32,15 +32,19 @@ if (pwd) {
     process.setgid(pwd.gid);
     process.setuid(pwd.uid);
 }
+process.send({type: "ready"});
 
 let compiles = {};
-let stopping = false;
+let destroying = false;
 
 process.on('message', (msg) => {
     switch (msg.type) {
-    case 'stop':
-        if (!compiles.length)
+    case 'destroy':
+        if (!compiles.length) {
             process.exit();
+        } else {
+            destroying = true;
+        }
         break;
     case 'cancel':
         let c = compiles[msg.id];
@@ -55,7 +59,7 @@ process.on('message', (msg) => {
         compile.on('exit', event => {
             delete compiles[msg.id];
             process.send({type: 'compileFinished', id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
-            if (stopping && !compiles.length)
+            if (destroying && !compiles.length)
                 process.exit();
         });
         compiles[msg.id] = compile;

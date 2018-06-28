@@ -87,6 +87,7 @@ if (ports.length) {
                     reject(err);
                 } else {
                     if (files) {
+                        let pending = 0;
                         for (let i=0; i<files.length; ++i) {
                             try {
                                 let dir = path.join(environmentsRoot, files[i]);
@@ -102,7 +103,21 @@ if (ports.length) {
                                 } catch (err) {
                                 }
                                 if (env && env.hash) {
-                                    environments[env.hash] = new VM(dir, env.hash, option("vm-user"));
+                                    let vm = new VM(dir, env.hash, option("vm-user"));
+                                    ++pending;
+                                    environments[env.hash] = vm;
+                                    let errorHandler = () => {
+                                        if (!vm.ready && !--pending) {
+                                            resolve();
+                                        }
+                                    };
+                                    vm.once('error', errorHandler);
+                                    vm.once('ready', () => {
+                                        vm.ready = true;
+                                        vm.removeListener("error", errorHandler);
+                                        if (!--pending) 
+                                            resolve();
+                                    });
                                 } else {
                                     console.log("Removing directory", dir);
                                     fs.removeSync(dir);
@@ -111,8 +126,9 @@ if (ports.length) {
                                 console.error(`Got error loading environment ${files[i]} ${err.stack} ${err.message}`);
                             }
                         }
+                        if (!pending)
+                            resolve();
                     }
-                    resolve();
                 }
             });
         });
@@ -130,6 +146,18 @@ if (ports.length) {
             }
         }
         process.exit(message.code);
+    });
+
+    client.on("filterEnvironments", message => {
+        console.log(`Filtering environments to ${Object.keys(message.environments)}`);
+        for (let hash in environments) {
+            if (!(hash in message.environments)) {
+                const dir = path.join(environmentsRoot, hash);
+                console.log(`Purge environment ${hash} ${dir}`);
+                environments[hash].destroy();
+                delete environments[hash];
+            }
+        }
     });
 
     client.on("environment", message => {
@@ -173,23 +201,23 @@ if (ports.length) {
         if (!message.last)
             return;
 
+        console.log(`untar ${pendingEnvironment.file}`);
         exec("tar xf '" + pendingEnvironment.file + "'", { cwd: pendingEnvironment.dir }).
             then(() => {
-                console.log("STEP 1", path.join(pendingEnvironment.dir, "bin", "true"));
+                console.log("Checking that the environment runs", path.join(pendingEnvironment.dir, "bin", "true"));
                 return exec(`"${path.join(pendingEnvironment.dir, "bin", "true")}"`, { cwd: pendingEnvironment.dir });
             }).then(() => {
-                console.log("STEP 2");
+                console.log("Write json file");
                 return fs.writeFile(path.join(pendingEnvironment.dir, "environment.json"), JSON.stringify({ hash: pendingEnvironment.hash, created: new Date().toString() }));
             }).then(() => {
-                console.log("STEP 3");
+                console.log(`Unlink ${pendingEnvironment.file}`);
                 return fs.unlink(pendingEnvironment.file);
             }).then(() => {
+                console.log("Informing scheduler about our environments:", Object.keys(environments));
                 environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
-                console.log("STEP 4, sending environments back:", Object.keys(environments));
                 client.send("environments", { environments: Object.keys(environments) });
                 pendingEnvironment = undefined;
             }).catch((err) => {
-                console.log("STEP 5");
                 console.error("Got failure setting up environment", err);
                 try {
                     fs.removeSync(pendingEnvironment.dir);

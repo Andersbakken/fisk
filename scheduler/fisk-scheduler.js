@@ -152,6 +152,7 @@ server.on("slave", function(slave) {
     slave.pendingEnvironments = false;
     insertSlave(slave);
     console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
+    slave.send({type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) });
     distribute({slave: slave});
 
     slave.on('environments', function(message) {
@@ -215,6 +216,7 @@ server.on("compile", function(compile) {
         compile.send({ type: "needsEnvironment", environments: needed });
 
         let file;
+        let gotLast = false;
         compile.on("uploadEnvironment", environment => {
             file = Environments.prepare(environment);
             console.log("Got environment message", environment, typeof file);
@@ -233,6 +235,8 @@ server.on("compile", function(compile) {
                     compile.close();
                     return;
                 }
+                if (environment.last)
+                    gotLast = true;
                 console.log("Got environmentdata message", environment.data.length, environment.last);
                 file.save(environment.data).then(() => {
                     if (environment.last) {
@@ -261,8 +265,8 @@ server.on("compile", function(compile) {
             });
         });
         compile.on("close", () => {
-            // console.log("compile with upload closed", needed);
-            if (file) {
+            console.log("compile with upload closed", needed, gotLast);
+            if (file && !gotLast) {
                 file.discard();
                 file = undefined;
             }
@@ -347,68 +351,12 @@ server.on("compile", function(compile) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
-        // console.log("Client disappeared");
+        console.log("Client disappeared");
         compile.removeAllListeners();
         if (slave) {
             --slave.activeClients;
             --activeJobs;
             slave = undefined;
-        }
-    });
-});
-
-server.on("uploadEnvironment", upload => {
-    let file;
-    let hash;
-    upload.on("environment", environment => {
-        file = Environments.prepare(environment);
-        // console.log("Got environment message", environment, typeof file);
-        if (!file) {
-            // we already have this environment
-            console.error("already got environment", environment.message);
-            upload.send({ error: "already got environment" });
-            upload.close();
-        } else {
-            hash = environment.hash;
-            if (hash in pendingEnvironments) {
-                clearTimeout(pendingEnvironments[hash]);
-                delete pendingEnvironments[hash];
-            }
-        }
-    });
-    upload.on("environmentdata", environment => {
-        if (!file) {
-            console.error("no pending file");
-            upload.send({ error: "no pending file" });
-            upload.close();
-        }
-        console.log("Got environmentdata message", environment.data.length, environment.last);
-        file.save(environment.data).then(() => {
-            if (environment.last) {
-                file.close();
-                upload.close();
-                Environments.complete(file);
-                file = undefined;
-                // send any new environments to slaves
-                distribute({hash: hash});
-            }
-        }).catch(err => {
-            console.log("file error", err);
-            file = undefined;
-        });
-    });
-    upload.on("error", msg => {
-        console.error(`upload error '${msg}' from ${upload.ip}`);
-        if (file) {
-            file.discard();
-            file = undefined;
-        }
-    });
-    upload.on("close", () => {
-        upload.removeAllListeners();
-        if (file) {
-            file.discard();
-            file = undefined;
         }
     });
 });
