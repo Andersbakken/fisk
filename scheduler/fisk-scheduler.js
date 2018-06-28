@@ -170,7 +170,7 @@ server.express.get("/slaves", (req, res, next) => {
 server.express.get("/info", (req, res, next) => {
     let version = -1;
     try {
-        this.version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+        version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
     } catch (err) {
         console.log("Couldn't parse package json", err);
     }
