@@ -209,8 +209,10 @@ server.on("slave", function(slave) {
     insertSlave(slave);
     console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     if (Object.keys(slave.environments).sort() != Object.keys(Environments.environments).sort()) {
+        // console.log("sending filter", Object.keys(Environments.environments).sort(), Object.keys(slave.environments).sort());
         slave.send({type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) });
     } else {
+        // console.log("just calling distribute", Object.keys(Environments.environments).sort(), Object.keys(slave.environments).sort());
         distribute({slave: slave});
     }
 
@@ -306,9 +308,10 @@ server.on("compile", function(compile) {
                         // send any new environments to slaves
                         delete pendingEnvironments[hash];
                         purgeEnvironmentsToMaxSize().then(purged => {
-                            var msg = {type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) };
-                            forEachSlave(slave => slave.send(msg));
-                            distribute({hash: hash});
+                            if (purged) {
+                                var msg = {type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) };
+                                forEachSlave(slave => slave.send(msg));
+                            }
                         }).catch(error => {
                             console.error("Got some error here", error);
                         });

@@ -156,16 +156,15 @@ client.on("quit", message => {
 
 client.on("filterEnvironments", message => {
     console.log(`Filtering environments to ${Object.keys(message.environments)}`);
-    let purged = false;
     for (let hash in environments) {
         if (!(hash in message.environments)) {
             const dir = path.join(environmentsRoot, hash);
             console.log(`Purge environment ${hash} ${dir}`);
             environments[hash].destroy();
             delete environments[hash];
-            purged = true;
         }
     }
+    console.log("sending back env", Object.keys(environments));
     client.send("environments", { environments: Object.keys(environments) });
 });
 
@@ -222,8 +221,8 @@ client.on("data", message => {
             console.log(`Unlink ${pendingEnvironment.file}`);
             return fs.unlink(pendingEnvironment.file);
         }).then(() => {
-            console.log("Informing scheduler about our environments:", Object.keys(environments));
             environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
+            console.log("Informing scheduler about our environments:", Object.keys(environments));
             pendingEnvironment = undefined;
             client.send("environments", { environments: Object.keys(environments) });
         }).catch((err) => {
@@ -365,7 +364,7 @@ server.on("job", (job) => {
     });
 
     job.on("data", data => {
-        console.log("got data", this.id, data.last, typeof j.op);
+        // console.log("got data", this.id, data.last, typeof j.op);
         if (data.last)
             uploadDuration = Date.now() - jobStartTime;
         j.op.feed(data.data, data.last);
