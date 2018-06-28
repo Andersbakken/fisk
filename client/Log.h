@@ -26,7 +26,12 @@ void init(Level level, std::string &&logFile, LogFileMode mode);
 extern Level minLogLevel;
 Level stringToLevel(const char *str, bool *ok);
 
-void log(Level level, const std::string &string);
+enum Flag {
+    None = 0x0,
+    NoTrailingNewLine = 0x1
+};
+
+void log(Level level, const std::string &string, unsigned int flags = None);
 void log(Level level, const char *fmt, va_list args);
 void debug(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void warn(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));

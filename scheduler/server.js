@@ -120,6 +120,72 @@ class Server extends EventEmitter {
             this.emit("compile", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));
             ws.on('error', err => client.emit('error', err));
+            ws.on("message", msg => {
+                switch (typeof msg) {
+                case "string":
+                    if (remaining.bytes) {
+                        // bad, client have to send all the data in a binary message before sending JSON
+                        error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
+                        return;
+                    }
+                    // assume JSON
+                    let json;
+                    try {
+                        json = JSON.parse(msg);
+                    } catch (e) {
+                    }
+                    if (json === undefined) {
+                        error("Unable to parse string message as JSON");
+                        return;
+                    }
+                    if (json.type != "uploadEnvironment") {
+                        error("Expected type: \"uploadEnvironment\"");
+                        return;
+                    }
+
+                    if (!("system" in json)) {
+                        console.log(json);
+                        error("Need a systen property");
+                        return;
+                    }
+                    if (!("hash" in json)) {
+                        console.log(json);
+                        error("Need a hash property");
+                        return;
+                    }
+                    if (!("bytes" in json)) {
+                        console.log(json);
+                        error("Need a bytes property");
+                        return;
+                    }
+
+                    remaining.type = "uploadEnvironmentData";
+                    remaining.bytes = json.bytes;
+
+                    client.emit("uploadEnvironment", json);
+                    break;
+                case "object":
+                    if (msg instanceof Buffer) {
+                        if (!msg.length) {
+                            // no data?
+                            error("No data in buffer");
+                            return;
+                        }
+                        if (!remaining.bytes) {
+                            error("Got binary message without a preceeding json message describing the data");
+                            return;
+                        }
+                        if (msg.length > remaining.bytes) {
+                            // woops
+                            error(`length ${msg.length} > ${remaining.bytes}`);
+                            return;
+                        }
+                        remaining.bytes -= msg.length;
+                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                    }
+                    break;
+                }
+            });
             break;
         case "/slave":
             if (!("x-fisk-port" in req.headers)) {
@@ -182,70 +248,6 @@ class Server extends EventEmitter {
             });
             // console.log("Got dude", envs);
             this.emit("slave", client);
-            break;
-        case "/uploadenvironment":
-            client = new Client({ws: ws, ip: ip, type: Client.Type.UploadEnvironment});
-            this.emit("uploadEnvironment", client);
-
-            ws.on("message", msg => {
-                switch (typeof msg) {
-                case "string":
-                    if (remaining.bytes) {
-                        // bad, client have to send all the data in a binary message before sending JSON
-                        error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
-                        return;
-                    }
-                    // assume JSON
-                    let json;
-                    try {
-                        json = JSON.parse(msg);
-                    } catch (e) {
-                    }
-                    if (json === undefined) {
-                        error("Unable to parse string message as JSON");
-                        return;
-                    }
-                    if (!("system" in json)) {
-                        error("Need a systen property");
-                        return;
-                    }
-                    if (!("hash" in json)) {
-                        error("Need a hash property");
-                        return;
-                    }
-                    if (!("bytes" in json)) {
-                        error("Need a bytes property");
-                        return;
-                    }
-
-                    remaining.type = "environmentdata";
-                    remaining.bytes = json.bytes;
-
-                    client.emit("environment", json);
-
-                    break;
-                case "object":
-                    if (msg instanceof Buffer) {
-                        if (!msg.length) {
-                            // no data?
-                            error("No data in buffer");
-                            return;
-                        }
-                        if (!remaining.bytes) {
-                            error("Got binary message without a preceeding json message describing the data");
-                            return;
-                        }
-                        if (msg.length > remaining.bytes) {
-                            // woops
-                            error(`length ${msg.length} > ${remaining.bytes}`);
-                            return;
-                        }
-                        remaining.bytes -= msg.length;
-                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
-                    }
-                    break;
-                }
-            });
             break;
         case "/monitor":
             client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});

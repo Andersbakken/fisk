@@ -3,6 +3,7 @@
 
 #include "WebSocket.h"
 #include "Client.h"
+#include "Watchdog.h"
 #include <string>
 
 class SchedulerWebSocket : public WebSocket
@@ -25,19 +26,17 @@ public:
             }
             DEBUG("GOT JSON\n%s", msg.dump().c_str());
             const std::string type = msg["type"].string_value();
-            Client::Data &data = Client::data();
             if (type == "needsEnvironment") {
-                Client::uploadEnvironment();
-                Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                needsEnvironment = true;
+                done = true;
             } else if (type == "slave") {
-                data.slaveIp = msg["ip"].string_value();
-                data.slaveHostname = msg["hostname"].string_value();
-                data.slavePort = msg["port"].int_value();
-                data.jobId = msg["id"].int_value();
-                data.maintainSemaphores = msg["maintain_semaphores"].bool_value();
+                slaveIp = msg["ip"].string_value();
+                slaveHostname = msg["hostname"].string_value();
+                slavePort = msg["port"].int_value();
+                jobId = msg["id"].int_value();
+                maintainSemaphores = msg["maintain_semaphores"].bool_value();
                 DEBUG("type %d", msg["port"].type());
-                DEBUG("Got here %s:%d", data.slaveIp.c_str(), data.slavePort);
+                DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);
                 done = true;
             } else {
                 ERROR("Unexpected message type: %s", type.c_str());
@@ -48,6 +47,11 @@ public:
     }
 
     bool done { false };
+    bool needsEnvironment { false };
+    bool maintainSemaphores { false };
+    int jobId { 0 };
+    uint16_t slavePort { 0 };
+    std::string slaveIp, slaveHostname;
 };
 
 

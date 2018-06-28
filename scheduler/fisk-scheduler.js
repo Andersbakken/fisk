@@ -197,24 +197,80 @@ server.on("compile", function(compile) {
             break;
         }
     }
+    let needed = [];
     if (!found) {
-        let needed = [];
         compile.environments.forEach(env => {
             // console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
             if (!(env in pendingEnvironments)) {
                 needed.push(env);
-                pendingEnvironments[env] = setTimeout(() => {
-                    delete pendingEnvironments[env];
-                }, 60000);
+                pendingEnvironments[env] = true;
             }
         });
-        if (needed.length) {
-            console.log(`Asking ${compile.name} ${compile.ip} to upload ${needed}`);
-            compile.send({ type: "needsEnvironment", environments: needed });
-        } else {
+        if (!needed.length) {
             console.log(`We're already waiting for ${compile.environments}`);
             compile.send("slave", {});
+            return;
         }
+        console.log(`Asking ${compile.name} ${compile.ip} to upload ${needed}`);
+        compile.send({ type: "needsEnvironment", environments: needed });
+
+        let file;
+        compile.on("uploadEnvironment", environment => {
+            file = Environments.prepare(environment);
+            console.log("Got environment message", environment, typeof file);
+            if (!file) {
+                // we already have this environment
+                console.error("already got environment", environment.message);
+                compile.send({ error: "already got environment" });
+                compile.close();
+                return;
+            }
+            let hash = environment.hash;
+            compile.on("uploadEnvironmentData", environment => {
+                if (!file) {
+                    console.error("no pending file");
+                    compile.send({ error: "no pending file" });
+                    compile.close();
+                    return;
+                }
+                console.log("Got environmentdata message", environment.data.length, environment.last);
+                file.save(environment.data).then(() => {
+                    if (environment.last) {
+                        file.close();
+                        compile.close();
+                        Environments.complete(file);
+                        file = undefined;
+                        // send any new environments to slaves
+                        distribute({hash: hash});
+                        delete pendingEnvironments[hash];
+                    }
+                }).catch(err => {
+                    console.log("file error", err);
+                    file = undefined;
+                });
+            });
+        });
+        compile.on("error", msg => {
+            console.error(`upload error '${msg}' from ${compile.ip}`);
+            if (file) {
+                file.discard();
+                file = undefined;
+            }
+            needed.forEach(env => {
+                delete pendingEnvironments[env];
+            });
+        });
+        compile.on("close", () => {
+            // console.log("compile with upload closed", needed);
+            if (file) {
+                file.discard();
+                file = undefined;
+            }
+            needed.forEach(env => {
+                delete pendingEnvironments[env];
+            });
+        });
+
         return;
     }
 
@@ -306,7 +362,7 @@ server.on("uploadEnvironment", upload => {
     let hash;
     upload.on("environment", environment => {
         file = Environments.prepare(environment);
-        console.log("Got environment message", environment, typeof file);
+        // console.log("Got environment message", environment, typeof file);
         if (!file) {
             // we already have this environment
             console.error("already got environment", environment.message);

@@ -70,6 +70,7 @@ int main(int argcIn, char **argvIn)
 
     const char *preresolved = getenv("FISK_COMPILER");
     const char *slave = getenv("FISK_SLAVE");
+    const char *scheduler = getenv("FISK_SCHEDULER");
 
     Watchdog watchdog;
     Client::Data &data = Client::data();
@@ -99,6 +100,8 @@ int main(int argcIn, char **argvIn)
                    || !strncmp("--fisk-debug-level=", argvIn[i], 19)
                    || !strncmp("--fisk-debug=", argvIn[i], 13)) {
             logLevel = strchr(argvIn[i], '=') + 1;
+        } else if (!strcmp("--fisk-verbose", argvIn[i])) {
+            logLevel = "Debug";
         } else if (i + 1 < argcIn && (!strcmp("--fisk-log-level", argvIn[i])
                                       || !strcmp("--fisk-log-level", argvIn[i])
                                       || !strcmp("--fisk-log", argvIn[i])
@@ -118,6 +121,10 @@ int main(int argcIn, char **argvIn)
             slave = argvIn[i] + 13;
         } else if (i + 1 < argcIn && !strcmp("--fisk-slave", argvIn[i])) {
             slave = argvIn[++i];
+        } else if (!strncmp("--fisk-scheduler=", argvIn[i], 17)) {
+            scheduler = argvIn[i] + 17;
+        } else if (i + 1 < argcIn && !strcmp("--fisk-scheduler", argvIn[i])) {
+            scheduler = argvIn[++i];
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
         } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
@@ -229,7 +236,8 @@ int main(int argcIn, char **argvIn)
         if (!hostname.empty())
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
-    if (!schedulerWebsocket.connect(Config::scheduler() + "/compile", headers)) {
+    std::string url = scheduler ? std::string(scheduler) : Config::scheduler();
+    if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -247,7 +255,7 @@ int main(int argcIn, char **argvIn)
         DEBUG("Finished schedulerWebsocket");
     }
 
-    if (data.maintainSemaphores) {
+    if (schedulerWebsocket.maintainSemaphores) {
         for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
             if (sem_unlink(Client::Slot::typeToString(type))) {
                 if (errno != ENOENT) {
@@ -262,7 +270,19 @@ int main(int argcIn, char **argvIn)
         }
     }
 
-    if ((data.slaveHostname.empty() && data.slaveIp.empty()) || !data.slavePort) {
+    if (schedulerWebsocket.needsEnvironment) {
+        watchdog.stop();
+        const std::string tarball = Client::prepareEnvironmentForUpload();
+        printf("GOT TARBALL %s\n", tarball.c_str());
+        if (!tarball.empty()) {
+            Client::uploadEnvironment(&schedulerWebsocket, tarball);
+        }
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        return 0;
+    }
+
+    if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())
+        || !schedulerWebsocket.slavePort) {
         DEBUG("Have to run locally because no slave");
         watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -275,10 +295,10 @@ int main(int argcIn, char **argvIn)
     Select select;
     select.add(&slaveWebSocket);
     select.add(&watchdog);
-    headers["x-fisk-job-id"] = std::to_string(data.jobId);
+    headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
-                                               data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
-                                               data.slavePort), headers)) {
+                                               schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
+                                               schedulerWebsocket.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
         watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -388,6 +408,9 @@ static void usage(FILE *f)
             "  --fisk-slave=[ip address]          Set fisk's preferred slave\n"
             "  --fisk-slave [ip address]\n"
             "\n"
+            "  --fisk-scheduler=[url]             Set fisk's scheduler url (\"ws://127.0.0.1:8097\")\n"
+            "  --fisk-scheduler [url]\n"
+            "\n"
             "  --fisk-disabled                    Run all jobs locally\n"
             "\n"
             "  --fisk-clean-semaphores            Drop semaphores. This could be useful if fiskc has crashed while holding a semaphore\n"
@@ -403,5 +426,6 @@ static void usage(FILE *f)
             "  FISK_LOG_APPEND                    Append to log file\n"
             "  FISK_DISABLED                      Run all jobs locally\n"
             "  FISK_COMPILER                      Set resolved compiler\n"
+            "  FISK_SCHEDULER                     Set scheduler url\n"
             "  FISK_SLAVE                         Set preferred slave\n");
 }

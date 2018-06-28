@@ -6,6 +6,12 @@
 
 target_files=
 
+for ARG in $ARG{100..1}; do
+    set -- "$ARG" "$@"
+done
+
+echo "got args $@"
+
 # Optional path to strip from all paths if present, e.g. if the compiler is not in /usr.
 stripprefix=
 

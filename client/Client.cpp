@@ -3,6 +3,7 @@
 #include "Log.h"
 #include <unistd.h>
 #include "CompilerArgs.h"
+#include "SchedulerWebSocket.h"
 #include "Select.h"
 #include "Config.h"
 #include <unistd.h>
@@ -662,46 +663,149 @@ std::string Client::findExecutablePath(const char *argv0)
     return std::string();
 }
 
-void Client::uploadEnvironment()
+bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)
 {
-    const std::string execPath = Client::findExecutablePath(Client::data().argv[0]);
-    std::string dirname;
-    Client::parsePath(execPath.c_str(), 0, &dirname);
-    if (execPath.empty() || dirname.empty()) {
-        ERROR("Failed to get current directory");
-        return;
+    FILE *f = fopen(tarball.c_str(), "r");
+    std::string dir;
+    Client::parsePath(tarball, 0, &dir);
+    if (!f) {
+        ERROR("Failed to open %s for reading: %d %s", tarball.c_str(), errno, strerror(errno));
+        Client::recursiveMkdir(dir);
+        return false;
     }
-    const std::string node = Config::nodePath();
-    const std::string scheduler = Config::scheduler();
-    const std::string hash = sData.hash;
-    const std::string resolvedCompiler = sData.resolvedCompiler;
+    struct stat st;
+    if (stat(tarball.c_str(), &st)) {
+        ERROR("Failed to stat %s: %d %s", tarball.c_str(), errno, strerror(errno));
+        fclose(f);
+        Client::recursiveMkdir(dir);
+        return false;
+    }
+    {
 #ifdef __APPLE__
-    const char *system = "Darwin x86_64";
+        const char *system = "Darwin x86_64";
 #elif defined(__linux__) && defined(__i686)
-    const char *system = "Linux i686"
+        const char *system = "Linux i686"
 #elif defined(__linux__) && defined(__x86_64)
-    const char *system = "Linux x86_64";
+        const char *system = "Linux x86_64";
 #else
 #error unsupported platform
 #endif
-    const std::string commandLine = Client::format("%s ./fisk-envuploader.js '--scheduler=%s/uploadenvironment' '--system=%s' '--hash=%s' '--compiler=%s' --silent",
-                                                   node.c_str(), scheduler.c_str(), system, hash.c_str(), resolvedCompiler.c_str());
+        json11::Json::object msg {
+            { "type", "uploadEnvironment" },
+            { "hash", sData.hash },
+            { "bytes", static_cast<int>(st.st_size) },
+            { "system", system }
+        };
 
-    const pid_t pid = fork();
-    switch (pid) {
-    case 0: { // child
-        assert(dirname.size() && dirname[dirname.size() - 1] == '/');
-        TinyProcessLib::Process proc(commandLine, dirname + "../envuploader",
-                                     [](const char *bytes, size_t n) {},
-                                     [](const char *bytes, size_t n) {});
-
-        exit(0);
-        break; }
-    case -1: // error
-        ERROR("Failed to fork %d %s", errno, strerror(errno));
-        break;
-    default: // parent, all good
-        DEBUG("Forked process %d -> %s", pid, commandLine.c_str());
-        break;
+        std::string json = json11::Json(msg).dump();
+        schedulerWebSocket->send(WebSocket::Text, json.c_str(), json.size());
+        Select select;
+        select.add(schedulerWebSocket);
+        char buf[1024 * 256];
+        size_t sent = 0;
+        do {
+            const size_t chunkSize = std::min(st.st_size - sent, sizeof(buf));
+            if (fread(buf, 1, chunkSize, f) != chunkSize) {
+                ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
+                fclose(f);
+                Client::recursiveMkdir(dir);
+                return false;
+            }
+            schedulerWebSocket->send(WebSocket::Binary, buf, chunkSize);
+            DEBUG("Sending %zu bytes %zu/%zu sent", chunkSize, sent, static_cast<size_t>(st.st_size));
+            while (schedulerWebSocket->hasPendingSendData() && schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket)
+                select.exec();
+            sent += chunkSize;
+        } while (sent < static_cast<size_t>(st.st_size) && schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket);
     }
+    fclose(f);
+    Client::recursiveMkdir(dir);
+    return schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket;
+}
+
+extern "C" const unsigned char create_fisk_env[];
+extern "C" const unsigned create_fisk_env_size;
+std::string Client::prepareEnvironmentForUpload()
+{
+    char dir[PATH_MAX];
+    strcpy(dir, "/tmp/fisk-env-XXXXXX");
+    if (!mkdtemp(dir)) {
+        ERROR("Failed to mkdtemp %d %s", errno, strerror(errno));
+        return std::string();
+    }
+
+    // printf("GOT DIR %s\n", dir);
+
+    const std::string info = Client::format("%s/compiler-info_%s", dir, sData.hash.c_str());
+    FILE *f = fopen(info.c_str(), "w");
+    if (!f) {
+        ERROR("Failed to create info file: %s %d %s", info.c_str(), errno, strerror(errno));
+        Client::recursiveMkdir(dir);
+        return std::string();
+    }
+
+
+    {
+        std::string stdOut, stdErr;
+        TinyProcessLib::Process proc(sData.resolvedCompiler + " -v", dir,
+                                     [&stdOut](const char *bytes, size_t n) { stdOut.append(bytes, n); },
+                                     [&stdErr](const char *bytes, size_t n) { stdErr.append(bytes, n); });
+        const int exit_status = proc.get_exit_status();
+        if (exit_status) {
+            ERROR("Failed to run %s -v\n%s", sData.resolvedCompiler.c_str(), stdErr.c_str());
+            fclose(f);
+            Client::recursiveMkdir(dir);
+            return std::string();
+        }
+        stdOut += stdErr;
+        if (fwrite(stdOut.c_str(), 1, stdOut.size(), f) != stdOut.size()) {
+            ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
+            fclose(f);
+            Client::recursiveMkdir(dir);
+            return std::string();
+        }
+        fclose(f);
+    }
+
+
+    {
+        std::string stdOut, stdErr;
+        TinyProcessLib::Process proc("bash", dir,
+                                     [&stdOut](const char *bytes, size_t n) {
+                                         stdOut.append(bytes, n);
+                                         // printf("%s", std::string(bytes, n).c_str());
+                                         if (Log::minLogLevel <= Log::Debug)
+                                             Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+                                     }, [&stdErr](const char *bytes, size_t n) {
+                                         stdErr.append(bytes, n);
+                                         // fprintf(stderr, "%s", std::string(bytes, n).c_str());
+                                         if (Log::minLogLevel <= Log::Debug)
+                                             Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+                                     }, true);
+
+        proc.write(Client::format("export ARG1=%s\n"
+                                  "export ARG2=--addfile\n"
+                                  "export ARG3=%s:/etc/compiler_info\n",
+                                  sData.resolvedCompiler.c_str(),
+                                  info.c_str()));
+        proc.write(reinterpret_cast<const char *>(create_fisk_env), create_fisk_env_size);
+        proc.close_stdin();
+        const int exit_status = proc.get_exit_status();
+        if (exit_status) {
+            ERROR("Failed to run create-fisk-env: %s", stdErr.c_str());
+            Client::recursiveMkdir(dir);
+            return std::string();
+        }
+        if (stdOut.size() > 1 && stdOut[stdOut.size() - 1] == '\n')
+            stdOut.resize(stdOut.size() - 1);
+        const size_t idx = stdOut.rfind("\ncreating ");
+        if (idx == std::string::npos) {
+            ERROR("Failed to parse stdout of create-fisk-env:\n%s", stdOut.c_str());
+            Client::recursiveMkdir(dir);
+            return std::string();
+        }
+        std::string tarball = Client::format("%s/%s", dir, stdOut.substr(idx + 10).c_str());
+        return tarball;
+    }
+    return std::string();
 }

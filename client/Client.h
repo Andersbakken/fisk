@@ -22,6 +22,7 @@
 
 class Watchdog;
 struct CompilerArgs;
+class SchedulerWebSocket;
 namespace Client {
 struct Data
 {
@@ -35,11 +36,6 @@ struct Data
     std::string hash;
     int exitCode { 0 };
     std::set<sem_t *> semaphores;
-
-    std::string slaveIp, slaveHostname;
-    int jobId { 0 };
-    bool maintainSemaphores { false };
-    uint16_t slavePort { 0 };
 
     std::shared_ptr<CompilerArgs> compilerArgs;
     Watchdog *watchdog { 0 };
@@ -229,7 +225,8 @@ inline FileType fileType(const std::string &path, struct stat *st = 0)
 
 std::string environmentHash(const std::string &compiler);
 std::string findExecutablePath(const char *argv0);
-void uploadEnvironment();
+bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
+std::string prepareEnvironmentForUpload();
 }
 
 #endif /* CLIENT_H */

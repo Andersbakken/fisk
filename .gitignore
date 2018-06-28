@@ -78,3 +78,4 @@ cmake_install.cmake
 /bin/clang
 /bin/clang++
 /.gdb_history
+/client/create-fisk-env.c

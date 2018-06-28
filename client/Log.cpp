@@ -63,7 +63,7 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
     return Silent;
 }
 
-void Log::log(Level level, const std::string &string)
+void Log::log(Level level, const std::string &string, unsigned int flags)
 {
     if (level < sLevel && !sLogFile)
         return;
@@ -91,7 +91,7 @@ void Log::log(Level level, const std::string &string)
         fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
-    if (string.at(string.size() - 1) != '\n') {
+    if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
         fwrite("\n", 1, 1, stderr);
         if (sLogFile)
             fwrite("\n", 1, 1, sLogFile);
