@@ -43,6 +43,19 @@ enum CheckResult {
     Continue
 };
 
+void filterCOLLECT(std::string &output)
+{
+    size_t i=0;
+    while ((i = output.find("COLLECT_")) != std::string::npos) {
+        size_t endLine = output.find("\n", i);
+        if (endLine == std::string::npos) {
+            output.erase(i);
+        } else {
+            output.erase(i, endLine - i + 1);
+        }
+    }
+}
+
 static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
 {
     errno = 0;
@@ -537,7 +550,9 @@ std::string Client::environmentHash(const std::string &compiler)
             return std::string();
         }
 
-        return Client::toHex(Client::sha1(out + err));
+        out += err;
+        filterCOLLECT(out);
+        return Client::toHex(Client::sha1(out));
     };
     const std::string cache = Config::envCache();
     if (cache.empty())
@@ -758,6 +773,7 @@ std::string Client::prepareEnvironmentForUpload()
             return std::string();
         }
         stdOut += stdErr;
+        filterCOLLECT(stdOut);
         if (fwrite(stdOut.c_str(), 1, stdOut.size(), f) != stdOut.size()) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
             fclose(f);
