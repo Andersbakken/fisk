@@ -413,7 +413,7 @@ server.on("compile", function(compile) {
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
-        console.log("Client disappeared");
+        // console.log("Client disappeared");
         compile.removeAllListeners();
         if (slave) {
             --slave.activeClients;
