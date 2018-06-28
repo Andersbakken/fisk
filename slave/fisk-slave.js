@@ -17,6 +17,10 @@ if (process.getuid() !== 0) {
     process.exit(1);
 }
 
+process.on('unhandledRejection', (reason, p) => {
+    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+});
+
 let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
 if (ports.length) {
     var name = option("name") || option("hostname") || os.hostname();
@@ -32,7 +36,7 @@ if (ports.length) {
         return ret;
     });
     process.exit();
-} 
+}
 
 let environments = {};
 const client = new Client(option);
@@ -117,7 +121,7 @@ function loadEnvironments()
                                 vm.once('ready', () => {
                                     vm.ready = true;
                                     vm.removeListener("error", errorHandler);
-                                    if (!--pending) 
+                                    if (!--pending)
                                         resolve();
                                 });
                             } else {

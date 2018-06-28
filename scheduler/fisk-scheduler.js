@@ -8,6 +8,11 @@ const common = require('../common')(option);
 const Environments = require("./environments");
 const server = new Server(option);
 const fs = require("fs-extra");
+const bytes = require("bytes");
+
+process.on('unhandledRejection', (reason, p) => {
+    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+});
 
 const slaves = {};
 const monitors = [];
@@ -43,6 +48,57 @@ function findSlave(ip, port) {
     return slaves(slaveKey(ip, port));
 }
 
+
+function purgeEnvironmentsToMaxSize()
+{
+    return new Promise((resolve, reject) => {
+        let maxSize = bytes.parse(option("max-cache-size"));
+        if (!maxSize) {
+            resolve(false);
+            return;
+        }
+        const p = Environments._path;
+        try {
+            let purged = false;
+            fs.readdirSync(p).map(file => {
+                console.log("got file", file);
+                let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(file);
+                if (!match)
+                    return undefined;
+                var abs = path.join(p, file);
+                var stat;
+                try {
+                    stat = fs.statSync(abs);
+                } catch (err) {
+                    return undefined;
+                }
+                return {
+                    path: abs,
+                    hash: match[1],
+                    size: stat.size,
+                    created: stat.birthtimeMs
+                };
+            }).sort((a, b) => {
+                // console.log(`comparing ${a.path} ${a.created} to ${b.path} ${b.created}`);
+                return b.created - a.created;
+            }).forEach(env => {
+                if (!env)
+                    return;
+                if (maxSize >= env.size) {
+                    maxSize -= env.size;
+                    return;
+                }
+                purged = true;
+                Environments.remove(env.hash);
+                console.log("Should purge env", env.hash);
+            });
+            resolve(purged);
+        } catch (err) {
+            resolve(false);
+            return;
+        }
+    });
+}
 
 function distribute(conf)
 {
@@ -245,8 +301,14 @@ server.on("compile", function(compile) {
                         Environments.complete(file);
                         file = undefined;
                         // send any new environments to slaves
-                        distribute({hash: hash});
                         delete pendingEnvironments[hash];
+                        purgeEnvironmentsToMaxSize().then(purged => {
+                            var msg = {type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) };
+                            forEachSlave(slave => slave.send(msg));
+                            distribute({hash: hash});                        
+                        }).catch(error => {
+                            console.error("Got some error here", error);
+                        });
                     }
                 }).catch(err => {
                     console.log("file error", err);
@@ -318,11 +380,11 @@ server.on("compile", function(compile) {
     if (compile.ip in semaphoreMaintenanceTimers) {
         clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
     } else {
+        semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
+            delete semaphoreMaintenanceTimers[compile.ip];
+        }, 60 * 60000);
         data["maintain_semaphores"] = true;
     }
-    semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
-        delete semaphoreMaintenanceTimers[compile.ip];
-    }, 10 * 60000);
 
     if (slave) {
         ++activeJobs;
@@ -379,9 +441,10 @@ server.on("error", err => {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(option("env-dir", path.join(common.cacheDir(), "environments"))).then(() => {
-    server.listen();
-}).catch(e => {
-    console.error(e);
-    process.exit();
-});
+Environments.load(option("env-dir", path.join(common.cacheDir(), "environments")))
+    .then(purgeEnvironmentsToMaxSize)
+    .then(() => server.listen())
+    .catch(e => {
+        console.error(e);
+        process.exit();
+    });

@@ -168,34 +168,40 @@ const environments = {
     _data: {},
     _path: undefined,
 
-    load(path) {
+    load(p) {
         return new Promise((resolve, reject) => {
-            fs.stat(path).then(st => {
+            fs.stat(p).then(st => {
                 if (st.isDirectory()) {
                     // we're good
-                    environments._path = path;
-                    environments._read(path).then(() => {
+                    environments._path = p;
+                    fs.readdir(p).then(files => {
+                        files.forEach(e => {
+                            let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(e);
+                            if (match) {
+                                const hash = match[1];
+                                const system = match[2];
+                                environments._data[hash] = new Environment(path.join(p, e), hash, system);
+                            }
+                        });
                         resolve();
-                    }).catch(e => {
-                        reject(`Can't make directory ${path}: ${e.message}`);
                     });
                 } else {
-                    reject(`Can't use path ${path}`);
+                    reject(`Can't use path ${p}`);
                 }
             }).catch(e => {
                 if ("code" in e && e.code == "ENOENT") {
                     // make the directory
-                    fs.mkdirp(path, err => {
+                    fs.mkdirp(p, err => {
                         if (err) {
-                            reject(`Can't make directory ${path}: ${e.message}`);
+                            reject(`Can't make directory ${p}: ${e.message}`);
                             return;
                         }
                         // we're good
-                        environments._path = path;
+                        environments._path = p;
                         resolve();
                     });
                 } else {
-                    reject(`Can't make directory ${path}: ${e.message}`);
+                    reject(`Can't make directory ${p}: ${e.message}`);
                 }
             });
         });
@@ -226,52 +232,14 @@ const environments = {
         return environments._data[hash];
     },
 
-    _read(p) {
-        return new Promise((resolve, reject) => {
-            fs.readdir(p).then(files => {
-                let envs = files.filter(e => e.endsWith(".tar.gz"));
-                const next = () => {
-                    if (!envs.length) {
-                        resolve();
-                        return;
-                    }
-                    const env = envs.shift();
-                    let data = {};
-
-                    fs.open(path.join(p, env), "r").then(fd => {
-                        data.fd = fd;
-                        data.buf = Buffer.alloc(1024);
-                        return fs.read(fd, data.buf, 0, 1024);
-                    }).then(bytes => {
-                        if (bytes < 4) {
-                            throw new Error(`Read ${bytes} from ${env}`);
-                        }
-                        data.bytes = bytes;
-                        const fd = data.fd;
-                        data.fd = undefined;
-                        return fs.close(fd);
-                    }).then(() => {
-                        let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(env);
-                        if (!match) {
-                            throw new Error(`Bad env name: ${env}`);
-                        }
-                        const hash = match[1];
-                        const system = match[2];
-                        environments._data[hash] = new Environment(path.join(p, env), hash, system);
-                        process.nextTick(next);
-                    }).catch(e => {
-                        if (data.fd) {
-                            fs.closeSync(data.fd);
-                        }
-                        console.error(e);
-                        process.nextTick(next);
-                    });
-                };
-                next();
-            }).catch(e => {
-                reject(e);
-            });
-        });
+    remove(hash) {
+        try {
+            fs.removeSync(environments._data[hash].path);
+            delete environments._data[hash];
+        } catch (err) {
+            console.error("Failed to remove environment", environments._data[hash].path, err);
+            return;
+        }
     }
 };
 
