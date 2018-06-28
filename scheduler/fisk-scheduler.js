@@ -43,12 +43,12 @@ function findSlave(ip, port) {
     return slaves(slaveKey(ip, port));
 }
 
+
 function distribute(conf)
 {
     let keys;
-    if (conf
-        && conf.slave) {
-        if (conf.pendingEnvironments)
+    if (conf && conf.slave) {
+        if (conf.slave.pendingEnvironments)
             return;
         keys = [ slaveKey(conf.slave) ];
     } else {
