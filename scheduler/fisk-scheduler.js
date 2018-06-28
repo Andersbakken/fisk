@@ -208,8 +208,11 @@ server.on("slave", function(slave) {
     slave.pendingEnvironments = false;
     insertSlave(slave);
     console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
-    slave.send({type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) });
-    distribute({slave: slave});
+    if (Object.keys(slave.environments).sort() != Object.keys(Environments.environments).sort()) {
+        slave.send({type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) });
+    } else {
+        distribute({slave: slave});
+    }
 
     slave.on('environments', function(message) {
         slave.environments = {};
@@ -305,7 +308,7 @@ server.on("compile", function(compile) {
                         purgeEnvironmentsToMaxSize().then(purged => {
                             var msg = {type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) };
                             forEachSlave(slave => slave.send(msg));
-                            distribute({hash: hash});                        
+                            distribute({hash: hash});
                         }).catch(error => {
                             console.error("Got some error here", error);
                         });

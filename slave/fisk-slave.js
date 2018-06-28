@@ -166,9 +166,7 @@ client.on("filterEnvironments", message => {
             purged = true;
         }
     }
-    if (purged) {
-        client.send("environments", { environments: Object.keys(environments) });
-    }
+    client.send("environments", { environments: Object.keys(environments) });
 });
 
 client.on("environment", message => {
@@ -226,8 +224,8 @@ client.on("data", message => {
         }).then(() => {
             console.log("Informing scheduler about our environments:", Object.keys(environments));
             environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
-            client.send("environments", { environments: Object.keys(environments) });
             pendingEnvironment = undefined;
+            client.send("environments", { environments: Object.keys(environments) });
         }).catch((err) => {
             console.error("Got failure setting up environment", err);
             try {
