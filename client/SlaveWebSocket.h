@@ -80,6 +80,12 @@ public:
                 }
             }
             f = fopen(files[0].path.c_str(), "w");
+            if (!f) {
+                Client::data().watchdog->stop();
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                return;
+            }
+            assert(f);
             if (files[0].remaining)
                 fill(0, 0);
         } else {
@@ -122,6 +128,13 @@ public:
                     break;
                 front = &files.front();
                 f = fopen(front->path.c_str(), "w");
+                if (!f) {
+                    Client::data().watchdog->stop();
+                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                    return;
+                }
+
+                assert(f);
                 continue;
             }
         } while (offset < bytes);
