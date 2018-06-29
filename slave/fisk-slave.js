@@ -169,7 +169,7 @@ client.on("dropEnvironments", message => {
 
 client.on("requestEnvironments", message => {
     console.log("scheduler wants us to inform of current environments", Object.keys(environments));
-    client.send("environments", { environments: Object.keys(environments) }); 
+    client.send("environments", { environments: Object.keys(environments) });
 });
 
 client.on("environment", message => {
@@ -303,13 +303,16 @@ server.on("job", (job) => {
         job: job,
         op: undefined,
         done: false,
+        buffers: [],
         start: function() {
             let job = this.job;
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
             this.op = vm.startCompile(job.commandLine, job.argv0);
+            this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
             }
+            delete this.buffers;
             this.op.on("stdout", data => job.send({ type: "stdout", data: data }));
             this.op.on("stderr", data => job.send({ type: "stderr", data: data }));
             this.op.on("finished", event => {
@@ -372,7 +375,12 @@ server.on("job", (job) => {
         // console.log("got data", this.id, data.last, typeof j.op);
         if (data.last)
             uploadDuration = Date.now() - jobStartTime;
-        j.op.feed(data.data, data.last);
+        if (!j.op) {
+            j.buffers.push(data);
+            console.log("buffering...", j.buffers.length);
+        } else {
+            j.op.feed(data.data, data.last);
+        }
     });
 
     jobQueue.push(j);
