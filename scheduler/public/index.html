@@ -1,5 +1,5 @@
 <html>
-  <head
+  <head>
     <title>Fisk!</title>
     <script language="javascript">
       function doshit() {
@@ -20,9 +20,14 @@
              } catch (err) {
                  text = e.data;
              }
+             var atBottom = div.scrollTop == div.scrollHeight - div.clientHeight;
+             console.log("drit", div.scrollTop, div.scrollHeight,
+             div.clientHeight, atBottom);
              div.appendChild(document.createTextNode(text));
              div.appendChild(document.createElement("br"));
-             div.scrollTop = div.scrollHeight - div.clientHeight;
+             if (atBottom) {
+                 div.scrollTop = div.scrollHeight - div.clientHeight;
+             }
          };
       }
       window.onload = doshit;
