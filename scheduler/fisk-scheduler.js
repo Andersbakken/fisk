@@ -254,7 +254,7 @@ server.on("slave", function(slave) {
             job.slave = { ip: slave.ip, port: slave.port, name: slave.name };
             if (slave.hostName)
                 job.hostName = slave.hostname;
-            console.log("job", job);
+            // console.log("job", job);
             monitors.forEach(monitor => monitor.send(job));
         }
     });
@@ -264,7 +264,7 @@ let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
-    console.log("request", compile.environments);
+    // console.log("request", compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
         if (Environments.hasEnvironment(compile.environments[i])) {
@@ -275,7 +275,7 @@ server.on("compile", function(compile) {
     let needed = [];
     if (!found) {
         compile.environments.forEach(env => {
-            console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
+            // console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
             if (!(env in pendingEnvironments)) {
                 needed.push(env);
                 pendingEnvironments[env] = true;
@@ -309,9 +309,10 @@ server.on("compile", function(compile) {
                     compile.close();
                     return;
                 }
-                if (environment.last)
+                if (environment.last) {
                     gotLast = true;
-                console.log("Got environmentdata message", environment.data.length, environment.last);
+                    console.log("Got environmentdata message", environment.data.length, environment.last);
+                }
                 file.save(environment.data).then(() => {
                     if (environment.last) {
                         file.close();
@@ -343,8 +344,8 @@ server.on("compile", function(compile) {
             });
         });
         compile.once("close", () => {
-            console.log("compile with upload closed", needed, gotLast);
             if (file && !gotLast) {
+                console.log("compile with upload closed", needed, "discarding");
                 file.discard();
                 file = undefined;
             }
