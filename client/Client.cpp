@@ -651,6 +651,22 @@ std::string Client::realpath(const std::string &path)
     return std::string();
 }
 
+std::string Client::base64(const std::string &src)
+{
+    BIO *b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO *sink = BIO_new(BIO_s_mem());
+    BIO_push(b64, sink);
+    BIO_write(b64, &src[0], src.size());
+    BIO_flush(b64);
+    const char *encoded;
+    const long len = BIO_get_mem_data(sink, &encoded);
+    std::string ret(encoded, len);
+    BIO_free(b64);
+    BIO_free(sink);
+    return ret;
+}
+
 std::string Client::findExecutablePath(const char *argv0)
 {
 #if defined(__linux__)
