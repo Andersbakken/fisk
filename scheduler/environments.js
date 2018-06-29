@@ -4,23 +4,46 @@ const path = require("path");
 const socket = {
     _queue: new Map(),
 
+    requestEnvironments(client) {
+        console.log("queueing requestEnvironments");
+        var key = client.ip + " " + client.port;
+        if (!socket._queue[key])
+            socket._queue[key] = { client: client, sending: false, messages: [] };
+        socket._queue[key].messages.push({ requestEnvironments: true });
+        if (!socket._queue[key].sending) {
+            socket._next(key);
+        }
+    },
     enqueue(client, hash, system, file) {
-        // console.log("queuing", file, hash, "for", client.ip);
+        console.log("queuing", file, hash, "for", client.ip);
         var key = client.ip + " " + client.port;
         if (!socket._queue[key])
             socket._queue[key] = { client: client, sending: false, messages: [] };
 
-        socket._queue[key].messages.push({ hash: hash, system: system, file: file });
-        if (!socket._queue[key].sending) {
-            socket._next(key);
+        let found = false;
+        if (!socket._queue[key].messages.find(pending => pending.hash == hash && pending.system == system && pending.file == file)) {
+            socket._queue[key].messages.push({ hash: hash, system: system, file: file });
+            if (!socket._queue[key].sending) {
+                socket._next(key);
+            }
         }
     },
 
     _next(key) {
         let data = socket._queue[key];
+        if (data.sending)
+            throw new Error("We're already sending!");
         data.sending = true;
         let client = data.client;
         const q = data.messages.shift();
+        console.log("about to send", q);
+        if (q.requestEnvironments) {
+            client.send({ type: "requestEnvironments" });
+            data.sending = false;
+            if (data.messages.length)
+                process.nextTick(socket._next, key);
+            return;
+        }
         let size;
         // console.log("About to send", q.file, "to", client.ip, ":", client.port);
         fs.stat(q.file).then(st => {
@@ -66,11 +89,16 @@ const socket = {
 };
 
 class Environment {
-    constructor(path, hash, system) {
+    constructor(path, hash, system, originalPath) {
         this.path = path;
         this.hash = hash;
         this.system = system;
-        console.log("Created environment", JSON.stringify(this));
+        this.originalPath = originalPath;
+        try {
+            this.size = fs.statSync(path).size;
+        } catch (err) {
+        }
+        console.log("Created environment", JSON.stringify(this), originalPath);
     }
 
 
@@ -99,7 +127,7 @@ class Environment {
 }
 
 class File {
-    constructor(path, hash, system) {
+    constructor(path, hash, system, originalPath) {
         this._fd = fs.openSync(path, "w");
         this._pending = [];
         this._writing = false;
@@ -107,6 +135,7 @@ class File {
         this.path = path;
         this.hash = hash;
         this.system = system;
+        this.originalPath = originalPath;
     }
 
     save(data) {
@@ -176,11 +205,12 @@ const environments = {
                     environments._path = p;
                     fs.readdir(p).then(files => {
                         files.forEach(e => {
-                            let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(e);
+                            let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(e);
                             if (match) {
                                 const hash = match[1];
                                 const system = match[2];
-                                environments._data[hash] = new Environment(path.join(p, e), hash, system);
+                                const originalPath = decodeURIComponent(match[3]);
+                                environments._data[hash] = new Environment(path.join(p, e), hash, system, originalPath);
                             }
                         });
                         resolve();
@@ -211,15 +241,20 @@ const environments = {
         if (environment.hash in environments._data)
             return undefined;
         fs.mkdirpSync(environments._path);
-        return new File(path.join(environments._path, `${environment.hash}_${environment.system}.tar.gz`), environment.hash, environment.system);
+        return new File(path.join(environments._path, `${environment.hash}:${environment.system}:${encodeURIComponent(environment.originalPath)}.tar.gz`),
+                        environment.hash, environment.system, environment.originalPath);
     },
 
     complete(file) {
-        environments._data[file.hash] = new Environment(file.path, file.hash, file.system);
+        environments._data[file.hash] = new Environment(file.path, file.hash, file.system, file.originalPath);
     },
 
     hasEnvironment(hash) {
         return hash in environments._data;
+    },
+
+    requestEnvironments(slave) {
+        socket.requestEnvironments(slave);
     },
 
     get environments() {

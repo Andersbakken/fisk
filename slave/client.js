@@ -5,16 +5,21 @@ const path = require('path');
 const fs = require('fs');
 
 class Client extends EventEmitter {
-    constructor(option) {
+    constructor(option, configVersion) {
         super();
 
+        this.configVersion = configVersion;
         this.scheduler = option("scheduler", "ws://localhost:8097");
+        if (this.scheduler.indexOf('://') == -1)
+            this.scheduler = "ws://" + this.scheduler;
+        if (!/:[0-9]+$/.exec(this.scheduler))
+            this.scheduler += ":8097";
         this.serverPort = option.int("port", 8096);
         this.hostname = option("hostname");
         this.name = option("name");
         this.slots = option.int("slots", os.cpus().length);
         try {
-            this.version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+            this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
         } catch (err) {
         }
         if (!this.name) {
@@ -45,10 +50,11 @@ class Client extends EventEmitter {
         let headers = {
             "x-fisk-port": this.serverPort,
             "x-fisk-environments": environments.join(";"),
+            "x-fisk-config-version": this.configVersion,
             "x-fisk-slave-name": this.name,
             "x-fisk-system": system,
             "x-fisk-slots": this.slots,
-            "x-fisk-npm-version": this.version
+            "x-fisk-npm-version": this.npmVersion
         };
         if (this.hostname)
             headers["x-fisk-slave-hostname"] = this.hostname;
@@ -88,6 +94,8 @@ class Client extends EventEmitter {
                     error("Bad message, no type");
                     return;
                 }
+
+                console.log("got message from scheduler", json.type);
 
                 if (json.bytes) {
                     remaining = json.bytes;

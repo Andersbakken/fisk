@@ -235,7 +235,8 @@ bool Client::findCompiler(const char *preresolved)
     // printf("RESULT %s\n", resolvedCompiler->c_str());
 
     sData.compiler = std::move(exec);
-    return true;
+    struct stat st;
+    return !stat(sData.compiler.c_str(), &st) && (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode));
 }
 
 void Client::parsePath(const char *path, std::string *basename, std::string *dirname)
@@ -713,6 +714,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             { "type", "uploadEnvironment" },
             { "hash", sData.hash },
             { "bytes", static_cast<int>(st.st_size) },
+            { "originalPath", sData.resolvedCompiler },
             { "system", system }
         };
 

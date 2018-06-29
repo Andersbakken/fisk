@@ -43,10 +43,11 @@ class Job extends EventEmitter {
 };
 
 class Server extends EventEmitter {
-    constructor(option) {
+    constructor(option, configVersion) {
         super();
         this.option = option;
         this.id = 0;
+        this.configVersion = configVersion;
     }
 
     listen() {
@@ -91,6 +92,12 @@ class Server extends EventEmitter {
                 return;
             }
             const name = req.headers["x-fisk-client-name"];
+            const configVersion = req.headers["x-fisk-config-version"];
+            if (configVersion != this.configVersion) {
+                error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
+                return;
+            }
+
             client = new Job(ws, ip, hash, name, req.headers["x-fisk-sourcefile"]);
             break;
         default:
@@ -129,7 +136,7 @@ class Server extends EventEmitter {
                     // console.log("Got binary", msg.length, bytes);
                     if (!msg.length) {
                         // no data?
-                        error("No data in buffer");
+                        console.error("No data in buffer");
                         return;
                     }
                     if (!bytes) {

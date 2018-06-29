@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 
-const Version = 4;
+const Version = 5;
 
 function cacheDir(option)
 {
@@ -39,6 +39,7 @@ function validateCache(option)
 module.exports = function(option) {
     validateCache(option);
     return {
-        cacheDir: cacheDir.bind(this, option)
+        cacheDir: cacheDir.bind(this, option),
+        Version: Version
     };
 };

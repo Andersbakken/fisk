@@ -39,7 +39,7 @@ if (ports.length) {
 }
 
 let environments = {};
-const client = new Client(option);
+const client = new Client(option, common.Version);
 const environmentsRoot = path.join(common.cacheDir(), "environments");
 
 function exec(command, options)
@@ -154,18 +154,22 @@ client.on("quit", message => {
     process.exit(message.code);
 });
 
-client.on("filterEnvironments", message => {
-    console.log(`Filtering environments to ${Object.keys(message.environments)}`);
-    for (let hash in environments) {
-        if (!(hash in message.environments)) {
-            const dir = path.join(environmentsRoot, hash);
-            console.log(`Purge environment ${hash} ${dir}`);
-            environments[hash].destroy();
-            delete environments[hash];
+client.on("dropEnvironments", message => {
+    console.log(`Dropping environments ${message.environments}`);
+    message.environments.forEach(env => {
+        var environment = environments[env];
+        if (environment) {
+            const dir = path.join(environmentsRoot, env);
+            console.log(`Purge environment ${env} ${dir}`);
+            environment.destroy();
+            delete environments[env];
         }
-    }
-    console.log("sending back env", Object.keys(environments));
-    client.send("environments", { environments: Object.keys(environments) });
+    });
+});
+
+client.on("requestEnvironments", message => {
+    console.log("scheduler wants us to inform of current environments", Object.keys(environments));
+    client.send("environments", { environments: Object.keys(environments) }); 
 });
 
 client.on("environment", message => {
@@ -209,30 +213,31 @@ client.on("data", message => {
     if (!message.last)
         return;
 
-    console.log(`untar ${pendingEnvironment.file}`);
-    exec("tar xf '" + pendingEnvironment.file + "'", { cwd: pendingEnvironment.dir }).
+    var pending = pendingEnvironment;
+    pendingEnvironment = undefined;
+
+    console.log(`untar ${pending.file}`);
+    exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
         then(() => {
-            console.log("Checking that the environment runs", path.join(pendingEnvironment.dir, "bin", "true"));
-            return exec(`"${path.join(pendingEnvironment.dir, "bin", "true")}"`, { cwd: pendingEnvironment.dir });
+            console.log("Checking that the environment runs", path.join(pending.dir, "bin", "true"));
+            return exec(`"${path.join(pending.dir, "bin", "true")}"`, { cwd: pending.dir });
         }).then(() => {
             console.log("Write json file");
-            return fs.writeFile(path.join(pendingEnvironment.dir, "environment.json"), JSON.stringify({ hash: pendingEnvironment.hash, created: new Date().toString() }));
+            return fs.writeFile(path.join(pending.dir, "environment.json"), JSON.stringify({ hash: pending.hash, created: new Date().toString() }));
         }).then(() => {
-            console.log(`Unlink ${pendingEnvironment.file}`);
-            return fs.unlink(pendingEnvironment.file);
+            console.log(`Unlink ${pending.file}`);
+            return fs.unlink(pending.file);
         }).then(() => {
-            environments[pendingEnvironment.hash] = new VM(pendingEnvironment.dir, pendingEnvironment.hash);
+            environments[pending.hash] = new VM(pending.dir, pending.hash);
             console.log("Informing scheduler about our environments:", Object.keys(environments));
-            pendingEnvironment = undefined;
             client.send("environments", { environments: Object.keys(environments) });
         }).catch((err) => {
             console.error("Got failure setting up environment", err);
             try {
-                fs.removeSync(pendingEnvironment.dir);
+                fs.removeSync(pending.dir);
             } catch (rmdirErr) {
-                console.error("Failed to remove directory", pendingEnvironment.dir, rmdirErr);
+                console.error("Failed to remove directory", pending.dir, rmdirErr);
             }
-            pendingEnvironment = undefined;
         });
 });
 
@@ -262,7 +267,7 @@ client.on("close", () => {
 });
 
 
-const server = new Server(option);
+const server = new Server(option, common.Version);
 let jobQueue = [];
 
 server.on('headers', (headers, request) => {

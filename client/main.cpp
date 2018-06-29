@@ -10,6 +10,7 @@
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
+#include <regex>
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
@@ -229,6 +230,7 @@ int main(int argcIn, char **argvIn)
     headers["x-fisk-environments"] = hashes;
     Client::parsePath(data.compilerArgs->sourceFile(0), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name();
+    headers["x-fisk-config-version"] = std::to_string(Config::Version);
     if (slave)
         headers["x-fisk-slave"] = slave;
     {
@@ -237,6 +239,13 @@ int main(int argcIn, char **argvIn)
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
     std::string url = scheduler ? std::string(scheduler) : Config::scheduler();
+    if (url.find("://") == std::string::npos)
+        url.insert(0, "ws://");
+
+    std::regex regex(":[0-9]+$", std::regex_constants::ECMAScript);
+    if (!std::regex_search(url, regex))
+        url.append(":8097");
+
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         watchdog.stop();

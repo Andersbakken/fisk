@@ -4,14 +4,14 @@ const path = require("path");
 const os = require("os");
 const option = require("@jhanssen/options")("fisk/scheduler");
 const Server = require("./server");
-const common = require('../common')(option);
+const common = require("../common")(option);
 const Environments = require("./environments");
-const server = new Server(option);
+const server = new Server(option, common.Version);
 const fs = require("fs-extra");
 const bytes = require("bytes");
 
-process.on('unhandledRejection', (reason, p) => {
-    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+process.on("unhandledRejection", (reason, p) => {
+    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
 });
 
 const slaves = {};
@@ -48,7 +48,6 @@ function findSlave(ip, port) {
     return slaves(slaveKey(ip, port));
 }
 
-
 function purgeEnvironmentsToMaxSize()
 {
     return new Promise((resolve, reject) => {
@@ -62,7 +61,7 @@ function purgeEnvironmentsToMaxSize()
             let purged = false;
             fs.readdirSync(p).map(file => {
                 console.log("got file", file);
-                let match = /^([A-Za-z0-9]*)_(.*).tar.gz$/.exec(file);
+                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);                
                 if (!match)
                     return undefined;
                 var abs = path.join(p, file);
@@ -100,44 +99,60 @@ function purgeEnvironmentsToMaxSize()
     });
 }
 
-function distribute(conf)
+function syncEnvironments(slave)
 {
-    let keys;
-    if (conf && conf.slave) {
-        if (conf.slave.pendingEnvironments)
-            return;
-        keys = [ slaveKey(conf.slave) ];
-    } else {
-        keys = Object.keys(slaves);
+    if (!slave) {
+        forEachSlave(syncEnvironments);
+        return;
     }
-    let hashes;
-    if (conf && conf.hash) {
-        hashes = [ conf.hash ];
-    } else {
-        hashes = Object.keys(Environments.environments);
-    }
-    // console.log("distribute", keys, hashes);
-    for (let h=0; h<hashes.length; ++h) {
-        let hash = hashes[h];
-        for (let i=0; i<keys.length; ++i) {
-            let key = keys[i];
-            let slave = slaves[key];
-            if (!slave.pendingEnvironments && slave.environments && !(hash in slave.environments)) {
-                let e = Environments.environment(hash);
-                if (e.canRun(slave.system)) {
-                    console.log("sending", hash, "to", key);
-                    Environments.environment(hash).send(slave);
-                    slave.pendingEnvironments = true;
-                // } else {
-                //     console.log("slave can't run this environment", key, hash);
-                }
-            }
+    var needs = [];
+    var unwanted = [];
+    console.log("scheduler has", Object.keys(Environments.environments).sort());
+    console.log("slave has", Object.keys(slave.environments).sort());
+    for (let env in Environments.environments) {
+        if (env in slave.environments) {
+            slave.environments[env] = -1;
+        } else {
+            needs.push(env);
         }
+    }
+    for (let env in slave.environments) {
+        if (slave.environments[env] != -1) {
+            unwanted.push(env);
+            delete slave.environments[env];
+        } else {
+            slave.environments[env] = true;
+        }
+    }
+    console.log("unwanted", unwanted);
+    console.log("needs", needs);
+    if (unwanted.length) {
+        slave.send({ type: "dropEnvironments", environments: unwanted });
+    }
+    if (needs.length) {
+        needs.forEach(env => Environments.environments[env].send(slave));
+        // Environments.requestEnvironments(slave);
     }
 }
 
+function environmentsInfo()
+{
+    let ret = JSON.stringify(Environments.environments);
+    ret.maxSize = option("max-cache-size") || 0;
+    ret.maxSizeBytes = bytes.parse(option("max-cache-size"));
+    ret.usedSizeBytes = 0;
+    for (let hash in Environments.environments) {
+        let env = Environments.environments[hash];
+        if (env.size)
+            ret.usedSizeBytes += env.size;
+    }
+    ret.usedSize = bytes.format(ret.usedSizeBytes);
+    return ret;
+}
+
 server.express.get("/environments", (req, res, next) => {
-    res.send(Object.keys(Environments.environments));
+    
+    res.send(environmentsInfo());
 });
 
 server.express.get("/slaves", (req, res, next) => {
@@ -160,7 +175,7 @@ server.express.get("/slaves", (req, res, next) => {
             name: s.name,
             created: s.created,
             load: s.load,
-            version: s.version,
+            npmVersion: s.npmVersion,
             environments: Object.keys(s.environments)
         });
     }
@@ -168,14 +183,14 @@ server.express.get("/slaves", (req, res, next) => {
 });
 
 server.express.get("/info", (req, res, next) => {
-    let version = -1;
+    let npmVersion = -1;
     try {
-        version = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+        npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
     } catch (err) {
         console.log("Couldn't parse package json", err);
     }
 
-    res.send({ version: version, environments: Object.keys(Environments.environments) });
+    res.send({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version });
 });
 
 server.express.get("/quit-slaves", (req, res, next) => {
@@ -205,22 +220,14 @@ server.express.get("/quit", (req, res, next) => {
 
 server.on("slave", function(slave) {
     slave.activeClients = 0;
-    slave.pendingEnvironments = false;
     insertSlave(slave);
     console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
-    if (Object.keys(slave.environments).sort() != Object.keys(Environments.environments).sort()) {
-        // console.log("sending filter", Object.keys(Environments.environments).sort(), Object.keys(slave.environments).sort());
-        slave.send({type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) });
-    } else {
-        // console.log("just calling distribute", Object.keys(Environments.environments).sort(), Object.keys(slave.environments).sort());
-        distribute({slave: slave});
-    }
+    syncEnvironments(slave);
 
-    slave.on('environments', function(message) {
+    slave.on("environments", function(message) {
         slave.environments = {};
         message.environments.forEach(env => slave.environments[env] = true);
-        slave.pendingEnvironments = false;
-        distribute({slave: slave});
+        syncEnvironments(slave);
     });
 
     slave.on("error", function(msg) {
@@ -251,7 +258,7 @@ let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
-    // console.log("request", compile.environments);
+    console.log("request", compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
         if (Environments.hasEnvironment(compile.environments[i])) {
@@ -262,7 +269,7 @@ server.on("compile", function(compile) {
     let needed = [];
     if (!found) {
         compile.environments.forEach(env => {
-            // console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
+            console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
             if (!(env in pendingEnvironments)) {
                 needed.push(env);
                 pendingEnvironments[env] = true;
@@ -307,11 +314,8 @@ server.on("compile", function(compile) {
                         file = undefined;
                         // send any new environments to slaves
                         delete pendingEnvironments[hash];
-                        purgeEnvironmentsToMaxSize().then(purged => {
-                            if (purged) {
-                                var msg = {type: "filterEnvironments", environments: Object.keys(Environments.environments).reduce((obj, value) => { obj[value] = true; return obj; }, {}) };
-                                forEachSlave(slave => slave.send(msg));
-                            }
+                        purgeEnvironmentsToMaxSize().then(() => {
+                            syncEnvironments();
                         }).catch(error => {
                             console.error("Got some error here", error);
                         });
@@ -332,7 +336,7 @@ server.on("compile", function(compile) {
                 delete pendingEnvironments[env];
             });
         });
-        compile.on("close", () => {
+        compile.once("close", () => {
             console.log("compile with upload closed", needed, gotLast);
             if (file && !gotLast) {
                 file.discard();

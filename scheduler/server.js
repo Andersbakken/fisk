@@ -48,10 +48,11 @@ Client.Type = {
 };
 
 class Server extends EventEmitter {
-    constructor(option) {
+    constructor(option, configVersion) {
         super();
         this.option = option;
         this.app = express();
+        this.configVersion = configVersion;
         this.id = 0;
     }
 
@@ -99,6 +100,13 @@ class Server extends EventEmitter {
             // look at headers
             if (!("x-fisk-environments" in req.headers)) {
                 error("No x-fisk-environments header");
+                return;
+            }
+
+            const configVersion = req.headers["x-fisk-config-version"];
+            if (configVersion != this.configVersion) {
+                error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
+                console.log("Balls", req.headers);
                 return;
             }
             const compileEnvironments = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
@@ -159,6 +167,12 @@ class Server extends EventEmitter {
                         return;
                     }
 
+                    if (!("originalPath" in json)) {
+                        console.log(json);
+                        error("Need an originalPath property");
+                        return;
+                    }
+                
                     remaining.type = "uploadEnvironmentData";
                     remaining.bytes = json.bytes;
 
@@ -200,6 +214,12 @@ class Server extends EventEmitter {
 
             if (!("x-fisk-slots" in req.headers) || !parseInt(req.headers["x-fisk-slots"])) {
                 error("No x-fisk-slots header");
+                return;
+            }
+
+            const confVersion = req.headers["x-fisk-config-version"];
+            if (confVersion != this.configVersion) {
+                error(`Bad config version, expected ${this.configVersion}, got ${confVersion}`);
                 return;
             }
 
