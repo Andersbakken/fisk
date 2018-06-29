@@ -52,6 +52,7 @@ class Server extends EventEmitter {
         super();
         this.option = option;
         this.app = express();
+        this.app.use(express.static(`${__dirname}/public`));
         this.configVersion = configVersion;
         this.id = 0;
     }

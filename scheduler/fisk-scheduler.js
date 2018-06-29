@@ -249,8 +249,14 @@ server.on("slave", function(slave) {
         slave.totalCompileSpeed += job.compileSpeed;
         slave.totalUploadSpeed += job.uploadSpeed;
         console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
-        job.type = "jobPerformed";
-        monitors.forEach(monitor => monitor.send(job));
+        if (monitors.length) {
+            job.type = "jobPerformed";
+            job.slave = { ip: slave.ip, port: slave.port, name: slave.name };
+            if (slave.hostName)
+                job.hostName = slave.hostname;
+            console.log("job", job);
+            monitors.forEach(monitor => monitor.send(job));
+        }
     });
 });
 

@@ -1,0 +1,34 @@
+<html>
+  <head
+    <title>Fisk!</title>
+    <script language="javascript">
+      function doshit() {
+         var div = document.getElementById("output");
+         div.style = "overflow:auto; height:100%";
+         var connection = new WebSocket("ws://" +
+         window.location.origin.substr(7) + "/monitor");
+
+         connection.onerror = function (error) {
+             console.log('WebSocket Error ' + error);
+         };
+         connection.onmessage = function (e) {
+             console.log('Server: ' + e.data);
+             var text;
+             try {
+                 var msg = JSON.parse(e.data);
+                 text = msg.slave.name + ": " + msg.slave.port + " (" + msg.slave.ip + ") compiled " + msg.sourceFile + " for " + msg.client.name + " (" + msg.client.ip + ") in " + msg.compileDuration + "ms";
+             } catch (err) {
+                 text = e.data;
+             }
+             div.appendChild(document.createTextNode(text));
+             div.appendChild(document.createElement("br"));
+             div.scrollTop = div.scrollHeight - div.clientHeight;
+         };
+      }
+      window.onload = doshit;
+    </script>
+  </head>
+  <body>
+    <div id="output"></div>
+  </body>
+</html>
