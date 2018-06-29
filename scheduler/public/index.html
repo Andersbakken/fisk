@@ -20,7 +20,7 @@
              } catch (err) {
                  text = e.data;
              }
-             var atBottom = div.scrollTop == div.scrollHeight - div.clientHeight;
+             var atBottom = div.scrollTop + 20 >= div.scrollHeight - div.clientHeight;
              console.log("drit", div.scrollTop, div.scrollHeight,
              div.clientHeight, atBottom);
              div.appendChild(document.createTextNode(text));
