@@ -11,6 +11,15 @@ add_custom_command(OUTPUT create-fisk-env.c
                    COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env  -P "${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake")
 
 include_directories(${OPENSSL_INCLUDE_DIR})
-add_executable(fiskc Client.cpp CompilerArgs.cpp Config.cpp Log.cpp Watchdog.cpp WebSocket.cpp main.cpp create-fisk-env.c)
+add_executable(fiskc
+    Client.cpp
+    CompilerArgs.cpp
+    Config.cpp
+    Log.cpp
+    Select.cpp
+    Watchdog.cpp
+    WebSocket.cpp
+    main.cpp
+    create-fisk-env.c)
 add_dependencies(fiskc create-create-fisk-env)
 target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library)
