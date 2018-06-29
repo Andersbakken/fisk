@@ -4,6 +4,8 @@ if (SANITIZE_ADDRESS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
 endif ()
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
 
 add_subdirectory(3rdparty)
 add_subdirectory(client)
