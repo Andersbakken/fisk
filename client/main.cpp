@@ -76,7 +76,12 @@ int main(int argcIn, char **argvIn)
     Watchdog watchdog;
     Client::Data &data = Client::data();
     data.watchdog = &watchdog;
-    auto signalHandler = [](int) { exit(1); };
+    auto signalHandler = [](int) {
+        for (sem_t *semaphore : Client::data().semaphores) {
+            sem_post(semaphore);
+        }
+        _exit(1);
+    };
     for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
         std::signal(signal, signalHandler);
     }
