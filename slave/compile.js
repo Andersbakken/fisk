@@ -1,10 +1,8 @@
 const child_process = require('child_process');
 const mktemp = require('mktemp');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const EventEmitter = require('events');
-
-const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
     constructor(args, argv0, dir) {
@@ -17,12 +15,16 @@ class Compile extends EventEmitter {
 
         let hasDashX = false;
         let sourceFile;
-        let originalOutput;
+        let hasOutput = false;
         for (let i=0; i<args.length; ++i) {
             switch (args[i]) {
             case '-o':
-                originalOutput = args[++i];
-                args[i] = path.join(dir, magicalObjectName);
+                hasOutput = true;
+                // fall through
+            case '-MT':
+            case '-MQ':
+            case '-MF':
+                fs.mkdirpSync(path.join(dir, path.dirname(args[++i])));
                 break;
             case '-x':
                 hasDashX = true;
@@ -46,9 +48,6 @@ class Compile extends EventEmitter {
             case '--param':
             case '-G':
             case '-I':
-            case '-MF':
-            case '-MQ':
-            case '-MT':
             case '-T':
             case '-V':
             case '-Xanalyzer':
@@ -86,10 +85,10 @@ class Compile extends EventEmitter {
             throw new Error("No sourcefile");
         }
 
-        if (!originalOutput) {
+        if (!hasOutput) {
             args.push('-o');
-            args.push(path.join(dir, magicalObjectName));
-            originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
+            let originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
+            args.push(path.join(dir, originalOutput));
         }
 
         if (!hasDashX) {
@@ -162,6 +161,7 @@ class Compile extends EventEmitter {
             // try {
             let files = [];
             function addDir(dir, prefix) {
+                // console.log("add dir", dir, prefix);
                 try {
                     fs.readdirSync(dir).forEach(file => {
                         if (file === 'sourcefile')
@@ -169,15 +169,12 @@ class Compile extends EventEmitter {
                         try {
                             let stat = fs.statSync(path.join(dir, file));
                             if (stat.isDirectory()) {
-                                addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
+                                addDir(path.join(dir, file), prefix ? path.join(prefix, file) : file);
                             } else if (stat.isFile()) {
-                                if (file === magicalObjectName) {
-                                    files.push({ path: originalOutput, mapped: path.join(prefix, file) });
-                                } else {
-                                    files.push({ path: path.join(prefix, file) });
-                                }
+                                files.push({ path: path.join(prefix, file) });
                             }
                         } catch (err) {
+                            console.error("BAD", err);
                         }
                         // console.log("ADDED FILE", file, files[files.length - 1]);
                     });
