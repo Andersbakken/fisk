@@ -39,7 +39,7 @@ class CompileJob extends EventEmitter
 
 class VM extends EventEmitter
 {
-    constructor(root, hash, user) {
+    constructor(root, hash, user, keepCompiles) {
         super();
         this.root = root;
         this.hash = hash;
@@ -86,7 +86,8 @@ class VM extends EventEmitter
                     })
                 });
 
-                fs.remove(this.compiles[msg.id].dir);
+                if (!keepCompiles)
+                    fs.remove(this.compiles[msg.id].dir);
                 delete this.compiles[msg.id];
                 if (!--this.compileCount)
                     id = 0;

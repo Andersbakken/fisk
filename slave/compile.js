@@ -100,8 +100,9 @@ class Compile extends EventEmitter {
         }
 
         if (!hasDashX) {
+            args.push("-x");
             if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
-                args.unshift('c++-cpp-output');
+                args.push('c++-cpp-output');
             } else {
                 switch (path.extname(sourceFile)) {
                 case '.C':
@@ -112,44 +113,43 @@ class Compile extends EventEmitter {
                 case '.cp':
                 case '.cxx':
                 case '.ii':
-                    args.unshift('c++-cpp-output');
+                    args.push('c++-cpp-output');
                     break;
                 case '.hh':
                 case '.hpp':
                 case '.H':
-                    args.unshift('c++-header');
+                    args.push('c++-header');
                     break;
                 case '.h':
-                    args.unshift('c-header');
+                    args.push('c-header');
                     break;
                 case '.c':
-                    args.unshift('cpp-output');
+                    args.push('cpp-output');
                     break;
                 case '.m':
                 case '.mi':
-                    args.unshift('objective-c-cpp-output');
+                    args.push('objective-c-cpp-output');
                     break;
                 case '.s':
-                    args.unshift('assembler');
+                    args.push('assembler');
                     break;
                 case '.sx':
                 case '.S':
-                    args.unshift('assembler-with-cpp');
+                    args.push('assembler-with-cpp');
                     break;
                 case '.mm':
                 case '.M':
                 case '.mii':
-                    args.unshift('objective-c++-cpp-output');
+                    args.push('objective-c++-cpp-output');
                     break;
                 default:
                     throw new Error(`Can't determine source language for file: ${sourceFile}`);
                 }
             }
-            args.unshift('-x');
         }
         if (compiler.indexOf('clang') == -1)
             args.push('-fpreprocessed'); // this is not good for clang
-        // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
+        console.log("Calling " + argv0 + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
