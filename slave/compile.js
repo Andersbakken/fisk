@@ -20,6 +20,16 @@ class Compile extends EventEmitter {
         let originalOutput;
         for (let i=0; i<args.length; ++i) {
             switch (args[i]) {
+            case '-MF':
+            case '-MQ':
+            case '-MT':
+                ++i;
+                continue;
+            case '-MMD':
+            case '-MD':
+            case '-MM':
+            case '-M':
+                continue;
             case '-o':
                 originalOutput = args[++i];
                 args[i] = path.join(dir, magicalObjectName);
@@ -46,9 +56,6 @@ class Compile extends EventEmitter {
             case '--param':
             case '-G':
             case '-I':
-            case '-MF':
-            case '-MQ':
-            case '-MT':
             case '-T':
             case '-V':
             case '-Xanalyzer':
