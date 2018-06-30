@@ -23,3 +23,13 @@ add_executable(fiskc
     create-fisk-env.c)
 add_dependencies(fiskc create-create-fisk-env)
 target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library)
+
+add_custom_target(link_c++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/c++)
+add_custom_target(link_cc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/cc)
+if (APPLE)
+    add_custom_target(link_clang++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/clang++)
+    add_custom_target(link_clang ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/clang)
+else ()
+    add_custom_target(link_g++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/g++)
+    add_custom_target(link_gcc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fcc)
+endif ()
