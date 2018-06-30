@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <process.hpp>
 #ifdef __APPLE__
+#include <semaphore.h>
 #include <mach-o/dyld.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -450,11 +451,13 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
               Client::Slot::typeToString(type), slots, errno, strerror(errno));
         return std::make_unique<Client::Slot>(type, nullptr);
     }
+#ifndef __APPLE__
     if (Log::minLogLevel <= Log::Debug) {
         int val = -1;
         sem_getvalue(sem, &val);
         Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
     }
+#endif
 
     int ret;
     do {
@@ -741,7 +744,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         char buf[1024 * 256];
         size_t sent = 0;
         do {
-            const size_t chunkSize = std::min(st.st_size - sent, sizeof(buf));
+            const size_t chunkSize = std::min<size_t>(st.st_size - sent, sizeof(buf));
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
                 fclose(f);

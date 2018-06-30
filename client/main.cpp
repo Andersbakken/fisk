@@ -142,6 +142,9 @@ int main(int argcIn, char **argvIn)
             }
             return 0;
         } else if (!strcmp("--fisk-dump-semaphores", argvIn[i])) {
+#ifdef __APPLE__
+            fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
+#else
             for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
                 sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
                 if (!sem) {
@@ -155,6 +158,7 @@ int main(int argcIn, char **argvIn)
                 printf("%s %d/%zu\n", Client::Slot::typeToString(type), val, Client::Slot::slots(type));
                 sem_close(sem);
             }
+#endif
 
             return 0;
         } else if (!strncmp("--fisk", argvIn[i], 6)) {
