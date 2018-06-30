@@ -6,7 +6,7 @@ const path = require('path');
 let id = 0;
 class CompileJob extends EventEmitter
 {
-    constructor(commandLine, argv0, vm) {
+    constructor(commandLine, argv0, sourcefile, vm) {
         super();
         this.vm = vm;
         this.commandLine = commandLine;
@@ -15,7 +15,7 @@ class CompileJob extends EventEmitter
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
         this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
-        this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
+        this.fd = fs.openSync(path.join(this.dir, 'sourcefile' + path.extname(sourcefile)), "w");
         this.cppSize = 0;
         this.startCompile = undefined;
     }
@@ -39,7 +39,7 @@ class CompileJob extends EventEmitter
 
 class VM extends EventEmitter
 {
-    constructor(root, hash, user) {
+    constructor(root, hash, user, keepCompiles) {
         super();
         this.root = root;
         this.hash = hash;
@@ -86,7 +86,8 @@ class VM extends EventEmitter
                     })
                 });
 
-                fs.remove(this.compiles[msg.id].dir);
+                if (!keepCompiles)
+                    fs.remove(this.compiles[msg.id].dir);
                 delete this.compiles[msg.id];
                 if (!--this.compileCount)
                     id = 0;
@@ -107,8 +108,8 @@ class VM extends EventEmitter
         this.child.send({type: 'destroy'});
     }
 
-    startCompile(commandLine, argv0) {
-        let compile = new CompileJob(commandLine, argv0, this);
+    startCompile(commandLine, argv0, sourceFile) {
+        let compile = new CompileJob(commandLine, argv0, sourceFile, this);
         this.compiles[compile.id] = compile;
         ++this.compileCount;
         console.log("startCompile " + compile.id);
