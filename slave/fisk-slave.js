@@ -109,7 +109,7 @@ function loadEnvironments()
                             } catch (err) {
                             }
                             if (env && env.hash) {
-                                let vm = new VM(dir, env.hash, option("vm-user"), option("keep-compiles"));
+                                let vm = new VM(dir, env.hash, option("vm-user"));
                                 ++pending;
                                 environments[env.hash] = vm;
                                 let errorHandler = () => {
@@ -307,7 +307,7 @@ server.on("job", (job) => {
         start: function() {
             let job = this.job;
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
-            this.op = vm.startCompile(job.commandLine, job.argv0, job.sourceFile);
+            this.op = vm.startCompile(job.commandLine, job.argv0);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
