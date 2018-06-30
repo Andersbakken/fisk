@@ -120,12 +120,14 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
         mPort = 80;
 
     addrinfo *res = 0;
+    addrinfo stackRes;
     in_addr literal;
     sockaddr_in literalSockAddr = { 0 };
     int ret;
     if (inet_aton(mHost.c_str(), &literal)) {
         DEBUG("Got literal ip address: %s", mHost.c_str());
-        res = static_cast<addrinfo *>(calloc(1, sizeof(addrinfo)));
+        memset(&stackRes, 0, sizeof(stackRes));
+        res = &stackRes;
         res->ai_family = PF_INET;
         res->ai_socktype = SOCK_STREAM;
         res->ai_protocol = 0;
@@ -192,7 +194,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
             break; // async connect
         }
     }
-    freeaddrinfo(res);
+    if (res != &stackRes)
+        freeaddrinfo(res);
 
     if (mFD == -1) {
         ERROR("Couldn't connect to host %s", mHost.c_str());
