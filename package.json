@@ -1,6 +1,6 @@
 {
   "name": "@andersbakken/fisk",
-  "version": "1.1.35",
+  "version": "1.1.36",
   "description": "Fisk, a distributed compile system",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
