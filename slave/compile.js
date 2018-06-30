@@ -84,7 +84,7 @@ class Compile extends EventEmitter {
                         throw new Error("More than one source file");
                     }
                     sourceFile = args[i];
-                    args[i] = path.join(dir, 'sourcefile' + path.extname(sourceFile));
+                    args[i] = path.join(dir, 'sourcefile');
                 }
                 break;
             }
@@ -100,9 +100,8 @@ class Compile extends EventEmitter {
         }
 
         if (!hasDashX) {
-            args.push("-x");
             if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
-                args.push('c++-cpp-output');
+                args.unshift('c++-cpp-output');
             } else {
                 switch (path.extname(sourceFile)) {
                 case '.C':
@@ -113,43 +112,44 @@ class Compile extends EventEmitter {
                 case '.cp':
                 case '.cxx':
                 case '.ii':
-                    args.push('c++-cpp-output');
+                    args.unshift('c++-cpp-output');
                     break;
                 case '.hh':
                 case '.hpp':
                 case '.H':
-                    args.push('c++-header');
+                    args.unshift('c++-header');
                     break;
                 case '.h':
-                    args.push('c-header');
+                    args.unshift('c-header');
                     break;
                 case '.c':
-                    args.push('cpp-output');
+                    args.unshift('cpp-output');
                     break;
                 case '.m':
                 case '.mi':
-                    args.push('objective-c-cpp-output');
+                    args.unshift('objective-c-cpp-output');
                     break;
                 case '.s':
-                    args.push('assembler');
+                    args.unshift('assembler');
                     break;
                 case '.sx':
                 case '.S':
-                    args.push('assembler-with-cpp');
+                    args.unshift('assembler-with-cpp');
                     break;
                 case '.mm':
                 case '.M':
                 case '.mii':
-                    args.push('objective-c++-cpp-output');
+                    args.unshift('objective-c++-cpp-output');
                     break;
                 default:
                     throw new Error(`Can't determine source language for file: ${sourceFile}`);
                 }
             }
+            args.unshift('-x');
         }
         if (compiler.indexOf('clang') == -1)
             args.push('-fpreprocessed'); // this is not good for clang
-        console.log("Calling " + argv0 + " " + args.join(' '));
+        // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
@@ -171,7 +171,7 @@ class Compile extends EventEmitter {
             function addDir(dir, prefix) {
                 try {
                     fs.readdirSync(dir).forEach(file => {
-                        if (file === 'sourcefile' + path.extname(sourceFile))
+                        if (file === 'sourcefile')
                             return;
                         try {
                             let stat = fs.statSync(path.join(dir, file));

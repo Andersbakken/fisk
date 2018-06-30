@@ -6,7 +6,7 @@ const path = require('path');
 let id = 0;
 class CompileJob extends EventEmitter
 {
-    constructor(commandLine, argv0, sourcefile, vm) {
+    constructor(commandLine, argv0, vm) {
         super();
         this.vm = vm;
         this.commandLine = commandLine;
@@ -15,7 +15,7 @@ class CompileJob extends EventEmitter
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
         this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
-        this.fd = fs.openSync(path.join(this.dir, 'sourcefile' + path.extname(sourcefile)), "w");
+        this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
         this.cppSize = 0;
         this.startCompile = undefined;
     }
@@ -108,8 +108,8 @@ class VM extends EventEmitter
         this.child.send({type: 'destroy'});
     }
 
-    startCompile(commandLine, argv0, sourceFile) {
-        let compile = new CompileJob(commandLine, argv0, sourceFile, this);
+    startCompile(commandLine, argv0) {
+        let compile = new CompileJob(commandLine, argv0, this);
         this.compiles[compile.id] = compile;
         ++this.compileCount;
         console.log("startCompile " + compile.id);

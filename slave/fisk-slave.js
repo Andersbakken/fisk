@@ -307,7 +307,7 @@ server.on("job", (job) => {
         start: function() {
             let job = this.job;
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
-            this.op = vm.startCompile(job.commandLine, job.argv0, job.sourceFile);
+            this.op = vm.startCompile(job.commandLine, job.argv0);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
