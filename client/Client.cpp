@@ -389,16 +389,42 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 commandLine += arg;
 
             };
+            std::string depFile;
+            std::string outputFile;
+            bool hasDepFile = false;
             for (size_t i=1; i<count; ++i) {
-                commandLine += " '";
-                if (i == args->objectFileIndex) {
-                    commandLine += '-';
-                } else {
-                    append(args->commandLine.at(i));
+                const std::string arg = args->commandLine.at(i);
+                if (arg == "-o") {
+                    outputFile = args->commandLine.at(++i);
+                    continue;
                 }
+
+                commandLine += " '";
+                append(args->commandLine.at(i));
                 commandLine += '\'';
+
+                if (arg == "-MMD" || arg == "-MD" || arg == "-MM" || arg == "-M") {
+                    hasDepFile = true;
+                } else if (arg == "-MF" && i + 1 < count) {
+                    commandLine += " '";
+                    append(args->commandLine.at(++i));
+                    commandLine += '\'';
+                }
             }
             commandLine += " '-E'";
+
+            if (hasDepFile) {
+                if (depFile.empty()) {
+                    if (outputFile.empty())
+                        outputFile = args->sourceFile();
+                    size_t idx = outputFile.rfind('.');
+                    if (idx != std::string::npos) {
+                        outputFile.erase(idx + 1);
+                    }
+                    depFile = outputFile + "d";
+                }
+                DEBUG("Depfile is %s", depFile.c_str());
+            }
             DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
             std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
             ptr->slotDuration = Client::mono() - started;
@@ -415,6 +441,8 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             ptr->mDone = true;
             ptr->duration = Client::mono() - started;
             ptr->mCond.notify_one();
+            if (hasDepFile)
+                ptr->depFile = std::move(depFile);
         });
     return ret;
 }

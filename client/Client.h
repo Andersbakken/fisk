@@ -95,6 +95,7 @@ public:
     int exitStatus { -1 };
     unsigned long long duration { 0 };
     unsigned long long slotDuration { 0 };
+    std::string depFile;
 private:
     std::mutex mMutex;
     std::condition_variable mCond;
