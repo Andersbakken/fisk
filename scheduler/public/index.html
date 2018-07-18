@@ -21,7 +21,6 @@
                  text = e.data;
              }
              var atBottom = div.scrollTop + 20 >= div.scrollHeight - div.clientHeight;
-             div.clientHeight, atBottom);
              div.appendChild(document.createTextNode(text));
              div.appendChild(document.createElement("br"));
              if (atBottom) {
