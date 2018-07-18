@@ -41,7 +41,9 @@ int main(int argcIn, char **argvIn)
             }
         });
 
-    Config::init();
+    if (!Config::init()) {
+        return 1;
+    }
     std::string logLevel = Config::logLevel();
     std::string logFile = Config::logFile();
     const char *env;

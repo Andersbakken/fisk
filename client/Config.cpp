@@ -21,40 +21,44 @@ static json11::Json value(const std::string &key)
     return json11::Json();
 }
 
-void Config::init()
+bool Config::init()
 {
     auto load = [](const std::string &path) {
         FILE *f = fopen(path.c_str(), "r");
         if (!f)
-            return;
+            return true;
         fseek(f, 0, SEEK_END);
         const long size = ftell(f);
         fseek(f, 0, SEEK_SET);
         if (!size) {
             fclose(f);
-            return;
+            return false;
         }
 
         std::string contents(size, ' ');
         const size_t read = fread(&contents[0], 1, size, f);
         fclose(f);
         if (read != static_cast<size_t>(size)) {
-            ERROR("Failed to read from file: %s (%d %s)", path.c_str(), errno, strerror(errno));
-            return;
+            fprintf(stderr, "Failed to read from file: %s (%d %s)\n", path.c_str(), errno, strerror(errno));
+            return false;
         }
 
         std::string err;
         json11::Json parsed = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
-            ERROR("Failed to parse json from %s: %s", path.c_str(), err.c_str());
-            return;
+            fprintf(stderr, "Failed to parse json from %s: %s\n", path.c_str(), err.c_str());
+            return false;
         }
         sJSON.push_back(std::move(parsed));
+        return true;
     };
     if (const char *home = getenv("HOME")) {
-        load(std::string(home) + "/.config/fisk/client.conf");
+        if (!load(std::string(home) + "/.config/fisk/client.conf")) {
+            return false;
+        }
     }
-    load("/etc/xdg/fisk/client.conf");
+    if (!load("/etc/xdg/fisk/client.conf"))
+        return false;
 
     const std::string dir = cacheDir();
     std::string versionFile = dir + "version";
@@ -66,7 +70,7 @@ void Config::init()
             flock(fd, LOCK_UN); // what if it fails?
             ::close(fd);
             if (version == htonl(Version)) {
-                return;
+                return true;
             }
         }
     }
@@ -83,6 +87,7 @@ void Config::init()
         flock(fd, LOCK_UN);
         ::close(fd);
     }
+    return true;
 }
 
 std::string Config::scheduler()
