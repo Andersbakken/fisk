@@ -16,12 +16,12 @@
              var text;
              try {
                  var msg = JSON.parse(e.data);
-                 text = msg.slave.name + ": " + msg.slave.port + " (" + msg.slave.ip + ") compiled " + msg.sourceFile + " for " + msg.client.name + " (" + msg.client.ip + ") in " + msg.compileDuration + "ms";
+                 text = (new Date().toLocaleTimeString()) + ": " + msg.slave.name + ": " + msg.slave.port + " (" + msg.slave.ip + ") compiled " + msg.sourceFile + " for " + msg.client.name + " (" + msg.client.ip + ") in " + msg.compileDuration + "ms";
              } catch (err) {
                  text = e.data;
              }
              var atBottom = div.scrollTop + 20 >= div.scrollHeight - div.clientHeight;
-             console.log("drit", div.scrollTop, div.scrollHeight,
+             // console.log("drit", div.scrollTop, div.scrollHeight,
              div.clientHeight, atBottom);
              div.appendChild(document.createTextNode(text));
              div.appendChild(document.createElement("br"));
