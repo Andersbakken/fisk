@@ -202,6 +202,7 @@ client.on("environment", message => {
     // environment from scheduler
 });
 
+let pendingVMS = 0;
 client.on("data", message => {
     if (!pendingEnvironment || pendingEnvironment.done)
         throw new Error("We're not expecting data");
@@ -213,10 +214,14 @@ client.on("data", message => {
     if (!message.last)
         return;
 
+    fs.closeSync(pendingEnvironment.fd);
+    pendingEnvironment.fd = undefined;
+
     var pending = pendingEnvironment;
     pendingEnvironment = undefined;
 
     console.log(`untar ${pending.file}`);
+    ++pendingVMS;
     exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
         then(() => {
             console.log("Checking that the environment runs", path.join(pending.dir, "bin", "true"));
@@ -225,18 +230,21 @@ client.on("data", message => {
             console.log("Write json file");
             return fs.writeFile(path.join(pending.dir, "environment.json"), JSON.stringify({ hash: pending.hash, created: new Date().toString() }));
         }).then(() => {
-            console.log(`Unlink ${pending.file}`);
+            console.log(`Unlink ${pending.file} ${pending.hash}`);
             return fs.unlink(pending.file);
         }).then(() => {
             environments[pending.hash] = new VM(pending.dir, pending.hash);
-            console.log("Informing scheduler about our environments:", Object.keys(environments));
-            client.send("environments", { environments: Object.keys(environments) });
         }).catch((err) => {
             console.error("Got failure setting up environment", err);
             try {
                 fs.removeSync(pending.dir);
             } catch (rmdirErr) {
                 console.error("Failed to remove directory", pending.dir, rmdirErr);
+            }
+        }).finally(() => {
+            if (!--pendingVMS && !pendingEnvironment) {
+                client.send("environments", { environments: Object.keys(environments) });
+                console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
             }
         });
 });
