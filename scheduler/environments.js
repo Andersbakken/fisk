@@ -36,7 +36,7 @@ const socket = {
         data.sending = true;
         let client = data.client;
         const q = data.messages.shift();
-        console.log("about to send", q);
+        console.log("about to send", q, "to", key);
         if (q.requestEnvironments) {
             client.send({ type: "requestEnvironments" });
             data.sending = false;
@@ -61,7 +61,7 @@ const socket = {
             const readNext = () => {
                 if (!remaining) {
                     data.sending = false;
-                    // console.log("Finished sending env", q.file, data.messages.length, client.ip);
+                    console.log("Finished sending env", q.file, data.messages.length, key);
                     if (data.messages.length) {
                         process.nextTick(socket._next, key);
                     } else {
