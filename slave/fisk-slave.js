@@ -222,6 +222,13 @@ client.on("data", message => {
 
     console.log(`untar ${pending.file}`);
     ++pendingVMS;
+    function inform()
+    {
+        if (!--pendingVMS && !pendingEnvironment) {
+            client.send("environments", { environments: Object.keys(environments) });
+            console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
+        }
+    }
     exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
         then(() => {
             console.log("Checking that the environment runs", path.join(pending.dir, "bin", "true"));
@@ -234,6 +241,7 @@ client.on("data", message => {
             return fs.unlink(pending.file);
         }).then(() => {
             environments[pending.hash] = new VM(pending.dir, pending.hash);
+            inform();
         }).catch((err) => {
             console.error("Got failure setting up environment", err);
             try {
@@ -241,11 +249,7 @@ client.on("data", message => {
             } catch (rmdirErr) {
                 console.error("Failed to remove directory", pending.dir, rmdirErr);
             }
-        }).finally(() => {
-            if (!--pendingVMS && !pendingEnvironment) {
-                client.send("environments", { environments: Object.keys(environments) });
-                console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
-            }
+            inform();
         });
 });
 
