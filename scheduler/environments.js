@@ -66,6 +66,7 @@ const socket = {
                         process.nextTick(socket._next, key);
                     } else {
                         delete socket._queue[key];
+                        console.log(`queue for ${key} is empty`);
                     }
                     return;
                 }
