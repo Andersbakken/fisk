@@ -98,29 +98,9 @@ bool Client::findCompiler(const char *preresolved)
     if (!preresolved) {
         const char *path = getenv("PATH");
         if (path) {
-            std::string self, basename;
             const char *begin = path, *end = 0;
-            // fprintf(stderr, "trying realpath [%s]\n", sData.argv[0]);
-            const bool hasSlash = strchr(sData.argv[0], '/');
-            std::string rp = hasSlash ? Client::realpath(sData.argv[0]) : std::string();
-            // fprintf(stderr, "REALPATH %s %s\n", sData.argv[0], rp.c_str());
-            std::string dirname;
-            if (!rp.empty()) {
-                // std::string dirname;
-                parsePath(rp, 0, &dirname);
-                parsePath(sData.argv[0], &basename, 0);
-                self = dirname + basename;
-                // printf("self %s argv[0] %s basename %s\n", self.c_str(), sData.argv[0], basename.c_str());
-                // printf("realPath %s dirname %s argv[0] %s basename %s\n", rp.c_str(), dirname.c_str(), sData.argv[0], basename.c_str());
-            } else if (hasSlash) {
-                // printf("[Client.cpp:%d]: } else if (strchr(sData.argv[0], '/')) {\n", __LINE__); fflush(stdout);
-                return false;
-            } else {
-                basename = sData.argv[0];
-            }
-
-            // printf("self %s argv[0] %s basename %s\n", self.c_str(), sData.argv[0], basename.c_str());
-            // printf("realPath %s dirname %s argv[0] %s basename %s\n", rp.c_str(), dirname.c_str(), sData.argv[0], basename.c_str());
+            std::string argv0;
+            Client::parsePath(sData.argv[0], &argv0, 0);
             do {
                 end = strchr(begin, ':');
                 if (!end) {
@@ -132,11 +112,12 @@ bool Client::findCompiler(const char *preresolved)
                 if (!exec.empty()) {
                     if (exec[exec.size() - 1] != '/')
                         exec += '/';
-                    exec += basename;
-                    if (exec != self && !access(exec.c_str(), X_OK)) {
-                        if (self.empty()) {
-                            self = exec;
-                        } else {
+                    exec += argv0;
+                    if (!access(exec.c_str(), X_OK)) {
+                        std::string resolved = Client::realpath(exec);
+                        std::string basename;
+                        Client::parsePath(resolved, 0, &basename);
+                        if (basename != "fiskc") {
                             if (fileType(exec) == Symlink) {
                                 char link[PATH_MAX + 1];
                                 const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
@@ -416,7 +397,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                     commandLine += '\'';
                 }
             }
-            commandLine += " '-E'";
+            commandLine += " '-E' '-C'";
 
             if (hasDepFile) {
                 if (depFile.empty()) {
