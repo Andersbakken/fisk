@@ -420,7 +420,7 @@ static void usage(FILE *f)
             "\n"
             "  --fisk-log-file=[file]             Log to file\n"
             "  --fisk-log-file [file]\n"
-            "  --fisk-log-file-append\n           Append to log file\n"
+            "  --fisk-log-file-append             Append to log file\n"
             "\n"
             "  --fisk-compiler=[compiler]         Set fisk's resolved compiler to [compiler]\n"
             "  --fisk-compiler [compiler]\n"
