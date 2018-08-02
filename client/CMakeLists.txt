@@ -22,7 +22,7 @@ add_executable(fiskc
     main.cpp
     create-fisk-env.c)
 add_dependencies(fiskc create-create-fisk-env)
-target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library)
+target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library dl)
 
 add_custom_target(link_c++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/c++)
 add_custom_target(link_cc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/cc)
