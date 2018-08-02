@@ -76,7 +76,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
 #else
     const char *format = "%08d %llu.%03llu: ";
 #endif
-    fprintf(stderr, format, sPid, elapsed / 1000, elapsed % 1000);
+    fprintf(stdout, format, sPid, elapsed / 1000, elapsed % 1000);
     fwrite(string.c_str(), 1, string.size(), stderr);
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
