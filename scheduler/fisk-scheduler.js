@@ -61,7 +61,7 @@ function purgeEnvironmentsToMaxSize()
             let purged = false;
             fs.readdirSync(p).map(file => {
                 console.log("got file", file);
-                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);                
+                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);
                 if (!match)
                     return undefined;
                 var abs = path.join(p, file);
@@ -151,7 +151,7 @@ function environmentsInfo()
 }
 
 server.express.get("/environments", (req, res, next) => {
-    
+
     res.send(environmentsInfo());
 });
 
@@ -264,7 +264,7 @@ let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
-    // console.log("request", compile.environments);
+    console.log("request", compileName);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
         if (Environments.hasEnvironment(compile.environments[i])) {
@@ -389,7 +389,7 @@ server.on("compile", function(compile) {
                 slave = s;
             }
         // } else {
-        //     console.log("Dude doesn't have the compiler", s.ip);
+        //     console.log("Dude't havethe compiler", s.ip);
         }
     });
     let data = {};
@@ -406,7 +406,7 @@ server.on("compile", function(compile) {
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
-        // console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
@@ -419,6 +419,7 @@ server.on("compile", function(compile) {
         data.port = slave.port;
         compile.send("slave", data);
     } else {
+        console.log("No slave for you", compile.ip);
         compile.send("slave", data);
     }
     compile.on("error", msg => {
