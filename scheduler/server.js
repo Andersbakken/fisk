@@ -125,6 +125,9 @@ class Server extends EventEmitter {
             const clientName = req.headers["x-fisk-client-name"];
             if (clientName)
                 data.name = clientName;
+            const clientHostName = req.headers["x-fisk-client-hostname"];
+            if (clientHostName)
+                data.hostName = clientHostName;
             client = new Client(data);
             this.emit("compile", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));
@@ -173,7 +176,7 @@ class Server extends EventEmitter {
                         error("Need an originalPath property");
                         return;
                     }
-                
+
                     remaining.type = "uploadEnvironmentData";
                     remaining.bytes = json.bytes;
 
