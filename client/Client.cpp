@@ -397,7 +397,10 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                     commandLine += '\'';
                 }
             }
-            commandLine += " '-E' '-C'";
+            commandLine += " '-E'";
+            if (!Config::discardComments()) {
+                commandLine += " '-C'";
+            }
 
             if (hasDepFile) {
                 if (depFile.empty()) {

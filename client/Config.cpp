@@ -287,3 +287,12 @@ std::string Config::logLevel()
     return "error";
 #endif
 }
+
+bool Config::discardComments()
+{
+    json11::Json val = value("discard-comments");
+    if (val.is_bool()) {
+        return val.bool_value();
+    }
+    return false;
+}

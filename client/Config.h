@@ -29,5 +29,6 @@ std::vector<std::string> compatibleHashes(const std::string &hash);
 std::string logFile();
 bool logFileAppend();
 std::string logLevel();
+bool discardComments();
 }
 #endif /* CONFIG_H */
