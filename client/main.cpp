@@ -329,6 +329,7 @@ int main(int argcIn, char **argvIn)
         select.exec();
 
     DEBUG("Waiting for preprocessed");
+    watchdog.suspend();
     preprocessed->wait();
     DEBUG("Preprocessed finished");
     preprocessedDuration = preprocessed->duration;

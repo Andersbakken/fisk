@@ -37,6 +37,8 @@ public:
     }
     void transition(Stage stage);
     void stop();
+    void suspend();
+    void resume();
 protected:
     virtual int fd() const override { return -1; }
     virtual unsigned int mode() const override { return None; }
@@ -46,7 +48,11 @@ protected:
     virtual int timeout() const override;
 private:
     Watchdog::Stage mStage { Watchdog::Initial };
-    bool mStopped;
+    enum State {
+        Running,
+        Stopped,
+        Suspended
+    } mState { Running };
     unsigned long long mTransitionTime { Client::mono() };
 };
 

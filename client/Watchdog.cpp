@@ -4,7 +4,7 @@
 #include "Log.h"
 
 Watchdog::Watchdog()
-    : mStopped(!Config::watchdog())
+    : mState(Config::watchdog() ? Running : Stopped)
 {
     mTransitionTime = Watchdog::timings[Initial] = Client::started;
 }
@@ -22,12 +22,27 @@ void Watchdog::transition(Stage stage)
 
 void Watchdog::stop()
 {
-    mStopped = true;
+    mState = Stopped;
+}
+
+void Watchdog::suspend()
+{
+    mState = Suspended;
+    const unsigned long long now = Client::mono();
+    if (mTransitionTime < now)
+        mTransitionTime = now - mTransitionTime; // mTransitionTime now holds amount of ms elapsed
+}
+
+void Watchdog::resume()
+{
+    mState = Running;
+    const unsigned long long now = Client::mono();
+    mTransitionTime = now - mTransitionTime;
 }
 
 int Watchdog::timeout() const
 {
-    if (mStopped)
+    if (mState != Running)
         return -1;
     const unsigned long long now = Client::mono();
     unsigned long long timeout = mTransitionTime;
@@ -62,6 +77,8 @@ int Watchdog::timeout() const
 
 void Watchdog::onTimeout()
 {
-    ERROR("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
-    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+    if (mState == Running) {
+        ERROR("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+    }
 }
