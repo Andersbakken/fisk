@@ -477,9 +477,19 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
 #endif
 
     int ret;
-    do {
-        ret = sem_wait(sem);
-    } while (ret == -1 && errno == EINTR);
+    while (true) {
+        do {
+            struct timespec time = { 20, 0 };
+            ret = sem_timedwait(sem, &time);
+        } while (ret == -1 && errno == EINTR);
+        if (ret == ETIMEDOUT) {
+            sem_unlink(Client::Slot::typeToString(type));
+        } else {
+            assert(!ret);
+            break;
+        }
+    }
+
     assert(!ret);
     return std::make_unique<Client::Slot>(type, sem);
 }
