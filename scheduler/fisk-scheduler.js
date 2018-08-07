@@ -424,7 +424,7 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
-            if (!--jobsByClient[compile.ip))
+            if (!--jobsByClient[compile.ip])
                 delete jobsByClient[compile.ip];
             slave = undefined;
         }
@@ -436,7 +436,7 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
-            if (!--jobsByClient[compile.ip))
+            if (!--jobsByClient[compile.ip])
                 delete jobsByClient[compile.ip];
             slave = undefined;
         }
