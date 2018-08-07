@@ -260,7 +260,7 @@ server.on("slave", function(slave) {
     });
 });
 
-let semaphoreMaintenanceTimers = {};
+let jobsByClient = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
@@ -389,21 +389,19 @@ server.on("compile", function(compile) {
                 slave = s;
             }
         // } else {
-        //     console.log("Dude't havethe compiler", s.ip);
+        //     console.log("Dude doesn't havethe compiler", s.ip);
         }
     });
     let data = {};
-    // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
-    if (compile.ip in semaphoreMaintenanceTimers) {
-        clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
-    } else {
-        semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
-            delete semaphoreMaintenanceTimers[compile.ip];
-        }, 60 * 60000);
-        data["maintain_semaphores"] = true;
-    }
-
     if (slave) {
+        // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
+        if (compile.ip in jobsByClient) {
+            ++jobsByClient[compile.ip];
+        } else {
+            jobsByClient[compile.ip] = 1;
+            data["maintain_semaphores"] = true;
+        }
+
         ++activeJobs;
         let sendTime = Date.now();
         console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
@@ -426,6 +424,8 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
+            if (!--jobsByClient[compile.ip))
+                delete jobsByClient[compile.ip];
             slave = undefined;
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
@@ -436,6 +436,8 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
+            if (!--jobsByClient[compile.ip))
+                delete jobsByClient[compile.ip];
             slave = undefined;
         }
     });
