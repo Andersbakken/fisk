@@ -221,6 +221,11 @@ bool Client::findCompiler(const char *preresolved)
     }
     // printf("RESULT %s\n", resolvedCompiler->c_str());
 
+    if (exec.size() >= 5 && !strcmp(exec.c_str() + exec.size() - 5, "fiskc")) { // resolved to ourselves
+        sData.slaveCompiler.clear();
+        sData.resolvedCompiler.clear();
+        return false;
+    }
     sData.compiler = std::move(exec);
     struct stat st;
     return !stat(sData.compiler.c_str(), &st) && (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode));
