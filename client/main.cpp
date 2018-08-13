@@ -21,6 +21,11 @@ static unsigned long long preprocessedSlotDuration = 0;
 static void usage(FILE *f);
 int main(int argcIn, char **argvIn)
 {
+    if (getenv("FISKC_INVOKED")) {
+        fprintf(stderr, "Recursive invocation of fiskc detected.\n");
+        return 1;
+    }
+    setenv("FISKC_INVOKED", "1", 1);
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
