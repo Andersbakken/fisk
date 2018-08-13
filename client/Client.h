@@ -30,6 +30,7 @@ struct Data
 
     int argc { 0 };
     char **argv { 0 };
+    bool maintainSemaphores { false };
     std::string compiler; // this is the next one on the path and the one we will exec if we run locally
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave

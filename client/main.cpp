@@ -24,10 +24,13 @@ int main(int argcIn, char **argvIn)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
-            for (sem_t *semaphore : Client::data().semaphores) {
-                sem_post(semaphore);
+            const Client::Data &data = Client::data();
+            for (sem_t *semaphore : data.semaphores) {
+                if (!data.maintainSemaphores)
+                    sem_post(semaphore);
+                sem_close(semaphore);
             }
-            if (Watchdog *watchdog = Client::data().watchdog) {
+            if (Watchdog *watchdog = data.watchdog) {
                 if (Log::minLogLevel <= Log::Warn) {
                     std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
                                                      milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
@@ -275,7 +278,7 @@ int main(int argcIn, char **argvIn)
         DEBUG("Finished schedulerWebsocket");
     }
 
-    if (schedulerWebsocket.maintainSemaphores) {
+    if (data.maintainSemaphores) {
         for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
             if (sem_unlink(Client::Slot::typeToString(type))) {
                 if (errno != ENOENT) {

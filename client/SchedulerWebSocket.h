@@ -34,7 +34,7 @@ public:
                 slaveHostname = msg["hostname"].string_value();
                 slavePort = msg["port"].int_value();
                 jobId = msg["id"].int_value();
-                maintainSemaphores = msg["maintain_semaphores"].bool_value();
+                Client::data().maintainSemaphores = msg["maintain_semaphores"].bool_value();
                 DEBUG("type %d", msg["port"].type());
                 DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);
                 done = true;
@@ -48,7 +48,6 @@ public:
 
     bool done { false };
     bool needsEnvironment { false };
-    bool maintainSemaphores { false };
     int jobId { 0 };
     uint16_t slavePort { 0 };
     std::string slaveIp, slaveHostname;
