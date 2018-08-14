@@ -473,13 +473,15 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
               Client::Slot::typeToString(type), slots, errno, strerror(errno));
         return std::make_unique<Client::Slot>(type, nullptr);
     }
-#ifndef __APPLE__
+#ifdef __APPLE__
+    int ret = sem_wait(sem);
+    (void)ret;
+#else
     if (Log::minLogLevel <= Log::Debug) {
         int val = -1;
         sem_getvalue(sem, &val);
         Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
     }
-#endif
 
     int ret;
     while (true) {
@@ -490,10 +492,10 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
         if (ret == ETIMEDOUT) {
             sem_unlink(Client::Slot::typeToString(type));
         } else {
-            assert(!ret);
             break;
         }
     }
+#endif
 
     assert(!ret);
     return std::make_unique<Client::Slot>(type, sem);
