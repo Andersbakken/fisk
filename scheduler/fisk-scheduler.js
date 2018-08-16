@@ -260,7 +260,7 @@ server.on("slave", function(slave) {
     });
 });
 
-let jobsByClient = {};
+let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
@@ -389,19 +389,21 @@ server.on("compile", function(compile) {
                 slave = s;
             }
         // } else {
-        //     console.log("Dude doesn't havethe compiler", s.ip);
+        //     console.log("Dude't havethe compiler", s.ip);
         }
     });
     let data = {};
-    if (slave) {
-        // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
-        if (compile.ip in jobsByClient) {
-            ++jobsByClient[compile.ip];
-        } else {
-            jobsByClient[compile.ip] = 1;
-            data["maintain_semaphores"] = true;
-        }
+    // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
+    if (compile.ip in semaphoreMaintenanceTimers) {
+        clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
+    } else {
+        data["maintain_semaphores"] = true;
+    }
+    semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
+        delete semaphoreMaintenanceTimers[compile.ip];
+    }, 60 * 60000);
 
+    if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
         console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
