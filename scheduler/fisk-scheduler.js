@@ -426,8 +426,6 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
-            if (!--jobsByClient[compile.ip])
-                delete jobsByClient[compile.ip];
             slave = undefined;
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
@@ -438,8 +436,6 @@ server.on("compile", function(compile) {
         if (slave) {
             --slave.activeClients;
             --activeJobs;
-            if (!--jobsByClient[compile.ip])
-                delete jobsByClient[compile.ip];
             slave = undefined;
         }
     });
