@@ -40,7 +40,7 @@ int main(int argcIn, char **argvIn)
                     std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
                                                      milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
                     for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
-                        str += Client::format(" %s: %llu (%llu)", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
+                        str += Client::format(" %s: %llu (%llu)\n", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
                                               watchdog->timings[i] - watchdog->timings[i - 1],
                                               watchdog->timings[i] - Client::started);
                     }
