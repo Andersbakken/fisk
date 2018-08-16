@@ -105,7 +105,7 @@ unsigned long long Config::schedulerConnectTimeout()
     if (val.is_number())
         return val.int_value();
 
-    return 1000;
+    return 3000;
 }
 
 unsigned long long Config::acquiredSlaveTimeout()
