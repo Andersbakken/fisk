@@ -489,11 +489,10 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
             struct timespec time = { 20, 0 };
             ret = sem_timedwait(sem, &time);
         } while (ret == -1 && errno == EINTR);
-        if (ret == ETIMEDOUT) {
-            sem_unlink(Client::Slot::typeToString(type));
-        } else {
+        if (!ret)
             break;
-        }
+        if (errno == ETIMEDOUT)
+            sem_unlink(Client::Slot::typeToString(type));
     }
 #endif
 
