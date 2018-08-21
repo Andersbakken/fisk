@@ -207,7 +207,7 @@ bool Config::watchdog()
     if (val.is_bool()) {
         return val.bool_value();
     }
-    return true;
+    return false;
 }
 
 std::string Config::nodePath()
