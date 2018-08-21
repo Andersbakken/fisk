@@ -141,7 +141,7 @@ unsigned long long Config::responseTimeout()
     if (val.is_number())
         return val.int_value();
 
-    return 20000;
+    return 120000;
 }
 
 std::string Config::clientName()
@@ -207,7 +207,7 @@ bool Config::watchdog()
     if (val.is_bool()) {
         return val.bool_value();
     }
-    return false;
+    return true;
 }
 
 std::string Config::nodePath()
