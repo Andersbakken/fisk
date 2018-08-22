@@ -61,33 +61,31 @@ public:
 
             json11::Json::array index = msg["index"].array_items();
             Client::data().exitCode = msg["exitCode"].int_value();
-            if (index.empty()) {
-                ERROR("No files?");
-                Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
-                return;
-            }
-            files.resize(index.size());
-            for (size_t i=0; i<index.size(); ++i) {
-                File &ff = files[i];
-                ff.path = index[i]["path"].string_value();
-                ff.remaining = index[i]["bytes"].int_value();
-                if (ff.path.empty()) {
-                    ERROR("No file for idx: %zu", i);
+            if (!index.empty()) {
+                files.resize(index.size());
+                for (size_t i=0; i<index.size(); ++i) {
+                    File &ff = files[i];
+                    ff.path = index[i]["path"].string_value();
+                    ff.remaining = index[i]["bytes"].int_value();
+                    if (ff.path.empty()) {
+                        ERROR("No file for idx: %zu", i);
+                        Client::data().watchdog->stop();
+                        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                        return;
+                    }
+                }
+                f = fopen(files[0].path.c_str(), "w");
+                if (!f) {
                     Client::data().watchdog->stop();
                     Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                     return;
                 }
+                assert(f);
+                if (files[0].remaining)
+                    fill(0, 0);
+            } else {
+                done = true;
             }
-            f = fopen(files[0].path.c_str(), "w");
-            if (!f) {
-                Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
-                return;
-            }
-            assert(f);
-            if (files[0].remaining)
-                fill(0, 0);
         } else {
             DEBUG("Got binary data: %zu bytes", len);
             if (files.empty()) {
