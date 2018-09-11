@@ -294,5 +294,5 @@ bool Config::discardComments()
     if (val.is_bool()) {
         return val.bool_value();
     }
-    return false;
+    return true;
 }
