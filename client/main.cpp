@@ -21,7 +21,6 @@ static unsigned long long preprocessedSlotDuration = 0;
 static void usage(FILE *f);
 int main(int argcIn, char **argvIn)
 {
-    static unsigned long long started = Client::mono();
     if (getenv("FISKC_INVOKED")) {
         fprintf(stderr, "Recursive invocation of fiskc detected.\n");
         return 1;
@@ -197,8 +196,6 @@ int main(int argcIn, char **argvIn)
 
     Log::init(level, std::move(logFile), logFileMode);
 
-    printf("CONFIG SHIT FINISHED %llu\n", Client::mono() - started);
-
     if (!Client::findCompiler(preresolved)) {
         ERROR("Can't find executable for %s", data.argv[0]);
         return 1;
@@ -208,7 +205,6 @@ int main(int argcIn, char **argvIn)
           data.compiler.c_str(), data.resolvedCompiler.c_str(),
           data.slaveCompiler.c_str());
 
-    printf("FUCKING TRYING DESIRED %zu\n", Config::desiredCompileSlots());
     if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
         fprintf(stderr, "FUCKING GOING LOCAL\n");
         Client::runLocal(std::move(slot));
@@ -227,7 +223,6 @@ int main(int argcIn, char **argvIn)
         args[i] = data.argv[i];
     }
     data.compilerArgs = CompilerArgs::create(args);
-    printf("CREATED COMPILER ARGS %llu\n", Client::mono() - started);
     if (!data.compilerArgs
         || data.compilerArgs->mode != CompilerArgs::Compile
         || data.compilerArgs->flags & CompilerArgs::StdinInput
@@ -281,7 +276,6 @@ int main(int argcIn, char **argvIn)
     if (!std::regex_search(url, regex))
         url.append(":8097");
 
-    printf("CONNECTING TO SCHEDULER ARGS %llu\n", Client::mono() - started);
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         watchdog.stop();
@@ -298,7 +292,6 @@ int main(int argcIn, char **argvIn)
         while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
             select.exec();
         DEBUG("Finished schedulerWebsocket");
-        printf("SCHEDULER FINISHED %llu\n", Client::mono() - started);
     }
 
     if (data.maintainSemaphores) {
@@ -337,8 +330,6 @@ int main(int argcIn, char **argvIn)
 
     // usleep(1000 * 1000 * 16);
     watchdog.transition(Watchdog::AcquiredSlave);
-    printf("GOT SLAVE %llu\n", Client::mono() - started);
-
     SlaveWebSocket slaveWebSocket;
     Select select;
     select.add(&slaveWebSocket);
@@ -353,15 +344,12 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket) {
+    while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
-    }
-    printf("GOT SLAVE CONNECTED %llu\n", Client::mono() - started);
 
     DEBUG("Waiting for preprocessed");
     watchdog.suspend();
     preprocessed->wait();
-    printf("PREPROCESSED WAITED %llu\n", Client::mono() - started);
     DEBUG("Preprocessed finished");
     preprocessedDuration = preprocessed->duration;
     preprocessedSlotDuration = preprocessed->slotDuration;
@@ -388,7 +376,6 @@ int main(int argcIn, char **argvIn)
     if (wait) {
         while ((slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
             select.exec();
-        printf("WAITED FOR SLAVE TO BE READY %llu\n", Client::mono() - started);
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             watchdog.stop();
@@ -402,8 +389,6 @@ int main(int argcIn, char **argvIn)
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
-    printf("UPLOADED PREPROCESSED DATA %llu\n", Client::mono() - started);
-
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
         watchdog.stop();
@@ -430,7 +415,6 @@ int main(int argcIn, char **argvIn)
     watchdog.transition(Watchdog::Finished);
     watchdog.stop();
     schedulerWebsocket.close("slaved");
-    printf("DONE DONE %llu\n", Client::mono() - started);
 
     return data.exitCode;
 }
