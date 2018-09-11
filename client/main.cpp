@@ -144,10 +144,12 @@ int main(int argcIn, char **argvIn)
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
         } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
-            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
+            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
                 if (sem_unlink(Client::Slot::typeToString(type))) {
-                    fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
-                            Client::Slot::typeToString(type), errno, strerror(errno));
+                    if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max()) {
+                        fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
+                                Client::Slot::typeToString(type), errno, strerror(errno));
+                    }
                 }
             }
             return 0;
@@ -155,7 +157,10 @@ int main(int argcIn, char **argvIn)
 #ifdef __APPLE__
             fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
 #else
-            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
+            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
+                if (Client::Slot::slots(type) == std::numeric_limits<size_t>::max()) {
+                    continue;
+                }
                 sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
                 if (!sem) {
                     fprintf(stderr, "Failed to open semaphore %s slots: %zu: %d %s\n",
@@ -199,6 +204,12 @@ int main(int argcIn, char **argvIn)
           data.argv[0], preresolved ? preresolved : "",
           data.compiler.c_str(), data.resolvedCompiler.c_str(),
           data.slaveCompiler.c_str());
+
+    if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
+        fprintf(stderr, "FUCKING GOING LOCAL\n");
+        Client::runLocal(std::move(slot));
+        return 0;
+    }
 
     if (disabled) {
         DEBUG("Have to run locally because we're disabled");
@@ -284,8 +295,8 @@ int main(int argcIn, char **argvIn)
     }
 
     if (data.maintainSemaphores) {
-        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp }) {
-            if (sem_unlink(Client::Slot::typeToString(type))) {
+        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
+            if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max() && sem_unlink(Client::Slot::typeToString(type))) {
                 if (errno != ENOENT) {
                     ERROR("Failed to unlink semaphore %s: %d %s",
                           Client::Slot::typeToString(type), errno, strerror(errno));
