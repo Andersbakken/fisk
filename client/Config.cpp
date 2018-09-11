@@ -179,8 +179,16 @@ size_t Config::compileSlots()
 {
     json11::Json val = value("slots");
     if (val.is_number())
-        return val.int_value();
+        return std::max(1, val.int_value());
     return std::thread::hardware_concurrency();
+}
+
+size_t Config::desiredCompileSlots()
+{
+    json11::Json val = value("desired_slots");
+    if (val.is_number())
+        return val.int_value();
+    return 0;
 }
 
 size_t Config::cppSlots()
@@ -188,7 +196,7 @@ size_t Config::cppSlots()
     {
         json11::Json val = value("cpp-slots");
         if (val.is_number())
-            return val.int_value();
+            return std::max(1, val.int_value());
     }
     return std::thread::hardware_concurrency() * 2;
 }
