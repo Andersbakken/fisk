@@ -391,20 +391,21 @@ int main(int argcIn, char **argvIn)
     // return 0;
     while (!slaveWebSocket.done && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
-    if (slaveWebSocket.done) {
-        if (!preprocessed->stdErr.empty()) {
-            fwrite(preprocessed->stdErr.c_str(), sizeof(char), preprocessed->stdErr.size(), stderr);
-        }
-        watchdog.transition(Watchdog::Finished);
+    if (!slaveWebSocket.done) {
+        DEBUG("Have to run locally because something went wrong with the slave, part deux");
         watchdog.stop();
-        schedulerWebsocket.close("slaved");
-        return data.exitCode;
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        return 0; // unreachable
     }
 
-    DEBUG("Have to run locally because something went wrong with the slave, part deux");
+    if (!preprocessed->stdErr.empty()) {
+        fwrite(preprocessed->stdErr.c_str(), sizeof(char), preprocessed->stdErr.size(), stderr);
+    }
+    watchdog.transition(Watchdog::Finished);
     watchdog.stop();
-    Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
-    return 0; // unreachable
+    schedulerWebsocket.close("slaved");
+
+    return data.exitCode;
 }
 
 static void usage(FILE *f)
