@@ -19,6 +19,7 @@ unsigned long long responseTimeout();
 std::string clientName();
 std::string cacheDir();
 size_t compileSlots();
+size_t desiredCompileSlots();
 size_t cppSlots();
 std::string envCache();
 bool watchdog();

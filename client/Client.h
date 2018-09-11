@@ -56,19 +56,29 @@ class Slot
 {
 public:
     enum Type {
+        DesiredCompile,
         Compile,
         Cpp
     };
 
     Slot(Type type, sem_t *sem);
-   ~Slot();
-    static const char *typeToString(Type type)
+    ~Slot();
+    static constexpr const char *typeToString(Type type)
     {
-        return type == Compile ? "/fisk.compile" : "/fisk.cpp";
+        return (type == Compile ? "/fisk.compile" : (type == DesiredCompile ? "/fisk.desiredCompile" : "/fisk.cpp"));
     }
     static size_t slots(Type type)
     {
-        return type == Compile ? Config::compileSlots() : Config::cppSlots();
+        switch (type) {
+        case Compile:
+            return Config::compileSlots();
+        case Cpp:
+            return Config::cppSlots();
+        case DesiredCompile:
+            return Config::desiredCompileSlots();
+        }
+        assert(0);
+        return 0;
     }
 private:
     Slot(const Slot &) = delete;
@@ -78,6 +88,7 @@ private:
     sem_t *mSemaphore;
 };
 
+std::unique_ptr<Slot> tryAcquireSlot(Slot::Type type);
 std::unique_ptr<Slot> acquireSlot(Slot::Type type);
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
