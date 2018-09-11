@@ -9,7 +9,7 @@
 namespace Config
 {
 enum { Version = 5 };
-bool init();
+bool init(int &argc, char **&argv);
 std::string scheduler();
 unsigned long long schedulerConnectTimeout();
 unsigned long long acquiredSlaveTimeout();

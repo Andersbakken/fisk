@@ -49,7 +49,7 @@ int main(int argcIn, char **argvIn)
             }
         });
 
-    if (!Config::init()) {
+    if (!Config::init(argcIn, argvIn)) {
         return 1;
     }
     std::string logLevel = Config::logLevel();
@@ -206,7 +206,6 @@ int main(int argcIn, char **argvIn)
           data.slaveCompiler.c_str());
 
     if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-        fprintf(stderr, "FUCKING GOING LOCAL\n");
         Client::runLocal(std::move(slot));
         return 0;
     }

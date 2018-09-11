@@ -95,53 +95,62 @@ bool Client::findCompiler(const char *preresolved)
 {
     // printf("PATH %s\n", path);
     std::string exec;
-    if (!preresolved) {
+    auto findInPath = [](const std::string &argv0) -> std::string {
         const char *path = getenv("PATH");
-        if (path) {
-            const char *begin = path, *end = 0;
-            std::string argv0;
-            Client::parsePath(sData.argv[0], &argv0, 0);
-            do {
-                end = strchr(begin, ':');
-                if (!end) {
-                    exec = begin;
-                } else {
-                    exec.assign(begin, end - begin);
-                    begin = end + 1;
-                }
-                if (!exec.empty()) {
-                    if (exec[exec.size() - 1] != '/')
-                        exec += '/';
-                    exec += argv0;
-                    if (!access(exec.c_str(), X_OK)) {
-                        std::string resolved = Client::realpath(exec);
-                        std::string basename;
-                        Client::parsePath(resolved, 0, &basename);
-                        if (basename != "fiskc") {
-                            if (fileType(exec) == Symlink) {
-                                char link[PATH_MAX + 1];
-                                const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
-                                if (len < 0) {
-                                    ERROR("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
-                                    exec.clear();
-                                    continue;
-                                }
-                                link[len] = '\0';
-                                std::string linkedFile;
-                                parsePath(link, &linkedFile, 0);
-                                if (linkedFile == "icecc" || linkedFile == "fiskc") {
-                                    exec.clear();
-                                    continue;
-                                }
-                            }
+        if (!path)
+            return std::string();
 
-                            break;
+        const char *begin = path, *end = 0;
+        std::string ret;
+        do {
+            end = strchr(begin, ':');
+            if (!end) {
+                ret = begin;
+            } else {
+                ret.assign(begin, end - begin);
+                begin = end + 1;
+            }
+            if (!ret.empty()) {
+                if (ret[ret.size() - 1] != '/')
+                    ret += '/';
+                ret += argv0;
+                if (!access(ret.c_str(), X_OK)) {
+                    std::string resolved = Client::realpath(ret);
+                    std::string basename;
+                    Client::parsePath(resolved, 0, &basename);
+                    if (basename != "fiskc") {
+                        if (fileType(ret) == Symlink) {
+                            char link[PATH_MAX + 1];
+                            const ssize_t len = readlink(ret.c_str(), link, sizeof(link) - 1);
+                            if (len < 0) {
+                                ERROR("Can't follow symlink: %s (%d %s)", ret.c_str(), errno, strerror(errno));
+                                ret.clear();
+                                continue;
+                            }
+                            link[len] = '\0';
+                            std::string linkedFile;
+                            parsePath(link, &linkedFile, 0);
+                            if (linkedFile == "icecc" || linkedFile == "fiskc") {
+                                ret.clear();
+                                continue;
+                            }
                         }
+
+                        break;
                     }
-                    exec.clear();
                 }
-            } while (end);
-        }
+                ret.clear();
+            }
+        } while (end);
+        return  ret;
+    };
+
+    if (!preresolved) {
+        std::string argv0;
+        Client::parsePath(sData.argv[0], &argv0, 0);
+        exec = findInPath(argv0);
+    } else if (preresolved[0] != '/') {
+        exec = findInPath(preresolved);
     } else {
         exec = preresolved;
     }

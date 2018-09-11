@@ -21,7 +21,7 @@ static json11::Json value(const std::string &key)
     return json11::Json();
 }
 
-bool Config::init()
+bool Config::init(int &argc, char **&argv)
 {
     auto load = [](const std::string &path) {
         FILE *f = fopen(path.c_str(), "r");
@@ -52,6 +52,144 @@ bool Config::init()
         sJSON.push_back(std::move(parsed));
         return true;
     };
+
+    std::map<std::string, json11::Json> commandLines;
+    int i=1;
+    bool error = false;
+    struct Arg {
+        const std::string arg;
+        json11::Json::Type type;
+    } const sArgs[] = {
+        { "scheduler", json11::Json::STRING },
+        { "scheduler-connect-timeout", json11::Json::NUMBER },
+        { "acquired-slave-timeout", json11::Json::NUMBER },
+        { "slave-connect-timeout", json11::Json::NUMBER },
+        { "upload-job-timeout", json11::Json::NUMBER },
+        { "response-timeout", json11::Json::NUMBER },
+        { "client-name", json11::Json::STRING },
+        { "cache-dir", json11::Json::STRING },
+        { "slots", json11::Json::NUMBER },
+        { "desired-slots", json11::Json::NUMBER },
+        { "cpp-slots", json11::Json::NUMBER },
+        { "watchdog", json11::Json::BOOL },
+        { "node-path", json11::Json::STRING },
+        { "hostname", json11::Json::STRING },
+        { "name", json11::Json::STRING },
+        { "log-file", json11::Json::STRING },
+        { "log-file-append", json11::Json::BOOL },
+        { "log-level", json11::Json::STRING },
+        { "verbose", json11::Json::BOOL },
+        { "discard-comments", json11::Json::BOOL }
+    };
+
+    auto parseValue = [](const std::string &value, json11::Json::Type type, bool *ok) -> json11::Json {
+        *ok = true;
+        switch (type) {
+        case json11::Json::NUMBER: {
+            char *end;
+            const int val = strtoul(value.c_str(), &end, 10);
+            if (*end) {
+                *ok = false;
+                return json11::Json();
+            }
+            return val; }
+        case json11::Json::BOOL: {
+            if (value.empty() || value == "true") {
+                return true;
+            } else if (value == "false") {
+                return false;
+            } else {
+                // fprintf(stderr, "Can't parse argument --fisk-%s=%s\n", arg.c_str(), value.c_str());
+                *ok = false;
+                return json11::Json();
+            }
+            break; }
+        case json11::Json::STRING: {
+            return value; }
+        default: {
+            assert(0);
+            return json11::Json(); }
+        }
+    };
+
+    std::map<std::string, json11::Json> envs;
+    for (const auto &arg : sArgs) {
+        std::string env = "FISK_" + arg.arg;
+        for (size_t i=5; i<env.size(); ++i) {
+            char &ch = env[i];
+            if (ch == '-') {
+                ch = '_';
+            } else {
+                ch = std::toupper(ch);
+            }
+        }
+        if (char *envVal = getenv(env.c_str())) {
+            bool ok;
+            envs[arg.arg] = parseValue(envVal, arg.type, &ok);
+            if (!ok) {
+                fprintf(stderr, "Can't parse environment %s=%s\n", env.c_str(), envVal);
+                return false;
+            }
+        }
+    }
+
+    auto processArg = [&argc, &argv, &i, &commandLines, &error, &parseValue](const std::string &arg, json11::Json::Type type) {
+        std::string a = "--fisk-" + arg;
+        int consumed;
+        std::string value;
+        if (argv[i] == a) {
+            if (type == json11::Json::BOOL) {
+                consumed = 1;
+            } else {
+                consumed = 2;
+                value = argv[i + 1];
+            }
+        } else if (type != json11::Json::BOOL) {
+            a += "=";
+            if (!strncmp(argv[i], a.c_str(), a.size())) {
+                consumed = 1;
+                value = argv[i] + a.size();
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        bool ok;
+        commandLines[arg] = parseValue(value, type, &ok);
+        if (!ok) {
+            fprintf(stderr, "Can't parse argument --fisk-%s=%s\n", arg.c_str(), value.c_str());
+            error = true;
+            return true;
+        }
+        argc -= consumed;
+        memmove(argv + i, argv + i + consumed, sizeof(char *) * consumed);
+        return true;
+    };
+
+    while (i < argc) {
+        if (strncmp("--fisk-", argv[i], 7)) {
+            ++i;
+            continue;
+        }
+
+        bool found = false;
+        for (const auto &arg : sArgs) {
+            if (processArg(arg.arg, arg.type)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+            return false;
+        }
+    }
+
+    if (!commandLines.empty()) {
+        sJSON.push_back(std::move(commandLines));
+    }
+
     if (const char *home = getenv("HOME")) {
         if (!load(std::string(home) + "/.config/fisk/client.conf")) {
             return false;
@@ -185,7 +323,7 @@ size_t Config::compileSlots()
 
 size_t Config::desiredCompileSlots()
 {
-    json11::Json val = value("desired_slots");
+    json11::Json val = value("desired-slots");
     if (val.is_number())
         return val.int_value();
     return 0;
