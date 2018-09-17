@@ -28,9 +28,34 @@ function slaveKey() {
     }
 }
 
+function slaveToMonitorInfo(slave, type)
+{
+    return {
+        type: type,
+        ip: slave.ip,
+        name: slave.name,
+        hostname: slave.hostname,
+        slots: slave.slots,
+        port: slave.port,
+        jobsPerformed: slave.jobsPerformed,
+        compileSpeed: slave.jobsPerformed / slave.totalCompileSpeed || 0,
+        uploadSpeed: slave.jobsPerformed / slave.totalUploadSpeed || 0,
+        system: slave.system,
+        created: slave.created,
+        npmVersion: slave.npmVersion,
+        environments: Object.keys(slave.environments)
+    }
+}
+
 function insertSlave(slave) {
     slaves[slaveKey(slave)] = slave;
     ++slaveCount;
+    if (monitors.length) {
+        const info = slaveToMonitorInfo(slave, "slaveAdded");
+        monitors.forEach(monitor => {
+            monitor.send(info);
+        });
+    }
 }
 
 function forEachSlave(cb) {
@@ -42,6 +67,13 @@ function forEachSlave(cb) {
 function removeSlave(slave) {
     --slaveCount;
     delete slaves[slaveKey(slave)];
+    if (monitors.length) {
+        const info = slaveToMonitorInfo(slave, "slaveRemoved");
+        monitors.forEach(monitor => {
+            monitor.send(info);
+        });
+    }
+
 }
 
 function findSlave(ip, port) {
@@ -168,8 +200,8 @@ server.express.get("/slaves", (req, res, next) => {
             jobsScheduled: s.jobsScheduled,
             lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
             jobsPerformed: s.jobsPerformed,
-            compileSpeed: s.jobsPerformed / s.totalCompileSpeed,
-            uploadSpeed: s.jobsPerformed / s.totalUploadSpeed,
+            compileSpeed: s.jobsPerformed / s.totalCompileSpeed || 0,
+            uploadSpeed: s.jobsPerformed / s.totalUploadSpeed || 0,
             hostname: s.hostname,
             system: s.system,
             name: s.name,
@@ -477,6 +509,9 @@ server.on("monitor", client => {
         }
         client.removeAllListeners();
     }
+    forEachSlave(slave => {
+        client.send(slaveToMonitorInfo(slave, "slaveAdded"));
+    });
     client.on("close", remove);
     client.on("error", remove);
 });
