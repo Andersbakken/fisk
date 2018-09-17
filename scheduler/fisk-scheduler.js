@@ -250,10 +250,17 @@ server.on("slave", function(slave) {
         slave.totalUploadSpeed += job.uploadSpeed;
         console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
         if (monitors.length) {
-            job.type = "jobFinished";
-            job.slave = { ip: slave.ip, port: slave.port, name: slave.name, hostname: slave.hostname };
-            // console.log("job", job);
-            monitors.forEach(monitor => monitor.send(job));
+            const info = {
+                type: "jobFinished",
+                id: job.id,
+                cppSize: job.cppSize,
+                compileDuration: job.compileDuration,
+                compileSpeed: job.compileSpeed,
+                uploadDuration: job.uploadDuration,
+                uploadSpeed: job.uploadSpeed
+            };
+
+            monitors.forEach(monitor => monitor.send(info));
         }
     });
 });
