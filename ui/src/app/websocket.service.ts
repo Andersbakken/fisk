@@ -22,7 +22,7 @@ export class WebSocketService {
             return;
         }
         try {
-            this.socket = new WebSocket(`ws://${host}:${port}/events`);
+            this.socket = new WebSocket(`ws://${host}:${port}/monitor`);
         } catch (e) {
             console.error("websocket error", e.message);
             return;

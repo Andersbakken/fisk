@@ -3,7 +3,6 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
-import { NgxChartsModule } from '@swimlane/ngx-charts';
 
 import { MatCardModule, MatTabsModule,
          MatInputModule, MatSnackBarModule } from '@angular/material';
@@ -39,7 +38,6 @@ const appRoutes: Routes = [
         BrowserModule,
         BrowserAnimationsModule,
         FormsModule,
-        NgxChartsModule,
         MatCardModule,
         MatTabsModule,
         MatInputModule,
