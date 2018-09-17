@@ -353,7 +353,6 @@ server.on("job", (job) => {
                 const end = Date.now();
                 console.log("GOT ID", j);
                 client.send("jobFinished", {
-                    client: { ip: job.ip, name: job.clientName },
                     id: j.id,
                     cppSize: event.cppSize,
                     compileDuration: event.compileDuration,
