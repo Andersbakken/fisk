@@ -300,7 +300,6 @@ function startPending()
     }
 }
 
-let nextJobId = 0;
 server.on("job", (job) => {
     let vm = environments[job.hash];
     if (!vm) {
@@ -310,8 +309,9 @@ server.on("job", (job) => {
     const jobStartTime = Date.now();
     let uploadDuration;
 
+    console.log("got job", Object.keys(job));
     var j = {
-        id: nextJobId++,
+        id: job.id,
         job: job,
         op: undefined,
         done: false,
@@ -351,9 +351,10 @@ server.on("job", (job) => {
                 }
                 // job.close();
                 const end = Date.now();
+                console.log("GOT ID", j);
                 client.send("jobFinished", {
                     client: { ip: job.ip, name: job.clientName },
-                    sourceFile: event.sourceFile,
+                    id: j.id,
                     cppSize: event.cppSize,
                     compileDuration: event.compileDuration,
                     compileSpeed: (event.cppSize / event.compileDuration),

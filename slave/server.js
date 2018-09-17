@@ -4,7 +4,7 @@ const WebSocket = require("ws");
 const Url = require("url");
 
 class Job extends EventEmitter {
-    constructor(ws, ip, hash, clientName, sourceFile, wait) {
+    constructor(ws, ip, hash, clientName, sourceFile, id) {
         super();
         this.ws = ws;
         this.ip = ip;
@@ -12,6 +12,7 @@ class Job extends EventEmitter {
         this.clientName = clientName;
         this.sourceFile = sourceFile;
         this.wait = undefined;
+        this.id = id;
         // setTimeout(() => { console.log("closing him"); ws.close(); }, 200);
     }
 
@@ -98,7 +99,8 @@ class Server extends EventEmitter {
                 return;
             }
 
-            client = new Job(ws, ip, hash, name, req.headers["x-fisk-sourcefile"]);
+            // console.log("GOT HEADERS", req.headers);
+            client = new Job(ws, ip, hash, name, req.headers["x-fisk-sourcefile"], req.headers["x-fisk-job-id"]);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);

@@ -125,9 +125,9 @@ class Server extends EventEmitter {
             const clientName = req.headers["x-fisk-client-name"];
             if (clientName)
                 data.name = clientName;
-            const clientHostName = req.headers["x-fisk-client-hostname"];
-            if (clientHostName)
-                data.hostName = clientHostName;
+            const clientHostname = req.headers["x-fisk-client-hostname"];
+            if (clientHostname)
+                data.hostname = clientHostname;
             client = new Client(data);
             this.emit("compile", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));

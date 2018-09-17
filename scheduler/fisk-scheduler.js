@@ -221,7 +221,7 @@ server.express.get("/quit", (req, res, next) => {
 server.on("slave", function(slave) {
     slave.activeClients = 0;
     insertSlave(slave);
-    console.log("slave connected", slave.ip, slave.name || "", slave.hostName || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
+    console.log("slave connected", slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     syncEnvironments(slave);
 
     slave.on("environments", function(message) {
@@ -235,7 +235,7 @@ server.on("slave", function(slave) {
     });
     slave.on("close", function() {
         removeSlave(slave);
-        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostName || "", "slaveCount is", slaveCount);
+        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
         slave.removeAllListeners();
     });
 
@@ -250,10 +250,8 @@ server.on("slave", function(slave) {
         slave.totalUploadSpeed += job.uploadSpeed;
         console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
         if (monitors.length) {
-            job.type = "jobPerformed";
-            job.slave = { ip: slave.ip, port: slave.port, name: slave.name };
-            if (slave.hostName)
-                job.hostName = slave.hostname;
+            job.type = "jobFinished";
+            job.slave = { ip: slave.ip, port: slave.port, name: slave.name, hostname: slave.hostname };
             // console.log("job", job);
             monitors.forEach(monitor => monitor.send(job));
         }
@@ -264,7 +262,7 @@ let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", function(compile) {
     let arrived = Date.now();
-    console.log("request", compile.hostName, compile.ip, compile.environments);
+    console.log("request", compile.hostname, compile.ip, compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
         if (Environments.hasEnvironment(compile.environments[i])) {
@@ -415,9 +413,30 @@ server.on("compile", function(compile) {
             id = 0;
         data.id = id;
         data.ip = slave.ip;
-        data.hostName = slave.hostName;
+        data.hostname = slave.hostname;
         data.port = slave.port;
         compile.send("slave", data);
+        if (monitors.length) {
+            let info = {
+                type: "jobStarted",
+                client: {
+                    hostname: compile.hostname,
+                    ip: compile.ip,
+                    name: compile.name
+                },
+                sourceFile: compile.sourceFile,
+                slave: {
+                    hostname: slave.hostname,
+                    ip: slave.ip,
+                    name: slave.name,
+                    port: slave.port
+                },
+                id: id
+            };
+
+            monitors.forEach(monitor => monitor.send(info));
+        }
+
     } else {
         console.log("No slave for you", compile.ip);
         compile.send("slave", data);
