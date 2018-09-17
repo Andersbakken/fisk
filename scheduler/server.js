@@ -232,8 +232,7 @@ class Server extends EventEmitter {
             const hostname = req.headers["x-fisk-slave-hostname"];
             const system = req.headers["x-fisk-system"];
             const slots = parseInt(req.headers["x-fisk-slots"]);
-            const version = req.headers["x-fisk-npm-version"];
-            // console.log(req.headers);
+            const npmVersion = req.headers["x-fisk-npm-version"];
             let environments = {};
             req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
                 if (env)
@@ -251,7 +250,7 @@ class Server extends EventEmitter {
                                   totalUploadSpeed: 0,
                                   lastJob: 0,
                                   load: 0,
-                                  version: version,
+                                  npmVersion: npmVersion,
                                   hostname: hostname,
                                   environments: environments,
                                   system: system });
