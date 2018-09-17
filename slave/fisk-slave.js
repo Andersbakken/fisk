@@ -379,6 +379,7 @@ server.on("job", (job) => {
         if (idx != -1) {
             jobQueue.splice(idx, 1);
             j.cancel();
+            client.send("jobAborted", { id: j.id });
             startPending();
         }
     });

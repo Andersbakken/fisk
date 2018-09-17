@@ -295,6 +295,19 @@ server.on("slave", function(slave) {
             monitors.forEach(monitor => monitor.send(info));
         }
     });
+
+    slave.on("jobAborted", function(job) {
+        console.log(`slave: ${slave.ip}:${slave.port} aborted a job`, job);
+        if (monitors.length) {
+            const info = {
+                type: "jobAborted",
+                id: job.id
+            };
+
+            monitors.forEach(monitor => monitor.send(info));
+        }
+    });
+
 });
 
 let semaphoreMaintenanceTimers = {};
