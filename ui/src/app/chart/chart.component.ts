@@ -194,16 +194,19 @@ export class ChartComponent implements AfterViewInit {
         }
         const slaveKey = job.slave.ip + ":" + job.slave.port;
         const clientKey = job.client.ip;
-        const clientName = job.client.name;
         if (!(clientKey in this.clients)) {
             const rect = this.clients.g.append("rect")
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
                 .attr("fill", this._color(clientKey, false));
+            let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
+                client: job.client, rect: rect, text: undefined, jobs: 1, name: job.client.name
+            };
             const text = this.svg.append("text")
                 .attr("y", this.view.height - 12)
-                .text(() => { return clientName; });
-            this.clients[clientKey] = { client: job.client, rect: rect, text: text, jobs: 1 };
+                .text(() => { return `${clientData.Name} (${clientData.jobs} jobs)`; });
+            clientData.text = text;
+            this.clients[clientKey] = clientData;
         } else {
             ++this.clients[clientKey].jobs;
         }
@@ -267,6 +270,8 @@ export class ChartComponent implements AfterViewInit {
                 .attr("x", x)
                 .attr("width", width)
                 .duration(100);
+            client.text
+                .text(() => { return `${client.name} (${client.jobs} jobs)`; });
             client.text
                 .transition()
                 .attr("x", x + 5)
