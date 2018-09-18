@@ -18,6 +18,7 @@ export class ChartComponent implements AfterViewInit {
 
     view: any = { width: 0, height: 0 };
     slaves: any = {};
+    clients: any = {};
     jobs: any = {};
     svg: any = undefined;
     slaveTimer: any = undefined;
@@ -25,7 +26,7 @@ export class ChartComponent implements AfterViewInit {
     constructor(private fisk: FiskService, private ngZone: NgZone,
                 private config: ConfigService, private message: MessageService) {
         this.fisk.on("data", (data: any) => {
-            console.log("hello", data);
+            // console.log("hello", data);
             // this.ngZone.run(() => {
             switch (data.type) {
             case "slaveAdded":
@@ -65,7 +66,6 @@ export class ChartComponent implements AfterViewInit {
             this.ngZone.run(() => {
                 const div = document.getElementById("chart");
                 const rect: any = div.getBoundingClientRect();
-                console.log(rect);
                 this.view.width = window.innerWidth - ((rect.x * 2) + 50);
                 this.view.height = window.innerHeight - rect.y - 50;
 
@@ -100,6 +100,7 @@ export class ChartComponent implements AfterViewInit {
             .append("svg")
             .attr("width", this.view.width)
             .attr("height", this.view.height);
+        this.clients.g = this.svg.append("g");
     }
 
     _color(key, invert) {
@@ -153,7 +154,7 @@ export class ChartComponent implements AfterViewInit {
         }
         const halo = this.svg.append("ellipse").attr("fill", this._color(key, true));
         const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
-        const text = this.svg.append("text").text(d => { return key; });
+        const text = this.svg.append("text").text(() => { return key; });
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
@@ -193,16 +194,31 @@ export class ChartComponent implements AfterViewInit {
             console.error("job already exists", job);
             return;
         }
-        const key = job.slave.ip + ":" + job.slave.port;
-        const slave = this.slaves[key];
+        const slaveKey = job.slave.ip + ":" + job.slave.port;
+        const clientKey = job.client.ip;
+        const clientName = job.client.name;
+        if (!(clientKey in this.clients)) {
+            const rect = this.clients.g.append("rect")
+                .attr("y", this.view.height - 30)
+                .attr("height", 30)
+                .attr("fill", this._color(clientKey, false));
+            const text = this.svg.append("text")
+                .attr("y", this.view.height - 12)
+                .text(() => { return clientName; });
+            this.clients[clientKey] = { client: job.client, rect: rect, text: text, jobs: 1 };
+        } else {
+            ++this.clients[clientKey].jobs;
+        }
+        const slave = this.slaves[slaveKey];
         if (!slave) {
             console.error("can't find slave", job);
             return;
         }
-        this.jobs[job.id] = key;
+        this.jobs[job.id] = { slave: slaveKey, client: clientKey };
         ++slave.jobs;
 
         this._adjustSlave(slave);
+        this._adjustClients();
     }
 
     _jobFinished(job) {
@@ -210,11 +226,20 @@ export class ChartComponent implements AfterViewInit {
             console.error("no such job", job);
             return;
         }
-        const key = this.jobs[job.id];
+        const jobData = this.jobs[job.id];
         delete this.jobs[job.id];
-        const slave = this.slaves[key];
+        const slave = this.slaves[jobData.slave];
+        const client = this.clients[jobData.client];
+        if (client) {
+            if (!--client.jobs) {
+                client.rect.remove();
+                client.text.remove();
+                delete this.clients[jobData.client];
+            }
+            this._adjustClients();
+        }
         if (!slave) {
-            console.error("can't find slave", job, key);
+            console.error("can't find slave", job, jobData.slave);
             return;
         }
         if (!slave.jobs) {
@@ -224,6 +249,32 @@ export class ChartComponent implements AfterViewInit {
         --slave.jobs;
 
         this._adjustSlave(slave);
+    }
+
+    _adjustClients() {
+        let total = 0;
+        for (let k in this.clients) {
+            if (k === "g")
+                continue;
+            total += this.clients[k].jobs;
+        }
+        let x = 0;
+        for (let k in this.clients) {
+            if (k === "g")
+                continue;
+            const client = this.clients[k];
+            const width = (client.jobs / total) * this.view.width;
+            client.rect
+                .transition()
+                .attr("x", x)
+                .attr("width", width)
+                .duration(100);
+            client.text
+                .transition()
+                .attr("x", x + 5)
+                .duration(100);
+            x += width;
+        }
     }
 
     _rearrangeSlaves() {
