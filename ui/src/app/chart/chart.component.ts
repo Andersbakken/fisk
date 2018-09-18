@@ -104,10 +104,7 @@ export class ChartComponent implements AfterViewInit {
     }
 
     _color(key, invert) {
-        var m_w = 123456789;
-        var m_z = 987654321;
-        var mask = 0xffffffff;
-
+        // taken from https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
         function Alea(seed) {
             if(seed === undefined) {seed = +new Date() + Math.random();}
             function Mash() {
