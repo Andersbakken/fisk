@@ -1,10 +1,8 @@
 const child_process = require('child_process');
 const mktemp = require('mktemp');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const EventEmitter = require('events');
-
-const magicalObjectName = 'fisk-slave-out';
 
 class Compile extends EventEmitter {
     constructor(args, argv0, dir) {
@@ -14,26 +12,25 @@ class Compile extends EventEmitter {
             throw new Error("Bad args");
         }
         let compiler = args.shift();
+        let outputs = [];
 
         let hasDashX = false;
         let sourceFile;
-        let originalOutput;
         for (let i=0; i<args.length; ++i) {
             switch (args[i]) {
             case '-MF':
             case '-MQ':
             case '-MT':
+            case '-o':
                 ++i;
+                outputs.push(args[i]);
+                args[i] = "output_" + (outputs.length - 1);
                 continue;
             case '-MMD':
             case '-MD':
             case '-MM':
             case '-M':
                 continue;
-            case '-o':
-                originalOutput = args[++i];
-                args[i] = path.join(dir, magicalObjectName);
-                break;
             case '-x':
                 hasDashX = true;
                 switch (args[++i]) {
@@ -91,12 +88,6 @@ class Compile extends EventEmitter {
         }
         if (!sourceFile) {
             throw new Error("No sourcefile");
-        }
-
-        if (!originalOutput) {
-            args.push('-o');
-            args.push(path.join(dir, magicalObjectName));
-            originalOutput = sourceFile.substr(0, sourceFile.length - path.extname(sourceFile).length + 1) + "o";
         }
 
         if (!hasDashX) {
@@ -178,8 +169,9 @@ class Compile extends EventEmitter {
                             if (stat.isDirectory()) {
                                 addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
-                                if (file === magicalObjectName) {
-                                    files.push({ path: originalOutput, mapped: path.join(prefix, file) });
+                                var match = /output_([0-9]+)/.exec(file);
+                                if (match) {
+                                    files.push({ path: outputs[match[1]], mapped: path.join(prefix, file) });
                                 } else {
                                     files.push({ path: path.join(prefix, file) });
                                 }
