@@ -150,7 +150,7 @@ export class ChartComponent implements AfterViewInit {
             console.error("slave already exists", slave);
             return;
         }
-        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true));
+        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke": "black").attr("stroke-width": 2);
         const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
         const text = this.svg.append("text").text(() => { return key; });
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
@@ -182,8 +182,8 @@ export class ChartComponent implements AfterViewInit {
     _adjustSlave(slave) {
         slave.halo
             .transition()
-            .attr("rx", this._ellipseX(slave, true))
-            .attr("ry", this._ellipseY(slave, true))
+            .attr("rx", this._ellipseX(slave, true) + 1)
+            .attr("ry", this._ellipseY(slave, true) + 1)
             .duration(200);
     }
 
@@ -304,8 +304,8 @@ export class ChartComponent implements AfterViewInit {
             slave.halo
                 .attr("cx", width / 2 + Math.cos(angle) * xr)
                 .attr("cy", height / 2 + Math.sin(angle) * yr)
-                .attr("rx", this._ellipseX(slave, true))
-                .attr("ry", this._ellipseY(slave, true));
+                .attr("rx", this._ellipseX(slave, true) + 1)
+                .attr("ry", this._ellipseY(slave, true) + 1);
             slave.text
                 .attr("x", (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2))
                 .attr("y", (height / 2 + Math.sin(angle) * yr) + (3 * Math.SQRT2));
