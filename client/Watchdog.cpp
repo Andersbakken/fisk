@@ -40,45 +40,52 @@ void Watchdog::resume()
     mTransitionTime = now - mTransitionTime;
 }
 
-int Watchdog::timeout() const
+int Watchdog::timeout()
 {
     if (mState != Running)
         return -1;
     const unsigned long long now = Client::mono();
-    unsigned long long timeout = mTransitionTime;
+    mTimeoutTime = mTransitionTime;
     switch (mStage) {
     case Initial:
-        timeout += Config::schedulerConnectTimeout();
+        mTimeoutTime += Config::schedulerConnectTimeout();
         break;
     case ConnectedToScheduler:
-        timeout += Config::acquiredSlaveTimeout();
+        mTimeoutTime += Config::acquiredSlaveTimeout();
         break;
     case AcquiredSlave:
-        timeout += Config::slaveConnectTimeout();
+        mTimeoutTime += Config::slaveConnectTimeout();
         break;
     case ConnectedToSlave:
-        timeout += Config::uploadJobTimeout();
+        mTimeoutTime += Config::uploadJobTimeout();
         break;
     case UploadedJob:
-        timeout += Config::responseTimeout();
+        mTimeoutTime += Config::responseTimeout();
         break;
     case Finished:
         return -1;
     }
-    if (now >= timeout) {
+    if (now >= mTimeoutTime) {
         DEBUG("Already timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
         return 0;
     }
-    // DEBUG("Setting watchdog timeout to %llu waiting for %s",
-    //       timeout - now,
-    //       stageName(static_cast<Stage>(mStage + 1)));
-    return timeout - now;
+    DEBUG("Setting watchdog timeout to %llu (%llu/%llu) waiting for %s",
+          mTimeoutTime - now,
+          mTimeoutTime, now,
+          stageName(static_cast<Stage>(mStage + 1)));
+    return mTimeoutTime - now;
 }
 
 void Watchdog::onTimeout()
 {
-    if (mState == Running) {
+    if (mState == Running && Client::mono() >= mTimeoutTime) {
         ERROR("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
     }
+}
+
+void Watchdog::heartbeat()
+{
+    mTransitionTime = Client::mono();
+    wakeup();
 }

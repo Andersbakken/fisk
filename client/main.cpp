@@ -350,6 +350,7 @@ int main(int argcIn, char **argvIn)
     DEBUG("Waiting for preprocessed");
     watchdog.suspend();
     preprocessed->wait();
+    watchdog.resume();
     DEBUG("Preprocessed finished");
     preprocessedDuration = preprocessed->duration;
     preprocessedSlotDuration = preprocessed->slotDuration;

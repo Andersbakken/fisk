@@ -315,9 +315,14 @@ server.on("job", (job) => {
         job: job,
         op: undefined,
         done: false,
+        heartbeatTimer: undefined,
         buffers: [],
         start: function() {
             let job = this.job;
+            this.heartbeatTimer = setInterval(() => {
+                console.log("sending heartbeat");
+                job.send("heartbeat", {});
+            }, 5000);
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
             this.op = vm.startCompile(job.commandLine, job.argv0);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
@@ -349,6 +354,11 @@ server.on("job", (job) => {
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
                 }
+                if (this.heartbeatTimer) {
+                    clearTimeout(this.heartbeatTimer);
+                    this.heartbeatTimer = undefined;
+                }
+
                 // job.close();
                 const end = Date.now();
                 // console.log("GOT ID", j);
@@ -366,6 +376,10 @@ server.on("job", (job) => {
         cancel: function() {
             if (!this.done && this.op) {
                 this.op.cancel();
+            }
+            if (this.heartbeatTimer) {
+                clearTimeout(this.heartbeatTimer);
+                this.heartbeatTimer = undefined;
             }
         }
     };

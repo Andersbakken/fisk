@@ -7,9 +7,11 @@
 #include <string.h>
 #include <functional>
 #include <sys/select.h>
+#include <unistd.h>
 #include "Log.h"
 #include "Client.h"
 
+class Select;
 struct Socket
 {
     virtual ~Socket() {}
@@ -23,20 +25,43 @@ struct Socket
     virtual void onWrite() = 0;
     virtual void onRead() = 0;
     virtual void onTimeout() = 0;
-    virtual int timeout() const = 0;
+    virtual int timeout() = 0;
+    void wakeup();
+private:
+    Select *mSelect { nullptr };
+    friend class Select;
 };
 
 class Select
 {
 public:
-    Select() {}
-    void add(Socket *socket) { mSockets.insert(socket); }
-    void remove(Socket *socket) { mSockets.erase(socket); }
+    Select()
+    {
+        if (pipe(mPipe) == -1) {
+            mPipe[0] = mPipe[1] = -1;
+        }
+    }
+    ~Select()
+    {
+        if (mPipe[0] != -1)
+            ::close(mPipe[0]);
+        if (mPipe[1] != -1)
+            ::close(mPipe[1]);
+    }
+    void add(Socket *socket) { assert(!socket->mSelect); socket->mSelect = this; mSockets.insert(socket); }
+    void remove(Socket *socket) { assert(socket->mSelect == this); socket->mSelect = nullptr; mSockets.erase(socket); }
 
     int exec(int timeoutMs = -1) const;
+    void wakeup();
 private:
     std::set<Socket *> mSockets;
+    int mPipe[2];
 };
 
+inline void Socket::wakeup()
+{
+    assert(mSelect);
+    mSelect->wakeup();
+}
 
 #endif /* SELECT_H */

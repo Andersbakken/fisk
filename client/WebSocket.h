@@ -55,7 +55,7 @@ protected:
 
     // Socket
     virtual unsigned int mode() const override;
-    virtual int timeout() const override { return -1; }
+    virtual int timeout() override { return -1; }
     virtual int fd() const override { return mFD; }
     virtual void onWrite() override;
     virtual void onRead() override;

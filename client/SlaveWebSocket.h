@@ -52,6 +52,12 @@ public:
                 return;
             }
 
+            if (type == "heartbeat") {
+                DEBUG("Got a heartbeat.");
+                Client::data().watchdog->heartbeat();
+                return;
+            }
+
             if (type != "response") {
                 ERROR("Unexpected message type %s. Wanted \"response\"", msg["type"].string_value().c_str());
                 Client::data().watchdog->stop();

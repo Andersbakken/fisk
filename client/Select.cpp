@@ -5,8 +5,9 @@ int Select::exec(int timeoutMs) const
     fd_set r, w;
     FD_ZERO(&r);
     FD_ZERO(&w);
-    int max = -1;
-    std::vector<int> timeouts;
+    int max = mPipe[0];
+    FD_SET(mPipe[0], &r);
+    std::vector<unsigned long long> timeouts;
     const unsigned long long before = Client::mono();
     for (Socket *socket : mSockets) {
         const int to = socket->timeout();
@@ -44,11 +45,22 @@ int Select::exec(int timeoutMs) const
 
     const unsigned long long after = ret ? 0 : Client::mono();
     size_t idx = 0;
+    if (FD_ISSET(mPipe[0], &r)) {
+        --ret;
+        char ch;
+        int readRet;
+        do {
+            readRet = ::read(mPipe[0], &ch, 1);
+        } while (readRet == -1 && errno == EINTR);
+    }
     for (Socket *socket : mSockets) {
         if (!ret) {
-            const unsigned long long socketTimeout = timeouts[idx++] + before;
-            if (after >= socketTimeout)
-                socket->onTimeout();
+            if (timeouts[idx] >= 0) {
+                const unsigned long long socketTimeout = timeouts[idx] + before;
+                if (after >= socketTimeout)
+                    socket->onTimeout();
+            }
+            ++idx;
         } else {
             const int fd = socket->fd();
             if (fd != -1) {
@@ -61,4 +73,17 @@ int Select::exec(int timeoutMs) const
     }
 
     return ret;
+}
+
+void Select::wakeup()
+{
+    if (mPipe[1] != -1) {
+        DEBUG("Waking up with pipe");
+        int err;
+        do {
+            err = write(mPipe[1], "w", 1);
+        } while (err == -1 && errno == EINTR);
+    } else {
+        DEBUG("Pipe not there");
+    }
 }

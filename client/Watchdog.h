@@ -36,6 +36,7 @@ public:
         return "";
     }
     void transition(Stage stage);
+    void heartbeat();
     void stop();
     void suspend();
     void resume();
@@ -45,7 +46,7 @@ protected:
     virtual void onWrite() override {}
     virtual void onRead() override {}
     virtual void onTimeout() override;
-    virtual int timeout() const override;
+    virtual int timeout() override;
 private:
     Watchdog::Stage mStage { Watchdog::Initial };
     enum State {
@@ -54,6 +55,7 @@ private:
         Suspended
     } mState { Running };
     unsigned long long mTransitionTime { Client::mono() };
+    unsigned long long mTimeoutTime { 0 };
 };
 
 #endif /* WATCHDOG_H */

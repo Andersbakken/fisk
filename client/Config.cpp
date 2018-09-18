@@ -141,7 +141,7 @@ unsigned long long Config::responseTimeout()
     if (val.is_number())
         return val.int_value();
 
-    return 120000;
+    return 10000; // restarts on each heartbeat which happen every 5 seconds
 }
 
 std::string Config::clientName()
