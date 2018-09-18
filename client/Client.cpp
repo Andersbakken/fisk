@@ -472,28 +472,20 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
               Client::Slot::typeToString(type), slots, errno, strerror(errno));
         return std::make_unique<Client::Slot>(type, nullptr);
     }
-#ifdef __APPLE__
-    int ret = sem_wait(sem);
-    (void)ret;
-#else
     int ret;
-    while (true) {
-        do {
-            struct timespec time = { 20, 0 };
-            ret = sem_timedwait(sem, &time);
-        } while (ret == -1 && errno == EINTR);
-        if (!ret)
-            break;
-        if (errno == ETIMEDOUT)
-            sem_unlink(Client::Slot::typeToString(type));
-    }
+    do {
+        ret = sem_wait(sem);
+    } while (ret == -1 && errno == EINTR);
+
     if (Log::minLogLevel <= Log::Debug) {
+#ifdef __linux__
         int val = -1;
         sem_getvalue(sem, &val);
         Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
-    }
-
+#else
+        Log::debug("Opened semaphore %s for %zu slots", Client::Slot::typeToString(type), slots);
 #endif
+    }
 
     assert(!ret);
     return std::make_unique<Client::Slot>(type, sem);
