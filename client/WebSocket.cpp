@@ -385,8 +385,10 @@ void WebSocket::onRead()
     if (mState == ConnectedWebSocket) {
         while (true) {
             const size_t last = mRecvBuffer.size();
-            wslay_event_recv(mContext);
-#warning should handle error
+            if (wslay_event_recv(mContext) != 0) {
+                mState = Error;
+                return;
+            }
             if (mRecvBuffer.empty() || last == mRecvBuffer.size())
                 break;
         }
