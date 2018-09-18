@@ -16,8 +16,9 @@ export class ChartComponent implements AfterViewInit {
     title = 'app';
     data: any = undefined;
 
-    view: any = { width: 1000, height: 1000 };
+    view: any = { width: 0, height: 0 };
     slaves: any = {};
+    jobs: any = {};
     svg: any = undefined;
     slaveTimer: any = undefined;
 
@@ -28,7 +29,17 @@ export class ChartComponent implements AfterViewInit {
             // this.ngZone.run(() => {
             switch (data.type) {
             case "slaveAdded":
-                this._addSlave(data);
+                this._slaveAdded(data);
+                break;
+            case "slaveRemove":
+                this._slaveRemoved(data);
+                break;
+            case "jobStarted":
+                this._jobStarted(data);
+                break;
+            case "jobFinished":
+            case "jobAborted":
+                this._jobFinished(data);
                 break;
             }
             // });
@@ -48,6 +59,23 @@ export class ChartComponent implements AfterViewInit {
         if (host !== undefined) {
             this.reconnect(host, this.config.get("port", 8097));
         }
+
+        window.addEventListener("resize", () => {
+            //console.log(window.innerWidth, window.innerHeight);
+            this.ngZone.run(() => {
+                const div = document.getElementById("chart");
+                const rect: any = div.getBoundingClientRect();
+                console.log(rect);
+                this.view.width = window.innerWidth - ((rect.x * 2) + 50);
+                this.view.height = window.innerHeight - rect.y - 50;
+
+                this.svg
+                    .attr("width", this.view.width)
+                    .attr("height", this.view.height);
+
+                this._rearrangeSlaves();
+            });
+        });
     }
 
     private reconnect(host: string, port: number) {
@@ -63,13 +91,18 @@ export class ChartComponent implements AfterViewInit {
     }
 
     ngAfterViewInit() {
+        const div = document.getElementById("chart");
+        const rect: any = div.getBoundingClientRect();
+        this.view.width = window.innerWidth - ((rect.x * 2) + 50);
+        this.view.height = window.innerHeight - rect.y - 50;
+
         this.svg = d3.select("#chart")
             .append("svg")
             .attr("width", this.view.width)
             .attr("height", this.view.height);
     }
 
-    _color(key) {
+    _color(key, invert) {
         var m_w = 123456789;
         var m_z = 987654321;
         var mask = 0xffffffff;
@@ -104,28 +137,100 @@ export class ChartComponent implements AfterViewInit {
         var h = rand(1, 360);
         var s = rand(0, 100);
         var l = rand(0, 100);
+
+        if (invert) {
+            s = 100 - s;
+        }
+
         return 'hsl(' + h + ',' + s + '%,' + l + '%)';
     }
 
-    _addSlave(slave) {
+    _slaveAdded(slave) {
         const key = slave.ip + ":" + slave.port;
         if (key in this.slaves) {
             console.error("slave already exists", slave);
             return;
         }
-        const ellipse = this.svg.append("ellipse");
+        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true));
+        const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
         const text = this.svg.append("text").text(d => { return key; });
-        this.slaves[key] = { slave: slave, ellipse: ellipse, text: text };
+        this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
         this.slaveTimer = setTimeout(() => { this._rearrangeSlaves(); }, 250);
+    }
+
+    _slaveRemoved(slave) {
+        const key = slave.ip + ":" + slave.port;
+        if (!(key in this.slaves)) {
+            console.error("slave does not exist", slave);
+            return;
+        }
+        delete this.slaves[key];
+        if (this.slaveTimer)
+            clearTimeout(this.slaveTimer);
+        this.slaveTimer = setTimeout(() => { this._rearrangeSlaves(); }, 250);
+    }
+
+    _ellipseX(slave, grow) {
+        return (50 + (slave.jobs * (grow ? 4 : 0))) * Math.SQRT2;
+    }
+
+    _ellipseY(slave, grow) {
+        return (25 + (slave.jobs * (grow ? 4 : 0))) * Math.SQRT2;
+    }
+
+    _adjustSlave(slave) {
+        slave.halo
+            .transition()
+            .attr("rx", this._ellipseX(slave, true))
+            .attr("ry", this._ellipseY(slave, true))
+            .duration(200);
+    }
+
+    _jobStarted(job) {
+        if (job.id in this.jobs) {
+            console.error("job already exists", job);
+            return;
+        }
+        const key = job.slave.ip + ":" + job.slave.port;
+        const slave = this.slaves[key];
+        if (!slave) {
+            console.error("can't find slave", job);
+            return;
+        }
+        this.jobs[job.id] = key;
+        ++slave.jobs;
+
+        this._adjustSlave(slave);
+    }
+
+    _jobFinished(job) {
+        if (!(job.id in this.jobs)) {
+            console.error("no such job", job);
+            return;
+        }
+        const key = this.jobs[job.id];
+        delete this.jobs[job.id];
+        const slave = this.slaves[key];
+        if (!slave) {
+            console.error("can't find slave", job, key);
+            return;
+        }
+        if (!slave.jobs) {
+            console.error("slave jobs already at 0", job, slave);
+            return;
+        }
+        --slave.jobs;
+
+        this._adjustSlave(slave);
     }
 
     _rearrangeSlaves() {
         const count = Object.keys(this.slaves).length;
         const nodesPerRing = 20;
         const ringCount = Math.floor(count / nodesPerRing) + 1;
-        const radiusFactor = 2.5;
+        const radiusFactor = 2.8;
         const width = this.view.width;
         const height = this.view.height;
         const xRadius = Math.round(width / radiusFactor);
@@ -145,9 +250,13 @@ export class ChartComponent implements AfterViewInit {
             slave.ellipse
                 .attr("cx", width / 2 + Math.cos(angle) * xr)
                 .attr("cy", height / 2 + Math.sin(angle) * yr)
-                .attr("rx", 50 * Math.SQRT2)
-                .attr("ry", 25 * Math.SQRT2)
-                .attr("fill", this._color(key));
+                .attr("rx", this._ellipseX(slave, false))
+                .attr("ry", this._ellipseY(slave, false));
+            slave.halo
+                .attr("cx", width / 2 + Math.cos(angle) * xr)
+                .attr("cy", height / 2 + Math.sin(angle) * yr)
+                .attr("rx", this._ellipseX(slave, true))
+                .attr("ry", this._ellipseY(slave, true));
             slave.text
                 .attr("x", (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2))
                 .attr("y", (height / 2 + Math.sin(angle) * yr) + (3 * Math.SQRT2));
