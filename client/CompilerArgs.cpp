@@ -335,6 +335,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         }
     }
 
+    if (!hasDashC) {
+        DEBUG("link job, building local");
+        return nullptr;
+    }
+
 #warning need to handle color diagnostics
 #warning need to handle clang_get_default_target
 
