@@ -204,7 +204,7 @@ export class ChartComponent implements AfterViewInit {
             };
             const text = this.svg.append("text")
                 .attr("y", this.view.height - 12)
-                .text(() => { return `${clientData.Name} (${clientData.jobs} jobs)`; });
+                .text(() => { return `${clientData.name} (${clientData.jobs} jobs)`; });
             clientData.text = text;
             this.clients[clientKey] = clientData;
         } else {
