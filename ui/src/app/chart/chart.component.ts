@@ -150,7 +150,7 @@ export class ChartComponent implements AfterViewInit {
             console.error("slave already exists", slave);
             return;
         }
-        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke": "black").attr("stroke-width": 2);
+        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke", "black").attr("stroke-width", 2);
         const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
         const text = this.svg.append("text").text(() => { return key; });
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
