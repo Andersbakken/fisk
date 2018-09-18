@@ -138,8 +138,10 @@ class Compile extends EventEmitter {
             }
             args.unshift('-x');
         }
-        if (compiler.indexOf('clang') == -1)
-            args.push('-fpreprocessed'); // this is not good for clang
+        if (compiler.indexOf('clang') == -1) {
+            args.push('-fpreprocessed', '-fdirectives-only'); // this is not good for clang
+        }
+
         // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
         this.proc = proc;

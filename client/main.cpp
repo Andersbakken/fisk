@@ -222,14 +222,8 @@ int main(int argcIn, char **argvIn)
         args[i] = data.argv[i];
     }
     data.compilerArgs = CompilerArgs::create(args);
-    if (!data.compilerArgs
-        || data.compilerArgs->mode != CompilerArgs::Compile
-        || (data.compilerArgs->flags & (CompilerArgs::AssemblerWithCpp|CompilerArgs::Assembler)) // this probably could work but fails for dyncall_call.S
-        || data.compilerArgs->flags & CompilerArgs::StdinInput
-        || data.compilerArgs->sourceFileIndexes.size() != 1) {
-        DEBUG("Have to run locally because mode %s - flags 0x%x - source files: %zu",
-              CompilerArgs::modeName(data.compilerArgs ? data.compilerArgs->mode : CompilerArgs::Invalid),
-              data.compilerArgs ? data.compilerArgs->flags : 0, data.compilerArgs ? data.compilerArgs->sourceFileIndexes.size() : 0);
+    if (!data.compilerArgs) {
+        DEBUG("Have to run locally");
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
     }
@@ -258,7 +252,7 @@ int main(int argcIn, char **argvIn)
     DEBUG("Got hashes %s for %s", hashes.c_str(), data.resolvedCompiler.c_str());
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = hashes;
-    Client::parsePath(data.compilerArgs->sourceFile(0), &headers["x-fisk-sourcefile"], 0);
+    Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name();
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     if (slave)
