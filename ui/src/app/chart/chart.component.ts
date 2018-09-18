@@ -108,36 +108,37 @@ export class ChartComponent implements AfterViewInit {
         var m_z = 987654321;
         var mask = 0xffffffff;
 
-        function hashCode(s) {
-            return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);
+        function Alea(seed) {
+            if(seed === undefined) {seed = +new Date() + Math.random();}
+            function Mash() {
+                var n = 4022871197;
+                return function(r) {
+                    var f;
+                    for(var t, s, u = 0, e = 0.02519603282416938; u < r.length; u++)
+                        s = r.charCodeAt(u), f = (e * (n += s) - (n*e|0)),
+                    n = 4294967296 * ((t = f * (e*n|0)) - (t|0)) + (t|0);
+                    return (n|0) * 2.3283064365386963e-10;
+                }
+            }
+            return function() {
+                var m = Mash(), a = m(" "), b = m(" "), c = m(" "), x = 1, y;
+                seed = seed.toString(), a -= m(seed), b -= m(seed), c -= m(seed);
+                a < 0 && a++, b < 0 && b++, c < 0 && c++;
+                return function() {
+                    var y = x * 2.3283064365386963e-10 + a * 2091639; a = b, b = c;
+                    return c = y - (x = y|0);
+                };
+            }();
         }
 
-        // Takes any integer
-        function seed(i) {
-            m_w = i;
-            m_z = 987654321;
+        function rand(min, max, r) {
+            return min + r() * (max - min);
         }
 
-        // Returns number between 0 (inclusive) and 1.0 (exclusive),
-        // just like Math.random().
-        function random()
-        {
-            m_z = (36969 * (m_z & 65535) + (m_z >> 16)) & mask;
-            m_w = (18000 * (m_w & 65535) + (m_w >> 16)) & mask;
-            var result = ((m_z << 16) + m_w) & mask;
-            result /= 4294967296;
-            return result + 0.5;
-        }
-
-        function rand(min, max) {
-            return min + random() * (max - min);
-        }
-
-        seed(hashCode(key));
-
-        var h = rand(1, 360);
-        var s = rand(0, 100);
-        var l = rand(0, 100);
+        const random = Alea(key);
+        var h = rand(1, 360, random);
+        var s = rand(0, 100, random);
+        var l = Math.max(rand(0, 100, random), 45);
 
         if (invert) {
             s = 100 - s;
