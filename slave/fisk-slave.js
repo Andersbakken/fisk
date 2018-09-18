@@ -309,7 +309,7 @@ server.on("job", (job) => {
     const jobStartTime = Date.now();
     let uploadDuration;
 
-    console.log("got job", Object.keys(job));
+    // console.log("got job", Object.keys(job));
     var j = {
         id: job.id,
         job: job,
@@ -351,7 +351,7 @@ server.on("job", (job) => {
                 }
                 // job.close();
                 const end = Date.now();
-                console.log("GOT ID", j);
+                // console.log("GOT ID", j);
                 client.send("jobFinished", {
                     id: j.id,
                     cppSize: event.cppSize,
