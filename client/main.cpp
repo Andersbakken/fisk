@@ -206,7 +206,6 @@ int main(int argcIn, char **argvIn)
           data.slaveCompiler.c_str());
 
     if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-        fprintf(stderr, "FUCKING GOING LOCAL\n");
         Client::runLocal(std::move(slot));
         return 0;
     }
@@ -225,6 +224,7 @@ int main(int argcIn, char **argvIn)
     data.compilerArgs = CompilerArgs::create(args);
     if (!data.compilerArgs
         || data.compilerArgs->mode != CompilerArgs::Compile
+        || (data.compilerArgs->flags & (CompilerArgs::AssemblerWithCpp|CompilerArgs::Assembler)) // this probably could work but fails for dyncall_call.S
         || data.compilerArgs->flags & CompilerArgs::StdinInput
         || data.compilerArgs->sourceFileIndexes.size() != 1) {
         DEBUG("Have to run locally because mode %s - flags 0x%x - source files: %zu",
