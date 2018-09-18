@@ -22,22 +22,27 @@ void Watchdog::transition(Stage stage)
 
 void Watchdog::stop()
 {
-    mState = Stopped;
+    if (mState == Running)
+        mState = Stopped;
 }
 
 void Watchdog::suspend()
 {
-    mState = Suspended;
-    const unsigned long long now = Client::mono();
-    if (mTransitionTime < now)
-        mTransitionTime = now - mTransitionTime; // mTransitionTime now holds amount of ms elapsed
+    if (mState == Running) {
+        mState = Suspended;
+        const unsigned long long now = Client::mono();
+        if (mTransitionTime < now)
+            mTransitionTime = now - mTransitionTime; // mTransitionTime now holds amount of ms elapsed
+    }
 }
 
 void Watchdog::resume()
 {
-    mState = Running;
-    const unsigned long long now = Client::mono();
-    mTransitionTime = now - mTransitionTime;
+    if (mState == Suspended) {
+        mState = Running;
+        const unsigned long long now = Client::mono();
+        mTransitionTime = now - mTransitionTime;
+    }
 }
 
 int Watchdog::timeout()
