@@ -79,6 +79,11 @@ int main(int argcIn, char **argvIn)
         disabled = !strlen(env) || !strcmp(env, "1");
     }
 
+    bool noDesire = false;
+    if ((env = getenv("FISK_NO_DESIRE"))) {
+        noDesire = !strlen(env) || !strcmp(env, "1");
+    }
+
     const char *preresolved = getenv("FISK_COMPILER");
     const char *slave = getenv("FISK_SLAVE");
     const char *scheduler = getenv("FISK_SCHEDULER");
@@ -143,6 +148,8 @@ int main(int argcIn, char **argvIn)
             scheduler = argvIn[++i];
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
+        } else if (!strcmp("--fisk-no-desire", argvIn[i])) {
+            noDesire = true;
         } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
             for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
                 if (sem_unlink(Client::Slot::typeToString(type))) {
@@ -205,9 +212,11 @@ int main(int argcIn, char **argvIn)
           data.compiler.c_str(), data.resolvedCompiler.c_str(),
           data.slaveCompiler.c_str());
 
-    if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-        Client::runLocal(std::move(slot));
-        return 0;
+    if (!noDesire) {
+        if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
+            Client::runLocal(std::move(slot));
+            return 0;
+        }
     }
 
     if (disabled) {
@@ -283,9 +292,18 @@ int main(int argcIn, char **argvIn)
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket.done && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket)
+        while (!schedulerWebsocket.done
+               && schedulerWebsocket.state() >= SchedulerWebSocket::None
+               && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
+        }
         DEBUG("Finished schedulerWebsocket");
+        if (!schedulerWebsocket.done) {
+            DEBUG("Have to run locally because no server 2");
+            watchdog.stop();
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+            return 0; // unreachable
+        }
     }
 
     if (data.maintainSemaphores) {
