@@ -1,8 +1,9 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
-const http = require('http');
-const express = require('express');
+const http = require("http");
+const express = require("express");
+const path = require("path");
 
 class Client extends EventEmitter {
     constructor(obj) {
@@ -52,7 +53,12 @@ class Server extends EventEmitter {
         super();
         this.option = option;
         this.app = express();
-        this.app.use(express.static(`${__dirname}/public`));
+        this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
+        this.app.all('/*', function(req, res, next) {
+            // Just send the index.html for other files to support HTML5Mode
+            res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
+        });
+
         this.configVersion = configVersion;
         this.id = 0;
     }
