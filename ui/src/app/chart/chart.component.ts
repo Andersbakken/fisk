@@ -86,7 +86,7 @@ export class ChartComponent implements AfterViewInit {
         this.fisk.open(host, port);
     }
 
-    onSelect(event) {
+    clicked(event) {
         console.log(event);
     }
 
