@@ -7,7 +7,9 @@
     "build": "ng build",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "dist": "ng build --aot --prod",
+    "gzip": "cd dist/ui && for i in *.js; do gzip -f -k \"$i\"; done && for i in *.css; do gzip -f -k \"$i\"; done"
   },
   "private": true,
   "dependencies": {
