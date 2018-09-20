@@ -291,7 +291,7 @@ class Server extends EventEmitter {
         case "/monitor":
             client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
             client.nonce = req.nonce;
-            console.log("Got nonce", req.nonce);
+            // console.log("Got nonce", req.nonce);
             ws.on("message", message => client.emit("message", message));
             this.emit("monitor", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));

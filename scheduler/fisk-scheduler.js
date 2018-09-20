@@ -567,22 +567,37 @@ server.on("monitor", client => {
         try {
             message = JSON.parse(messageText);
         } catch (err) {
-            client.send({ type: "error", "error": `Bad message won't parse as JSON: ${err}` });
+            client.send({ success: false, error: `Bad message won't parse as JSON: ${err}` });
             client.close();
+            return;
         }
         switch (message.type) {
         case 'readConfiguration':
             break;
         case 'writeConfiguration':
             if (!user) {
-                client.send({ type: "error", "error": `Unauthenticated message: ${message.type}` });
+                client.send({ type: "writeConfiguration", success: false, "error": `Unauthenticated message: ${message.type}` });
                 return;
             }
             writeConfiguration(message);
             break;
+        case 'listUsers': {
+            if (!user) {
+                client.send({ type: "listUsers", success: false, "error": `Unauthenticated message: ${message.type}` });
+                return;
+            }
+            db.get("users").then(users => {
+                if (!users)
+                    users = {};
+                client.send({ type: "listUsers", success: true, users: Object.keys(users) });
+            }).catch(err => {
+                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                client.send({ type: "listUsers", success: false, error: err.toString() });
+            });
+            break; }
         case 'removeUser': {
             if (!user) {
-                client.send({ type: "error", "error": `Unauthenticated message: ${message.type}` });
+                client.send({ type: "removeUser", success: false, "error": `Unauthenticated message: ${message.type}` });
                 return;
             }
             if (!message.user) {
@@ -628,6 +643,8 @@ server.on("monitor", client => {
                 if (message.hmac) {
                     if (!users[message.user].cookie) {
                         throw new Error("No cookie");
+                    } else if (users[message.user].cookieIp != client.ip) {
+                        throw new Error("Wrong ip address");
                     } else if (users[message.user].cookieExpiration <= Date.now()) {
                         throw new Error("Cookie expired");
                     } else {
@@ -648,12 +665,16 @@ server.on("monitor", client => {
                     });
                 }
             }).then(() => {
+                return randomBytes(256);
+            }).then(cookie => {
                 user = message.user;
                 const expiration = new Date(Date.now() + 12096e5);
-                users[message.user].cookieExpiration = expiration.valueOf(); // push cookie expiration out for another two weeks
-                return db.set("users", users).then(() => expiration);
-            }).then((expiration) => {
-                client.send({ type: "login", success: true, user: message.user, cookie: users[message.user].cookie, cookieExpiration: expiration.toString() });
+                users[message.user].cookie = cookie.toString("base64");
+                users[message.user].cookieIp = client.ip;
+                users[message.user].cookieExpiration = expiration.valueOf();
+                return db.set("users", users);
+            }).then(() => {
+                client.send({ type: "login", success: true, user: message.user, cookie: users[message.user].cookie });
             }).catch(err => {
                 console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
                 client.send({ type: "login", success: false, error: err.toString() });
@@ -685,6 +706,7 @@ server.on("monitor", client => {
             }).then(cookie => {
                 users[message.user].cookie = cookie.toString("base64");
                 users[message.user].cookieExpiration = (Date.now() + 12096e5);
+                users[message.user].cookieIp = client.ip;
                 return db.set("users", users);
             }).then(() => {
                 // console.log("here", values);
@@ -692,8 +714,7 @@ server.on("monitor", client => {
                 client.send({ type: "addUser",
                               success: true,
                               user: message.user,
-                              cookie: users[message.user].cookie,
-                              expiration: new Date(users[message.user].cookieExpiration).toString() });
+                              cookie: users[message.user].cookie });
             }).catch(err => {
                 console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
                 client.send({ type: "addUser", success: false, error: err.toString() });
