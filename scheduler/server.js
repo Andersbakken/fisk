@@ -4,6 +4,7 @@ const Url = require("url");
 const http = require("http");
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 
 class Client extends EventEmitter {
     constructor(obj) {
@@ -61,6 +62,7 @@ class Server extends EventEmitter {
 
         this.configVersion = configVersion;
         this.id = 0;
+        this.nonces = {};
     }
 
     listen() {
@@ -69,6 +71,14 @@ class Server extends EventEmitter {
         const port = this.option.int("port", 8097);
         this.server.listen(port, this.option.int("backlog", 50));
         console.log("listening on", port);
+        this.ws.on('headers', (headers, request) => {
+            const url = Url.parse(request.url);
+            if (url.pathname == "/monitor") {
+                const nonce = crypto.randomBytes(256).toString("base64");
+                headers.push(`x-fisk-nonce: ${nonce}`);
+                request.nonce = nonce;
+            }
+        });
         this.ws.on("connection", this._handleConnection.bind(this));
     }
 
@@ -280,6 +290,8 @@ class Server extends EventEmitter {
             break;
         case "/monitor":
             client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
+            client.nonce = req.nonce;
+            console.log("Got nonce", req.nonce);
             ws.on("message", message => client.emit("message", message));
             this.emit("monitor", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));

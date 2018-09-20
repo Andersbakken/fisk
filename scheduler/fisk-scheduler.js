@@ -615,7 +615,7 @@ server.on("monitor", client => {
             break; }
         case 'login': {
             user = undefined;
-            if (!message.user || (!message.password && !message.cookie)) {
+            if (!message.user || (!message.password && !message.hmac)) {
                 client.send({ type: "login", success: false, error: "Bad login message" });
                 return;
             }
@@ -625,12 +625,19 @@ server.on("monitor", client => {
                 if (!users[message.user]) {
                     throw new Error(`User: ${message.user} does not seem to exist`);
                 }
-                if (message.cookie) {
-                    if (users[message.user].cookie != message.cookie) {
-                        throw new Error("Unrecognized cookie");
-                    } else if (user[message.user].cookieExpiration >= Date.now()) {
+                if (message.hmac) {
+                    if (!users[message.user].cookie) {
+                        throw new Error("No cookie");
+                    } else if (users[message.user].cookieExpiration <= Date.now()) {
                         throw new Error("Cookie expired");
                     } else {
+                        const hmac = crypto.createHmac("sha512", Buffer.from(users[message.user].cookie, "base64"));
+                        hmac.write(client.nonce);
+                        hmac.end();
+                        const hmacString = hmac.read().toString("base64");
+                        if (hmacString != message.hmac) {
+                            throw new Error(`Wrong password ${message.user}`);
+                        };
                         return undefined;
                     }
                 } else {
