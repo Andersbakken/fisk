@@ -280,6 +280,7 @@ class Server extends EventEmitter {
             break;
         case "/monitor":
             client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
+            ws.on("message", message => client.emit("message", message));
             this.emit("monitor", client);
             ws.on('close', (status, reason) => client.emit('close', status, reason));
             ws.on('error', err => client.emit('error', err));

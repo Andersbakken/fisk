@@ -9,6 +9,8 @@ const Environments = require("./environments");
 const server = new Server(option, common.Version);
 const fs = require("fs-extra");
 const bytes = require("bytes");
+const crypto = require("crypto");
+const Database = require("./database");
 
 process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
@@ -19,6 +21,8 @@ const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
 let jobId = 0;
+let db = new Database(path.join(common.cacheDir(), "db.json"));
+let pendingUsers = {};
 
 function slaveKey() {
     if (arguments.length == 1) {
@@ -44,7 +48,7 @@ function slaveToMonitorInfo(slave, type)
         created: slave.created,
         npmVersion: slave.npmVersion,
         environments: Object.keys(slave.environments)
-    }
+    };
 }
 
 function insertSlave(slave) {
@@ -512,6 +516,37 @@ server.on("compile", function(compile) {
     });
 });
 
+function writeConfiguration(change)
+{
+
+}
+
+function hash(password, salt)
+{
+    return new Promise((resolve, reject) => {
+        crypto.pbkdf2(password, salt, 12000, 256, "sha512", (err, hash) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(hash);
+            }
+        });
+    });
+};
+
+function randomBytes(bytes)
+{
+    return new Promise((resolve, reject) => {
+        crypto.randomBytes(bytes, (err, result) => {
+            if (err) {
+                reject(`Failed to random bytes ${err}`);
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
 server.on("monitor", client => {
     monitors.push(client);
     function remove()
@@ -525,6 +560,144 @@ server.on("monitor", client => {
     forEachSlave(slave => {
         client.send(slaveToMonitorInfo(slave, "slaveAdded"));
     });
+    let user;
+    client.on("message", messageText => {
+        // console.log("GOT MESSAGE", messageText);
+        let message;
+        try {
+            message = JSON.parse(messageText);
+        } catch (err) {
+            client.send({ type: "error", "error": `Bad message won't parse as JSON: ${err}` });
+            client.close();
+        }
+        switch (message.type) {
+        case 'readConfiguration':
+            break;
+        case 'writeConfiguration':
+            if (!user) {
+                client.send({ type: "error", "error": `Unauthenticated message: ${message.type}` });
+                return;
+            }
+            writeConfiguration(message);
+            break;
+        case 'removeUser': {
+            if (!user) {
+                client.send({ type: "error", "error": `Unauthenticated message: ${message.type}` });
+                return;
+            }
+            if (!message.user) {
+                client.send({ type: "removeUser", success: false, error: "Bad removeUser message" });
+                return;
+            }
+
+            if (pendingUsers[message.user]) {
+                client.send({ type: "removeUser", success: false, error: "Someone's here already" });
+                return;
+            }
+            pendingUsers[message.user] = true;
+            let users;
+            db.get("users").then(users => {
+                if (!users || !users[message.user]) {
+                    throw new Error(`user ${message.user} doesn't exist`);
+                }
+                delete users[message.user];
+                return db.set("users", users);
+            }).then(() => {
+                client.send({ type: "removeUser", success: true, user: message.user });
+            }).catch(err => {
+                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                client.send({ type: "removeUser", success: false, error: err.toString() });
+            }).finally(() => {
+                delete pendingUsers[message.user];
+            });
+
+            // console.log("gotta remove user", message);
+            break; }
+        case 'login': {
+            user = undefined;
+            if (!message.user || (!message.password && !message.cookie)) {
+                client.send({ type: "login", success: false, error: "Bad login message" });
+                return;
+            }
+            let users;
+            db.get("users").then(u => {
+                users = u || {};
+                if (!users[message.user]) {
+                    throw new Error(`User: ${message.user} does not seem to exist`);
+                }
+                if (message.cookie) {
+                    if (users[message.user].cookie != message.cookie) {
+                        throw new Error("Unrecognized cookie");
+                    } else if (user[message.user].cookieExpiration >= Date.now()) {
+                        throw new Error("Cookie expired");
+                    } else {
+                        return undefined;
+                    }
+                } else {
+                    return hash(message.password, Buffer.from(users[message.user].salt, "base64")).then(hash => {
+                        if (users[message.user].hash != hash.toString('base64')) {
+                            throw new Error(`Wrong password ${message.user}`);
+                        }
+                    });
+                }
+            }).then(() => {
+                user = message.user;
+                const expiration = new Date(Date.now() + 12096e5);
+                users[message.user].cookieExpiration = expiration.valueOf(); // push cookie expiration out for another two weeks
+                return db.set("users", users).then(() => expiration);
+            }).then((expiration) => {
+                client.send({ type: "login", success: true, user: message.user, cookie: users[message.user].cookie, cookieExpiration: expiration.toString() });
+            }).catch(err => {
+                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                client.send({ type: "login", success: false, error: err.toString() });
+            });
+            break; }
+        case 'addUser': {
+            if (!message.user || !message.password) {
+                client.send({ type: "addUser", success: false, error: "Bad addUser message" });
+                return;
+            }
+            if (pendingUsers[message.user]) {
+                client.send({ type: "addUser", success: false, error: "Someone's here already" });
+                return;
+            }
+            pendingUsers[message.user] = true;
+            let users;
+            db.get("users").then(u => {
+                users = u || {};
+                if (users[message.user]) {
+                    throw new Error(`user ${message.user} already exists`);
+                }
+                return randomBytes(256);
+            }).then(salt => {
+                users[message.user] = { salt: salt.toString("base64") };
+                return hash(message.password, salt);
+            }).then(hash => {
+                users[message.user].hash = hash.toString("base64");
+                return randomBytes(256);
+            }).then(cookie => {
+                users[message.user].cookie = cookie.toString("base64");
+                users[message.user].cookieExpiration = (Date.now() + 12096e5);
+                return db.set("users", users);
+            }).then(() => {
+                // console.log("here", values);
+                // values = [1,2];
+                client.send({ type: "addUser",
+                              success: true,
+                              user: message.user,
+                              cookie: users[message.user].cookie,
+                              expiration: new Date(users[message.user].cookieExpiration).toString() });
+            }).catch(err => {
+                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                client.send({ type: "addUser", success: false, error: err.toString() });
+            }).finally(() => {
+                delete pendingUsers[message.user];
+            });
+
+            // console.log("gotta add user", message);
+            break; }
+        }
+    });
     client.on("close", remove);
     client.on("error", remove);
 });
@@ -535,6 +708,12 @@ server.on("error", err => {
 
 Environments.load(option("env-dir", path.join(common.cacheDir(), "environments")))
     .then(purgeEnvironmentsToMaxSize)
+    // .then(() => {
+    //     return db.get("users");
+    // }).then(u => {
+    //     console.log("got users", u);
+    //     users = u || {};
+    // })
     .then(() => server.listen())
     .catch(e => {
         console.error(e);
