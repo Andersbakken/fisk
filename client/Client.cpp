@@ -348,7 +348,6 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
     Preprocessed *ptr = new Preprocessed;
     std::unique_ptr<Client::Preprocessed> ret(ptr);
     ret->mThread = std::thread([ptr, args, compiler, started] {
-            assert(args->mode == CompilerArgs::Compile);
             std::string out, err;
             ptr->stdOut.reserve(1024 * 1024);
             std::string commandLine = compiler;
