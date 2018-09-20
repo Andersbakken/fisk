@@ -32,7 +32,7 @@ export class ChartComponent implements AfterViewInit {
             case "slaveAdded":
                 this._slaveAdded(data);
                 break;
-            case "slaveRemove":
+            case "slaveRemoved":
                 this._slaveRemoved(data);
                 break;
             case "jobStarted":
@@ -165,6 +165,10 @@ export class ChartComponent implements AfterViewInit {
             console.error("slave does not exist", slave);
             return;
         }
+        let slaveobj = this.slaves[key];
+        slaveobj.ellipse.remove();
+        slaveobj.halo.remove();
+        slaveobj.text.remove();
         delete this.slaves[key];
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
