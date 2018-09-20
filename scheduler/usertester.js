@@ -25,6 +25,12 @@ ws.on("open", () => {
     } else if (argv.login) {
         ws.send(JSON.stringify({type: "login", user: "agbakken@gmail.com", password: "ball1"}));
         console.log("login");
+    } else if (argv.listUsers) {
+        ws.send(JSON.stringify({type: "login", user: "agbakken@gmail.com", password: "ball1"}));
+        setTimeout(() => {
+            ws.send(JSON.stringify({type: "listUsers"}));
+            console.log("listUsers");
+        }, 2000);
     } else if (argv.removeUser) {
         ws.send(JSON.stringify({type: "login", "user": "agbakken@gmail.com", "password": "ball1"}));
         setTimeout(() => {
