@@ -83,7 +83,7 @@ function handleConnection(ws, req)
             ws.close();
         }
     } else {
-        let id = req.headers["x-fisk-job-id"];
+        let id = parseInt(req.headers["x-fisk-job-id"]);
         let task = tasks[id];
         delete tasks[id];
         let headers = {};

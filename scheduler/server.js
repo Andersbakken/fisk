@@ -283,6 +283,8 @@ class Server extends EventEmitter {
                 // console.log("GOT MESSAGE", json);
                 if ("type" in json) {
                     client.emit(json.type, json);
+                } else {
+                    console.error("Bad message without type", json);
                 }
             });
             // console.log("Got dude", envs);

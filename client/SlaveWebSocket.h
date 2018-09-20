@@ -82,6 +82,7 @@ public:
                 }
                 f = fopen(files[0].path.c_str(), "w");
                 if (!f) {
+                    ERROR("Can't open file: %s", files[0].path.c_str());
                     Client::data().watchdog->stop();
                     Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
                     return;

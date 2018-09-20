@@ -225,12 +225,14 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    std::vector<std::string> args(data.argc);
-    for (int i=0; i<data.argc; ++i) {
-        // printf("%zu: %s\n", i, argv[i]);
-        args[i] = data.argv[i];
+    {
+        std::vector<std::string> args(data.argc);
+        for (int i=0; i<data.argc; ++i) {
+            // printf("%zu: %s\n", i, argv[i]);
+            args[i] = data.argv[i];
+        }
+        data.compilerArgs = CompilerArgs::create(args);
     }
-    data.compilerArgs = CompilerArgs::create(args);
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -341,6 +343,7 @@ int main(int argcIn, char **argvIn)
     select.add(&slaveWebSocket);
     select.add(&watchdog);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
+    headers["x-fisk-slave-ip"] = schedulerWebsocket.slaveIp;
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
                                                schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
                                                schedulerWebsocket.slavePort), headers)) {
@@ -368,7 +371,9 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
+    std::vector<std::string> args = std::move(data.compilerArgs->commandLine);
     args[0] = data.slaveCompiler;
+
     const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
     json11::Json::object msg {
         { "commandLine", args },
@@ -377,7 +382,7 @@ int main(int argcIn, char **argvIn)
         { "bytes", static_cast<int>(preprocessed->stdOut.size()) }
     };
 
-    std::string json = json11::Json(msg).dump();
+    const std::string json = json11::Json(msg).dump();
     slaveWebSocket.wait = wait;
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {

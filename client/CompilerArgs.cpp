@@ -348,12 +348,24 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         return nullptr;
     }
 
+    if (!(ret->flags & HasDashO)) {
+        ret->commandLine.push_back("-o");
+        ret->commandLine.push_back(ret->output());
+        ret->flags |= HasDashO;
+    }
+
     if (ret->flags & (HasDashMMD|HasDashMD) && !(ret->flags & HasDashMF)) {
         const std::string out = ret->output();
         std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
         ret->commandLine.push_back("-MF");
         ret->commandLine.push_back(std::move(dfile));
     }
+    for (size_t i=0; i<ret->commandLine.size(); ++i) {
+        printf("%s ", ret->commandLine[i].c_str());
+    }
+    printf("\n");
+
+
     return ret;
 }
 

@@ -384,7 +384,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             bool hasDepFile = false;
             for (size_t i=1; i<count; ++i) {
                 const std::string arg = args->commandLine.at(i);
-                if (arg == "-o") {
+                if (arg == "-o" && args->commandLine.size() > i + 1) {
                     outputFile = args->commandLine.at(++i);
                     continue;
                 }
@@ -409,11 +409,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             if (hasDepFile) {
                 if (depFile.empty()) {
                     if (outputFile.empty())
-                        outputFile = args->sourceFile();
-                    size_t idx = outputFile.rfind('.');
-                    if (idx != std::string::npos) {
-                        outputFile.erase(idx + 1);
-                    }
+                        outputFile = args->output();
                     depFile = outputFile + "d";
                 }
                 DEBUG("Depfile is %s", depFile.c_str());

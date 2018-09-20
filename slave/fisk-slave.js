@@ -304,12 +304,28 @@ server.on("job", (job) => {
     let vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);
+        job.close();
         return;
     }
     const jobStartTime = Date.now();
     let uploadDuration;
 
-    // console.log("got job", Object.keys(job));
+    client.send("jobStarted", {
+        id: job.id,
+        sourceFile: job.sourceFile,
+        client: {
+            name: job.name,
+            hostname: job.hostname,
+            ip: job.ip,
+        },
+        slave: {
+            ip: job.slaveIp,
+            name: option("name"),
+            hostname: option("hostname") || os.hostname(),
+            port: server.port
+        }
+    });
+    console.log("sending to server");
     var j = {
         id: job.id,
         job: job,
@@ -323,7 +339,7 @@ server.on("job", (job) => {
                 console.log("sending heartbeat");
                 job.send("heartbeat", {});
             }, 5000);
-            console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.clientName, job.wait);
+            console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.hostname, job.wait);
             this.op = vm.startCompile(job.commandLine, job.argv0);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {

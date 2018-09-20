@@ -4,16 +4,10 @@ const WebSocket = require("ws");
 const Url = require("url");
 
 class Job extends EventEmitter {
-    constructor(ws, ip, hash, clientName, sourceFile, id) {
+    constructor(data) {
         super();
-        this.ws = ws;
-        this.ip = ip;
-        this.hash = hash;
-        this.clientName = clientName;
-        this.sourceFile = sourceFile;
-        this.wait = undefined;
-        this.id = id;
-        // setTimeout(() => { console.log("closing him"); ws.close(); }, 200);
+        for (let key in data)
+            this[key] = data[key];
     }
 
     send(type, msg) {
@@ -52,14 +46,16 @@ class Server extends EventEmitter {
     }
 
     listen() {
+        this.port = this.option.int("port", 8096);
         this.ws = new WebSocket.Server({
-            port: this.option.int("port", 8096),
+            port: this.port,
             backlog: this.option.int("backlog", 50)
         });
         console.log("listening on", this.ws.options.port);
         this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
         this.ws.on('headers', (headers, request) => this.emit('headers', headers, request));
     }
+
 
     _handleConnection(ws, req) {
         const connectTime = Date.now();
@@ -100,7 +96,15 @@ class Server extends EventEmitter {
             }
 
             // console.log("GOT HEADERS", req.headers);
-            client = new Job(ws, ip, hash, name, req.headers["x-fisk-sourcefile"], req.headers["x-fisk-job-id"]);
+            client = new Job({ ws: ws,
+                               ip: ip,
+                               hash: hash,
+                               name: name,
+                               hostname: req.headers["x-fisk-client-hostname"],
+                               sourceFile: req.headers["x-fisk-sourcefile"],
+                               id: parseInt(req.headers["x-fisk-job-id"]),
+                               slaveIp: req.headers["x-fisk-slave-ip"] });
+
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);

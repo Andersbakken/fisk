@@ -73,8 +73,9 @@ struct CompilerArgs
         } else {
             std::string source = sourceFile();
             const size_t lastDot = source.rfind('.');
-            if (lastDot != std::string::npos && lastDot > source.rfind('/')) {
-                source.resize(lastDot - 1); // ### is this right?
+            const size_t lastSlash = source.rfind('/');
+            if (lastDot != std::string::npos && (lastDot > lastSlash || lastSlash == std::string::npos)) {
+                source.resize(lastDot + 1); // ### is this right?
             }
             source.push_back('o');
             return source;
