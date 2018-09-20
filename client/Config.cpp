@@ -248,23 +248,6 @@ std::string Config::name()
     return name;
 }
 
-std::vector<std::string> Config::compatibleHashes(const std::string &hash)
-{
-    std::vector<std::string> ret;
-    json11::Json val = value("compatible-hashes");
-    if (val.is_object()) {
-        const json11::Json &value = val[hash];
-        if (value.is_string()) {
-            ret.push_back(value.string_value());
-        } else if (value.is_array()) {
-            for (const json11::Json &array_val : value.array_items()) {
-                ret.push_back(array_val.string_value());
-            }
-        }
-    }
-    return ret;
-}
-
 std::string Config::logFile()
 {
     json11::Json val = value("log-file");

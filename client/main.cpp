@@ -253,14 +253,8 @@ int main(int argcIn, char **argvIn)
     }
 
     data.hash = Client::environmentHash(data.resolvedCompiler);
-    std::vector<std::string> compatibleHashes = Config::compatibleHashes(data.hash);
-    std::string hashes = data.hash;
-    for (const std::string &compatibleHash : compatibleHashes) {
-        hashes += ";" + compatibleHash;
-    }
-    DEBUG("Got hashes %s for %s", hashes.c_str(), data.resolvedCompiler.c_str());
     std::map<std::string, std::string> headers;
-    headers["x-fisk-environments"] = hashes;
+    headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name();
     headers["x-fisk-config-version"] = std::to_string(Config::Version);

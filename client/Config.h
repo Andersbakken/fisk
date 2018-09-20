@@ -26,7 +26,6 @@ bool watchdog();
 std::string nodePath();
 std::string hostname();
 std::string name();
-std::vector<std::string> compatibleHashes(const std::string &hash);
 std::string logFile();
 bool logFileAppend();
 std::string logLevel();
