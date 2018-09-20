@@ -320,7 +320,7 @@ int main(int argcIn, char **argvIn)
     if (schedulerWebsocket.needsEnvironment) {
         watchdog.stop();
         const std::string tarball = Client::prepareEnvironmentForUpload();
-        printf("GOT TARBALL %s\n", tarball.c_str());
+        // printf("GOT TARBALL %s\n", tarball.c_str());
         if (!tarball.empty()) {
             Client::uploadEnvironment(&schedulerWebsocket, tarball);
         }

@@ -360,11 +360,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-MF");
         ret->commandLine.push_back(std::move(dfile));
     }
-    for (size_t i=0; i<ret->commandLine.size(); ++i) {
-        printf("%s ", ret->commandLine[i].c_str());
-    }
-    printf("\n");
-
 
     return ret;
 }
