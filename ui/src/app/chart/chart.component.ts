@@ -200,6 +200,7 @@ export class ChartComponent implements AfterViewInit {
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
             const rect = this.clients.g.append("rect")
+                .attr("id", `rect-${job.client.name}`)
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
                 .attr("fill", this._color(clientKey, false));
@@ -208,6 +209,7 @@ export class ChartComponent implements AfterViewInit {
             };
             const text = this.svg.append("text")
                 .attr("y", this.view.height - 12)
+                .attr("clip-path", `url(#rect-${job.client.name})`)
                 .text(() => { return `${clientData.name} (${clientData.jobs} jobs)`; });
             clientData.text = text;
             this.clients[clientKey] = clientData;
