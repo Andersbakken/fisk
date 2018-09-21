@@ -79,6 +79,7 @@ class Server extends EventEmitter {
                     this.server.listen(port, this.option.int("backlog", 50));
                 }, 1000);
             } else {
+                console.error("Got server error", error.toString());
                 throw error;
             }
         });
