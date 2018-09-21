@@ -70,13 +70,13 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
 
     std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
-    const unsigned long long elapsed = Client::mono() - Client::started;
-#ifdef __linux__
-    const char *format = "%05d %llu.%03llu: ";
-#else
-    const char *format = "%08d %llu.%03llu: ";
-#endif
-    fprintf(stdout, format, sPid, elapsed / 1000, elapsed % 1000);
+    // const unsigned long long elapsed = Client::mono() - Client::started;
+// #ifdef __linux__
+//     const char *format = "%05d %llu.%03llu: ";
+// #else
+//     const char *format = "%08d %llu.%03llu: ";
+// #endif
+    // fprintf(stdout, format, sPid, elapsed / 1000, elapsed % 1000);
     fwrite(string.c_str(), 1, string.size(), stderr);
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
@@ -88,7 +88,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     }
 
     if (sLogFile) {
-        fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
+        // fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
