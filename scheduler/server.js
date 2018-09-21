@@ -53,19 +53,21 @@ class Server extends EventEmitter {
     constructor(option, configVersion) {
         super();
         this.option = option;
-        this.app = express();
-        this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
-        this.app.all('/*', function(req, res, next) {
-            // Just send the index.html for other files to support HTML5Mode
-            res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
-        });
-
         this.configVersion = configVersion;
         this.id = 0;
         this.nonces = {};
     }
 
     listen() {
+        this.app = express();
+        this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
+        this.emit("listen", this.app);
+
+        this.app.all('/*', function(req, res, next) {
+            // Just send the index.html for other files to support HTML5Mode
+            res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
+        });
+
         this.server = http.createServer(this.app);
         this.ws = new WebSocket.Server({ server: this.server });
         const port = this.option.int("port", 8097);

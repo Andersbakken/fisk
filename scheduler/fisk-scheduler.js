@@ -188,72 +188,74 @@ function environmentsInfo()
     return ret;
 }
 
-server.express.get("/environments", (req, res, next) => {
+server.on("listen", app => {
+    app.get("/environments", (req, res, next) => {
 
-    res.send(environmentsInfo());
-});
+        res.send(environmentsInfo());
+    });
 
-server.express.get("/slaves", (req, res, next) => {
-    let ret = [];
-    for (let ip in slaves) {
-        let s = slaves[ip];
-        ret.push({
-            ip: s.ip,
-            name: s.name,
-            slots: s.slots,
-            port: s.port,
-            activeClients: s.activeClients,
-            jobsScheduled: s.jobsScheduled,
-            lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
-            jobsPerformed: s.jobsPerformed,
-            compileSpeed: s.jobsPerformed / s.totalCompileSpeed || 0,
-            uploadSpeed: s.jobsPerformed / s.totalUploadSpeed || 0,
-            hostname: s.hostname,
-            system: s.system,
-            name: s.name,
-            created: s.created,
-            load: s.load,
-            npmVersion: s.npmVersion,
-            environments: Object.keys(s.environments)
-        });
-    }
-    res.send(ret);
-});
-
-server.express.get("/info", (req, res, next) => {
-    let npmVersion = -1;
-    try {
-        npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
-    } catch (err) {
-        console.log("Couldn't parse package json", err);
-    }
-
-    res.send({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version });
-});
-
-server.express.get("/quit-slaves", (req, res, next) => {
-    res.sendStatus(200);
-    const msg = {
-        type: "quit",
-        code: req.query.code || 0,
-        purgeEnvironments: "purge_environments" in req.query
-    };
-    console.log("Sending quit message to slaves", msg, Object.keys(slaves));
-    for (let ip in slaves) {
-        slaves[ip].send(msg);
-    }
-});
-
-server.express.get("/quit", (req, res, next) => {
-    console.log("quitting", req.query);
-    if ("purge_environments" in req.query) {
-        try {
-            fs.removeSync(path.join(common.cacheDir(), "environments"));
-        } catch (err) {
+    app.get("/slaves", (req, res, next) => {
+        let ret = [];
+        for (let ip in slaves) {
+            let s = slaves[ip];
+            ret.push({
+                ip: s.ip,
+                name: s.name,
+                slots: s.slots,
+                port: s.port,
+                activeClients: s.activeClients,
+                jobsScheduled: s.jobsScheduled,
+                lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
+                jobsPerformed: s.jobsPerformed,
+                compileSpeed: s.jobsPerformed / s.totalCompileSpeed || 0,
+                uploadSpeed: s.jobsPerformed / s.totalUploadSpeed || 0,
+                hostname: s.hostname,
+                system: s.system,
+                name: s.name,
+                created: s.created,
+                load: s.load,
+                npmVersion: s.npmVersion,
+                environments: Object.keys(s.environments)
+            });
         }
-    }
-    res.sendStatus(200);
-    setTimeout(() => process.exit(), 100);
+        res.send(ret);
+    });
+
+    app.get("/info", (req, res, next) => {
+        let npmVersion = -1;
+        try {
+            npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+        } catch (err) {
+            console.log("Couldn't parse package json", err);
+        }
+
+        res.send({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version });
+    });
+
+    app.get("/quit-slaves", (req, res, next) => {
+        res.sendStatus(200);
+        const msg = {
+            type: "quit",
+            code: req.query.code || 0,
+            purgeEnvironments: "purge_environments" in req.query
+        };
+        console.log("Sending quit message to slaves", msg, Object.keys(slaves));
+        for (let ip in slaves) {
+            slaves[ip].send(msg);
+        }
+    });
+
+    app.get("/quit", (req, res, next) => {
+        console.log("quitting", req.query);
+        if ("purge_environments" in req.query) {
+            try {
+                fs.removeSync(path.join(common.cacheDir(), "environments"));
+            } catch (err) {
+            }
+        }
+        res.sendStatus(200);
+        setTimeout(() => process.exit(), 100);
+    });
 });
 
 server.on("slave", slave => {
