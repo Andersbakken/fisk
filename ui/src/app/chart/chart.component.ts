@@ -26,24 +26,23 @@ export class ChartComponent implements AfterViewInit {
     constructor(private fisk: FiskService, private ngZone: NgZone,
                 private config: ConfigService, private message: MessageService) {
         this.fisk.on("data", (data: any) => {
-            // console.log("hello", data);
-            // this.ngZone.run(() => {
-            switch (data.type) {
-            case "slaveAdded":
-                this._slaveAdded(data);
-                break;
-            case "slaveRemoved":
-                this._slaveRemoved(data);
-                break;
-            case "jobStarted":
-                this._jobStarted(data);
-                break;
-            case "jobFinished":
-            case "jobAborted":
-                this._jobFinished(data);
-                break;
-            }
-            // });
+            this.ngZone.runOutsideAngular(() => {
+                switch (data.type) {
+                case "slaveAdded":
+                    this._slaveAdded(data);
+                    break;
+                case "slaveRemoved":
+                    this._slaveRemoved(data);
+                    break;
+                case "jobStarted":
+                    this._jobStarted(data);
+                    break;
+                case "jobFinished":
+                case "jobAborted":
+                    this._jobFinished(data);
+                    break;
+                }
+            });
         });
         this.fisk.on("open", () => {
             this.message.showMessage("connected to " + this.host + ":" + this.port);
@@ -63,7 +62,7 @@ export class ChartComponent implements AfterViewInit {
 
         window.addEventListener("resize", () => {
             //console.log(window.innerWidth, window.innerHeight);
-            this.ngZone.run(() => {
+            this.ngZone.runOutsideAngular(() => {
                 const div = document.getElementById("chart");
                 const rect: any = div.getBoundingClientRect();
                 this.view.width = window.innerWidth - ((rect.x * 2) + 50);
@@ -91,16 +90,18 @@ export class ChartComponent implements AfterViewInit {
     }
 
     ngAfterViewInit() {
-        const div = document.getElementById("chart");
-        const rect: any = div.getBoundingClientRect();
-        this.view.width = window.innerWidth - ((rect.x * 2) + 50);
-        this.view.height = window.innerHeight - rect.y - 50;
+        this.ngZone.runOutsideAngular(() => {
+            const div = document.getElementById("chart");
+            const rect: any = div.getBoundingClientRect();
+            this.view.width = window.innerWidth - ((rect.x * 2) + 50);
+            this.view.height = window.innerHeight - rect.y - 50;
 
-        this.svg = d3.select("#chart")
-            .append("svg")
-            .attr("width", this.view.width)
-            .attr("height", this.view.height);
-        this.clients.g = this.svg.append("g");
+            this.svg = d3.select("#chart")
+                .append("svg")
+                .attr("width", this.view.width)
+                .attr("height", this.view.height);
+            this.clients.g = this.svg.append("g");
+        });
     }
 
     _color(key, invert) {
@@ -156,7 +157,7 @@ export class ChartComponent implements AfterViewInit {
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
-        this.slaveTimer = setTimeout(() => { this._rearrangeSlaves(); }, 250);
+        this.slaveTimer = setTimeout(() => { this.ngZone.runOutsideAngular(() => { this._rearrangeSlaves(); }); }, 250);
     }
 
     _slaveRemoved(slave) {
@@ -172,7 +173,7 @@ export class ChartComponent implements AfterViewInit {
         delete this.slaves[key];
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
-        this.slaveTimer = setTimeout(() => { this._rearrangeSlaves(); }, 250);
+        this.slaveTimer = setTimeout(() => { this.ngZone.runOutsideAngular(() => { this._rearrangeSlaves(); }); }, 250);
     }
 
     _ellipseX(slave, grow) {

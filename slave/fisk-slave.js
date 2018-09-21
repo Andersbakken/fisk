@@ -316,7 +316,7 @@ server.on("job", (job) => {
         client: {
             name: job.name,
             hostname: job.hostname,
-            ip: job.ip,
+            ip: job.ip
         },
         slave: {
             ip: job.slaveIp,
