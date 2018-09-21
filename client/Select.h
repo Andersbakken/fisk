@@ -47,6 +47,10 @@ public:
             ::close(mPipe[0]);
         if (mPipe[1] != -1)
             ::close(mPipe[1]);
+        for (Socket *socket : mSockets) {
+            assert(socket->mSelect == this);
+            socket->mSelect = nullptr;
+        }
     }
     void add(Socket *socket) { assert(!socket->mSelect); socket->mSelect = this; mSockets.insert(socket); }
     void remove(Socket *socket) { assert(socket->mSelect == this); socket->mSelect = nullptr; mSockets.erase(socket); }
