@@ -22,6 +22,7 @@ export class ChartComponent implements AfterViewInit {
     jobs: any = {};
     svg: any = undefined;
     slaveTimer: any = undefined;
+    clientAdjustTimer: any = undefined;
 
     constructor(private fisk: FiskService, private ngZone: NgZone,
                 private config: ConfigService, private message: MessageService) {
@@ -260,31 +261,38 @@ export class ChartComponent implements AfterViewInit {
     }
 
     _adjustClients() {
-        let total = 0;
-        for (let k in this.clients) {
-            if (k === "g")
-                continue;
-            total += this.clients[k].jobs;
-        }
-        let x = 0;
-        for (let k in this.clients) {
-            if (k === "g")
-                continue;
-            const client = this.clients[k];
-            const width = (client.jobs / total) * this.view.width;
-            client.rect
-                .transition()
-                .attr("x", x)
-                .attr("width", width)
-                .duration(100);
-            client.text
-                .text(() => { return `${client.name} (${client.jobs} jobs)`; });
-            client.text
-                .transition()
-                .attr("x", x + 5)
-                .duration(100);
-            x += width;
-        }
+        if (this.clientAdjustTimer)
+            return;
+        this.clientAdjustTimer = setTimeout(() => {
+            this.clientAdjustTimer = undefined;
+            this.ngZone.runOutsideAngular(() => {
+                let total = 0;
+                for (let k in this.clients) {
+                    if (k === "g")
+                        continue;
+                    total += this.clients[k].jobs;
+                }
+                let x = 0;
+                for (let k in this.clients) {
+                    if (k === "g")
+                        continue;
+                    const client = this.clients[k];
+                    const width = (client.jobs / total) * this.view.width;
+                    client.rect
+                        .transition()
+                        .attr("x", x)
+                        .attr("width", width)
+                        .duration(100);
+                    client.text
+                        .text(() => { return `${client.name} (${client.jobs} jobs)`; });
+                    client.text
+                        .transition()
+                        .attr("x", x + 5)
+                        .duration(100);
+                    x += width;
+                }
+            });
+        }, 250);
     }
 
     _rearrangeSlaves() {
