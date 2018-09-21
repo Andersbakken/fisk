@@ -69,19 +69,32 @@ class Server extends EventEmitter {
         });
 
         this.server = http.createServer(this.app);
-        this.ws = new WebSocket.Server({ server: this.server });
         const port = this.option.int("port", 8097);
         this.server.listen(port, this.option.int("backlog", 50));
-        console.log("listening on", port);
-        this.ws.on('headers', (headers, request) => {
-            const url = Url.parse(request.url);
-            if (url.pathname == "/monitor") {
-                const nonce = crypto.randomBytes(256).toString("base64");
-                headers.push(`x-fisk-nonce: ${nonce}`);
-                request.nonce = nonce;
+
+        this.server.on("error", error => {
+            if (error.code == "EADDRINUSE") {
+                console.log(`Port ${port} is in use...`);
+                setTimeout(() => {
+                    this.server.listen(port, this.option.int("backlog", 50));
+                }, 1000);
+            } else {
+                throw error;
             }
         });
-        this.ws.on("connection", this._handleConnection.bind(this));
+        this.server.once("listening", () => {
+            this.ws = new WebSocket.Server({ server: this.server });
+            console.log("listening on", port);
+            this.ws.on('headers', (headers, request) => {
+                const url = Url.parse(request.url);
+                if (url.pathname == "/monitor") {
+                    const nonce = crypto.randomBytes(256).toString("base64");
+                    headers.push(`x-fisk-nonce: ${nonce}`);
+                    request.nonce = nonce;
+                }
+            });
+            this.ws.on("connection", this._handleConnection.bind(this));
+        });
     }
 
     get express() { return this.app; }
