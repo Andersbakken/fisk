@@ -401,6 +401,7 @@ server.on("job", (job) => {
     };
 
     job.on("error", (err) => {
+        job.webSocketError = err;
         console.error("got error from job", err);
     });
     job.on("close", () => {
@@ -409,7 +410,7 @@ server.on("job", (job) => {
         if (idx != -1) {
             jobQueue.splice(idx, 1);
             j.cancel();
-            client.send("jobAborted", { id: j.id });
+            client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
             startPending();
         }
     });
