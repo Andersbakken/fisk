@@ -325,7 +325,7 @@ server.on("job", (job) => {
             port: server.port
         }
     });
-    console.log("sending to server");
+    // console.log("sending to server");
     var j = {
         id: job.id,
         job: job,
@@ -336,10 +336,10 @@ server.on("job", (job) => {
         start: function() {
             let job = this.job;
             this.heartbeatTimer = setInterval(() => {
-                console.log("sending heartbeat");
+                // console.log("sending heartbeat");
                 job.send("heartbeat", {});
             }, 5000);
-            console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.hostname, job.wait);
+            console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.wait);
             this.op = vm.startCompile(job.commandLine, job.argv0);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {
@@ -428,10 +428,10 @@ server.on("job", (job) => {
 
     jobQueue.push(j);
     if (jobQueue.length <= client.slots) {
-        console.log(`starting j ${j.id} because ${jobQueue.length} ${client.slots}`);
+        // console.log(`starting j ${j.id} because ${jobQueue.length} ${client.slots}`);
         j.start();
     } else {
-        console.log(`j ${j.id} is backlogged`, jobQueue.length, client.slots);
+        // console.log(`j ${j.id} is backlogged`, jobQueue.length, client.slots);
     }
 });
 

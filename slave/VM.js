@@ -113,7 +113,7 @@ class VM extends EventEmitter
         let compile = new CompileJob(commandLine, argv0, this);
         this.compiles[compile.id] = compile;
         ++this.compileCount;
-        console.log("startCompile " + compile.id);
+        // console.log("startCompile " + compile.id);
         return compile;
     }
 };
