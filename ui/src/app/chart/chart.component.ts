@@ -20,6 +20,7 @@ export class ChartComponent implements AfterViewInit {
     slaves: any = {};
     clients: any = {};
     jobs: any = {};
+    clientGroup: any = undefined;
     svg: any = undefined;
     slaveTimer: any = undefined;
     clientAdjustTimer: any = undefined;
@@ -46,6 +47,9 @@ export class ChartComponent implements AfterViewInit {
             });
         });
         this.fisk.on("open", () => {
+            this.ngZone.runOutsideAngular(() => {
+                this._clear();
+            });
             this.message.showMessage("connected to " + this.host + ":" + this.port);
         });
         this.config.onChange((key: string) => {
@@ -101,8 +105,25 @@ export class ChartComponent implements AfterViewInit {
                 .append("svg")
                 .attr("width", this.view.width)
                 .attr("height", this.view.height);
-            this.clients.g = this.svg.append("g");
+            this.clientGroup = this.svg.append("g");
         });
+    }
+
+    _clear() {
+        for (var k in this.slaves) {
+            let slave = this.slaves[k];
+            slave.ellipse.remove();
+            slave.halo.remove();
+            slave.text.remove();
+        }
+        this.slaves = {};
+        for (var k in this.clients) {
+            let client = this.clients[k];
+            client.rect.remove();
+            client.text.remove();
+        }
+        this.clients = {};
+        this.jobs = {};
     }
 
     _color(key, invert) {
@@ -201,7 +222,7 @@ export class ChartComponent implements AfterViewInit {
         const slaveKey = job.slave.ip + ":" + job.slave.port;
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
-            const rect = this.clients.g.append("rect")
+            const rect = this.clientGroup.append("rect")
                 .attr("id", `rect-${job.client.name}`)
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
@@ -268,14 +289,10 @@ export class ChartComponent implements AfterViewInit {
             this.ngZone.runOutsideAngular(() => {
                 let total = 0;
                 for (let k in this.clients) {
-                    if (k === "g")
-                        continue;
                     total += this.clients[k].jobs;
                 }
                 let x = 0;
                 for (let k in this.clients) {
-                    if (k === "g")
-                        continue;
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
                     client.rect
