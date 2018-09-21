@@ -54,6 +54,7 @@ int main(int argcIn, char **argvIn)
     }
     std::string logLevel = Config::logLevel();
     std::string logFile = Config::logFile();
+    std::string clientName;
     const char *env;
     if ((env = getenv("FISK_LOG"))) {
         logLevel = env;
@@ -63,6 +64,10 @@ int main(int argcIn, char **argvIn)
         if (!*env || strcmp(env, "0")) {
             logLevel = "Debug";
         }
+    }
+
+    if ((env = getenv("FISK_NAME"))) {
+        clientName = env;
     }
 
     if ((env = getenv("FISK_LOG_FILE"))) {
@@ -146,6 +151,10 @@ int main(int argcIn, char **argvIn)
             scheduler = argvIn[i] + 17;
         } else if (i + 1 < argcIn && !strcmp("--fisk-scheduler", argvIn[i])) {
             scheduler = argvIn[++i];
+        } else if (!strncmp("--fisk-name=", argvIn[i], 17)) {
+            clientName = argvIn[i] + 17;
+        } else if (i + 1 < argcIn && !strcmp("--fisk-name", argvIn[i])) {
+            clientName = argvIn[++i];
         } else if (!strcmp("--fisk-disabled", argvIn[i])) {
             disabled = true;
         } else if (!strcmp("--fisk-no-desire", argvIn[i])) {
@@ -200,6 +209,9 @@ int main(int argcIn, char **argvIn)
             return 1;
         }
     }
+
+    if (clientName.empty())
+        clientName = Config::name();
 
     Log::init(level, std::move(logFile), logFileMode);
 
@@ -258,7 +270,7 @@ int main(int argcIn, char **argvIn)
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
-    headers["x-fisk-client-name"] = Config::name();
+    headers["x-fisk-client-name"] = clientName;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     if (slave)
         headers["x-fisk-slave"] = slave;
@@ -458,6 +470,9 @@ static void usage(FILE *f)
             "  --fisk-compiler=[compiler]         Set fisk's resolved compiler to [compiler]\n"
             "  --fisk-compiler [compiler]\n"
             "\n"
+            "  --fisk-name=[clientname]           Set fisk's client name to [clientname]\n"
+            "  --fisk-name [clientname]\n"
+            "\n"
             "  --fisk-slave=[ip address]          Set fisk's preferred slave\n"
             "  --fisk-slave [ip address]\n"
             "\n"
@@ -479,6 +494,7 @@ static void usage(FILE *f)
             "  FISK_LOG_APPEND                    Append to log file\n"
             "  FISK_DISABLED                      Run all jobs locally\n"
             "  FISK_COMPILER                      Set resolved compiler\n"
+            "  FISK_NAME                          Set client name\n"
             "  FISK_SCHEDULER                     Set scheduler url\n"
             "  FISK_SLAVE                         Set preferred slave\n");
 }
