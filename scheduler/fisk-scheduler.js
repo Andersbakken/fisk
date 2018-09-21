@@ -261,7 +261,7 @@ server.on("listen", app => {
 server.on("slave", slave => {
     slave.activeClients = 0;
     insertSlave(slave);
-    console.log("slave connected", slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
+    console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     syncEnvironments(slave);
 
     slave.on("environments", message => {
