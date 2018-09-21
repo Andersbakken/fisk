@@ -371,7 +371,7 @@ int main(int argcIn, char **argvIn)
         return 0; // unreachable
     }
 
-    std::vector<std::string> args = std::move(data.compilerArgs->commandLine);
+    std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.slaveCompiler;
 
     const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
