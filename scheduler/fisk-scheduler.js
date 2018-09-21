@@ -56,7 +56,7 @@ function insertSlave(slave) {
     ++slaveCount;
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveAdded");
-        console.log("send to monitors", info);
+        // console.log("send to monitors", info);
         monitors.forEach(monitor => {
             monitor.send(info);
         });
@@ -74,7 +74,7 @@ function removeSlave(slave) {
     delete slaves[slaveKey(slave)];
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveRemoved");
-        console.log("send to monitors", info);
+        // console.log("send to monitors", info);
         monitors.forEach(monitor => {
             monitor.send(info);
         });
@@ -303,7 +303,7 @@ server.on("slave", slave => {
                 },
                 id: job.id
             };
-            console.log("send to monitors", info);
+            // console.log("send to monitors", info);
             monitors.forEach(monitor => monitor.send(info));
         }
     });
@@ -323,7 +323,7 @@ server.on("slave", slave => {
                 uploadDuration: job.uploadDuration,
                 uploadSpeed: job.uploadSpeed
             };
-            console.log("send to monitors", info);
+            // console.log("send to monitors", info);
             monitors.forEach(monitor => monitor.send(info));
         }
     });
