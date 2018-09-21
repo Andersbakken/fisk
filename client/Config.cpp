@@ -144,20 +144,6 @@ unsigned long long Config::responseTimeout()
     return 10000; // restarts on each heartbeat which happen every 5 seconds
 }
 
-std::string Config::clientName()
-{
-    json11::Json val = value("client-name");
-    if (val.is_string())
-        return val.string_value();
-
-    char buf[1024];
-    if (!gethostname(buf, sizeof(buf)))
-        return buf;
-
-    ERROR("Unable to retrieve client name %d %s", errno, strerror(errno));
-    return "unknown";
-}
-
 std::string Config::cacheDir()
 {
     json11::Json val = value("cache-dir");

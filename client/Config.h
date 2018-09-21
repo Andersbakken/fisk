@@ -16,7 +16,6 @@ unsigned long long acquiredSlaveTimeout();
 unsigned long long slaveConnectTimeout();
 unsigned long long uploadJobTimeout();
 unsigned long long responseTimeout();
-std::string clientName();
 std::string cacheDir();
 size_t compileSlots();
 size_t desiredCompileSlots();
