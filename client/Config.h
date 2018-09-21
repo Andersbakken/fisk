@@ -14,6 +14,7 @@ std::string scheduler();
 unsigned long long schedulerConnectTimeout();
 unsigned long long acquiredSlaveTimeout();
 unsigned long long slaveConnectTimeout();
+unsigned long long preprocessTimeout();
 unsigned long long uploadJobTimeout();
 unsigned long long responseTimeout();
 std::string cacheDir();

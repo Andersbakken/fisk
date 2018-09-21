@@ -126,6 +126,16 @@ unsigned long long Config::slaveConnectTimeout()
     return 1000;
 }
 
+unsigned long long Config::preprocessTimeout()
+{
+    json11::Json val = value("preprocess-timeout");
+    if (val.is_number())
+        return val.int_value();
+
+    return 1000;
+}
+
+
 unsigned long long Config::uploadJobTimeout()
 {
     json11::Json val = value("upload-job-timeout");
@@ -171,7 +181,7 @@ size_t Config::compileSlots()
 
 size_t Config::desiredCompileSlots()
 {
-    json11::Json val = value("desired_slots");
+    json11::Json val = value("desired-slots");
     if (val.is_number())
         return val.int_value();
     return 0;

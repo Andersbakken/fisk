@@ -26,25 +26,6 @@ void Watchdog::stop()
         mState = Stopped;
 }
 
-void Watchdog::suspend()
-{
-    if (mState == Running) {
-        mState = Suspended;
-        const unsigned long long now = Client::mono();
-        if (mTransitionTime < now)
-            mTransitionTime = now - mTransitionTime; // mTransitionTime now holds amount of ms elapsed
-    }
-}
-
-void Watchdog::resume()
-{
-    if (mState == Suspended) {
-        mState = Running;
-        const unsigned long long now = Client::mono();
-        mTransitionTime = now - mTransitionTime;
-    }
-}
-
 int Watchdog::timeout()
 {
     if (mState != Running)
@@ -62,6 +43,9 @@ int Watchdog::timeout()
         mTimeoutTime += Config::slaveConnectTimeout();
         break;
     case ConnectedToSlave:
+        mTimeoutTime += Config::preprocessTimeout();
+        break;
+    case PreprocessFinished:
         mTimeoutTime += Config::uploadJobTimeout();
         break;
     case UploadedJob:

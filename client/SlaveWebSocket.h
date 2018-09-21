@@ -12,7 +12,6 @@ public:
     bool wait { false };
     virtual void onConected() override
     {
-        Client::data().watchdog->transition(Watchdog::ConnectedToSlave);
     }
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {

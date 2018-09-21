@@ -367,11 +367,11 @@ int main(int argcIn, char **argvIn)
 
     while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+    watchdog.transition(Watchdog::ConnectedToSlave);
 
     DEBUG("Waiting for preprocessed");
-    watchdog.suspend();
     preprocessed->wait();
-    watchdog.resume();
+    watchdog.transition(Watchdog::PreprocessFinished);
     DEBUG("Preprocessed finished");
     preprocessedDuration = preprocessed->duration;
     preprocessedSlotDuration = preprocessed->slotDuration;

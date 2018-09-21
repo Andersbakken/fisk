@@ -17,6 +17,7 @@ public:
         ConnectedToScheduler,
         AcquiredSlave,
         ConnectedToSlave,
+        PreprocessFinished,
         UploadedJob,
         Finished
     };
@@ -29,6 +30,7 @@ public:
         case ConnectedToScheduler: return "ConnectedToScheduler";
         case AcquiredSlave: return "AcquiredSlave";
         case ConnectedToSlave: return "ConnectedToSlave";
+        case PreprocessFinished: return "PreprocessFinished";
         case UploadedJob: return "UploadedJob";
         case Finished: return "Finished";
         }
@@ -38,8 +40,6 @@ public:
     void transition(Stage stage);
     void heartbeat();
     void stop();
-    void suspend();
-    void resume();
 protected:
     virtual int fd() const override { return -1; }
     virtual unsigned int mode() const override { return None; }
