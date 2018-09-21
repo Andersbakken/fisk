@@ -401,8 +401,8 @@ server.on("job", (job) => {
     };
 
     job.on("error", (err) => {
-        job.webSocketError = err;
-        console.error("got error from job", err);
+        job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`);
+        console.error("got error from job", job.webSocketError);
     });
     job.on("close", () => {
         job.removeAllListeners();
