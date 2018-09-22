@@ -9,8 +9,7 @@
 #include <sys/types.h>
 #include <sys/file.h>
 
-static std::vector<json11::Json> sJSON;
-static json11::Json value(const std::string &key)
+static json11::Json value(const std::vector<json11::Json> &json, const std::string &key)
 {
     for (const json11::Json &json : sJSON) {
         const json11::Json &value = json[key];
@@ -21,7 +20,42 @@ static json11::Json value(const std::string &key)
     return json11::Json();
 }
 
-bool Config::init()
+namespace Config {
+static std::vector<GetterBase *> sBases;
+GetterBase::GetterBase(const char *arg)
+    : mJsonKey(arg)
+{
+    sBases.push_back(this);
+    mEnvironmentVariable = "FISK_" + mJsonKey;
+    for (char *ch = &mEnvironmentVariable[5]; *ch; ++ch) {
+        if (*ch == '-') {
+            *ch = '_';
+        } else {
+            *ch = std::toupper(*ch);
+        }
+    }
+    mCommandLine = "--fisk-" + mJsonKey;
+}
+
+GetterBase::~GetterBase()
+{
+}
+
+bool GetterBase::match(Mode mode, const char *arg)
+{
+    switch (mode) {
+    case JSON: return arg == mJsonKey;
+    case EnvironmentVariable: return arg == mEnvironmentVariable;
+    case CommandLine: return arg == mCommandLine;
+    }
+    abort();
+    return false;
+}
+
+Getter<std::string> schedulerFoo("scheduler", "ws://localhost:8097");
+};
+
+bool Config::init(int &argc, char **&argv)
 {
     auto load = [](const std::string &path) {
         FILE *f = fopen(path.c_str(), "r");
@@ -59,6 +93,8 @@ bool Config::init()
     }
     if (!load("/etc/xdg/fisk/client.conf"))
         return false;
+
+
 
     const std::string dir = cacheDir();
     std::string versionFile = dir + "version";

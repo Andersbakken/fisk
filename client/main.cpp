@@ -49,7 +49,7 @@ int main(int argcIn, char **argvIn)
             }
         });
 
-    if (!Config::init()) {
+    if (!Config::init(argcIn, argvIn)) {
         return 1;
     }
     std::string logLevel = Config::logLevel();
