@@ -4,7 +4,7 @@
 #include "Log.h"
 
 Watchdog::Watchdog()
-    : mState(Config::watchdog() ? Running : Stopped)
+    : mState(Config::watchdog ? Running : Stopped)
 {
     mTransitionTime = Watchdog::timings[Initial] = Client::started;
 }
@@ -34,22 +34,22 @@ int Watchdog::timeout()
     mTimeoutTime = mTransitionTime;
     switch (mStage) {
     case Initial:
-        mTimeoutTime += Config::schedulerConnectTimeout();
+        mTimeoutTime += Config::schedulerConnectTimeout;
         break;
     case ConnectedToScheduler:
-        mTimeoutTime += Config::acquiredSlaveTimeout();
+        mTimeoutTime += Config::acquiredSlaveTimeout;
         break;
     case AcquiredSlave:
-        mTimeoutTime += Config::slaveConnectTimeout();
+        mTimeoutTime += Config::slaveConnectTimeout;
         break;
     case ConnectedToSlave:
-        mTimeoutTime += Config::preprocessTimeout();
+        mTimeoutTime += Config::preprocessTimeout;
         break;
     case PreprocessFinished:
-        mTimeoutTime += Config::uploadJobTimeout();
+        mTimeoutTime += Config::uploadJobTimeout;
         break;
     case UploadedJob:
-        mTimeoutTime += Config::responseTimeout();
+        mTimeoutTime += Config::responseTimeout;
         break;
     case Finished:
         return -1;

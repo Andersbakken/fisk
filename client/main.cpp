@@ -18,8 +18,7 @@
 static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
-static void usage(FILE *f);
-int main(int argcIn, char **argvIn)
+int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
         fprintf(stderr, "Recursive invocation of fiskc detected.\n");
@@ -49,52 +48,52 @@ int main(int argcIn, char **argvIn)
             }
         });
 
-    if (!Config::init()) {
+    if (!Config::init(argc, argv)) {
         return 1;
     }
-    std::string logLevel = Config::logLevel();
-    std::string logFile = Config::logFile();
-    std::string clientName;
-    const char *env;
-    if ((env = getenv("FISK_LOG"))) {
-        logLevel = env;
-    } else if ((env = getenv("FISK_DEBUG"))) {
-        logLevel = env;
-    } else if ((env = getenv("FISK_VERBOSE"))) {
-        if (!*env || strcmp(env, "0")) {
-            logLevel = "Debug";
+    if (Config::help) {
+        Config::usage(stdout);
+        return 0;
+    }
+    if (Config::dumpSemaphores) {
+#ifdef __APPLE__
+        fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
+#else
+        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
+            if (Client::Slot::slots(type) == std::numeric_limits<size_t>::max()) {
+                continue;
+            }
+            sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
+            if (!sem) {
+                fprintf(stderr, "Failed to open semaphore %s slots: %zu: %d %s\n",
+                        Client::Slot::typeToString(type), Client::Slot::slots(type),
+                        errno, strerror(errno));
+                continue;
+            }
+            int val = -1;
+            sem_getvalue(sem, &val);
+            printf("%s %d/%zu\n", Client::Slot::typeToString(type), val, Client::Slot::slots(type));
+            sem_close(sem);
         }
+#endif
+        return 0;
     }
-
-    if ((env = getenv("FISK_NAME"))) {
-        clientName = env;
+    if (Config::cleanSemaphores) {
+        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
+            if (sem_unlink(Client::Slot::typeToString(type))) {
+                if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max()) {
+                    fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
+                            Client::Slot::typeToString(type), errno, strerror(errno));
+                }
+            }
+        }
+        return 0;
     }
-
-    if ((env = getenv("FISK_LOG_FILE"))) {
-        logFile = env;
-    }
-
-    Log::LogFileMode logFileMode = Log::Overwrite;
-    if ((env = getenv("FISK_LOG_APPEND"))) {
-        logFileMode = Log::Append;
-    }
-
-    bool disabled = false;
-    if ((env = getenv("FISK_DISABLED"))) {
-        disabled = !strlen(env) || !strcmp(env, "1");
-    }
-
-    bool noDesire = false;
-    if ((env = getenv("FISK_NO_DESIRE"))) {
-        noDesire = !strlen(env) || !strcmp(env, "1");
-    }
-
-    const char *preresolved = getenv("FISK_COMPILER");
-    const char *slave = getenv("FISK_SLAVE");
-    const char *scheduler = getenv("FISK_SCHEDULER");
 
     Watchdog watchdog;
     Client::Data &data = Client::data();
+    data.argv = argv;
+    data.argc = argc;
     data.watchdog = &watchdog;
     auto signalHandler = [](int) {
         for (sem_t *semaphore : Client::data().semaphores) {
@@ -105,102 +104,11 @@ int main(int argcIn, char **argvIn)
     for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
         std::signal(signal, signalHandler);
     }
-    data.argv = new char *[argcIn + 1];
-    bool noMoreFiskOptions = false;
-    for (int i=0; i<argcIn; ++i) {
-        if (noMoreFiskOptions) {
-            data.argv[data.argc++] = argvIn[i];
-        } else if (!strcmp("--", argvIn[i])) {
-            noMoreFiskOptions = true;
-        } else if (!strcmp("--help", argvIn[i]) || !strcmp("--fisk-help", argvIn[i])) {
-            std::string filename;
-            Client::parsePath(argvIn[0], &filename, 0);
-            if (!strcmp("--fisk-help", argvIn[i]) || filename == "fiskc") {
-                usage(stdout);
-                return 0;
-            } else {
-                data.argv[data.argc++] = argvIn[i];
-            }
-        } else if (!strncmp("--fisk-log-level=", argvIn[i], 17)
-                   || !strncmp("--fisk-log=", argvIn[i], 11)
-                   || !strncmp("--fisk-debug-level=", argvIn[i], 19)
-                   || !strncmp("--fisk-debug=", argvIn[i], 13)) {
-            logLevel = strchr(argvIn[i], '=') + 1;
-        } else if (!strcmp("--fisk-verbose", argvIn[i])) {
-            logLevel = "Debug";
-        } else if (i + 1 < argcIn && (!strcmp("--fisk-log-level", argvIn[i])
-                                      || !strcmp("--fisk-log-level", argvIn[i])
-                                      || !strcmp("--fisk-log", argvIn[i])
-                                      || !strcmp("--fisk-debug", argvIn[i]))) {
-            logLevel = argvIn[++i];
-        } else if (!strncmp("--fisk-log-file=", argvIn[i], 16)) {
-            logFile = argvIn[i] + 16;
-        } else if (i + 1 < argcIn && !strcmp("--fisk-log-file", argvIn[i])) {
-            logFile = argvIn[++i];
-        } else if (!strcmp("--fisk-log-file-append", argvIn[i])) {
-            logFileMode = Log::Append;
-        } else if (!strncmp("--fisk-compiler=", argvIn[i], 16)) {
-            preresolved = argvIn[i] + 16;
-        } else if (i + 1 < argcIn && !strcmp("--fisk-compiler", argvIn[i])) {
-            preresolved = argvIn[++i];
-        } else if (!strncmp("--fisk-slave=", argvIn[i], 13)) {
-            slave = argvIn[i] + 13;
-        } else if (i + 1 < argcIn && !strcmp("--fisk-slave", argvIn[i])) {
-            slave = argvIn[++i];
-        } else if (!strncmp("--fisk-scheduler=", argvIn[i], 17)) {
-            scheduler = argvIn[i] + 17;
-        } else if (i + 1 < argcIn && !strcmp("--fisk-scheduler", argvIn[i])) {
-            scheduler = argvIn[++i];
-        } else if (!strncmp("--fisk-name=", argvIn[i], 17)) {
-            clientName = argvIn[i] + 17;
-        } else if (i + 1 < argcIn && !strcmp("--fisk-name", argvIn[i])) {
-            clientName = argvIn[++i];
-        } else if (!strcmp("--fisk-disabled", argvIn[i])) {
-            disabled = true;
-        } else if (!strcmp("--fisk-no-desire", argvIn[i])) {
-            noDesire = true;
-        } else if (!strcmp("--fisk-clean-semaphores", argvIn[i])) {
-            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
-                if (sem_unlink(Client::Slot::typeToString(type))) {
-                    if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max()) {
-                        fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
-                                Client::Slot::typeToString(type), errno, strerror(errno));
-                    }
-                }
-            }
-            return 0;
-        } else if (!strcmp("--fisk-dump-semaphores", argvIn[i])) {
-#ifdef __APPLE__
-            fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
-#else
-            for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
-                if (Client::Slot::slots(type) == std::numeric_limits<size_t>::max()) {
-                    continue;
-                }
-                sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
-                if (!sem) {
-                    fprintf(stderr, "Failed to open semaphore %s slots: %zu: %d %s\n",
-                            Client::Slot::typeToString(type), Client::Slot::slots(type),
-                            errno, strerror(errno));
-                    continue;
-                }
-                int val = -1;
-                sem_getvalue(sem, &val);
-                printf("%s %d/%zu\n", Client::Slot::typeToString(type), val, Client::Slot::slots(type));
-                sem_close(sem);
-            }
-#endif
 
-            return 0;
-        } else if (!strncmp("--fisk", argvIn[i], 6)) {
-            usage(stderr);
-            fprintf(stderr, "Unknown option %s\n", argvIn[i]);
-            return 1;
-        } else {
-            data.argv[data.argc++] = argvIn[i];
-        }
-    }
+    std::string clientName = Config::name;
+
     Log::Level level = Log::Silent;
+    const std::string logLevel = Config::logLevel;
     if (!logLevel.empty()) {
         bool ok;
         level = Log::stringToLevel(logLevel.c_str(), &ok);
@@ -209,29 +117,29 @@ int main(int argcIn, char **argvIn)
             return 1;
         }
     }
+    if (Config::verbose)
+        level = Log::Debug;
+    std::string preresolved = Config::compiler;
 
-    if (clientName.empty())
-        clientName = Config::name();
-
-    Log::init(level, std::move(logFile), logFileMode);
+    Log::init(level, Config::logFile, Config::logFileAppend ? Log::Append : Log::Overwrite);
 
     if (!Client::findCompiler(preresolved)) {
         ERROR("Can't find executable for %s", data.argv[0]);
         return 1;
     }
     DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
-          data.argv[0], preresolved ? preresolved : "",
+          data.argv[0], preresolved.c_str(),
           data.compiler.c_str(), data.resolvedCompiler.c_str(),
           data.slaveCompiler.c_str());
 
-    if (!noDesire) {
+    if (!Config::noDesire) {
         if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
             Client::runLocal(std::move(slot));
             return 0;
         }
     }
 
-    if (disabled) {
+    if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
         return 0; // unreachable
@@ -270,16 +178,19 @@ int main(int argcIn, char **argvIn)
     std::map<std::string, std::string> headers;
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
-    headers["x-fisk-client-name"] = clientName;
+    headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
-    if (slave)
-        headers["x-fisk-slave"] = slave;
     {
-        std::string hostname = Config::hostname();
+        std::string slave = Config::slave;
+        if (!slave.empty())
+            headers["x-fisk-slave"] = std::move(slave);
+    }
+    {
+        std::string hostname = Config::hostname;
         if (!hostname.empty())
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
-    std::string url = scheduler ? std::string(scheduler) : Config::scheduler();
+    std::string url = Config::scheduler;
     if (url.find("://") == std::string::npos)
         url.insert(0, "ws://");
 
@@ -441,60 +352,4 @@ int main(int argcIn, char **argvIn)
     schedulerWebsocket.close("slaved");
 
     return data.exitCode;
-}
-
-static void usage(FILE *f)
-{
-    fprintf(f,
-            "Usage: fiskc [...options...]\n"
-            "Options:\n"
-            "  --help                             Display this help (if argv0 is fiskc)\n"
-            "\n"
-            "  --fisk-help                        Display this help\n"
-            "\n"
-            "  --fisk-log-level=[loglevel]        Set log level\n"
-            "  --fisk-log=[loglevel]              Level can be: \"debug\", \"warn\", \"error\" or \"silent\"\n"
-            "  --fisk-debug-level=[loglevel]\n"
-            "  --fisk-debug=[loglevel]\n"
-            "  --fisk-log-level [loglevel]\n"
-            "  --fisk-log [loglevel]\n"
-            "  --fisk-debug-level [loglevel]\n"
-            "  --fisk-debug [loglevel]\n"
-            "\n"
-            "  --fisk-verbose                     Set log level to \"debug\"\n"
-            "\n"
-            "  --fisk-log-file=[file]             Log to file\n"
-            "  --fisk-log-file [file]\n"
-            "  --fisk-log-file-append             Append to log file\n"
-            "\n"
-            "  --fisk-compiler=[compiler]         Set fisk's resolved compiler to [compiler]\n"
-            "  --fisk-compiler [compiler]\n"
-            "\n"
-            "  --fisk-name=[clientname]           Set fisk's client name to [clientname]\n"
-            "  --fisk-name [clientname]\n"
-            "\n"
-            "  --fisk-slave=[ip address]          Set fisk's preferred slave\n"
-            "  --fisk-slave [ip address]\n"
-            "\n"
-            "  --fisk-scheduler=[url]             Set fisk's scheduler url (\"ws://127.0.0.1:8097\")\n"
-            "  --fisk-scheduler [url]\n"
-            "\n"
-            "  --fisk-disabled                    Run all jobs locally\n"
-            "\n"
-            "  --fisk-clean-semaphores            Drop semaphores. This could be useful if fiskc has crashed while holding a semaphore\n"
-            "\n"
-            "  --fisk-dump-semaphores             Dump info about semaphores\n"
-            "  --                                 Pass all remaining arguments directly to the compiler\n"
-            "\n"
-            "Environment variables:\n"
-            "  FISK_LOG                           Set log level\n"
-            "  FISK_DEBUG                         Set log level\n"
-            "  FISK_VERBOSE                       Set log level to \"debug\" if value != \"0\"\n"
-            "  FISK_LOG_FILE                      Set log file\n"
-            "  FISK_LOG_APPEND                    Append to log file\n"
-            "  FISK_DISABLED                      Run all jobs locally\n"
-            "  FISK_COMPILER                      Set resolved compiler\n"
-            "  FISK_NAME                          Set client name\n"
-            "  FISK_SCHEDULER                     Set scheduler url\n"
-            "  FISK_SLAVE                         Set preferred slave\n");
 }

@@ -91,56 +91,60 @@ static std::string resolveSymlink(const std::string &link, const std::function<C
     return l;
 }
 
-bool Client::findCompiler(const char *preresolved)
+bool Client::findCompiler(const std::string &preresolved)
 {
     // printf("PATH %s\n", path);
     std::string exec;
-    if (!preresolved) {
-        const char *path = getenv("PATH");
-        if (path) {
-            const char *begin = path, *end = 0;
-            std::string argv0;
-            Client::parsePath(sData.argv[0], &argv0, 0);
-            do {
-                end = strchr(begin, ':');
-                if (!end) {
-                    exec = begin;
-                } else {
-                    exec.assign(begin, end - begin);
-                    begin = end + 1;
-                }
-                if (!exec.empty()) {
-                    if (exec[exec.size() - 1] != '/')
-                        exec += '/';
-                    exec += argv0;
-                    if (!access(exec.c_str(), X_OK)) {
-                        std::string resolved = Client::realpath(exec);
-                        std::string basename;
-                        Client::parsePath(resolved, 0, &basename);
-                        if (basename != "fiskc") {
-                            if (fileType(exec) == Symlink) {
-                                char link[PATH_MAX + 1];
-                                const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
-                                if (len < 0) {
-                                    ERROR("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
-                                    exec.clear();
-                                    continue;
-                                }
-                                link[len] = '\0';
-                                std::string linkedFile;
-                                parsePath(link, &linkedFile, 0);
-                                if (linkedFile == "icecc" || linkedFile == "fiskc") {
-                                    exec.clear();
-                                    continue;
-                                }
-                            }
-
-                            break;
-                        }
+    if (!preresolved.empty()) {
+        if (preresolved[0] == '/') {
+            exec = preresolved;
+        } else {
+            const char *path = getenv("PATH");
+            if (path) {
+                const char *begin = path, *end = 0;
+                std::string argv0;
+                Client::parsePath(sData.argv[0], &argv0, 0);
+                do {
+                    end = strchr(begin, ':');
+                    if (!end) {
+                        exec = begin;
+                    } else {
+                        exec.assign(begin, end - begin);
+                        begin = end + 1;
                     }
-                    exec.clear();
-                }
-            } while (end);
+                    if (!exec.empty()) {
+                        if (exec[exec.size() - 1] != '/')
+                            exec += '/';
+                        exec += argv0;
+                        if (!access(exec.c_str(), X_OK)) {
+                            std::string resolved = Client::realpath(exec);
+                            std::string basename;
+                            Client::parsePath(resolved, 0, &basename);
+                            if (basename != "fiskc") {
+                                if (fileType(exec) == Symlink) {
+                                    char link[PATH_MAX + 1];
+                                    const ssize_t len = readlink(exec.c_str(), link, sizeof(link) - 1);
+                                    if (len < 0) {
+                                        ERROR("Can't follow symlink: %s (%d %s)", exec.c_str(), errno, strerror(errno));
+                                        exec.clear();
+                                        continue;
+                                    }
+                                    link[len] = '\0';
+                                    std::string linkedFile;
+                                    parsePath(link, &linkedFile, 0);
+                                    if (linkedFile == "icecc" || linkedFile == "fiskc") {
+                                        exec.clear();
+                                        continue;
+                                    }
+                                }
+
+                                break;
+                            }
+                        }
+                        exec.clear();
+                    }
+                } while (end);
+            }
         }
     } else {
         exec = preresolved;
@@ -402,7 +406,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 }
             }
             commandLine += " '-E'";
-            if (!Config::discardComments()) {
+            if (!Config::discardComments) {
                 commandLine += " '-C'";
             }
 

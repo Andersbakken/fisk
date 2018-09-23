@@ -46,7 +46,7 @@ Data &data();
 extern const unsigned long long started;
 
 std::mutex &mutex();
-bool findCompiler(const char *preresolved);
+bool findCompiler(const std::string &preresolved);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
@@ -71,11 +71,11 @@ public:
     {
         switch (type) {
         case Compile:
-            return Config::compileSlots();
+            return Config::compileSlots;
         case Cpp:
-            return Config::cppSlots();
+            return Config::cppSlots;
         case DesiredCompile:
-            return Config::desiredCompileSlots();
+            return Config::desiredCompileSlots;
         }
         assert(0);
         return 0;

@@ -340,8 +340,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         return nullptr;
     }
 
-#warning need to handle color diagnostics
-#warning need to handle clang_get_default_target
+// #warning need to handle color diagnostics
+// #warning need to handle clang_get_default_target
 
     if (ret->flags & (AssemblerWithCpp|Assembler)) {
         DEBUG("Assembler, building local");

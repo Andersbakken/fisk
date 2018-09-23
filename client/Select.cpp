@@ -7,7 +7,7 @@ int Select::exec(int timeoutMs) const
     FD_ZERO(&w);
     int max = mPipe[0];
     FD_SET(mPipe[0], &r);
-    std::vector<unsigned long long> timeouts;
+    std::vector<int> timeouts;
     const unsigned long long before = Client::mono();
     for (Socket *socket : mSockets) {
         const int to = socket->timeout();
