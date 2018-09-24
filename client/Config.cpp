@@ -159,7 +159,7 @@ bool Config::init(int &argc, char **&argv)
         return false;
 
     std::map<std::string, std::string> commandLine, environmentVariables;
-    int i;
+    int i = 1;
     auto consumeArg = [&i, &argv, &argc](int extra) {
         memmove(&argv[i], &argv[i + extra + 1], sizeof(argv[0]) * (argc - i + 1));
         argc -= (extra + 1);

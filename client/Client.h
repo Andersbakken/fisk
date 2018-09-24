@@ -26,7 +26,7 @@ class SchedulerWebSocket;
 namespace Client {
 struct Data
 {
-    ~Data() { delete[] argv; }
+    ~Data() {}
 
     int argc { 0 };
     char **argv { 0 };
