@@ -10,6 +10,11 @@ add_custom_command(OUTPUT create-fisk-env.c
                    DEPENDS create-fisk-env
                    COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env  -P "${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake")
 
+add_custom_target(create-version ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake COMMENT "Generating create-fisk-env.c")
+add_custom_command(OUTPUT create-fisk-env.c
+                   DEPENDS create-fisk-env
+                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env  -P "${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake")
+
 include_directories(${OPENSSL_INCLUDE_DIR})
 add_executable(fiskc
     Client.cpp

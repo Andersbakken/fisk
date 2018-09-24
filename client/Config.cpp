@@ -193,12 +193,12 @@ bool Config::init(int &argc, char **&argv)
         }
         if (!it->second->requiresArgument() && !eq) {
             if (i + 1 < argc) { // optional arg
-                int extra = 0;
+                int extra = 1;
                 if (!it->second->apply(std::string(argv[i + 1]))) {
                     const bool ret = it->second->apply(std::string());
                     assert(ret);
                     (void)ret;
-                    extra = 1;
+                    extra = 0;
                 }
                 consumeArg(extra);
             } else {
@@ -211,7 +211,7 @@ bool Config::init(int &argc, char **&argv)
             continue;
         }
         if (eq) {
-            if (it->second->apply(std::string(eq))) {
+            if (it->second->apply(std::string(eq + 1))) {
                 it->second->mDone = true;
                 consumeArg(0);
                 continue;
