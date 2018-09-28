@@ -175,7 +175,7 @@ export class ChartComponent implements AfterViewInit {
         }
         const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke", "black").attr("stroke-width", 2);
         const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
-        const text = this.svg.append("text").text(() => { return key; });
+        const text = this.svg.append("text").text(key);
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
@@ -222,8 +222,9 @@ export class ChartComponent implements AfterViewInit {
         const slaveKey = job.slave.ip + ":" + job.slave.port;
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
-            const rect = this.clientGroup.append("rect")
+            const rect = this.clientGroup.append("clipPath")
                 .attr("id", `rect-${job.client.name}`)
+                .append("rect")
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
                 .attr("fill", this._color(clientKey, false));
@@ -233,7 +234,7 @@ export class ChartComponent implements AfterViewInit {
             const text = this.svg.append("text")
                 .attr("y", this.view.height - 12)
                 .attr("clip-path", `url(#rect-${job.client.name})`)
-                .text(() => { return `${clientData.name} (${clientData.jobs} jobs)`; });
+                .text(`${clientData.name} (${clientData.jobs} jobs)`);
             clientData.text = text;
             this.clients[clientKey] = clientData;
         } else {
@@ -301,7 +302,7 @@ export class ChartComponent implements AfterViewInit {
                         .attr("width", width)
                         .duration(100);
                     client.text
-                        .text(() => { return `${client.name} (${client.jobs} jobs)`; });
+                        .text(`${client.name} (${client.jobs} jobs)`);
                     client.text
                         .transition()
                         .attr("x", x + 5)
