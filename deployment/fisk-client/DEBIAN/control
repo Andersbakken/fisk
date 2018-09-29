@@ -1,0 +1,8 @@
+Package: fisk-client
+Version: 1.0-40
+Architecture: all
+Priority: optional
+Section: devel
+Depends: ccache
+Maintainer: Anders Bakken <agbakken@gmail.com>
+Description: Fisk client package

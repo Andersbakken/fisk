@@ -1,0 +1,8 @@
+Package: fisk-scheduler
+Version: 1.0-40
+Architecture: all
+Priority: optional
+Section: devel
+Depends: g++
+Maintainer: Anders Bakken <agbakken@gmail.com>
+Description: Fisk scheduler package

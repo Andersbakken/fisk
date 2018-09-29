@@ -1,0 +1,12 @@
+[Unit]
+Description=Fisk scheduler, the distributed compile system
+Wants=network.target
+
+[Service]
+User=root
+ExecStart=/var/fisk/scheduler/run-fisk-scheduler.js
+
+[Install]
+WantedBy=multi-user.target
+
+

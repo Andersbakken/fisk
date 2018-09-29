@@ -1,0 +1,7 @@
+#!/bin/bash
+
+mkdir -p /var/fisk/slave/data
+npm install --unsafe-perm -g @andersbakken/fisk
+sudo systemctl enable fisk-slave.service
+sudo service fisk-slave start
+

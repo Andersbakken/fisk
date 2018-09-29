@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm -rf /var/fisk/slave/data
+sudo service fisk-slave stop
+npm  --unsafe-perm uninstall -g @andersbakken/fisk
+sudo systemctl disable fisk-slave.service

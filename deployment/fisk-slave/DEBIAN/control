@@ -1,0 +1,7 @@
+Package: fisk-slave
+Version: 1.0-40
+Architecture: all
+Priority: optional
+Section: devel
+Maintainer: Anders Bakken <agbakken@gmail.com>
+Description: Fisk slave package

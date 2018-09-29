@@ -1,0 +1,12 @@
+[Unit]
+Description=Fisk slave, the distributed compile system
+Wants=network.target
+
+[Service]
+User=root
+ExecStart=/var/fisk/slave/run-fisk-slave.sh
+
+[Install]
+WantedBy=multi-user.target
+
+
