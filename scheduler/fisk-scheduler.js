@@ -306,6 +306,7 @@ server.on("slave", slave => {
             // console.log("send to monitors", info);
             monitors.forEach(monitor => monitor.send(info));
         }
+        console.log(`slave: ${job.slave.ip}:${job.slave.port} will build ${job.sourceFile} for ${job.client.name}`);
     });
 
     slave.on("jobFinished", job => {
