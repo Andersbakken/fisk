@@ -160,6 +160,7 @@ class Compile extends EventEmitter {
 
         proc.on('exit', (exitCode) => {
             // try {
+            var that = this;
             let files = [];
             function addDir(dir, prefix) {
                 try {
@@ -183,7 +184,7 @@ class Compile extends EventEmitter {
                         // console.log("ADDED FILE", file, files[files.length - 1]);
                     });
                 } catch (err) {
-                    this.emit('exit', { exitCode: 101, files: [], error: err, sourceFile: sourceFile });
+                    that.emit('exit', { exitCode: 101, files: [], error: err, sourceFile: sourceFile });
                     return;
                 }
             }
