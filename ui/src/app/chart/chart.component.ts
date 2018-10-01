@@ -229,7 +229,7 @@ export class ChartComponent implements AfterViewInit {
         if (!(clientKey in this.clients)) {
             const rectName = name("rect", job.client.name);
             const clip = this.clientGroup.append("clipPath")
-                .attr("id", rectName);
+                .attr("id", rectName)
                 .append("rect")
                 .attr("y", this.view.height - 30)
                 .attr("height", 30);
