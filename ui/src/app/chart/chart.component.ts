@@ -238,7 +238,7 @@ export class ChartComponent implements AfterViewInit {
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
                 .attr("fill", this._color(clientKey, false));
-            let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
+            let clientData: { client: any, clip: any, rect: any, text: any, jobs: number, name: string } = {
                 client: job.client, clip: clip, rect: rect, text: undefined, jobs: 1, name: job.client.name
             };
             const text = this.svg.append("text")
