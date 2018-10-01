@@ -306,7 +306,7 @@ server.on("slave", slave => {
             // console.log("send to monitors", info);
             monitors.forEach(monitor => monitor.send(info));
         }
-        console.log(`slave: ${job.slave.ip}:${job.slave.port} will build ${job.sourceFile} for ${job.client.name}`);
+        // console.log(`slave: ${job.slave.ip}:${job.slave.port} will build ${job.sourceFile} for ${job.client.name}`);
     });
 
     slave.on("jobFinished", job => {
@@ -489,7 +489,7 @@ server.on("compile", compile => {
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
-        // console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived} chewed for ${sendTime - arrived}`);
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived}`);
         ++slave.activeClients;
         ++slave.jobsScheduled;
         slave.lastJob = Date.now();
