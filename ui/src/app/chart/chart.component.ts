@@ -219,21 +219,30 @@ export class ChartComponent implements AfterViewInit {
             console.error("job already exists", job);
             return;
         }
+
+        const name = (id, name) => {
+            return id + name.replace(/-/g, "");
+        };
+
         const slaveKey = job.slave.ip + ":" + job.slave.port;
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
-            const rect = this.clientGroup.append("clipPath")
-                .attr("id", `rect-${job.client.name}`)
+            const rectName = name("rect", job.client.name);
+            const clip = this.clientGroup.append("clipPath")
+                .attr("id", rectName);
                 .append("rect")
+                .attr("y", this.view.height - 30)
+                .attr("height", 30);
+            const rect = this.clientGroup.append("rect")
                 .attr("y", this.view.height - 30)
                 .attr("height", 30)
                 .attr("fill", this._color(clientKey, false));
             let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
-                client: job.client, rect: rect, text: undefined, jobs: 1, name: job.client.name
+                client: job.client, clip: clip, rect: rect, text: undefined, jobs: 1, name: job.client.name
             };
             const text = this.svg.append("text")
                 .attr("y", this.view.height - 12)
-                .attr("clip-path", `url(#rect-${job.client.name})`)
+                .attr("clip-path", `url(#${rectName})`)
                 .text(`${clientData.name} (${clientData.jobs} jobs)`);
             clientData.text = text;
             this.clients[clientKey] = clientData;
@@ -264,6 +273,7 @@ export class ChartComponent implements AfterViewInit {
         if (client) {
             if (!--client.jobs) {
                 client.rect.remove();
+                client.clip.remove();
                 client.text.remove();
                 delete this.clients[jobData.client];
             }
@@ -297,6 +307,9 @@ export class ChartComponent implements AfterViewInit {
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
                     client.rect
+                        .attr("x", x)
+                        .attr("width", width)
+                    client.clip
                         .transition()
                         .attr("x", x)
                         .attr("width", width)
