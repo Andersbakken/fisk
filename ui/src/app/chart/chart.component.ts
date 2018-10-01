@@ -208,10 +208,11 @@ export class ChartComponent implements AfterViewInit {
 
     _adjustSlave(slave) {
         slave.halo
-            .transition()
+            // .interrupt()
+            // .transition()
             .attr("rx", this._ellipseX(slave, true) + 1)
-            .attr("ry", this._ellipseY(slave, true) + 1)
-            .duration(200);
+            .attr("ry", this._ellipseY(slave, true) + 1);
+            // .duration(200);
     }
 
     _jobStarted(job) {
