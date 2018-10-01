@@ -575,6 +575,7 @@ server.on("monitor", client => {
         try {
             message = JSON.parse(messageText);
         } catch (err) {
+            console.error(`Bad json message from monitor ${err.message}`);
             client.send({ success: false, error: `Bad message won't parse as JSON: ${err}` });
             client.close();
             return;
