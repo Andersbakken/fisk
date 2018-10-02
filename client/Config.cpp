@@ -254,13 +254,13 @@ bool Config::init(int &argc, char **&argv)
             char *eq = strchr(env, '=');
             std::string key, value;
             if (!eq) {
-                key = std::string(env, eq);
+                key = env + 5;
             } else {
-                key = env;
+                key = std::string(env + 5, eq);
                 value = eq + 1;
             }
 
-            for (char *ch = &key[5]; *ch; ++ch) {
+            for (char *ch = &key[0]; *ch; ++ch) {
                 if (*ch == '_') {
                     *ch = '-';
                 } else {
@@ -271,7 +271,7 @@ bool Config::init(int &argc, char **&argv)
             if (it == sGetters.end()) { // not found, treat as error?
                 continue;
             }
-            if (!it->second->mDone) // set from command line, no need to worry about environment
+            if (it->second->mDone) // set from command line, no need to worry about environment
                 continue;
 
             if (!it->second->apply(value)) {
