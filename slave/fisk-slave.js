@@ -351,7 +351,7 @@ server.on("job", (job) => {
             this.op.on("finished", event => {
                 this.done = true;
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished", this.id, job.sourceFile, "for", job.ip, job.clientName);
+                console.log("Job finished", this.id, job.sourceFile, "for", job.ip, job.name);
                 if (idx != -1) {
                     jobQueue.splice(idx, 1);
                 } else {
