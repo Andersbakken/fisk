@@ -334,6 +334,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             return nullptr;
         }
     }
+    if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
+        DEBUG("No src file, building local");
+        return nullptr;
+    }
 
     if (!hasDashC) {
         DEBUG("link job, building local");
