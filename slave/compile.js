@@ -114,6 +114,7 @@ class Compile extends EventEmitter {
                     args.unshift('c-header');
                     break;
                 case '.c':
+                case '.i':
                     args.unshift('cpp-output');
                     break;
                 case '.m':
