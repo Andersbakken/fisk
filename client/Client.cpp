@@ -422,15 +422,55 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
             ptr->slotDuration = Client::mono() - started;
             DEBUG("Running preprocess: %s", commandLine.c_str());
-            TinyProcessLib::Process proc(commandLine, std::string(),
-                                         [ptr](const char *bytes, size_t n) {
-                                             DEBUG("Preprocess appending %zu bytes to stdout", n);
-                                             ptr->stdOut.append(bytes, n);
-                                         }, [ptr](const char *bytes, size_t n) {
-                                             DEBUG("Preprocess appending %zu bytes to stderr", n);
-                                             ptr->stdErr.append(bytes, n);
-                                         });
-            ptr->exitStatus = proc.get_exit_status();
+            if (args->flags & (CompilerArgs::CPreprocessed
+                               |CompilerArgs::ObjectiveCPreprocessed
+                               |CompilerArgs::ObjectiveCPlusPlusPreprocessed
+                               |CompilerArgs::CPlusPlusPreprocessed)) {
+                ptr->exitStatus = 0;
+                FILE *f;
+                long size = 0;
+                f = fopen(args->sourceFile().c_str(), "r");
+                if (!f) {
+                    DEBUG("Failed to open %s for reading (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                    ptr->exitStatus = 1;
+                    goto end;
+                }
+                if (fseek(f, 0, SEEK_END)) {
+                    DEBUG("Failed to fseek to end of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                    ptr->exitStatus = 1;
+                    goto end;
+                }
+                size = ftell(f);
+                if (fseek(f, 0, SEEK_SET)) {
+                    DEBUG("Failed to fseek to beginning of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                    ptr->exitStatus = 1;
+                    goto end;
+                }
+
+                if (size < 0) {
+                    DEBUG("Failed to ftell %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                    ptr->exitStatus = 1;
+                    goto end;
+                }
+                ptr->stdOut.resize(size);
+                if (fread(&ptr->stdOut[0], 1, size, f) != static_cast<size_t>(size)) {
+                    DEBUG("Failed to fread %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                    ptr->exitStatus = 1;
+                }
+          end:
+                if (f)
+                    fclose(f);
+            } else {
+                TinyProcessLib::Process proc(commandLine, std::string(),
+                                             [ptr](const char *bytes, size_t n) {
+                                                 DEBUG("Preprocess appending %zu bytes to stdout", n);
+                                                 ptr->stdOut.append(bytes, n);
+                                             }, [ptr](const char *bytes, size_t n) {
+                                                 DEBUG("Preprocess appending %zu bytes to stderr", n);
+                                                 ptr->stdErr.append(bytes, n);
+                                             });
+                ptr->exitStatus = proc.get_exit_status();
+            }
             slot.reset();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
