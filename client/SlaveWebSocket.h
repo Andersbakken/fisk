@@ -64,6 +64,14 @@ public:
                 return;
             }
 
+            const auto success = msg["success"];
+            if (success.is_bool() && !success.bool_value()) {
+                ERROR("Slave had some issue. Build locally");
+                Client::data().watchdog->stop();
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                return;
+            }
+
             json11::Json::array index = msg["index"].array_items();
             Client::data().exitCode = msg["exitCode"].int_value();
             if (!index.empty()) {

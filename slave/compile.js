@@ -24,7 +24,7 @@ class Compile extends EventEmitter {
             case '-o':
                 ++i;
                 outputs.push(args[i]);
-                args[i] = "output_" + (outputs.length - 1);
+                args[i] = path.join(dir, "output_" + (outputs.length - 1));
                 continue;
             case '-MMD':
             case '-MD':

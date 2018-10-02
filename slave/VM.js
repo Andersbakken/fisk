@@ -79,6 +79,7 @@ class VM extends EventEmitter
                     cppSize: that.cppSize,
                     compileDuration: (now - that.startCompile),
                     exitCode: msg.exitCode,
+                    success: msg.success,
                     sourceFile: msg.sourceFile,
                     files: msg.files.map(file => {
                         file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);

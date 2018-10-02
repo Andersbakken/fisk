@@ -52,18 +52,23 @@ process.on('message', (msg) => {
             c.kill();
         break;
     case 'compile':
-        // console.log("compiling for );
-        let compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
-        // console.log("running thing", msg.commandLine);
-        compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
-        compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));
-        compile.on('exit', event => {
+        try {
+            // console.log("compiling for );
+            let compile = new Compile(msg.commandLine, msg.argv0, msg.dir);
+            // console.log("running thing", msg.commandLine);
+            compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
+            compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));
+            compile.on('exit', event => {
+                delete compiles[msg.id];
+                process.send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
+                if (destroying && !compiles.length)
+                    process.exit();
+            });
+            compiles[msg.id] = compile;
+        } catch (err) {
             delete compiles[msg.id];
-            process.send({type: 'compileFinished', id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
-            if (destroying && !compiles.length)
-                process.exit();
-        });
-        compiles[msg.id] = compile;
+            process.send({type: 'compileFinished', success: false, id: msg.id, files: [], exitCode: -1 });
+        }
         break;
     }
 });

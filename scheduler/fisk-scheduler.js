@@ -191,7 +191,7 @@ function environmentsInfo()
 server.on("listen", app => {
     app.get("/environments", (req, res, next) => {
 
-        res.send(environmentsInfo());
+        res.send(JSON.stringify(environmentsInfo(), null, 4));
     });
 
     app.get("/slaves", (req, res, next) => {
@@ -218,7 +218,7 @@ server.on("listen", app => {
                 environments: Object.keys(s.environments)
             });
         }
-        res.send(ret);
+        res.send(JSON.stringify(ret, null, 4));
     });
 
     app.get("/info", (req, res, next) => {
@@ -229,7 +229,7 @@ server.on("listen", app => {
             console.log("Couldn't parse package json", err);
         }
 
-        res.send({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version });
+        res.send(JSON.stringify({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version }, null, 4));
     });
 
     app.get("/quit-slaves", (req, res, next) => {

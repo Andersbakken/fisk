@@ -364,6 +364,7 @@ server.on("job", (job) => {
                 job.send({
                     type: "response",
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
+                    success: event.success,
                     exitCode: event.exitCode
                 });
 
