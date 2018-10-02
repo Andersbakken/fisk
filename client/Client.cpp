@@ -424,8 +424,10 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             DEBUG("Running preprocess: %s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {
+                                             DEBUG("Preprocess appending %zu bytes to stdout", n);
                                              ptr->stdOut.append(bytes, n);
                                          }, [ptr](const char *bytes, size_t n) {
+                                             DEBUG("Preprocess appending %zu bytes to stderr", n);
                                              ptr->stdErr.append(bytes, n);
                                          });
             ptr->exitStatus = proc.get_exit_status();
