@@ -50,6 +50,10 @@ let killed = false;
 function startFisk()
 {
     if (!fisk) {
+        if (!checkForUpdateActive) {
+            checkForUpdate();
+        }
+
         fisk = child_process.execFile("node", [ "./fisk-scheduler.js" ],
                                       { cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/" }, (error, stdout, stderr) => {
                                           console.log("fisk exited: ", error);
@@ -159,15 +163,22 @@ function killFisk()
     });
 }
 
+let checkForUpdateTimer;
+let checkForUpdateActive = false;
 function checkForUpdate()
 {
+    checkForUpdateActive = true;
+    if (checkForUpdateTimer) {
+        clearTimeout(checkForUpdateTimer);
+        checkForUpdateTimer = undefined;
+    }
     function final() // node 8 doesn't have finally
     {
+        checkForUpdateActive = false;
         console.log("do I have fisk?", typeof fisk);
         if (!fisk)
             startFisk();
-        setTimeout(checkForUpdate, 5 * 60000);
-
+        checkForUpdateTimer = setTimeout(checkForUpdate, 5 * 60000);
     }
     console.log("checking if fisk needs to be updated");
     updateFisk().then(updated => {
