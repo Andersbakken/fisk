@@ -61,6 +61,8 @@ class Server extends EventEmitter {
         const connectTime = Date.now();
         let client = undefined;
         let bytes = undefined;
+        let chunky = undefined;
+        let more = undefined;
         let ip = req.connection.remoteAddress;
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
@@ -130,7 +132,15 @@ class Server extends EventEmitter {
                     error("Unable to parse string message as JSON");
                     return;
                 }
-                bytes = json.bytes;
+                if (json.bytes) {
+                    bytes = json.bytes;
+                } else if (json.chunky == 'start') {
+                    client.chunky = true;
+                } else if (json.chunky == 'end') {
+                    client.emit("data", { last: true });
+                    return;
+                }
+
                 client.commandLine = json.commandLine;
                 client.argv0 = json.argv0;
                 client.connectTime = connectTime;
@@ -145,18 +155,23 @@ class Server extends EventEmitter {
                         console.error("No data in buffer");
                         return;
                     }
-                    if (!bytes) {
-                        error("Got binary message without a preceeding json message describing the data");
-                        return;
+                    let done = false;
+                    if (!client.chunky) {
+                        if (!bytes) {
+                            error("Got binary message without a preceeding json message describing the data");
+                            return;
+                        }
+                        if (msg.length > bytes) {
+                            // woops
+                            error(`length ${msg.length} > ${bytes}`);
+                            return;
+                        }
+                        bytes -= msg.length;
+                        client.emit("data", { data: msg, last: !bytes });
+                    } else {
+                        client.emit("data", { data: msg, last: false });
                     }
-                    if (msg.length > bytes) {
-                        // woops
-                        error(`length ${msg.length} > ${bytes}`);
-                        return;
-                    }
-                    bytes -= msg.length;
                     // console.log("Emitting", "data", { data: msg.length, last: !bytes });
-                    client.emit("data", { data: msg, last: !bytes });
                 }
                 break;
             }

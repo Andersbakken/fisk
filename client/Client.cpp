@@ -346,10 +346,15 @@ bool Client::recursiveRmdir(const std::string &dir)
     return ::rmdir(dir.c_str()) == 0;
 }
 
-std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
+std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args,
+                                                         std::function<void(std::string &&)> onStdOut, std::function<void()> onFinished)
 {
     const unsigned long long started = Client::mono();
     Preprocessed *ptr = new Preprocessed;
+    if (pipe(ptr->mPipe) != 0) {
+        ERROR("Failed to create pipe: %d %s", errno, strerror(errno));
+        ptr->mPipe[0] = ptr->mPipe[1] = -1;
+    }
     std::unique_ptr<Client::Preprocessed> ret(ptr);
     ret->mThread = std::thread([ptr, args, compiler, started] {
             std::string out, err;
@@ -461,16 +466,35 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 if (f)
                     fclose(f);
             } else {
+                printf("STARTED %llu\n", Client::mono());
+                bool first = true;
                 TinyProcessLib::Process proc(commandLine, std::string(),
-                                             [ptr](const char *bytes, size_t n) {
+                                             [ptr, &first](const char *bytes, size_t n) {
                                                  DEBUG("Preprocess appending %zu bytes to stdout", n);
+                                                 if (first) {
+                                                     first = false;
+                                                     printf("%llu GOT SOME %zu\n", Client::mono(), n);
+                                                 }
+                                                 std::unique_lock<std::mutex> lock(ptr->mMutex);
                                                  ptr->stdOut.append(bytes, n);
+                                                 if (ptr->mPipe[1] != -1 && !ptr->mStdOutReady) {
+                                                     int ret;
+                                                     do {
+                                                         ret = write(ptr->mPipe[1], "r", 1);
+                                                     } while (ret == -1 && errno == EINTR);
+                                                     ptr->mStdOutReady = true;
+                                                 }
                                              }, [ptr](const char *bytes, size_t n) {
                                                  DEBUG("Preprocess appending %zu bytes to stderr", n);
                                                  ptr->stdErr.append(bytes, n);
                                              });
                 ptr->exitStatus = proc.get_exit_status();
+                int ret;
+                do {
+                    ret = write(ptr->mPipe[1], "x", 1);
+                } while (ret == -1 && errno == EINTR);
             }
+            printf("FINISHED %llu\n", Client::mono());
             slot.reset();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
@@ -485,6 +509,10 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
 Client::Preprocessed::~Preprocessed()
 {
     wait();
+    if (mPipe[0] != -1) {
+        close(mPipe[0]);
+        close(mPipe[1]);
+    }
 }
 
 void Client::Preprocessed::wait()

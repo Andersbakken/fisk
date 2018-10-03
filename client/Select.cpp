@@ -1,4 +1,5 @@
 #include "Select.h"
+#include "Client.h"
 
 int Select::exec(int timeoutMs) const
 {

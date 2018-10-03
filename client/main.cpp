@@ -166,7 +166,16 @@ int main(int argc, char **argv)
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, 0);
 
-    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
+    std::string stdOutBuffer;
+    SlaveWebSocket slaveWebSocket;
+    auto onPreprocessStdOutReady = [&stdOutBuffer, &slaveWebSocket](std::string &&stdOut) {
+        if (slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+
+        } else {
+            stdOutBuffer.append(stdOut);
+        }
+    });
+    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs, [](std::string &&) {}, []() {});
     if (!preprocessed) {
         ERROR("Failed to preprocess");
         watchdog.stop();
@@ -261,7 +270,6 @@ int main(int argc, char **argv)
 
     // usleep(1000 * 1000 * 16);
     watchdog.transition(Watchdog::AcquiredSlave);
-    SlaveWebSocket slaveWebSocket;
     Select select;
     select.add(&slaveWebSocket);
     select.add(&watchdog);
@@ -278,9 +286,11 @@ int main(int argc, char **argv)
 
     while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+    printf("%llu GONNA WAIT\n", Client::mono());
     watchdog.transition(Watchdog::ConnectedToSlave);
 
     DEBUG("Waiting for preprocessed");
+
     preprocessed->wait();
     watchdog.transition(Watchdog::PreprocessFinished);
     DEBUG("Preprocessed finished");

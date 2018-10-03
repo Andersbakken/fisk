@@ -6,10 +6,11 @@
 #include <errno.h>
 #include <string.h>
 #include <functional>
+#include <vector>
 #include <sys/select.h>
 #include <unistd.h>
 #include "Log.h"
-#include "Client.h"
+#include <assert.h>
 
 class Select;
 struct Socket

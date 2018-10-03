@@ -2,6 +2,7 @@
 #define CLIENT_H
 
 #include "Config.h"
+#include "Select.h"
 #include <assert.h>
 #include <condition_variable>
 #include <cstdarg>
@@ -97,7 +98,7 @@ bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 bool recursiveRmdir(const std::string &path);
 std::string realpath(const std::string &path);
 
-class Preprocessed
+class Preprocessed : public Socket
 {
 public:
     ~Preprocessed();
@@ -108,15 +109,48 @@ public:
     unsigned long long duration { 0 };
     unsigned long long slotDuration { 0 };
     std::string depFile;
+protected:
+    //Socket
+    virtual int fd() const override { return mPipe[0]; }
+    virtual unsigned int mode() const override { return Read; }
+    virtual void onWrite() override { abort(); }
+    virtual void onRead() override
+    {
+        char buf;
+        int ret;
+        do {
+            ret = read(mPipe[0], &buf, sizeof(buf));
+        } while (ret == -1 && errno == EINTR);
+
+        assert(buf == 'r' || buf == 'x');
+        std::string out;
+        {
+            std::unique_lock<std::mutex> lock(mMutex);
+            mStdOutReady = false;
+            out = std::move(stdOut);
+        }
+        if (!out.empty())
+            mOnStdOut(std::move(out));
+        if (buf == 'r')
+            mOnFinished();
+    }
+    virtual void onTimeout() override { abort(); }
+    virtual int timeout() override { return -1; }
 private:
+    std::function<void(std::string &&) > mOnStdOut;
+    std::function<void() > mOnFinished;
+    int mPipe[2] { };
+    bool mStdOutReady { false };
     std::mutex mMutex;
     std::condition_variable mCond;
     std::thread mThread;
     bool mDone { false };
     bool mJoined { false };
-    friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
+    friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args,
+                                                    std::function<void(std::string &&)> onStdOut, std::function<void()> onFinished);
 };
-std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
+std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args,
+                                         std::function<void(std::string &&)> onStdOut, std::function<void()> onFinished);
 
 template <size_t StaticBufSize = 4096>
 static std::string vformat(const char *format, va_list args)
