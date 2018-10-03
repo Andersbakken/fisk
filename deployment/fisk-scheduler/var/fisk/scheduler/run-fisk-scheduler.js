@@ -11,7 +11,7 @@ function removeDirContents(path)
 {
     function go(path, rmdir) {
         if (fs.existsSync(path)) {
-            fs.readdirSync(path).forEach(function(file, index){
+            fs.readdirSync(path).forEach(function(file, index) {
                 const curPath = path + "/" + file;
                 if (fs.lstatSync(curPath).isDirectory()) { // recurse
                     go(curPath, true);
