@@ -340,7 +340,7 @@ server.on("job", (job) => {
                 job.send("heartbeat", {});
             }, 5000);
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.wait);
-            this.op = vm.startCompile(job.commandLine, job.argv0);
+            this.op = vm.startCompile(job.commandLine, job.argv0, job.id);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});

@@ -3,15 +3,14 @@ const child_process = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
 
-let id = 0;
 class CompileJob extends EventEmitter
 {
-    constructor(commandLine, argv0, vm) {
+    constructor(commandLine, argv0, id, vm) {
         super();
         this.vm = vm;
         this.commandLine = commandLine;
         this.argv0 = argv0;
-        this.id = ++id;
+        this.id = id;
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
         this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
@@ -44,7 +43,6 @@ class VM extends EventEmitter
         this.root = root;
         this.hash = hash;
         this.compiles = {};
-        this.compileCount = 0;
         this.destroying = false;
 
         fs.remove(path.join(root, 'compiles'));
@@ -91,8 +89,6 @@ class VM extends EventEmitter
                 if (!keepCompiles)
                     fs.remove(this.compiles[msg.id].dir);
                 delete this.compiles[msg.id];
-                if (!--this.compileCount)
-                    id = 0;
                 break;
             }
         });
@@ -110,10 +106,9 @@ class VM extends EventEmitter
         this.child.send({type: 'destroy'});
     }
 
-    startCompile(commandLine, argv0) {
-        let compile = new CompileJob(commandLine, argv0, this);
+    startCompile(commandLine, argv0, id) {
+        let compile = new CompileJob(commandLine, argv0, id, this);
         this.compiles[compile.id] = compile;
-        ++this.compileCount;
         // console.log("startCompile " + compile.id);
         return compile;
     }
