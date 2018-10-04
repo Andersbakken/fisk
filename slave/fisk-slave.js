@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")("fisk/slave");
+const option = require("@jhanssen/options")("fisk/slave", require('minimist')(process.argv.slice(2)));
 const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");

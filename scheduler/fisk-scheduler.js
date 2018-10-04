@@ -2,7 +2,7 @@
 
 const path = require("path");
 const os = require("os");
-const option = require("@jhanssen/options")("fisk/scheduler");
+const option = require("@jhanssen/options")("fisk/scheduler", require('minimist')(process.argv.slice(2)));
 const Server = require("./server");
 const common = require("../common")(option);
 const Environments = require("./environments");

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")("fisk/proxy");
+const option = require("@jhanssen/options")("fisk/proxy", require('minimist')(process.argv.slice(2)));
 const WebSocket = require('ws');
 
 let scheduler = option("scheduler", "ws://localhost:8097");
