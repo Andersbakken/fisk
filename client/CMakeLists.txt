@@ -8,14 +8,14 @@ find_package(OpenSSL REQUIRED)
 add_custom_target(create-create-fisk-env ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake COMMENT "Generating create-fisk-env.c")
 add_custom_command(OUTPUT create-fisk-env.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env
-                   DEPENDS create-create-fisk-env.cmake
-                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env  -P create-create-fisk-env.cmake)
+                   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake
+                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env  -P ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake)
 
 add_custom_target(create-npm-version ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake COMMENT "Generating create-fisk-env.c")
 add_custom_command(OUTPUT npm-version.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../package.json
-                   DEPENDS create-npm-version.cmake
-                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/../package.json" -DOUTPUT="${CMAKE_BINARY_DIR}/client/npm-version.c" -DVARIABLE=npm_version  -P create-npm-version.cmake)
+                   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake
+                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/../package.json" -DOUTPUT="${CMAKE_BINARY_DIR}/client/npm-version.c" -DVARIABLE=npm_version -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
 
 include_directories(${OPENSSL_INCLUDE_DIR})
 add_executable(fiskc
