@@ -129,7 +129,7 @@ class Server extends EventEmitter {
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
-        case "/compile":
+        case "/compile": {
             // look at headers
             if (!("x-fisk-environments" in req.headers)) {
                 error("No x-fisk-environments header");
@@ -151,6 +151,9 @@ class Server extends EventEmitter {
                 environments: compileEnvironments,
                 sourceFile: req.headers["x-fisk-sourcefile"]
             };
+            const npmVersion = req.headers["x-fisk-npm-version"];
+            if (npmVersion)
+                data.npmVersion = npmVersion;
             const preferredSlave = req.headers["x-fisk-slave"];
             if (preferredSlave)
                 data.slave = preferredSlave;
@@ -236,8 +239,8 @@ class Server extends EventEmitter {
                     break;
                 }
             });
-            break;
-        case "/slave":
+            break; }
+        case "/slave": {
             if (!("x-fisk-port" in req.headers)) {
                 error("No x-fisk-port header");
                 return;
@@ -305,7 +308,7 @@ class Server extends EventEmitter {
             });
             // console.log("Got dude", envs);
             this.emit("slave", client);
-            break;
+            break; }
         case "/monitor":
             client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
             client.nonce = req.nonce;

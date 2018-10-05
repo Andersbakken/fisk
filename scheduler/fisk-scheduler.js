@@ -353,6 +353,10 @@ server.on("slave", slave => {
 let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", compile => {
+    if (compile.npmVersion && compile.npmVersion != schedulerNpmVersion) {
+        compile.send("version_mismatch", { required_version: schedulerNpmVersion });
+        return;
+    }
     let arrived = Date.now();
     // console.log("request", compile.hostname, compile.ip, compile.environments);
     let found = false;

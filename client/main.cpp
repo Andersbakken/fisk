@@ -18,6 +18,7 @@
 static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
+extern "C" const char *npm_version;
 int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
@@ -180,6 +181,7 @@ int main(int argc, char **argv)
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
+    headers["x-fisk-npm-version"] = npm_version;
     {
         std::string slave = Config::slave;
         if (!slave.empty())
