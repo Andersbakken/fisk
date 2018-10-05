@@ -22,6 +22,7 @@ class Client extends EventEmitter {
             this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
         } catch (err) {
         }
+        console.log("this is our npm version", this.npmVersion);
         if (!this.name) {
             if (this.hostname) {
                 this.name = this.hostname;

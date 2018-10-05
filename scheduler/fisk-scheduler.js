@@ -16,6 +16,15 @@ process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
 });
 
+let schedulerNpmVersion;
+try {
+    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+} catch (err) {
+    console.log("Couldn't parse package json", err);
+    process.exit();
+}
+
+
 const slaves = {};
 const monitors = [];
 let slaveCount = 0;
@@ -222,14 +231,7 @@ server.on("listen", app => {
     });
 
     app.get("/info", (req, res, next) => {
-        let npmVersion = -1;
-        try {
-            npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
-        } catch (err) {
-            console.log("Couldn't parse package json", err);
-        }
-
-        res.send(JSON.stringify({ npmVersion: npmVersion, environments: environmentsInfo(), configVersion: common.Version }, null, 4));
+        res.send(JSON.stringify({ npmVersion: schedulerNpmVersion, environments: environmentsInfo(), configVersion: common.Version }, null, 4));
     });
 
     app.get("/quit-slaves", (req, res, next) => {
@@ -259,6 +261,11 @@ server.on("listen", app => {
 });
 
 server.on("slave", slave => {
+    if (slave.npmVersion != schedulerNpmVersion) {
+        console.log("slave has bad npm version", slave.npmVersion, "should have been", schedulerNpmVersion);
+        slave.send({ type: "quit" });
+        return;
+    }
     slave.activeClients = 0;
     insertSlave(slave);
     console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
