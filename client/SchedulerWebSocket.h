@@ -41,8 +41,8 @@ public:
                 DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);
                 done = true;
             } else if (type == "version_mismatch") {
-                ERROR("Version mismatch detected, client version: %s required version: %s",
-                      npm_version, msg["required_version"].string_value().c_str());
+                ERROR("Version mismatch detected, client version: %s minimum client version required: %s",
+                      npm_version, msg["minimum_version"].string_value().c_str());
                 _exit(1);
             } else {
                 ERROR("Unexpected message type: %s", type.c_str());

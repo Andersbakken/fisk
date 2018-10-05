@@ -24,6 +24,7 @@ try {
     process.exit();
 }
 
+const clientMinimumVersion = [ 1, 1, 84 ];
 
 const slaves = {};
 const monitors = [];
@@ -353,9 +354,23 @@ server.on("slave", slave => {
 let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
 server.on("compile", compile => {
-    if (compile.npmVersion && compile.npmVersion != schedulerNpmVersion) {
-        compile.send("version_mismatch", { required_version: schedulerNpmVersion });
-        return;
+    if (compile.npmVersion) {
+        let match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(compile.npmVersion);
+        console.log(compile.npmVersion, match);
+        let ok = false;
+        if (match) {
+            let major = parseInt(match[1]);
+            let minor = parseInt(match[2]);
+            let patch = parseInt(match[3]);
+            if (major == clientMinimumVersion[0]
+                && (minor > clientMinimumVersion[1] || (minor == clientMinimumVersion[1] && patch >= clientMinimumVersion[2]))) {
+                ok = true;
+            }
+        }
+        if (!ok) {
+            compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion[0]}.${clientMinimumVersion[1]}.${clientMinimumVersion[2]}` });
+            return;
+        }
     }
     let arrived = Date.now();
     // console.log("request", compile.hostname, compile.ip, compile.environments);
