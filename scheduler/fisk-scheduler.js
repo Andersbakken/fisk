@@ -356,7 +356,6 @@ let pendingEnvironments = {};
 server.on("compile", compile => {
     if (compile.npmVersion) {
         let match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(compile.npmVersion);
-        console.log(compile.npmVersion, match);
         let ok = false;
         if (match) {
             let major = parseInt(match[1]);
