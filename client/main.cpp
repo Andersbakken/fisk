@@ -128,8 +128,19 @@ int main(int argc, char **argv)
 
     Log::init(level, Config::logFile, Config::logFileAppend ? Log::Append : Log::Overwrite);
 
+    if (preresolved.empty()) {
+        std::string fn;
+        Client::parsePath(argv[0], &fn, 0);
+        if (fn == "fiskc") {
+#ifdef __APPLE__
+            preresolved = "clang";
+#else
+            preresolved = "gcc";
+#endif
+        }
+    }
     if (!Client::findCompiler(preresolved)) {
-        ERROR("Can't find executable for %s", data.argv[0]);
+        ERROR("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
         return 1;
     }
     DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",

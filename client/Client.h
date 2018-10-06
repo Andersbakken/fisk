@@ -47,6 +47,7 @@ extern const unsigned long long started;
 
 std::mutex &mutex();
 bool findCompiler(const std::string &preresolved);
+std::string findInPath(const std::string &fn);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
