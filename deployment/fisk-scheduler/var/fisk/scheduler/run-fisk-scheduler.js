@@ -55,7 +55,11 @@ function startFisk()
         }
 
         fisk = child_process.execFile("node", [ "./fisk-scheduler.js" ],
-                                      { cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/" }, (error, stdout, stderr) => {
+                                      {
+                                          maxBuffer: 1024 * 1024 * 16,
+                                          cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
+                                      },
+                                      (error, stdout, stderr) => {
                                           console.log("fisk exited: ", error);
                                           if (!killed) {
                                               fisk = undefined;
@@ -64,7 +68,6 @@ function startFisk()
                                           } else {
                                               killed = false;
                                           }
-
                                       });
         fisk.stdout.pipe(process.stdout);
         fisk.stderr.pipe(process.stderr);

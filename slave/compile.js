@@ -144,7 +144,7 @@ class Compile extends EventEmitter {
         }
 
         // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
-        let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0 });
+        let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
