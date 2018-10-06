@@ -16,12 +16,13 @@
    You should have received a copy of the GNU General Public License
    along with Fisk.  If not, see <http://www.gnu.org/licenses/>. */
 
-#include <vector>
-#include <string>
-#include <memory>
-#include <cstdint>
 #include <assert.h>
+#include <stddef.h>
+#include <cstdint>
 #include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 struct CompilerArgs
 {

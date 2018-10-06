@@ -1,7 +1,4 @@
 #include "WebSocket.h"
-#include "Log.h"
-#include "Watchdog.h"
-#include "Client.h"
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -9,10 +6,20 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <algorithm>
+#include <cstdint>
+#include <utility>
+
+#include "Client.h"
+#include "LUrlParser.h"
+#include "Log.h"
+#include "wslay/wslay.h"
+
+struct wslay_event_context;
 
 static inline std::string create_acceptkey(const std::string& clientkey)
 {

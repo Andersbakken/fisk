@@ -1,12 +1,13 @@
 #ifndef WATCHDOG_H
 #define WATCHDOG_H
 
-#include "Client.h"
-#include "Select.h"
 #include <assert.h>
 #include <assert.h>
 #include <atomic>
 #include <string>
+
+#include "Client.h"
+#include "Select.h"
 
 class Watchdog : public Socket
 {

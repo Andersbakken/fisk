@@ -1,29 +1,39 @@
 #include "Client.h"
 
-#include "Log.h"
-#include <unistd.h>
-#include "CompilerArgs.h"
-#include "SchedulerWebSocket.h"
-#include "Select.h"
-#include "Config.h"
-#include <unistd.h>
-#include <climits>
-#include <cstdlib>
+#include <dirent.h>
+#include <fcntl.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/ossl_typ.h>
+#include <process.hpp>
 #include <string.h>
 #include <sys/file.h>
-#include <dirent.h>
-#include <algorithm>
-#ifdef __linux__
-#include <sys/inotify.h>
-#endif
-#include <sys/types.h>
+#include <sys/time.h>
 #include <sys/wait.h>
-#include <process.hpp>
+#include <time.h>
+#include <unistd.h>
+#include <algorithm>
+#include <climits>
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
+#include <map>
+#include <utility>
+
+#include "CompilerArgs.h"
+#include "Config.h"
+#include "Log.h"
+#include "SchedulerWebSocket.h"
+#include "Select.h"
+#include "WebSocket.h"
+#include "json11.hpp"
+
+struct timeval;
 #ifdef __APPLE__
-#include <semaphore.h>
 #include <mach-o/dyld.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#include <semaphore.h>
 #endif
 
 static Client::Data sData;
