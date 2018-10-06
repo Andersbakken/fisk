@@ -50,6 +50,7 @@ GetterBase::~GetterBase()
 }
 
 Getter<bool> help("help", "Display this help", false);
+Getter<bool> version("version", "Display fisk version and exit", false);
 Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
@@ -167,9 +168,16 @@ bool Config::init(int &argc, char **&argv)
     };
 
     bool gotHelp = false;
+    bool gotVersion = false;
     while (i < argc) {
         if (!strcmp("--help", argv[i])) {
             gotHelp = true;
+            ++i;
+            continue;
+        }
+
+        if (!strcmp("--version", argv[i])) {
+            gotVersion = true;
             ++i;
             continue;
         }
@@ -236,11 +244,15 @@ bool Config::init(int &argc, char **&argv)
         consumeArg(1);
     }
 
-    if (gotHelp && static_cast<std::string>(compiler).empty()) {
+    if ((gotHelp || gotVersion) && static_cast<std::string>(compiler).empty()) {
         std::string file;
         Client::parsePath(argv[0], &file, nullptr);
         if (file == "fiskc") {
-            help.apply(std::string());
+            if (gotHelp) {
+                help.apply(std::string());
+            } else {
+                version.apply(std::string());
+            }
             return true;
         }
     }

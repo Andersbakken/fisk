@@ -191,6 +191,7 @@ extern Getter<std::string> slave;
 extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<bool> help;
+extern Getter<bool> version;
 inline std::string envCache()
 {
     std::string ret = cacheDir;

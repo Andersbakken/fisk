@@ -56,6 +56,10 @@ int main(int argc, char **argv)
         Config::usage(stdout);
         return 0;
     }
+    if (Config::version) {
+        printf("%s\n", npm_version);
+        return 0;
+    }
     if (Config::dumpSemaphores) {
 #ifdef __APPLE__
         fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
