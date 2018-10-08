@@ -108,6 +108,30 @@ export class ChartComponent implements AfterViewInit {
             this.stage = new PIXI.Container();
             div.appendChild(this.renderer.view);
 
+            const step = (item, props) => {
+                if (!("step" in item))
+                    return;
+                let done = true;
+                const step = item.step;
+                for (let i = 0; i < props.length; ++i) {
+                    const src = props[i];
+                    const dst = "d" + props[i];
+                    if (item[src] < item[dst]) {
+                        item[src] = Math.min(item[src] + step, item[dst]);
+                    } else if (item[src] > item[dst]) {
+                        item[src] = Math.max(item[src] - step, item[dst]);
+                    }
+                    if (done && item[src] != item[dst])
+                        done = false;
+                }
+                if (done) {
+                    delete item.step;
+                    for (let i = 0; i < props[length]; ++i) {
+                        delete item["d" + props[i]];
+                    }
+                }
+            };
+
             let animate = () => {
                 for (let sk in this.slaves) {
                     const slave = this.slaves[sk];
@@ -119,24 +143,8 @@ export class ChartComponent implements AfterViewInit {
                     ellipse.endFill();
 
                     const halo = slave.halo;
+                    step(halo, ["rx", "ry"]);
 
-                    if ("step" in halo) {
-                        if (halo.rx < halo.drx) {
-                            halo.rx = halo.rx = Math.min(halo.rx + halo.step, halo.drx);
-                        } else if (halo.rx > halo.drx) {
-                            halo.rx = Math.max(halo.rx - halo.step, halo.drx);
-                        }
-                        if (halo.ry < halo.dry) {
-                            halo.ry = Math.min(halo.ry + halo.step, halo.dry);
-                        } else if (halo.ry > halo.dry) {
-                            halo.ry = Math.max(halo.ry - halo.step, halo.dry);
-                        }
-                        if (halo.drx == halo.rx && halo.dry == halo.ry) {
-                            delete halo.step;
-                            delete halo.drx;
-                            delete halo.dry;
-                        }
-                    }
                     halo.clear();
                     halo.beginFill(0);
                     halo.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
