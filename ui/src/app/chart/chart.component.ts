@@ -266,9 +266,6 @@ export class ChartComponent implements AfterViewInit {
             console.error("slave already exists", slave);
             return;
         }
-        // const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke", "black").attr("stroke-width", 2);
-        // const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
-        // const text = this.svg.append("text").text(key);
         const halo = new PIXI.Graphics();
         halo.color = this._color(key, true);
         halo.stroke = 2;
@@ -309,9 +306,6 @@ export class ChartComponent implements AfterViewInit {
     }
 
     _adjustSlave(slave) {
-        // slave.halo
-        //     .attr("rx", this._ellipseX(slave, true) + 1)
-        //     .attr("ry", this._ellipseY(slave, true) + 1);
         slave.halo.drx = this._ellipseX(slave, true) + 1;
         slave.halo.dry = this._ellipseY(slave, true) + 1;
         slave.halo.step = 1;
@@ -331,10 +325,6 @@ export class ChartComponent implements AfterViewInit {
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
             const rectName = name("rect", job.client.name);
-            // const rect = this.clientGroup.append("rect")
-            //     .attr("y", this.view.height - 30)
-            //     .attr("height", 30)
-            //     .attr("fill", this._color(clientKey, false));
             const rect = new PIXI.Graphics();
             rect.ry = this.view.height - 30;
             rect.rheight = 30;
@@ -343,10 +333,6 @@ export class ChartComponent implements AfterViewInit {
             let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
                 client: job.client, rect: rect, text: undefined, jobs: 1, name: job.client.name
             };
-            // const text = this.svg.append("text")
-            //     .attr("y", this.view.height - 12)
-            //     .attr("clip-path", `url(#${rectName})`)
-            //     .text(`${clientData.name} (${clientData.jobs} jobs)`);
             const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
             text.y = this.view.height - 25;
             this.stage.addChild(text);
@@ -411,34 +397,25 @@ export class ChartComponent implements AfterViewInit {
                 for (let k in this.clients) {
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
-                    client.rect.drx = x;
-                    client.rect.drwidth = width;
                     if (!("rx" in client.rect)) {
-                        client.rect.rx = client.rect.drx;
+                        client.rect.rx = x;
                     } else {
+                        client.rect.drx = x;
                         client.rect.step = 1;
                     }
                     if (!("rwidth" in client.rect)) {
-                        client.rect.rwidth = client.rect.drwidth;
+                        client.rect.rwidth = width;
                     } else {
+                        client.rect.drwidth = width;
                         client.rect.step = 1;
                     }
                     client.text.text = `${client.name} (${client.jobs} jobs)`;
-                    client.text.dx = x + 5;
                     if (!("x" in client.text)) {
-                        client.text.x = client.text.dx;
+                        client.text.x = x + 5;
                     } else {
+                        client.text.dx = x + 5;
                         client.text.step = 1;
                     }
-                    // client.rect
-                    //     .attr("x", x)
-                    //     .attr("width", width)
-                    // client.text
-                    //     .text(`${client.name} (${client.jobs} jobs)`);
-                    // client.text
-                    //     .transition()
-                    //     .attr("x", x + 5)
-                    //     .duration(100);
                     x += width;
                 }
             });
@@ -476,19 +453,6 @@ export class ChartComponent implements AfterViewInit {
             slave.halo.ry = this._ellipseY(slave, true) + 1;
             slave.text.position.x = (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2);
             slave.text.position.y = (height / 2 + Math.sin(angle) * yr) - (5 * Math.SQRT2);
-            // slave.ellipse
-            //     .attr("cx", width / 2 + Math.cos(angle) * xr)
-            //     .attr("cy", height / 2 + Math.sin(angle) * yr)
-            //     .attr("rx", this._ellipseX(slave, false))
-            //     .attr("ry", this._ellipseY(slave, false));
-            // slave.halo
-            //     .attr("cx", width / 2 + Math.cos(angle) * xr)
-            //     .attr("cy", height / 2 + Math.sin(angle) * yr)
-            //     .attr("rx", this._ellipseX(slave, true) + 1)
-            //     .attr("ry", this._ellipseY(slave, true) + 1);
-            // slave.text
-            //     .attr("x", (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2))
-            //     .attr("y", (height / 2 + Math.sin(angle) * yr) + (3 * Math.SQRT2));
             angle += step;
             ++i;
         }
