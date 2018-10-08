@@ -154,6 +154,21 @@ export class ChartComponent implements AfterViewInit {
                     halo.endFill();
                 }
 
+                for (let ck in this.clients) {
+                    const client = this.clients[ck];
+
+                    const rect = client.rect;
+
+                    step(rect, ["rx", "rwidth"]);
+
+                    rect.clear();
+                    rect.beginFill(rect.color);
+                    rect.drawRect(rect.rx, rect.ry, rect.rwidth, rect.rheight);
+                    rect.endFill();
+
+                    step(client.text, ["x"]);
+                }
+
                 this.renderer.render(this.stage);
                 window.requestAnimationFrame(animate);
             };
@@ -321,8 +336,8 @@ export class ChartComponent implements AfterViewInit {
             //     .attr("height", 30)
             //     .attr("fill", this._color(clientKey, false));
             const rect = new PIXI.Graphics();
-            rect.y = this.view.height - 30;
-            rect.height = 30;
+            rect.ry = this.view.height - 30;
+            rect.rheight = 30;
             rect.color = this._color(clientKey, false);
             this.stage.addChild(rect);
             let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
@@ -333,7 +348,7 @@ export class ChartComponent implements AfterViewInit {
             //     .attr("clip-path", `url(#${rectName})`)
             //     .text(`${clientData.name} (${clientData.jobs} jobs)`);
             const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
-            text.y = this.view.height - 30;
+            text.y = this.view.height - 25;
             this.stage.addChild(text);
             clientData.text = text;
             this.clients[clientKey] = clientData;
@@ -396,10 +411,25 @@ export class ChartComponent implements AfterViewInit {
                 for (let k in this.clients) {
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
-                    client.rect.dx = x;
-                    client.rect.dwidth = width;
+                    client.rect.drx = x;
+                    client.rect.drwidth = width;
+                    if (!("rx" in client.rect)) {
+                        client.rect.rx = client.rect.drx;
+                    } else {
+                        client.rect.step = 1;
+                    }
+                    if (!("rwidth" in client.rect)) {
+                        client.rect.rwidth = client.rect.drwidth;
+                    } else {
+                        client.rect.step = 1;
+                    }
                     client.text.text = `${client.name} (${client.jobs} jobs)`;
                     client.text.dx = x + 5;
+                    if (!("x" in client.text)) {
+                        client.text.x = client.text.dx;
+                    } else {
+                        client.text.step = 1;
+                    }
                     // client.rect
                     //     .attr("x", x)
                     //     .attr("width", width)
