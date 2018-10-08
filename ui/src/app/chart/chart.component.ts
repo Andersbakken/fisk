@@ -274,6 +274,7 @@ export class ChartComponent implements AfterViewInit {
         ellipse.color = this._color(key, false);
         this.stage.addChild(ellipse);
         const text = new PIXI.Text(key, { fontSize: 16 });
+        text.mask = ellipse;
         this.stage.addChild(text);
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
@@ -335,6 +336,7 @@ export class ChartComponent implements AfterViewInit {
             };
             const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
             text.y = this.view.height - 25;
+            text.mask = rect;
             this.stage.addChild(text);
             clientData.text = text;
             this.clients[clientKey] = clientData;
