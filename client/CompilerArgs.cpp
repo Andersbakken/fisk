@@ -14,13 +14,9 @@
    along with Fisk.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include "CompilerArgs.h"
-
-#include <ext/alloc_traits.h>
-#include <string.h>
-#include <algorithm>
-#include <utility>
-
 #include "Log.h"
+#include "Client.h"
+#include <string.h>
 
 struct OptionArg {
     const char *name;

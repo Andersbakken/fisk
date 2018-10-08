@@ -1,19 +1,13 @@
 #ifndef WEBSOCKET_H
 #define WEBSOCKET_H
 
-#include <LUrlParser.h>
-#include <ctype.h>
-#include <stddef.h>
-#include <strings.h>
-#include <wslay/wslay.h>
 #include <functional>
-#include <map>
 #include <string>
 #include <vector>
-
+#include <map>
+#include <wslay/wslay.h>
 #include "Select.h"
-
-struct wslay_event_context;
+#include <LUrlParser.h>
 
 class WebSocket : public Socket
 {

@@ -1,14 +1,7 @@
 #include "Log.h"
-
-#include <assert.h>
-#include <stdio.h>
-#include <strings.h>
-#include <sys/file.h>
-#include <unistd.h>
-#include <cstdlib>
-#include <mutex>
-
 #include "Client.h"
+#include <unistd.h>
+#include <sys/file.h>
 
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = nullptr;

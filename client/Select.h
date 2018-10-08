@@ -1,20 +1,17 @@
 #ifndef SELECT_H
 #define SELECT_H
 
-#include <assert.h>
+#include <set>
+#include <map>
 #include <errno.h>
 #include <string.h>
+#include <functional>
 #include <sys/select.h>
 #include <unistd.h>
-#include <functional>
-#include <map>
-#include <set>
-
-#include "Client.h"
 #include "Log.h"
+#include "Client.h"
 
 class Select;
-
 struct Socket
 {
     virtual ~Socket() {}

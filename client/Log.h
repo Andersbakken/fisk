@@ -1,12 +1,11 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <stdio.h>
-#include <cstdarg>
-#include <memory>
 #include <sstream>
+#include <cstdarg>
 #include <string>
-#include <utility>
+#include <stdio.h>
+#include <memory>
 
 namespace Log
 {

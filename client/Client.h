@@ -1,32 +1,28 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
+#include "Config.h"
 #include <assert.h>
-#include <errno.h>
+#include <condition_variable>
+#include <cstdarg>
 #include <fcntl.h>
+#include <memory>
+#include <mutex>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <semaphore.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/stat.h>
-#include <condition_variable>
-#include <cstdarg>
-#include <memory>
-#include <mutex>
 #include <set>
+#include <string.h>
 #include <string>
+#include <sys/stat.h>
+#include <sys/stat.h>
 #include <thread>
 #include <vector>
 
-#include "Config.h"
-
-class SchedulerWebSocket;
 class Watchdog;
 struct CompilerArgs;
-
+class SchedulerWebSocket;
 namespace Client {
 struct Data
 {

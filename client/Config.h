@@ -1,18 +1,17 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <assert.h>
 #include <json11.hpp>
-#include <stdio.h>
-#include <stdlib.h>
-#include <strings.h>
-#include <cstdint>
-#include <functional>
-#include <limits>
-#include <sstream>
 #include <string>
-#include <type_traits>
+#include <cstdint>
 #include <vector>
+#include <type_traits>
+#include <strings.h>
+#include <assert.h>
+#include <sstream>
+#include <limits>
+
+#include <functional>
 
 namespace Config {
 enum { Version = 5 };

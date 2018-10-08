@@ -1,9 +1,6 @@
 #include "Watchdog.h"
-
-#include <mutex>
-
-#include "Client.h"
 #include "Config.h"
+#include "Client.h"
 #include "Log.h"
 
 Watchdog::Watchdog()
