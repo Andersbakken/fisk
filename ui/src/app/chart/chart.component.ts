@@ -74,9 +74,7 @@ export class ChartComponent implements AfterViewInit {
                 this.view.width = window.innerWidth - ((rect.x * 2) + 50);
                 this.view.height = window.innerHeight - rect.y - 50;
 
-                // this.svg
-                //     .attr("width", this.view.width)
-                //     .attr("height", this.view.height);
+                this.renderer.resize(this.view.width, this.view.height);
 
                 this._rearrangeSlaves();
             });
