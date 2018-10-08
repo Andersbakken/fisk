@@ -2,7 +2,7 @@ import { Component, AfterViewInit, NgZone } from '@angular/core';
 import { FiskService } from '../fisk.service';
 import { ConfigService } from '../config.service';
 import { MessageService } from '../message.service';
-import * as d3 from 'd3';
+import * as PIXI from 'pixi.js/dist/pixi.js'
 
 @Component({
   selector: 'app-chart',
@@ -20,10 +20,10 @@ export class ChartComponent implements AfterViewInit {
     slaves: any = {};
     clients: any = {};
     jobs: any = {};
-    clientGroup: any = undefined;
-    svg: any = undefined;
     slaveTimer: any = undefined;
     clientAdjustTimer: any = undefined;
+    renderer: any = undefined;
+    stage: any = undefined;
 
     constructor(private fisk: FiskService, private ngZone: NgZone,
                 private config: ConfigService, private message: MessageService) {
@@ -73,9 +73,9 @@ export class ChartComponent implements AfterViewInit {
                 this.view.width = window.innerWidth - ((rect.x * 2) + 50);
                 this.view.height = window.innerHeight - rect.y - 50;
 
-                this.svg
-                    .attr("width", this.view.width)
-                    .attr("height", this.view.height);
+                // this.svg
+                //     .attr("width", this.view.width)
+                //     .attr("height", this.view.height);
 
                 this._rearrangeSlaves();
             });
@@ -101,26 +101,71 @@ export class ChartComponent implements AfterViewInit {
             this.view.width = window.innerWidth - ((rect.x * 2) + 50);
             this.view.height = window.innerHeight - rect.y - 50;
 
-            this.svg = d3.select("#chart")
-                .append("svg")
-                .attr("width", this.view.width)
-                .attr("height", this.view.height);
-            this.clientGroup = this.svg.append("g");
+            const resolution = window.devicePixelRatio;
+            this.renderer = PIXI.autoDetectRenderer(this.view.width, this.view.height,
+                                                    { transparent: true, antialias: true,
+                                                      resolution: resolution, autoResize: true });
+            this.stage = new PIXI.Container();
+            div.appendChild(this.renderer.view);
+
+            let animate = () => {
+                for (let sk in this.slaves) {
+                    const slave = this.slaves[sk];
+
+                    const ellipse = slave.ellipse;
+                    ellipse.clear();
+                    ellipse.beginFill(ellipse.color);
+                    ellipse.drawEllipse(ellipse.cx, ellipse.cy, ellipse.rx, ellipse.ry);
+                    ellipse.endFill();
+
+                    const halo = slave.halo;
+
+                    if ("step" in halo) {
+                        if (halo.rx < halo.drx) {
+                            halo.rx = halo.rx = Math.min(halo.rx + halo.step, halo.drx);
+                        } else if (halo.rx > halo.drx) {
+                            halo.rx = Math.max(halo.rx - halo.step, halo.drx);
+                        }
+                        if (halo.ry < halo.dry) {
+                            halo.ry = Math.min(halo.ry + halo.step, halo.dry);
+                        } else if (halo.ry > halo.dry) {
+                            halo.ry = Math.max(halo.ry - halo.step, halo.dry);
+                        }
+                        if (halo.drx == halo.rx && halo.dry == halo.ry) {
+                            delete halo.step;
+                            delete halo.drx;
+                            delete halo.dry;
+                        }
+                    }
+                    halo.clear();
+                    halo.beginFill(0);
+                    halo.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
+                    halo.endFill();
+                    halo.beginFill(halo.color);
+                    halo.drawEllipse(halo.cx, halo.cy, halo.rx, halo.ry);
+                    halo.endFill();
+                }
+
+                this.renderer.render(this.stage);
+                window.requestAnimationFrame(animate);
+            };
+
+            window.requestAnimationFrame(animate);
         });
     }
 
     _clear() {
         for (var k in this.slaves) {
             let slave = this.slaves[k];
-            slave.ellipse.remove();
-            slave.halo.remove();
-            slave.text.remove();
+            slave.ellipse.destroy();
+            slave.halo.destroy();
+            slave.text.destroy();
         }
         this.slaves = {};
         for (var k in this.clients) {
             let client = this.clients[k];
-            client.rect.remove();
-            client.text.remove();
+            client.rect.destroy();
+            client.text.destroy();
         }
         this.clients = {};
         this.jobs = {};
@@ -164,7 +209,32 @@ export class ChartComponent implements AfterViewInit {
             s = 100 - s;
         }
 
-        return 'hsl(' + h + ',' + s + '%,' + l + '%)';
+        h /= 360;
+        s /= 100;
+        l /= 100;
+
+        var r, g, b;
+
+        if(s == 0){
+            r = g = b = l; // achromatic
+        } else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p + (q - p) * 6 * t;
+                if (t < 1/2) return q;
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                return p;
+            }
+
+            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            var p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+        }
+
+        return (r * 255) << 16 | (g * 255) << 8 | (b * 255);
     }
 
     _slaveAdded(slave) {
@@ -173,9 +243,18 @@ export class ChartComponent implements AfterViewInit {
             console.error("slave already exists", slave);
             return;
         }
-        const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke", "black").attr("stroke-width", 2);
-        const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
-        const text = this.svg.append("text").text(key);
+        // const halo = this.svg.append("ellipse").attr("fill", this._color(key, true)).attr("stroke", "black").attr("stroke-width", 2);
+        // const ellipse = this.svg.append("ellipse").attr("fill", this._color(key, false));
+        // const text = this.svg.append("text").text(key);
+        const halo = new PIXI.Graphics();
+        halo.color = this._color(key, true);
+        halo.stroke = 2;
+        this.stage.addChild(halo);
+        const ellipse = new PIXI.Graphics();
+        ellipse.color = this._color(key, false);
+        this.stage.addChild(ellipse);
+        const text = new PIXI.Text(key, { fontSize: 16 });
+        this.stage.addChild(text);
         this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
@@ -189,9 +268,9 @@ export class ChartComponent implements AfterViewInit {
             return;
         }
         let slaveobj = this.slaves[key];
-        slaveobj.ellipse.remove();
-        slaveobj.halo.remove();
-        slaveobj.text.remove();
+        slaveobj.ellipse.destroy();
+        slaveobj.halo.destroy();
+        slaveobj.text.destroy();
         delete this.slaves[key];
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
@@ -207,12 +286,12 @@ export class ChartComponent implements AfterViewInit {
     }
 
     _adjustSlave(slave) {
-        slave.halo
-            // .interrupt()
-            // .transition()
-            .attr("rx", this._ellipseX(slave, true) + 1)
-            .attr("ry", this._ellipseY(slave, true) + 1);
-            // .duration(200);
+        // slave.halo
+        //     .attr("rx", this._ellipseX(slave, true) + 1)
+        //     .attr("ry", this._ellipseY(slave, true) + 1);
+        slave.halo.drx = this._ellipseX(slave, true) + 1;
+        slave.halo.dry = this._ellipseY(slave, true) + 1;
+        slave.halo.step = 1;
     }
 
     _jobStarted(job) {
@@ -229,22 +308,25 @@ export class ChartComponent implements AfterViewInit {
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
             const rectName = name("rect", job.client.name);
-            const clip = this.clientGroup.append("clipPath")
-                .attr("id", rectName)
-                .append("rect")
-                .attr("y", this.view.height - 30)
-                .attr("height", 30);
-            const rect = this.clientGroup.append("rect")
-                .attr("y", this.view.height - 30)
-                .attr("height", 30)
-                .attr("fill", this._color(clientKey, false));
-            let clientData: { client: any, clip: any, rect: any, text: any, jobs: number, name: string } = {
-                client: job.client, clip: clip, rect: rect, text: undefined, jobs: 1, name: job.client.name
+            // const rect = this.clientGroup.append("rect")
+            //     .attr("y", this.view.height - 30)
+            //     .attr("height", 30)
+            //     .attr("fill", this._color(clientKey, false));
+            const rect = new PIXI.Graphics();
+            rect.y = this.view.height - 30;
+            rect.height = 30;
+            rect.color = this._color(clientKey, false);
+            this.stage.addChild(rect);
+            let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
+                client: job.client, rect: rect, text: undefined, jobs: 1, name: job.client.name
             };
-            const text = this.svg.append("text")
-                .attr("y", this.view.height - 12)
-                .attr("clip-path", `url(#${rectName})`)
-                .text(`${clientData.name} (${clientData.jobs} jobs)`);
+            // const text = this.svg.append("text")
+            //     .attr("y", this.view.height - 12)
+            //     .attr("clip-path", `url(#${rectName})`)
+            //     .text(`${clientData.name} (${clientData.jobs} jobs)`);
+            const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
+            text.y = this.view.height - 30;
+            this.stage.addChild(text);
             clientData.text = text;
             this.clients[clientKey] = clientData;
         } else {
@@ -273,9 +355,8 @@ export class ChartComponent implements AfterViewInit {
         const client = this.clients[jobData.client];
         if (client) {
             if (!--client.jobs) {
-                client.rect.remove();
-                client.clip.remove();
-                client.text.remove();
+                client.rect.destroy();
+                client.text.destroy();
                 delete this.clients[jobData.client];
             }
             this._adjustClients();
@@ -307,20 +388,19 @@ export class ChartComponent implements AfterViewInit {
                 for (let k in this.clients) {
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
-                    client.rect
-                        .attr("x", x)
-                        .attr("width", width)
-                    client.clip
-                        .transition()
-                        .attr("x", x)
-                        .attr("width", width)
-                        .duration(100);
-                    client.text
-                        .text(`${client.name} (${client.jobs} jobs)`);
-                    client.text
-                        .transition()
-                        .attr("x", x + 5)
-                        .duration(100);
+                    client.rect.dx = x;
+                    client.rect.dwidth = width;
+                    client.text.text = `${client.name} (${client.jobs} jobs)`;
+                    client.text.dx = x + 5;
+                    // client.rect
+                    //     .attr("x", x)
+                    //     .attr("width", width)
+                    // client.text
+                    //     .text(`${client.name} (${client.jobs} jobs)`);
+                    // client.text
+                    //     .transition()
+                    //     .attr("x", x + 5)
+                    //     .duration(100);
                     x += width;
                 }
             });
@@ -348,19 +428,29 @@ export class ChartComponent implements AfterViewInit {
             const xr = xRadius * factor;
             const yr = yRadius * factor;
 
-            slave.ellipse
-                .attr("cx", width / 2 + Math.cos(angle) * xr)
-                .attr("cy", height / 2 + Math.sin(angle) * yr)
-                .attr("rx", this._ellipseX(slave, false))
-                .attr("ry", this._ellipseY(slave, false));
-            slave.halo
-                .attr("cx", width / 2 + Math.cos(angle) * xr)
-                .attr("cy", height / 2 + Math.sin(angle) * yr)
-                .attr("rx", this._ellipseX(slave, true) + 1)
-                .attr("ry", this._ellipseY(slave, true) + 1);
-            slave.text
-                .attr("x", (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2))
-                .attr("y", (height / 2 + Math.sin(angle) * yr) + (3 * Math.SQRT2));
+            slave.ellipse.cx = width / 2 + Math.cos(angle) * xr;
+            slave.ellipse.cy = height / 2 + Math.sin(angle) * yr;
+            slave.ellipse.rx = this._ellipseX(slave, false);
+            slave.ellipse.ry = this._ellipseY(slave, false);
+            slave.halo.cx = width / 2 + Math.cos(angle) * xr;
+            slave.halo.cy = height / 2 + Math.sin(angle) * yr;
+            slave.halo.rx = this._ellipseX(slave, true) + 1;
+            slave.halo.ry = this._ellipseY(slave, true) + 1;
+            slave.text.position.x = (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2);
+            slave.text.position.y = (height / 2 + Math.sin(angle) * yr) - (5 * Math.SQRT2);
+            // slave.ellipse
+            //     .attr("cx", width / 2 + Math.cos(angle) * xr)
+            //     .attr("cy", height / 2 + Math.sin(angle) * yr)
+            //     .attr("rx", this._ellipseX(slave, false))
+            //     .attr("ry", this._ellipseY(slave, false));
+            // slave.halo
+            //     .attr("cx", width / 2 + Math.cos(angle) * xr)
+            //     .attr("cy", height / 2 + Math.sin(angle) * yr)
+            //     .attr("rx", this._ellipseX(slave, true) + 1)
+            //     .attr("ry", this._ellipseY(slave, true) + 1);
+            // slave.text
+            //     .attr("x", (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2))
+            //     .attr("y", (height / 2 + Math.sin(angle) * yr) + (3 * Math.SQRT2));
             angle += step;
             ++i;
         }
