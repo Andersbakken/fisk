@@ -24,6 +24,7 @@ export class ChartComponent implements AfterViewInit {
     clientAdjustTimer: any = undefined;
     renderer: any = undefined;
     stage: any = undefined;
+    step: number = undefined;
 
     constructor(private fisk: FiskService, private ngZone: NgZone,
                 private config: ConfigService, private message: MessageService) {
@@ -105,10 +106,12 @@ export class ChartComponent implements AfterViewInit {
             this.renderer = PIXI.autoDetectRenderer(this.view.width, this.view.height,
                                                     { transparent: true, antialias: true,
                                                       resolution: resolution, autoResize: true });
+            this.step = 0.5;// 1 / Math.max(3 - resolution, 1);
+            console.log("fisk ui resolution", resolution, "step", this.step);
             this.stage = new PIXI.Container();
             div.appendChild(this.renderer.view);
 
-            const step = (item, props) => {
+            const step = (item, props, steps) => {
                 if (!("step" in item))
                     return;
                 let done = true;
@@ -117,9 +120,9 @@ export class ChartComponent implements AfterViewInit {
                     const src = props[i];
                     const dst = "d" + props[i];
                     if (item[src] < item[dst]) {
-                        item[src] = Math.min(item[src] + step, item[dst]);
+                        item[src] = Math.min(item[src] + (step * steps), item[dst]);
                     } else if (item[src] > item[dst]) {
-                        item[src] = Math.max(item[src] - step, item[dst]);
+                        item[src] = Math.max(item[src] - (step * steps), item[dst]);
                     }
                     if (done && item[src] != item[dst])
                         done = false;
@@ -132,7 +135,14 @@ export class ChartComponent implements AfterViewInit {
                 }
             };
 
-            let animate = () => {
+            const framems = (1 / 60) * 1000;
+
+            let last = 0;
+            let animate = (ts) => {
+                const steps = Math.ceil((ts - last) / framems);
+                //console.log(steps, "steps since last", ts - last);
+                last = ts;
+
                 for (let sk in this.slaves) {
                     const slave = this.slaves[sk];
 
@@ -143,7 +153,7 @@ export class ChartComponent implements AfterViewInit {
                     ellipse.endFill();
 
                     const halo = slave.halo;
-                    step(halo, ["rx", "ry"]);
+                    step(halo, ["rx", "ry"], steps);
 
                     halo.clear();
                     halo.beginFill(0);
@@ -152,6 +162,12 @@ export class ChartComponent implements AfterViewInit {
                     halo.beginFill(halo.color);
                     halo.drawEllipse(halo.cx, halo.cy, halo.rx, halo.ry);
                     halo.endFill();
+
+                    const clip = slave.clip;
+                    clip.clear();
+                    clip.beginFill(0xffffff);
+                    clip.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
+                    clip.endFill();
                 }
 
                 for (let ck in this.clients) {
@@ -159,14 +175,20 @@ export class ChartComponent implements AfterViewInit {
 
                     const rect = client.rect;
 
-                    step(rect, ["rx", "rwidth"]);
+                    //step(rect, ["rx", "rwidth"], steps);
 
                     rect.clear();
                     rect.beginFill(rect.color);
                     rect.drawRect(rect.rx, rect.ry, rect.rwidth, rect.rheight);
                     rect.endFill();
 
-                    step(client.text, ["x"]);
+                    const clip = client.clip;
+                    clip.clear();
+                    clip.beginFill(0xffffff);
+                    clip.drawRect(rect.rx, rect.ry, rect.rwidth, rect.rheight);
+                    clip.endFill();
+
+                    //step(client.text, ["x"], steps);
                 }
 
                 this.renderer.render(this.stage);
@@ -274,9 +296,10 @@ export class ChartComponent implements AfterViewInit {
         ellipse.color = this._color(key, false);
         this.stage.addChild(ellipse);
         const text = new PIXI.Text(key, { fontSize: 16 });
-        text.mask = ellipse;
+        const clip = new PIXI.Graphics();
+        text.mask = clip;
         this.stage.addChild(text);
-        this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, jobs: 0 };
+        this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, clip: clip, jobs: 0 };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
         this.slaveTimer = setTimeout(() => { this.ngZone.runOutsideAngular(() => { this._rearrangeSlaves(); }); }, 250);
@@ -309,7 +332,7 @@ export class ChartComponent implements AfterViewInit {
     _adjustSlave(slave) {
         slave.halo.drx = this._ellipseX(slave, true) + 1;
         slave.halo.dry = this._ellipseY(slave, true) + 1;
-        slave.halo.step = 1;
+        slave.halo.step = this.step;
     }
 
     _jobStarted(job) {
@@ -331,14 +354,16 @@ export class ChartComponent implements AfterViewInit {
             rect.rheight = 30;
             rect.color = this._color(clientKey, false);
             this.stage.addChild(rect);
-            let clientData: { client: any, rect: any, text: any, jobs: number, name: string } = {
-                client: job.client, rect: rect, text: undefined, jobs: 1, name: job.client.name
+            let clientData: { client: any, rect: any, text: any, clip: undefined, jobs: number, name: string } = {
+                client: job.client, rect: rect, text: undefined, clip: undefined, jobs: 1, name: job.client.name
             };
             const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
             text.y = this.view.height - 25;
-            text.mask = rect;
+            const clip = new PIXI.Graphics();
+            text.mask = clip;
             this.stage.addChild(text);
             clientData.text = text;
+            clientData.clip = clip;
             this.clients[clientKey] = clientData;
         } else {
             ++this.clients[clientKey].jobs;
@@ -399,25 +424,25 @@ export class ChartComponent implements AfterViewInit {
                 for (let k in this.clients) {
                     const client = this.clients[k];
                     const width = (client.jobs / total) * this.view.width;
-                    if (!("rx" in client.rect)) {
+                    // if (!("rx" in client.rect)) {
                         client.rect.rx = x;
-                    } else {
-                        client.rect.drx = x;
-                        client.rect.step = 1;
-                    }
-                    if (!("rwidth" in client.rect)) {
+                    // } else {
+                    //     client.rect.drx = x;
+                    //     client.rect.step = this.step;
+                    // }
+                    // if (!("rwidth" in client.rect)) {
                         client.rect.rwidth = width;
-                    } else {
-                        client.rect.drwidth = width;
-                        client.rect.step = 1;
-                    }
+                    // } else {
+                    //     client.rect.drwidth = width;
+                    //     client.rect.step = this.step;
+                    // }
                     client.text.text = `${client.name} (${client.jobs} jobs)`;
-                    if (!("x" in client.text)) {
+                    // if (!("x" in client.text)) {
                         client.text.x = x + 5;
-                    } else {
-                        client.text.dx = x + 5;
-                        client.text.step = 1;
-                    }
+                    // } else {
+                    //     client.text.dx = x + 5;
+                    //     client.text.step = this.step;
+                    // }
                     x += width;
                 }
             });
