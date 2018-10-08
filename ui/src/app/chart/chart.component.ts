@@ -113,7 +113,7 @@ export class ChartComponent implements AfterViewInit {
 
             const step = (item, props, steps) => {
                 if (!("step" in item))
-                    return;
+                    return false;
                 let done = true;
                 const step = item.step;
                 for (let i = 0; i < props.length; ++i) {
@@ -133,45 +133,58 @@ export class ChartComponent implements AfterViewInit {
                         delete item["d" + props[i]];
                     }
                 }
+                return true;
             };
 
             const framems = (1 / 60) * 1000;
 
             let last = 0;
-            let animate = (ts) => {
-                const steps = Math.ceil((ts - last) / framems);
-                //console.log(steps, "steps since last", ts - last);
+            // let accum = 0;
+            // let num = 0;
+            let animate = ts => {
+                const steps = (ts - last) / framems;
+                // if (!(++num % 100)) {
+                //     console.log(steps, "steps since last", accum / num, ts - last);
+                // }
+                // accum += steps;
                 last = ts;
 
                 for (let sk in this.slaves) {
                     const slave = this.slaves[sk];
+                    const rendered = slave.rendered;
 
-                    const ellipse = slave.ellipse;
-                    ellipse.clear();
-                    ellipse.beginFill(ellipse.color);
-                    ellipse.drawEllipse(ellipse.cx, ellipse.cy, ellipse.rx, ellipse.ry);
-                    ellipse.endFill();
+                    if (!rendered) {
+                        const ellipse = slave.ellipse;
+                        ellipse.clear();
+                        ellipse.beginFill(ellipse.color);
+                        ellipse.drawEllipse(ellipse.cx, ellipse.cy, ellipse.rx, ellipse.ry);
+                        ellipse.endFill();
+                        slave.rendered = true;
+                    }
 
                     const halo = slave.halo;
-                    step(halo, ["rx", "ry"], steps);
+                    if (step(halo, ["rx", "ry"], steps) || !rendered) {
+                        halo.clear();
+                        halo.beginFill(0);
+                        halo.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
+                        halo.endFill();
+                        halo.beginFill(halo.color);
+                        halo.drawEllipse(halo.cx, halo.cy, halo.rx, halo.ry);
+                        halo.endFill();
 
-                    halo.clear();
-                    halo.beginFill(0);
-                    halo.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
-                    halo.endFill();
-                    halo.beginFill(halo.color);
-                    halo.drawEllipse(halo.cx, halo.cy, halo.rx, halo.ry);
-                    halo.endFill();
-
-                    const clip = slave.clip;
-                    clip.clear();
-                    clip.beginFill(0xffffff);
-                    clip.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
-                    clip.endFill();
+                        const clip = slave.clip;
+                        clip.clear();
+                        clip.beginFill(0xffffff);
+                        clip.drawEllipse(halo.cx, halo.cy, halo.rx + halo.stroke, halo.ry + halo.stroke);
+                        clip.endFill();
+                    }
                 }
 
                 for (let ck in this.clients) {
                     const client = this.clients[ck];
+                    if (client.rendered)
+                        continue;
+                    client.rendered = true;
 
                     const rect = client.rect;
 
@@ -299,7 +312,7 @@ export class ChartComponent implements AfterViewInit {
         const clip = new PIXI.Graphics();
         text.mask = clip;
         this.stage.addChild(text);
-        this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, clip: clip, jobs: 0 };
+        this.slaves[key] = { slave: slave, ellipse: ellipse, halo: halo, text: text, clip: clip, jobs: 0, rendered: false };
         if (this.slaveTimer)
             clearTimeout(this.slaveTimer);
         this.slaveTimer = setTimeout(() => { this.ngZone.runOutsideAngular(() => { this._rearrangeSlaves(); }); }, 250);
@@ -354,8 +367,8 @@ export class ChartComponent implements AfterViewInit {
             rect.rheight = 30;
             rect.color = this._color(clientKey, false);
             this.stage.addChild(rect);
-            let clientData: { client: any, rect: any, text: any, clip: undefined, jobs: number, name: string } = {
-                client: job.client, rect: rect, text: undefined, clip: undefined, jobs: 1, name: job.client.name
+            let clientData: { client: any, rect: any, text: any, clip: undefined, rendered: boolean, jobs: number, name: string } = {
+                client: job.client, rect: rect, text: undefined, clip: undefined, rendered: false, jobs: 1, name: job.client.name
             };
             const text = new PIXI.Text(`${clientData.name} (${clientData.jobs} jobs)`, { fontSize: 16 });
             text.y = this.view.height - 25;
@@ -443,6 +456,7 @@ export class ChartComponent implements AfterViewInit {
                     //     client.text.dx = x + 5;
                     //     client.text.step = this.step;
                     // }
+                    client.rendered = false;
                     x += width;
                 }
             });
@@ -480,6 +494,7 @@ export class ChartComponent implements AfterViewInit {
             slave.halo.ry = this._ellipseY(slave, true) + 1;
             slave.text.position.x = (width / 2 + Math.cos(angle) * xr) - (45 * Math.SQRT2);
             slave.text.position.y = (height / 2 + Math.sin(angle) * yr) - (5 * Math.SQRT2);
+            slave.rendered = false;
             angle += step;
             ++i;
         }
