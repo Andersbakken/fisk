@@ -6,7 +6,7 @@
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
-static const pid_t sPid = getpid();
+// static const pid_t sPid = getpid();
 static std::mutex sMutex;
 std::string sLogFileName;
 
