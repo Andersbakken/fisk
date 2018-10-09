@@ -169,6 +169,14 @@ bool Config::init(int &argc, char **&argv)
 
     bool gotHelp = false;
     bool gotVersion = false;
+
+    if (argc > 1 && !access(argv[1], X_OK)) {
+        // kinda hacky and hidden but it makes fiskc easier to use.
+        compiler.apply(std::string(argv[i]));
+        compiler.mDone = true;
+        consumeArg(0);
+    }
+
     while (i < argc) {
         if (!strcmp("--help", argv[i])) {
             gotHelp = true;
