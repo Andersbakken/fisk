@@ -951,7 +951,7 @@ bool Client::isAtty()
         return false;
     }
     const char *term = getenv("TERM");
-    if (term && strcasecmp(term, "dumb")) {
+    if (!term || strcasecmp(term, "dumb")) {
         return true;
     }
     return false;
