@@ -291,6 +291,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         } else if (size_t count = hasArg(arg)) {
             i += count;
         } else if (arg[0] != '-') {
+            if (ret->sourceFileIndex != std::numeric_limits<size_t>::max()) {
+                DEBUG("Multiple source files");
+                return nullptr;
+            }
             ret->sourceFileIndex = i;
             if (!(ret->flags & LanguageMask)) {
                 const size_t lastDot = arg.rfind('.');
