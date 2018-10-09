@@ -944,3 +944,16 @@ std::string Client::prepareEnvironmentForUpload()
     }
     return std::string();
 }
+
+bool Client::isAtty()
+{
+    if (!isatty(STDOUT_FILENO)) {
+        return false;
+    }
+    const char *term = getenv("TERM");
+    if (term && strcasecmp(term, "dumb")) {
+        return true;
+    }
+    return false;
+}
+

@@ -175,6 +175,19 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
+    if (!Client::isAtty()) {
+        printf("[main.cpp:%d]: if (!Client::isAtty()) {\n", __LINE__); fflush(stdout);
+        for (auto it = data.compilerArgs->commandLine.begin(); it != data.compilerArgs->commandLine.end(); ++it) {
+            if (*it == "-fcolor-diagnostics") {
+                *it = "-fno-color-diagnostics";
+            } else if (*it == "-fdiagnostics-color=always" || *it == "-fdiagnostics-color=auto") {
+                *it = "-fdiagnostics-color=never";
+            }
+            printf("%s ", it->c_str());
+        }
+        printf("\n");
+    }
+
     SchedulerWebSocket schedulerWebsocket;
 
     struct sigaction act;

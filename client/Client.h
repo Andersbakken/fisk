@@ -226,6 +226,7 @@ std::string environmentHash(const std::string &compiler);
 std::string findExecutablePath(const char *argv0);
 bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
 std::string prepareEnvironmentForUpload();
+bool isAtty();
 }
 
 #endif /* CLIENT_H */
