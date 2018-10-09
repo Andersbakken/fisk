@@ -67,7 +67,7 @@ process.on('message', (msg) => {
             compiles[msg.id] = compile;
         } catch (err) {
             delete compiles[msg.id];
-            process.send({type: 'compileFinished', success: false, id: msg.id, files: [], exitCode: -1 });
+            process.send({type: 'compileFinished', success: false, id: msg.id, files: [], exitCode: -1, error: err.toString() });
         }
         break;
     }

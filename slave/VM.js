@@ -72,12 +72,15 @@ class VM extends EventEmitter
                 that = this.compiles[msg.id];
                 if (!that)
                     return;
+                if (msg.error)
+                    console.error("Got some error", msg.error);
                 const now = Date.now();
                 that.emit('finished', {
                     cppSize: that.cppSize,
                     compileDuration: (now - that.startCompile),
                     exitCode: msg.exitCode,
                     success: msg.success,
+                    error: msg.error,
                     sourceFile: msg.sourceFile,
                     files: msg.files.map(file => {
                         file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
