@@ -352,11 +352,17 @@ export class ChartComponent implements AfterViewInit {
             return;
         }
 
+        const slaveKey = job.slave.ip + ":" + job.slave.port;
+        const slave = this.slaves[slaveKey];
+        if (!slave) {
+            console.error("can't find slave", job);
+            return;
+        }
+
         const name = (id, name) => {
             return id + name.replace(/-/g, "");
         };
 
-        const slaveKey = job.slave.ip + ":" + job.slave.port;
         const clientKey = job.client.ip;
         if (!(clientKey in this.clients)) {
             const rectName = name("rect", job.client.name);
@@ -379,11 +385,6 @@ export class ChartComponent implements AfterViewInit {
         } else {
             ++this.clients[clientKey].jobs;
         }
-        const slave = this.slaves[slaveKey];
-        if (!slave) {
-            console.error("can't find slave", job);
-            return;
-        }
         this.jobs[job.id] = { slave: slaveKey, client: clientKey };
         ++slave.jobs;
 
@@ -399,6 +400,10 @@ export class ChartComponent implements AfterViewInit {
         const jobData = this.jobs[job.id];
         delete this.jobs[job.id];
         const slave = this.slaves[jobData.slave];
+        if (!slave) {
+            console.error("can't find slave", job, jobData.slave);
+            return;
+        }
         const client = this.clients[jobData.client];
         if (client) {
             if (!--client.jobs) {
@@ -407,10 +412,6 @@ export class ChartComponent implements AfterViewInit {
                 delete this.clients[jobData.client];
             }
             this._adjustClients();
-        }
-        if (!slave) {
-            console.error("can't find slave", job, jobData.slave);
-            return;
         }
         if (!slave.jobs) {
             console.error("slave jobs already at 0", job, slave);
