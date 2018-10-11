@@ -192,8 +192,8 @@ int main(int argc, char **argv)
     act.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &act, 0);
 
-    std::unique_ptr<Client::Preprocessed> preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
-    if (!preprocessed) {
+    data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
+    if (!data.preprocessed) {
         ERROR("Failed to preprocess");
         watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -308,13 +308,13 @@ int main(int argc, char **argv)
     watchdog.transition(Watchdog::ConnectedToSlave);
 
     DEBUG("Waiting for preprocessed");
-    preprocessed->wait();
+    data.preprocessed->wait();
     watchdog.transition(Watchdog::PreprocessFinished);
     DEBUG("Preprocessed finished");
-    preprocessedDuration = preprocessed->duration;
-    preprocessedSlotDuration = preprocessed->slotDuration;
+    preprocessedDuration = data.preprocessed->duration;
+    preprocessedSlotDuration = data.preprocessed->slotDuration;
 
-    if (preprocessed->exitStatus != 0) {
+    if (data.preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
         watchdog.stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
@@ -329,7 +329,7 @@ int main(int argc, char **argv)
         { "commandLine", args },
         { "argv0", data.compiler },
         { "wait", wait },
-        { "bytes", static_cast<int>(preprocessed->stdOut.size()) }
+        { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }
     };
 
     const std::string json = json11::Json(msg).dump();
@@ -347,7 +347,7 @@ int main(int argc, char **argv)
     }
 
     assert(!slaveWebSocket.wait);
-    slaveWebSocket.send(WebSocket::Binary, preprocessed->stdOut.c_str(), preprocessed->stdOut.size());
+    slaveWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
@@ -371,12 +371,13 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    if (!preprocessed->stdErr.empty()) {
-        fwrite(preprocessed->stdErr.c_str(), sizeof(char), preprocessed->stdErr.size(), stderr);
+    if (!data.preprocessed->stdErr.empty()) {
+        fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
     }
     watchdog.transition(Watchdog::Finished);
     watchdog.stop();
     schedulerWebsocket.close("slaved");
 
+    Client::writeStatistics();
     return data.exitCode;
 }

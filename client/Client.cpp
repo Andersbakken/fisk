@@ -284,12 +284,12 @@ Client::Slot::~Slot()
 bool Client::setFlag(int fd, int flag)
 {
     int flags, r;
-    while ((flags = fcntl(fd, F_GETFL, 0)) == -1 && errno == EINTR);
+    EINTRWRAP(flags, fcntl(fd, F_GETFL, 0));
     if (flags == -1) {
         ERROR("Failed to read flags from %d %d %s", fd, errno, strerror(errno));
         return false;
     }
-    while ((r = fcntl(fd, F_SETFL, flags | flag)) == -1 && errno == EINTR);
+    EINTRWRAP(r, fcntl(fd, F_SETFL, flags | flag));
 
     if (r == -1) {
         ERROR("Failed to set flag 0x%x on socket %d %d %s", flag, fd, errno, strerror(errno));
@@ -485,6 +485,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             slot.reset();
             std::unique_lock<std::mutex> lock(ptr->mMutex);
             ptr->mDone = true;
+            ptr->cppSize = ptr->stdOut.size();
             ptr->duration = Client::mono() - started;
             ptr->mCond.notify_one();
             if (hasDepFile)
@@ -525,9 +526,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
         return std::make_unique<Client::Slot>(type, nullptr);
     }
     int ret;
-    do {
-        ret = sem_wait(sem);
-    } while (ret == -1 && errno == EINTR);
+    EINTRWRAP(ret, sem_wait(sem));
 
     if (Log::minLogLevel <= Log::Debug) {
 #ifdef __linux__
@@ -541,6 +540,74 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
 
     assert(!ret);
     return std::make_unique<Client::Slot>(type, sem);
+}
+
+void Client::writeStatistics()
+{
+    const std::string file = Config::statisticsLog;
+    if (file.empty())
+        return;
+
+    const int duration = Client::mono() - Client::started;
+    const Client::Data &data = Client::data();
+    std::vector<std::string> *commandLine, dummy;
+    if (data.compilerArgs) {
+        commandLine = &data.compilerArgs->commandLine;
+    } else {
+        commandLine = &dummy;
+        dummy.resize(data.argc);
+        for (int i=0; i<data.argc; ++i) {
+            dummy[i] = data.argv[i];
+        }
+    }
+
+    json11::Json::object stats {
+        { "commandLine", *commandLine },
+        { "duration", duration }
+    };
+    if (data.compilerArgs) {
+        const std::string sourceFile = data.compilerArgs->sourceFile();
+        stats["sourceFile"] = sourceFile;
+        struct stat st;
+        if (!stat(sourceFile.c_str(), &st)) {
+            stats["source_size"] = static_cast<int>(st.st_size);
+        }
+        int written = data.totalWritten;
+        if (!written) {
+            const std::string output = data.compilerArgs->output();
+            if (!stat(output.c_str(), &st)) {
+                written = st.st_size;
+            }
+        }
+        if (written)
+            stats["output_size"] = written;
+    }
+    if (data.preprocessed) {
+        stats["cpp_size"] = static_cast<int>(data.preprocessed->cppSize);
+        stats["cpp_time"] = static_cast<int>(data.preprocessed->duration);
+    }
+    const std::string json = json11::Json(stats).dump();
+
+    FILE *f = fopen(file.c_str(), "a+");
+    if (!f) {
+        ERROR("Failed to open %s for statistics log %d %s", file.c_str(), errno, strerror(errno));
+        return;
+    }
+    int fd = fileno(f);
+
+    errno = 0;
+    int ret;
+    EINTRWRAP(ret, flock(fd, LOCK_EX));
+    if (ret) {
+        ERROR("Failed to lock %s for writing %d %s", file.c_str(), errno, strerror(errno));
+        EINTRWRAP(ret, fclose(f));
+        return;
+    }
+
+    EINTRWRAP(ret, fwrite(json.c_str(), 1, json.size(), f));
+    EINTRWRAP(ret, fwrite("\n", 1, 1, f));
+    EINTRWRAP(ret, flock(fd, LOCK_UN));
+    EINTRWRAP(ret, fclose(f));
 }
 
 std::unique_ptr<Client::Slot> Client::tryAcquireSlot(Client::Slot::Type type)
@@ -587,6 +654,7 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         int status;
         waitpid(pid, &status, 0);
         slot.reset();
+        writeStatistics();
         if (WIFEXITED(status))
             _exit(WEXITSTATUS(status));
         _exit(101);

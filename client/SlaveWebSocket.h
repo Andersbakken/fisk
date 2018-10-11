@@ -80,6 +80,7 @@ public:
                     File &ff = files[i];
                     ff.path = index[i]["path"].string_value();
                     ff.remaining = index[i]["bytes"].int_value();
+                    totalWritten += ff.remaining;
                     if (ff.path.empty()) {
                         ERROR("No file for idx: %zu", i);
                         Client::data().watchdog->stop();
@@ -109,8 +110,10 @@ public:
                 return;
             }
             fill(reinterpret_cast<const unsigned char *>(data), len);
-            if (files.empty())
+            if (files.empty()) {
                 done = true;
+                Client::data().totalWritten = totalWritten;
+            }
         }
     }
 
@@ -163,6 +166,7 @@ public:
     };
 
     std::vector<File> files;
+    size_t totalWritten { 0 };
     FILE *f { 0 };
     bool done { false };
 };

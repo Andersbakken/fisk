@@ -20,10 +20,13 @@
 #include <thread>
 #include <vector>
 
+#define EINTRWRAP(VAR, BLOCK) do { VAR = BLOCK; } while (VAR == -1 && errno == EINTR)
+
 class Watchdog;
 struct CompilerArgs;
 class SchedulerWebSocket;
 namespace Client {
+class Preprocessed;
 struct Data
 {
     ~Data() {}
@@ -37,7 +40,9 @@ struct Data
     std::string hash;
     int exitCode { 0 };
     std::set<sem_t *> semaphores;
+    size_t totalWritten { 0 };
 
+    std::unique_ptr<Preprocessed> preprocessed;
     std::shared_ptr<CompilerArgs> compilerArgs;
     Watchdog *watchdog { 0 };
 };
@@ -91,6 +96,7 @@ private:
 
 std::unique_ptr<Slot> tryAcquireSlot(Slot::Type type);
 std::unique_ptr<Slot> acquireSlot(Slot::Type type);
+void writeStatistics();
 [[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
@@ -105,6 +111,7 @@ public:
     void wait();
 
     std::string stdOut, stdErr;
+    size_t cppSize { 0 };
     int exitStatus { -1 };
     unsigned long long duration { 0 };
     unsigned long long slotDuration { 0 };

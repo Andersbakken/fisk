@@ -172,9 +172,7 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
             continue;
         }
 
-        do {
-            ret = ::connect(mFD, addr->ai_addr, addr->ai_addrlen);
-        } while (ret == -1 && errno == EINTR);
+        EINTRWRAP(ret, ::connect(mFD, addr->ai_addr, addr->ai_addrlen));
 
         if (!ret) {
             DEBUG("Connected to server %s (%s:%d)", mHost.c_str(),

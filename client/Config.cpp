@@ -77,6 +77,8 @@ Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir", getenv("HOME"
                                      return value + '/';
                                  return value;
                              });
+Getter<std::string> statisticsLog("statistics-log", "Dump statistics into this file");
+
 Separator s5;
 Separator s6("CPU allowances:");
 Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(), [](const size_t &value) { return std::max<size_t>(1, value); });
@@ -205,6 +207,9 @@ bool Config::init(int &argc, char **&argv)
         auto it = sGetters.find(key);
         if (it == sGetters.end()) {
             fprintf(stderr, "Unknown argument %s\n", argv[i]);
+            // for (auto foo : sGetters) {
+            //     fprintf(stderr, "Balls: %s\n", foo.first.c_str());
+            // }
             return false;
         }
         if (!it->second->requiresArgument() && !eq) {

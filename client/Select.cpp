@@ -80,9 +80,7 @@ void Select::wakeup()
     if (mPipe[1] != -1) {
         DEBUG("Waking up with pipe");
         int err;
-        do {
-            err = write(mPipe[1], "w", 1);
-        } while (err == -1 && errno == EINTR);
+        EINTRWRAP(err, write(mPipe[1], "w", 1));
     } else {
         DEBUG("Pipe not there");
     }

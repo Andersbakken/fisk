@@ -192,6 +192,7 @@ extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<bool> help;
 extern Getter<bool> version;
+extern Getter<std::string> statisticsLog;
 inline std::string envCache()
 {
     std::string ret = cacheDir;
