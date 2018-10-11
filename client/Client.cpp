@@ -28,6 +28,7 @@
 
 static Client::Data sData;
 const unsigned long long Client::started = Client::mono();
+const unsigned long long Client::milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
 Client::Data &Client::data()
 {
     return sData;
@@ -548,22 +549,10 @@ void Client::writeStatistics()
     if (file.empty())
         return;
 
-    const int duration = Client::mono() - Client::started;
     const Client::Data &data = Client::data();
-    std::vector<std::string> *commandLine, dummy;
-    if (data.compilerArgs) {
-        commandLine = &data.compilerArgs->commandLine;
-    } else {
-        commandLine = &dummy;
-        dummy.resize(data.argc);
-        for (int i=0; i<data.argc; ++i) {
-            dummy[i] = data.argv[i];
-        }
-    }
-
     json11::Json::object stats {
-        { "commandLine", *commandLine },
-        { "duration", duration }
+        { "start", static_cast<int>(Client::milliseconds_since_epoch) },
+        { "end", static_cast<int>(Client::milliseconds_since_epoch + (Client::mono() - Client::started)) }
     };
     if (data.compilerArgs) {
         const std::string sourceFile = data.compilerArgs->sourceFile();
@@ -581,6 +570,12 @@ void Client::writeStatistics()
         }
         if (written)
             stats["output_size"] = written;
+    } else {
+        std::vector<std::string> args(data.argc);
+        for (int i=0; i<data.argc; ++i) {
+            args[i] = data.argv[i];
+        }
+        stats["command_line"] = std::move(args);
     }
     if (data.preprocessed) {
         stats["cpp_size"] = static_cast<int>(data.preprocessed->cppSize);

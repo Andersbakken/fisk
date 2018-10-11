@@ -49,6 +49,7 @@ struct Data
 Data &data();
 
 extern const unsigned long long started;
+extern const unsigned long long milliseconds_since_epoch;
 
 std::mutex &mutex();
 bool findCompiler(const std::string &preresolved);

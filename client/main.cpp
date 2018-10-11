@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <csignal>
 
-static const unsigned long long milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
+
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
 extern "C" const char *npm_version;
@@ -38,7 +38,9 @@ int main(int argc, char **argv)
             if (Watchdog *watchdog = data.watchdog) {
                 if (Log::minLogLevel <= Log::Warn) {
                     std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
-                                                     milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
+                                                     Client::milliseconds_since_epoch,
+                                                     preprocessedDuration,
+                                                     preprocessedSlotDuration);
                     for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
                         str += Client::format(" %s: %llu (%llu)\n", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
                                               watchdog->timings[i] - watchdog->timings[i - 1],
