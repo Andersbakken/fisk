@@ -169,7 +169,7 @@ int main(int argc, char **argv)
             // printf("%zu: %s\n", i, argv[i]);
             args[i] = data.argv[i];
         }
-        data.compilerArgs = CompilerArgs::create(args);
+        data.compilerArgs = CompilerArgs::create(args, &data.localReason);
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");

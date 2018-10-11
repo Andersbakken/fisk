@@ -2,7 +2,6 @@
 
 #include "Log.h"
 #include <unistd.h>
-#include "CompilerArgs.h"
 #include "SchedulerWebSocket.h"
 #include "Select.h"
 #include "Config.h"
@@ -545,6 +544,8 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
 
 void Client::writeStatistics()
 {
+    if (sData.localReason == CompilerArgs::Local_Preprocess)
+        return;
     const std::string file = Config::statisticsLog;
     if (file.empty())
         return;
@@ -571,6 +572,7 @@ void Client::writeStatistics()
         if (written)
             stats["output_size"] = written;
     } else {
+        stats["local"] = CompilerArgs::localReasonToString(sData.localReason);
         std::vector<std::string> args(data.argc);
         for (int i=0; i<data.argc; ++i) {
             args[i] = data.argv[i];

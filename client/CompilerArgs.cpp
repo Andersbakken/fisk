@@ -144,7 +144,7 @@ static inline size_t hasArg(const std::string &arg)
     return 0;
 }
 
-std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string> &args)
+std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string> &args, LocalReason *localReason)
 {
     std::shared_ptr<CompilerArgs> ret(new CompilerArgs);
     ret->commandLine = args;
@@ -159,13 +159,16 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             hasDashC = true;
         } else if (arg == "-S") {
             DEBUG("-S, running local");
+            *localReason = Local_DoNotAssemble;
             return nullptr;
         } else if (arg == "-E") {
             DEBUG("-E, running local");
+            *localReason = Local_Preprocess;
             return nullptr;
         } else if (arg == "-o") {
             if (i + 1 < args.size() && args[i + 1] == "-") {
                 DEBUG("-o - This means different things for different compilers. Run local");
+                *localReason = Local_StdOutOutput;
                 return nullptr;
             }
             ret->flags |= HasDashO;
@@ -186,6 +189,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             ++i;
         } else if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
             DEBUG("%s, running local", arg.c_str());
+            *localReason = Local_Preprocess;
             return nullptr;
         } else if (!strncmp(arg.c_str(), "-Wa,", 4)) {
             // stolen from icecc
@@ -200,6 +204,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
                 if (*pos == '=') {
                     DEBUG("Incompatible arg %s building local", arg.c_str());
+                    *localReason = Local_ParseError;
                     return nullptr;
                 }
 
@@ -225,6 +230,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 }
 
                 DEBUG("Incompatible arg (2) %s building local", arg.c_str());
+                *localReason = Local_ParseError;
                 return nullptr;
             }
         } else if (!strncmp(arg.c_str(), "-fdump", 6)
@@ -238,24 +244,30 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                    || arg == "--save-temps"
                    || arg == "-fbranch-probabilities") {
             DEBUG("Profiling arg: %s. Run local", arg.c_str());
+            *localReason = Local_Profiling;
             return nullptr;
         } else if (arg == "-march=native" || arg == "-mcpu=native" || arg == "-mtune=native") {
             DEBUG("Local archicture optimizations: %s. Run local", arg.c_str());
+            *localReason = Local_NativeArch;
             return nullptr;
         } else if (arg == "-fexec-charset" || arg == "-fwide-exec-charset" || arg == "-finput-charset") {
             DEBUG("build environment charset conversions: %s. Run local", arg.c_str());
+            *localReason = Local_Charset;
             return nullptr;
         } else if (!strncmp(arg.c_str(), "-fplugin=", 9) || !strncmp(arg.c_str(), "-fsanitize-blacklist=", 21)) {
             DEBUG("Extra files: %s. Run local", arg.c_str());
+            *localReason = Local_ExtraFiles;
             return nullptr;
         } else if (arg == "-Xclang") {
             if (++i < args.size() && args[i] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
+                *localReason = Local_ExtraFiles;
                 return nullptr;
             }
         } else if (arg == "-arch") {
             if (hasArch) {
                 DEBUG("multiple -arch options, building locally");
+                *localReason = Local_MultiArch;
                 return nullptr;
             }
             hasArch = true;
@@ -294,7 +306,22 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             i += count;
         } else if (arg[0] != '-') {
             if (ret->sourceFileIndex != std::numeric_limits<size_t>::max()) {
-                DEBUG("Multiple source files");
+                if (!hasDashC) {
+                    while (i < args.size()) {
+                        if (args[i] == "-c") {
+                            hasDashC = true;
+                            break;
+                        }
+                        ++i;
+                    }
+                }
+                if (!hasDashC) {
+                    DEBUG("link job, building local");
+                    *localReason = Local_Link;
+                } else {
+                    DEBUG("Multiple source files");
+                    *localReason = Local_MultiSource;
+                }
                 return nullptr;
             }
             ret->sourceFileIndex = i;
@@ -337,24 +364,27 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             }
         } else if (arg == "-") {
             DEBUG("STDIN input, building local");
+            *localReason = Local_StdinInput;
             return nullptr;
         }
     }
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
         DEBUG("No src file, building local");
+        *localReason = Local_NoSources;
         return nullptr;
     }
 
     if (!hasDashC) {
+        *localReason = Local_Link;
         DEBUG("link job, building local");
         return nullptr;
     }
 
-// #warning need to handle color diagnostics
-// #warning need to handle clang_get_default_target
+    // #warning need to handle clang_get_default_target
 
     if (ret->flags & (AssemblerWithCpp|Assembler)) {
         DEBUG("Assembler, building local");
+        *localReason = Local_DoNotAssemble;
         return nullptr;
     }
 
@@ -370,7 +400,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-MF");
         ret->commandLine.push_back(std::move(dfile));
     }
-
+    *localReason = Remote;
     return ret;
 }
 
@@ -395,4 +425,26 @@ const char *CompilerArgs::languageName(Flag flag, bool preprocessed)
     default: break;
     }
     return "";
+}
+
+const char *CompilerArgs::localReasonToString(LocalReason reason)
+{
+    switch (reason) {
+    case Remote: return "Remote";
+    case Local_Preprocess: return "Preprocess";
+    case Local_DoNotAssemble: return "DoNotAssemble";
+    case Local_StdOutOutput: return "StdOutOutput";
+    case Local_ParseError: return "ParseError";
+    case Local_Profiling: return "Profiling";
+    case Local_NativeArch: return "NativeArch";
+    case Local_Charset: return "Charset";
+    case Local_ExtraFiles: return "ExtraFiles";
+    case Local_MultiArch: return "MultiArch";
+    case Local_MultiSource: return "MultiSource";
+    case Local_StdinInput: return "StdinInput";
+    case Local_NoSources: return "NoSources";
+    case Local_Link: return "Link";
+    }
+    abort();
+    return 0;
 }

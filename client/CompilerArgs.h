@@ -57,7 +57,24 @@ struct CompilerArgs
     static const char *languageName(Flag flag, bool preprocessed = false);
     uint32_t flags { 0 };
 
-    static std::shared_ptr<CompilerArgs> create(const std::vector<std::string> &args);
+    enum LocalReason {
+        Remote,
+        Local_Preprocess,
+        Local_DoNotAssemble,
+        Local_StdOutOutput,
+        Local_ParseError,
+        Local_Profiling,
+        Local_NativeArch,
+        Local_Charset,
+        Local_ExtraFiles,
+        Local_MultiArch,
+        Local_MultiSource,
+        Local_StdinInput,
+        Local_NoSources,
+        Local_Link
+    };
+    static const char *localReasonToString(LocalReason reason);
+    static std::shared_ptr<CompilerArgs> create(const std::vector<std::string> &args, LocalReason *reason);
 
     std::string sourceFile() const
     {

@@ -2,6 +2,7 @@
 #define CLIENT_H
 
 #include "Config.h"
+#include "CompilerArgs.h"
 #include <assert.h>
 #include <condition_variable>
 #include <cstdarg>
@@ -23,7 +24,6 @@
 #define EINTRWRAP(VAR, BLOCK) do { VAR = BLOCK; } while (VAR == -1 && errno == EINTR)
 
 class Watchdog;
-struct CompilerArgs;
 class SchedulerWebSocket;
 namespace Client {
 class Preprocessed;
@@ -45,6 +45,7 @@ struct Data
     std::unique_ptr<Preprocessed> preprocessed;
     std::shared_ptr<CompilerArgs> compilerArgs;
     Watchdog *watchdog { 0 };
+    CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
 };
 Data &data();
 
