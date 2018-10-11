@@ -573,11 +573,7 @@ void Client::writeStatistics()
             stats["output_size"] = written;
     } else {
         stats["local"] = CompilerArgs::localReasonToString(sData.localReason);
-        std::vector<std::string> args(data.argc);
-        for (int i=0; i<data.argc; ++i) {
-            args[i] = data.argv[i];
-        }
-        stats["command_line"] = std::move(args);
+        stats["command_line"] = data.originalArgs;
     }
     if (data.preprocessed) {
         stats["cpp_size"] = static_cast<int>(data.preprocessed->cppSize);

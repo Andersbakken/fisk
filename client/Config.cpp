@@ -173,6 +173,12 @@ bool Config::init(int &argc, char **&argv)
     bool gotHelp = false;
     bool gotVersion = false;
 
+    std::vector<std::string> &originalArgs = Client::data().originalArgs;
+    originalArgs.resize(argc);
+    for (int i=0; i<argc; ++i) {
+        originalArgs[i] = argv[i];
+    }
+
     if (argc > 1 && !access(argv[1], X_OK)) {
         // kinda hacky and hidden but it makes fiskc easier to use.
         compiler.apply(std::string(argv[i]));
