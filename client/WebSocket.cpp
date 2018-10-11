@@ -363,7 +363,7 @@ void WebSocket::onRead()
     while (true) {
         char buf[BUFSIZ];
         const ssize_t r = ::read(mFD, buf, sizeof(buf));
-        DEBUG("Read %zd bytes", r);
+        VERBOSE("Read %zd bytes", r);
         if (!r) {
             mState = Closed;
             break;
@@ -402,7 +402,7 @@ void WebSocket::send()
     size_t sendBufferOffset = 0;
     while (sendBufferOffset < mSendBuffer.size()) {
         const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
-        DEBUG("Wrote %zd bytes\n", r);
+        VERBOSE("Wrote %zd bytes\n", r);
         if (r > 0) {
             sendBufferOffset += r;
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {

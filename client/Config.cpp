@@ -104,14 +104,15 @@ Separator s9;
 Separator s10("Logging:");
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather overwriting)", false);
-Getter<std::string> logLevel("log-level", "Log level (Level can be: \"debug\", \"warn\", \"error\" or \"silent\")",
+Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\" or \"silent\")",
 #ifdef NDEBUG
                              "silent"
 #else
                              "error"
 #endif
     );
-Getter<bool> verbose("verbose", "Set log level to \"debug\"", false);
+Getter<bool> debug("debug", "Set log level to \"debug\"", false);
+Getter<bool> verbose("verbose", "Set log level to \"verbose\"", false);
 Separator s11;
 Separator s12("Semaphores:");
 Getter<bool> dumpSemaphores("dump-semaphores", "Dump info about fiskc's semaphores", false);

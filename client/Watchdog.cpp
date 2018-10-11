@@ -58,10 +58,10 @@ int Watchdog::timeout()
         DEBUG("Already timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
         return 0;
     }
-    DEBUG("Setting watchdog timeout to %llu (%llu/%llu) waiting for %s",
-          mTimeoutTime - now,
-          mTimeoutTime, now,
-          stageName(static_cast<Stage>(mStage + 1)));
+    VERBOSE("Setting watchdog timeout to %llu (%llu/%llu) waiting for %s",
+            mTimeoutTime - now,
+            mTimeoutTime, now,
+            stageName(static_cast<Stage>(mStage + 1)));
     return mTimeoutTime - now;
 }
 

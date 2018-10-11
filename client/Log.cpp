@@ -111,6 +111,14 @@ void Log::log(Level level, const char *fmt, va_list args)
     log(level, Client::vformat(fmt, args));
 }
 
+void Log::verbose(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    log(Verbose, fmt, args);
+    va_end(args);
+}
+
 void Log::debug(const char *fmt, ...)
 {
     va_list args;

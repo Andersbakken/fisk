@@ -120,12 +120,15 @@ int main(int argc, char **argv)
         bool ok;
         level = Log::stringToLevel(logLevel.c_str(), &ok);
         if (!ok) {
-            fprintf(stderr, "Invalid log level: %s (\"Debug\", \"Warn\", \"Error\" or \"Silent\")\n", logLevel.c_str());
+            fprintf(stderr, "Invalid log level: %s (\"Verbose\", \"Debug\", \"Warn\", \"Error\" or \"Silent\")\n", logLevel.c_str());
             return 1;
         }
     }
-    if (Config::verbose)
+    if (Config::debug) {
         level = Log::Debug;
+    } else if (Config::verbose) {
+        level = Log::Verbose;
+    }
     std::string preresolved = Config::compiler;
 
     Log::init(level, Config::logFile, Config::logFileAppend ? Log::Append : Log::Overwrite);

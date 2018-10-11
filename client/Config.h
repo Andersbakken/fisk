@@ -213,6 +213,7 @@ extern Getter<std::string> logFile;
 extern Getter<bool> logFileAppend;
 extern Getter<std::string> logLevel;
 extern Getter<bool> verbose;
+extern Getter<bool> debug;
 extern Getter<bool> discardComments;
 extern Getter<bool> dumpSemaphores;
 extern Getter<bool> cleanSemaphores;

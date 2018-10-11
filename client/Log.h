@@ -11,6 +11,7 @@ namespace Log
 {
 
 enum Level {
+    Verbose,
     Debug,
     Warn,
     Error,
@@ -33,10 +34,13 @@ enum Flag {
 
 void log(Level level, const std::string &string, unsigned int flags = None);
 void log(Level level, const char *fmt, va_list args);
+void verbose(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void debug(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void warn(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void error(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
+#define VERBOSE(...) if (Log::minLogLevel <= Log::Verbose)  \
+        Log::verbose(__VA_ARGS__)
 #define DEBUG(...) if (Log::minLogLevel <= Log::Debug)  \
         Log::debug(__VA_ARGS__)
 #define WARN(...) if (Log::minLogLevel <= Log::Warn)    \
