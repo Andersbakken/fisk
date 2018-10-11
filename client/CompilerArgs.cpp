@@ -233,19 +233,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 *localReason = Local_ParseError;
                 return nullptr;
             }
-        } else if (!strncmp(arg.c_str(), "-fdump", 6)
-                   || arg == "-combine"
-                   || arg == "-fprofile-arcs"
-                   || arg == "-ftest-coverage"
-                   || arg == "-frepo"
-                   || arg == "-fprofile-generate"
-                   || arg == "-fprofile-use"
-                   || arg == "-save-temps"
-                   || arg == "--save-temps"
-                   || arg == "-fbranch-probabilities") {
-            DEBUG("Profiling arg: %s. Run local", arg.c_str());
-            *localReason = Local_Profiling;
-            return nullptr;
         } else if (arg == "-march=native" || arg == "-mcpu=native" || arg == "-mtune=native") {
             DEBUG("Local archicture optimizations: %s. Run local", arg.c_str());
             *localReason = Local_NativeArch;
@@ -435,7 +422,6 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     case Local_DoNotAssemble: return "DoNotAssemble";
     case Local_StdOutOutput: return "StdOutOutput";
     case Local_ParseError: return "ParseError";
-    case Local_Profiling: return "Profiling";
     case Local_NativeArch: return "NativeArch";
     case Local_Charset: return "Charset";
     case Local_ExtraFiles: return "ExtraFiles";

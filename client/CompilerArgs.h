@@ -63,7 +63,6 @@ struct CompilerArgs
         Local_DoNotAssemble,
         Local_StdOutOutput,
         Local_ParseError,
-        Local_Profiling,
         Local_NativeArch,
         Local_Charset,
         Local_ExtraFiles,

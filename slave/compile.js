@@ -12,7 +12,7 @@ class Compile extends EventEmitter {
             throw new Error("Bad args");
         }
         let compiler = args.shift();
-        let outputs = [];
+        let output;
 
         let hasDashX = false;
         let sourceFile;
@@ -23,8 +23,8 @@ class Compile extends EventEmitter {
             case '-MT':
             case '-o':
                 ++i;
-                outputs.push(args[i]);
-                args[i] = path.join(dir, "output_" + (outputs.length - 1));
+                output = args[i];
+                args[i] = path.join(dir, "output.o");
                 continue;
             case '-MMD':
             case '-MD':
@@ -143,6 +143,13 @@ class Compile extends EventEmitter {
             args.push('-fpreprocessed', '-fdirectives-only'); // this is not good for clang
         }
 
+        if (!output) {
+            let out = path.join(dir, "output.o");
+            args.push("-o", out);
+            var suffix = path.extname(sourceFile);
+            output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
+        }
+
         // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
         let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
@@ -173,9 +180,13 @@ class Compile extends EventEmitter {
                             if (stat.isDirectory()) {
                                 addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
-                                var match = /output_([0-9]+)/.exec(file);
-                                if (match) {
-                                    files.push({ path: outputs[match[1]], mapped: path.join(prefix, file) });
+                                if (file == "output.o") {
+                                    files.push({ path: output, mapped: path.join(prefix, file) });
+                                } else if (file == "output.gcno") {
+                                    // console.log("mapping", output, prefix, file);
+                                    files.push({ path: output.substr(0, output.length - 1) + "gcno", mapped: path.join(prefix, file) });
+                                } else if (file == "output.gcda") {
+                                    files.push({ path: output.substr(0, output.length - 1) + "gcda", mapped: path.join(prefix, file) });
                                 } else {
                                     files.push({ path: path.join(prefix, file) });
                                 }
