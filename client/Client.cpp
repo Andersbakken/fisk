@@ -552,8 +552,8 @@ void Client::writeStatistics()
 
     const Client::Data &data = Client::data();
     json11::Json::object stats {
-        { "start", static_cast<int>(Client::milliseconds_since_epoch) },
-        { "end", static_cast<int>(Client::milliseconds_since_epoch + (Client::mono() - Client::started)) }
+        { "start", static_cast<double>(Client::milliseconds_since_epoch / 1000.0) },
+        { "end", static_cast<double>((Client::milliseconds_since_epoch + (Client::mono() - Client::started)) / 1000.0) }
     };
     if (data.compilerArgs) {
         const std::string sourceFile = data.compilerArgs->sourceFile();
