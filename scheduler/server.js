@@ -165,8 +165,6 @@ class Server extends EventEmitter {
                 data.hostname = clientHostname;
             client = new Client(data);
             this.emit("compile", client);
-            ws.on('close', (status, reason) => client.emit('close', status, reason));
-            ws.on('error', err => client.emit('error', err));
             ws.on("message", msg => {
                 switch (typeof msg) {
                 case "string":
@@ -315,19 +313,18 @@ class Server extends EventEmitter {
             // console.log("Got nonce", req.nonce);
             ws.on("message", message => client.emit("message", message));
             this.emit("monitor", client);
-            ws.on('close', (status, reason) => client.emit('close', status, reason));
-            ws.on('error', err => client.emit('error', err));
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
             return;
         }
 
+        ws.on("error", err => client.emit("error", err));
         ws.on("close", (code, reason) => {
-            if (remaining.bytes)
-                client.emit("error", "Got close while reading a binary message");
             if (client)
                 client.emit("close", { code: code, reason: reason });
+            if (remaining.bytes)
+                client.emit("error", "Got close while reading a binary message");
             ws.removeAllListeners();
         });
     }

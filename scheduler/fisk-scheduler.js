@@ -80,16 +80,18 @@ function forEachSlave(cb) {
 }
 
 function removeSlave(slave) {
-    --slaveCount;
-    delete slaves[slaveKey(slave)];
-    if (monitors.length) {
-        const info = slaveToMonitorInfo(slave, "slaveRemoved");
-        // console.log("send to monitors", info);
-        monitors.forEach(monitor => {
-            monitor.send(info);
-        });
+    const key = slaveKey(slave);
+    if (key in slaves) {
+        --slaveCount;
+        delete slaves[slaveKey(slave)];
+        if (monitors.length) {
+            const info = slaveToMonitorInfo(slave, "slaveRemoved");
+            // console.log("send to monitors", info);
+            monitors.forEach(monitor => {
+                monitor.send(info);
+            });
+        }
     }
-
 }
 
 function findSlave(ip, port) {
@@ -279,7 +281,9 @@ server.on("slave", slave => {
     });
 
     slave.on("error", msg => {
-        console.error(`slave error '${msg}' from ${slave.ip}`);
+        console.log("slave error", msg, slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
+        removeSlave(slave);
+        slave.removeAllListeners();
     });
     slave.on("close", () => {
         removeSlave(slave);
