@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 
         DEBUG("Starting schedulerWebsocket");
         while (!schedulerWebsocket.done
-               && schedulerWebsocket.state() > SchedulerWebSocket::None
+               && schedulerWebsocket.state() >= SchedulerWebSocket::None
                && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
         }
