@@ -70,7 +70,7 @@ class Server extends EventEmitter {
 
         this.server = http.createServer(this.app);
         const port = this.option.int("port", 8097);
-        this.server.listen(port, this.option.int("backlog", 50));
+        this.server.listen({port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
 
         this.server.on("error", error => {
             if (error.code == "EADDRINUSE") {
