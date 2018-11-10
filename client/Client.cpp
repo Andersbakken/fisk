@@ -631,7 +631,11 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
             argvCopy[i] = sData.argv[i];
         }
         argvCopy[sData.argc] = 0;
-        ::execv(sData.compiler.c_str(), argvCopy);
+        for (int i=0; i<3; ++i) {
+            ::execv(sData.compiler.c_str(), argvCopy);
+            DEBUG("Trying execv(%s) again errno: %d %s", sData.compiler.c_str(), errno, strerror(errno));
+            usleep(75000);
+        }
         ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
