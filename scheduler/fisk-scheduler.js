@@ -108,7 +108,7 @@ function purgeEnvironmentsToMaxSize()
         try {
             let purged = false;
             fs.readdirSync(p).map(file => {
-                console.log("got file", file);
+                // console.log("got file", file);
                 let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);
                 if (!match)
                     return undefined;
@@ -185,7 +185,7 @@ function syncEnvironments(slave)
 
 function environmentsInfo()
 {
-    let ret = JSON.stringify(Environments.environments);
+    let ret = Environments.environments;
     ret.maxSize = option("max-cache-size") || 0;
     ret.maxSizeBytes = bytes.parse(option("max-cache-size"));
     ret.usedSizeBytes = 0;
@@ -200,7 +200,6 @@ function environmentsInfo()
 
 server.on("listen", app => {
     app.get("/environments", (req, res, next) => {
-
         res.send(JSON.stringify(environmentsInfo(), null, 4));
     });
 
