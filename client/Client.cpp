@@ -648,8 +648,8 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         run();
         exit(102);
     } else { // paren
-        int status;
-        EINTRWRAP(status, waitpid(pid, &status, 0));
+        int ret, status;
+        EINTRWRAP(ret, waitpid(pid, &status, 0));
         slot.reset();
         writeStatistics();
         if (WIFEXITED(status))
