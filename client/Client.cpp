@@ -646,15 +646,15 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         exit(101);
     } else if (pid == 0) { // child
         run();
-        exit(101);
+        exit(102);
     } else { // paren
         int status;
-        waitpid(pid, &status, 0);
+        EINTRWRAP(status, waitpid(pid, &status, 0));
         slot.reset();
         writeStatistics();
         if (WIFEXITED(status))
             _exit(WEXITSTATUS(status));
-        _exit(101);
+        _exit(103);
     }
 }
 
