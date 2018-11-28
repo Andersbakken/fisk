@@ -306,7 +306,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     DEBUG("link job, building local");
                     *localReason = Local_Link;
                 } else {
-                    DEBUG("Multiple source files");
+                    DEBUG("Multiple source files %s and %s", args[ret->sourceFileIndex].c_str(), arg.c_str());
                     *localReason = Local_MultiSource;
                 }
                 return nullptr;
