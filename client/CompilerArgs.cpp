@@ -152,6 +152,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
     ret->objectFileIndex = -1;
     bool hasDashC = false;
     bool hasArch = false;
+    if (Log::minLogLevel <= Log::Verbose) {
+        for (size_t i=0; i<args.size(); ++i) {
+            VERBOSE("%zu/%zu: %s", i+1, args.size(), args[i].c_str());
+        }
+    }
+
     for (size_t i=1; i<args.size(); ++i) {
         const std::string &arg = args[i];
         if (arg.empty()) {
