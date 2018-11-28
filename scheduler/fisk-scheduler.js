@@ -185,9 +185,9 @@ function syncEnvironments(slave)
 
 function environmentsInfo()
 {
-    let ret = Environments.environments;
+    let ret = Object.assign({}, Environments.environments);
     ret.maxSize = option("max-cache-size") || 0;
-    ret.maxSizeBytes = bytes.parse(option("max-cache-size"));
+    ret.maxSizeBytes = bytes.parse(option("max-cache-size")) || 0;
     ret.usedSizeBytes = 0;
     for (let hash in Environments.environments) {
         let env = Environments.environments[hash];
