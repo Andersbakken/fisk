@@ -338,6 +338,7 @@ int main(int argc, char **argv)
     };
 
     const std::string json = json11::Json(msg).dump();
+    DEBUG("Sending to slave:\n%s\n", json.c_str());
     slaveWebSocket.wait = wait;
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
