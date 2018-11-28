@@ -631,7 +631,7 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
             argvCopy[i] = sData.argv[i];
         }
         argvCopy[sData.argc] = 0;
-        for (int i=0; i<3; ++i) {
+        for (size_t i=0; i<3; ++i) {
             ::execv(sData.compiler.c_str(), argvCopy);
             DEBUG("Trying execv(%s) again errno: %d %s", sData.compiler.c_str(), errno, strerror(errno));
             usleep(75000);
@@ -639,7 +639,16 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
-    const pid_t pid = fork();
+    pid_t pid;
+    for (size_t i=0; i<3; ++i) {
+        pid = fork();
+        if (pid == -1 && errno == EAGAIN) {
+            DEBUG("Fork failed (%s) again errno: %d %s. Trying again...", sData.compiler.c_str(), errno, strerror(errno));
+            usleep(75000);
+        } else {
+            break;
+        }
+    }
     if (pid == -1) { // errpr
         ERROR("Failed to fork: %d %s", errno, strerror(errno));
         run();
