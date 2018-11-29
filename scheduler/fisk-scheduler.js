@@ -370,7 +370,6 @@ server.on("compile", compile => {
             return;
         }
     }
-    let arrived = Date.now();
     // console.log("request", compile.hostname, compile.ip, compile.environments);
     let found = false;
     for (let i=0; i<compile.environments.length; ++i) {
@@ -513,9 +512,9 @@ server.on("compile", compile => {
     if (slave) {
         ++activeJobs;
         let sendTime = Date.now();
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} got slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} active jobs is ${activeJobs} arrived ${arrived}`);
         ++slave.activeClients;
         ++slave.jobsScheduled;
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} slave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
         slave.lastJob = Date.now();
         let id = ++jobId;
         if (id == 2147483647)
