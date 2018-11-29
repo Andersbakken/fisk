@@ -85,9 +85,7 @@ class Compile extends EventEmitter {
                 ++i;
                 break;
             default:
-                if (/^-mlinker-version=/.exec(args[i])
-                    || /^-mmacosx-version-min=/.exec(args[i])
-                    || /^-stdlib=/.exec(args[i])) {
+                if (/^-mlinker-version=/.exec(args[i]) || /^-stdlib=/.exec(args[i])) {
                     args.splice(i--, 1);
                     break;
                 }
