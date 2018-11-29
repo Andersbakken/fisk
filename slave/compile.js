@@ -7,11 +7,13 @@ const EventEmitter = require('events');
 class Compile extends EventEmitter {
     constructor(args, argv0, dir) {
         super();
+
         if (!args || !args.length || !dir || !argv0) {
             console.error(argv0, args, dir);
             throw new Error("Bad args");
         }
         let compiler = args.shift();
+        const isClang = compiler.indexOf('clang') != -1;
         let output;
 
         let hasDashX = false;
@@ -31,28 +33,37 @@ class Compile extends EventEmitter {
             case '-MM':
             case '-M':
                 continue;
+            case '-cxx-isystem':
+            case '-isysroot':
+            case '-isystem':
+            case '-I':
+                args.splice(i--, 2);
+                break;
             case '-x':
                 hasDashX = true;
-                switch (args[++i]) {
-                case 'c':
-                    args[i] = 'cpp-output';
-                    break;
-                case 'c++':
-                    args[i] = 'c++-cpp-output';
-                    break;
-                case 'objective-c':
-                    args[i] = 'objective-c-output';
-                    break;
-                case 'objective-c++':
-                    args[i] = 'objective-c++-cpp-output';
-                    break;
-                default:
-                    break;
+                if (!isClang) {
+                    switch (args[++i]) {
+                    case 'c':
+                        args[i] = 'cpp-output';
+                        break;
+                    case 'c++':
+                        args[i] = 'c++-cpp-output';
+                        break;
+                    case 'objective-c':
+                        args[i] = 'objective-c-output';
+                        break;
+                    case 'objective-c++':
+                        args[i] = 'objective-c++-cpp-output';
+                        break;
+                    default:
+                        break;
+                    }
+                } else {
+                    ++i;
                 }
                 break;
             case '--param':
             case '-G':
-            case '-I':
             case '-T':
             case '-V':
             case '-Xanalyzer':
@@ -67,8 +78,6 @@ class Compile extends EventEmitter {
             case '-imultilib':
             case '-include':
             case '-iprefix':
-            case '-isysroot':
-            case '-isystem':
             case '-ivfsoverlay':
             case '-iwithprefix':
             case '-iwithprefixbefore':
@@ -76,8 +85,16 @@ class Compile extends EventEmitter {
                 ++i;
                 break;
             default:
+                if (/^-mlinker-version=/.exec(args[i])
+                    || /^-mmacosx-version-min=/.exec(args[i])
+                    || /^-stdlib=/.exec(args[i])) {
+                    args.splice(i--, 1);
+                    break;
+                }
+
                 if (args[i][0] != '-') {
                     if (sourceFile) {
+                        console.log("Multiple source files", sourceFile, args[i]);
                         throw new Error("More than one source file");
                     }
                     sourceFile = args[i];
@@ -92,8 +109,9 @@ class Compile extends EventEmitter {
 
         if (!hasDashX) {
             if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
-                args.unshift('c++-cpp-output');
+                args.unshift(isClang ? 'c++' : 'c++-cpp-output');
             } else {
+                console.log("Got shit", sourceFile);
                 switch (path.extname(sourceFile)) {
                 case '.C':
                 case '.cc':
@@ -102,6 +120,8 @@ class Compile extends EventEmitter {
                 case '.c++':
                 case '.cp':
                 case '.cxx':
+                    args.unshift(isClang ? 'c++' : 'c++-cpp-output');
+                    break;
                 case '.ii':
                     args.unshift('c++-cpp-output');
                     break;
@@ -114,12 +134,14 @@ class Compile extends EventEmitter {
                     args.unshift('c-header');
                     break;
                 case '.c':
+                    args.unshift(isClang ? 'c' : 'cpp-output');
+                    break;
                 case '.i':
                     args.unshift('cpp-output');
                     break;
                 case '.m':
                 case '.mi':
-                    args.unshift('objective-c-cpp-output');
+                    args.unshift(isClang ? 'objective-c' : 'objective-c-cpp-output');
                     break;
                 case '.s':
                     args.unshift('assembler');
@@ -131,7 +153,7 @@ class Compile extends EventEmitter {
                 case '.mm':
                 case '.M':
                 case '.mii':
-                    args.unshift('objective-c++-cpp-output');
+                    args.unshift(isClang ? 'objective-c++' : 'objective-c++-cpp-output');
                     break;
                 default:
                     throw new Error(`Can't determine source language for file: ${sourceFile}`);
@@ -141,6 +163,8 @@ class Compile extends EventEmitter {
         }
         if (compiler.indexOf('clang') == -1) {
             args.push('-fpreprocessed', '-fdirectives-only'); // this is not good for clang
+        } else {
+            args.push('-Wno-stdlibcxx-not-found');
         }
 
         if (!output) {
@@ -150,8 +174,8 @@ class Compile extends EventEmitter {
             output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
         }
 
-        // console.log("CALLING " + argv0 + " " + compiler + " " + args.join(' '));
-        let proc = child_process.spawn(compiler, args, { cwd: dir, argv0: argv0, maxBuffer: 1024 * 1024 * 16 });
+        // console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
+        let proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');

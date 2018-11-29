@@ -417,6 +417,11 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                 }
             }
             commandLine += " '-E'";
+            if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
+                commandLine += " '-frewrite-includes'";
+            } else {
+                commandLine += " '-fdirectives-only'";
+            }
             if (!Config::discardComments) {
                 commandLine += " '-C'";
             }
@@ -998,6 +1003,7 @@ std::string Client::prepareEnvironmentForUpload()
                                   sData.resolvedCompiler.c_str(),
                                   info.c_str()));
         proc.write(reinterpret_cast<const char *>(create_fisk_env), create_fisk_env_size);
+        DEBUG("Running create-fisk-env %s --addfile %s:/etc/compiler_info", sData.resolvedCompiler.c_str(), info.c_str());
         proc.close_stdin();
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
