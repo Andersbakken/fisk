@@ -299,6 +299,8 @@ int main(int argc, char **argv)
     select.add(&watchdog);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
     headers["x-fisk-slave-ip"] = schedulerWebsocket.slaveIp;
+    if (!schedulerWebsocket.environment.empty())
+        headers["x-fisk-environment"] = schedulerWebsocket.environment;
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
                                                schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
                                                schedulerWebsocket.slavePort), headers)) {

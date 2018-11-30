@@ -34,6 +34,7 @@ public:
             } else if (type == "slave") {
                 slaveIp = msg["ip"].string_value();
                 slaveHostname = msg["hostname"].string_value();
+                environment = msg["environment"].string_value();
                 slavePort = msg["port"].int_value();
                 jobId = msg["id"].int_value();
                 Client::data().maintainSemaphores = msg["maintain_semaphores"].bool_value();
@@ -56,7 +57,7 @@ public:
     bool needsEnvironment { false };
     int jobId { 0 };
     uint16_t slavePort { 0 };
-    std::string slaveIp, slaveHostname;
+    std::string slaveIp, slaveHostname, environment;
 };
 
 
