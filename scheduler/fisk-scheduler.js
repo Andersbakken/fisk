@@ -160,7 +160,7 @@ function syncEnvironments(slave)
     for (let env in Environments.environments) {
         if (env in slave.environments) {
             slave.environments[env] = -1;
-        } else {
+        } else if (Environments.environments[env].canRun(slave.system)) {
             needs.push(env);
         }
     }
