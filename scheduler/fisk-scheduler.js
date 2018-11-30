@@ -463,11 +463,15 @@ server.on("compile", compile => {
     let slave;
     let bestScore;
     let env;
+    let extraArgs;
+    let blacklistedArgs;
+    // console.log("got usableEnvs", usableEnvs);
     forEachSlave(s => {
-        if (compile.slave && compile.slave != s.ip && compile.slave != s.name) 
+        if (compile.slave && compile.slave != s.ip && compile.slave != s.name)
             return;
-        
+
         for (let i=0; i<usableEnvs.length; ++i) {
+            // console.log("checking slave", s.name, s.environments);
             if (usableEnvs[i] in s.environments) {
                 const slaveScore = score(s);
                 // console.log("comparing", slaveScore, bestScore);
@@ -482,7 +486,7 @@ server.on("compile", compile => {
     });
     if (!slave) {
         console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
-        compile.send("slave", {});        
+        compile.send("slave", {});
     }
     let data = {};
     // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
@@ -601,7 +605,11 @@ server.on("monitor", client => {
             }
             writeConfiguration(message);
             break;
-        case 'environments':
+        case 'linkEnvironments':
+            Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist);
+            break;
+        case 'unlinkEnvironments':
+            Environments.unlink(message.srcHash, message.targetHash);
             break;
         case 'listUsers': {
             if (!user) {

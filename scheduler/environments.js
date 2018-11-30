@@ -278,10 +278,10 @@ const environments = {
                                     environments._data[hash] = new Environment(path.join(p, e), hash, system, originalPath);
                                 }
                             });
-                            setTimeout(() => {
-                                console.log(JSON.stringify(environments._compatibilities, null, 4));
-                                // environments.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", ["ball"], ["fesk"]);
-                            }, 1000);
+                            // setTimeout(() => {
+                            //     // console.log(JSON.stringify(environments._compatibilities, null, 4));
+                            //     environments.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", [], []);
+                            // }, 1000);
                             resolve();
                         });
                     } else {
@@ -328,6 +328,7 @@ const environments = {
         let compatible = [];
         if (srcHash in environments._data)
             compatible.push(srcHash);
+        // console.log("checking", srcHash, environments._compatibilities);
         let data = environments._compatibilities[srcHash];
         if (data)
             return compatible.concat(data.targetHashes);
