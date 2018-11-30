@@ -195,6 +195,7 @@ function environmentsInfo()
             ret.usedSizeBytes += env.size;
     }
     ret.usedSize = bytes.format(ret.usedSizeBytes);
+    ret.compatibilities = Environments.compatibilitiesInfo();
     return ret;
 }
 
@@ -347,7 +348,6 @@ server.on("slave", slave => {
             monitors.forEach(monitor => monitor.send(info));
         }
     });
-
 });
 
 let pendingEnvironments = {};
@@ -447,6 +447,7 @@ server.on("compile", compile => {
     if (!Environments.hasEnvironment(compile.environment) && requestEnvironment(compile)) {
         return;
     }
+    // console.log("compatible environments", usableEnvs);
 
     if (!usableEnvs.length) {
         console.log(`We're already waiting for ${compile.environment} and we don't have any compatible ones`);
@@ -461,6 +462,7 @@ server.on("compile", compile => {
     let file;
     let slave;
     let bestScore;
+    let env;
     forEachSlave(s => {
         if (compile.slave && compile.slave != s.ip && compile.slave != s.name) 
             return;
@@ -472,6 +474,7 @@ server.on("compile", compile => {
                 if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
                     bestScore = slaveScore;
                     slave = s;
+                    env = usableEnvs[i];
                 }
                 break;
             }
@@ -486,13 +489,15 @@ server.on("compile", compile => {
     if (compile.ip in semaphoreMaintenanceTimers) {
         clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
     } else {
-        data["maintain_semaphores"] = true;
+        data.maintain_semaphores = true;
     }
     semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
         delete semaphoreMaintenanceTimers[compile.ip];
     }, 60 * 60000);
 
     if (slave) {
+        if (env != compile.environment)
+            data.environment = env;
         ++activeJobs;
         let sendTime = Date.now();
         ++slave.activeClients;
@@ -595,6 +600,8 @@ server.on("monitor", client => {
                 return;
             }
             writeConfiguration(message);
+            break;
+        case 'environments':
             break;
         case 'listUsers': {
             if (!user) {
@@ -749,7 +756,7 @@ server.on("error", err => {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-Environments.load(option("env-dir", path.join(common.cacheDir(), "environments")))
+Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environments")))
     .then(purgeEnvironmentsToMaxSize)
     // .then(() => {
     //     return db.get("users");

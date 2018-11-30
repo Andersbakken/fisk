@@ -21,7 +21,8 @@ class Database {
                         try {
                             resolve(JSON.parse(data));
                         } catch (err) {
-                            reject(`Failed to parse JSON from file: ${this.path} ${err}`);
+                            fs.renameSync(this.path, this.path + ".error");
+                            reject(new Error(`Failed to parse JSON from file: ${this.path} ${err}`));
                         }
                     }
                 }
@@ -33,12 +34,13 @@ class Database {
             return records ? records[record] : undefined;
         });
     }
-    set(record, value) {
+    set(...keyValuePairs) {
         return this.read().then(records => {
             return new Promise((resolve, reject) => {
                 if (!records)
                     records = {};
-                records[record] = value;
+                for (let i=0; i<keyValuePairs.length; i+=2)
+                    records[keyValuePairs[i]] = keyValuePairs[i + 1];
 
                 fs.writeFile(this.path + ".tmp", JSON.stringify(records), err => {
                     if (err) {
@@ -46,7 +48,7 @@ class Database {
                     } else {
                         fs.rename(this.path + ".tmp", this.path, (err) => {
                             if (err) {
-                                reject(`Failed to rename ${this.path}.tmp to ${this.path} ${err}`);
+                                reject(new Error(`Failed to rename ${this.path}.tmp to ${this.path} ${err}`));
                             } else {
                                 resolve();
                             }

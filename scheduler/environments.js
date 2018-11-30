@@ -6,7 +6,7 @@ const socket = {
 
     requestEnvironments(client) {
         console.log("queueing requestEnvironments");
-        var key = client.ip + " " + client.port;
+        let key = client.ip + " " + client.port;
         if (!socket._queue[key])
             socket._queue[key] = { client: client, sending: false, messages: [] };
         socket._queue[key].messages.push({ requestEnvironments: true });
@@ -16,7 +16,7 @@ const socket = {
     },
     enqueue(client, hash, system, file) {
         console.log("queuing", file, hash, "for", client.ip);
-        var key = client.ip + " " + client.port;
+        let key = client.ip + " " + client.port;
         if (!socket._queue[key])
             socket._queue[key] = { client: client, sending: false, messages: [] };
 
@@ -101,7 +101,6 @@ class Environment {
         }
         console.log("Created environment", JSON.stringify(this), originalPath);
     }
-
 
     get file() {
         return `${this.hash}_${this.system}.tar.gz`;
@@ -194,49 +193,120 @@ class File {
     }
 }
 
-const environments = {
-    _data: {},
-    _path: undefined,
+class CompatibilityProperties {
+    constructor(args, blacklist) {
+        this.arguments = args || [];
+        this.blacklist = blacklist || [];
+    }
+};
 
-    load(p) {
-        return new Promise((resolve, reject) => {
-            fs.stat(p).then(st => {
-                if (st.isDirectory()) {
-                    // we're good
-                    environments._path = p;
-                    fs.readdir(p).then(files => {
-                        files.forEach(e => {
-                            let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(e);
-                            if (match) {
-                                const hash = match[1];
-                                const system = match[2];
-                                const originalPath = decodeURIComponent(match[3]);
-                                environments._data[hash] = new Environment(path.join(p, e), hash, system, originalPath);
-                            }
-                        });
-                        resolve();
-                    });
-                } else {
-                    reject(`Can't use path ${p}`);
+class Compatibilities {
+    constructor() {
+        this._targets = {};
+    }
+
+    get targets() {
+        return this._targets;
+    }
+
+    toObject() {
+        return this._targets;
+    }
+
+    contains(targetHash) {
+        return targetHash in this._targets;
+    }
+
+    arguments(targetHash) {
+        const ret = this._targets[targetHash];
+        return ret ? ret.arguments : [];
+    }
+
+    blacklist(targetHash) {
+        const ret = this._targets[targetHash];
+        return ret ? ret.blacklist : [];
+    }
+
+    set(targetHash, args, blacklist) {
+        this._targets[targetHash] = new CompatibilityProperties(args, blacklist);
+    }
+
+    unset(targetHash) {
+        delete this._targets[targetHash];
+    }
+
+    get targetHashes() {
+        return Object.keys(this._targets);
+    }
+
+    get size() {
+        return Object.keys(this._targets).length;
+    }
+};
+
+const environments = {
+    _data: {}, // key: hash, value: class Environment
+    _compatibilities: {}, // key: srcHash, value: class Compatibilities { targetHash, CompatibilityProperties { arguments, blacklist } }
+    _path: undefined,
+    _db: undefined,
+
+    load(db, p) {
+        this._db = db;
+        return db.get("compatibilities").then(compatibilities => {
+            if (compatibilities) {
+                for (var srcHash in compatibilities) {
+                    let targets = compatibilities[srcHash];
+                    let data = environments._compatibilities[srcHash] = new Compatibilities();
+                    for (let target in targets) {
+                        let obj = targets[target];
+                        data.set(target, obj.arguments, obj.blacklist);
+                    }
                 }
-            }).catch(e => {
-                if ("code" in e && e.code == "ENOENT") {
-                    // make the directory
-                    fs.mkdirp(p, err => {
-                        if (err) {
-                            reject(`Can't make directory ${p}: ${e.message}`);
-                            return;
-                        }
+            }
+            return new Promise((resolve, reject) => {
+                fs.stat(p).then(st => {
+                    if (st.isDirectory()) {
                         // we're good
                         environments._path = p;
-                        resolve();
-                    });
-                } else {
-                    reject(`Can't make directory ${p}: ${e.message}`);
-                }
+                        fs.readdir(p).then(files => {
+                            files.forEach(e => {
+                                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(e);
+                                if (match) {
+                                    const hash = match[1];
+                                    const system = match[2];
+                                    const originalPath = decodeURIComponent(match[3]);
+                                    environments._data[hash] = new Environment(path.join(p, e), hash, system, originalPath);
+                                }
+                            });
+                            setTimeout(() => {
+                                console.log(JSON.stringify(environments._compatibilities, null, 4));
+                                // environments.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", ["ball"], ["fesk"]);
+                            }, 1000);
+                            resolve();
+                        });
+                    } else {
+                        reject(`Can't use path ${p}`);
+                    }
+                }).catch(e => {
+                    if ("code" in e && e.code == "ENOENT") {
+                        // make the directory
+                        fs.mkdirp(p, err => {
+                            if (err) {
+                                reject(`Can't make directory ${p}: ${e.message}`);
+                                return;
+                            }
+                            // we're good
+                            environments._path = p;
+                            resolve();
+                        });
+                    } else {
+                        reject(`Can't make directory ${p}: ${e.message}`);
+                    }
+                });
             });
         });
     },
+
 
     prepare(environment) {
         if (environment.hash in environments._data)
@@ -254,11 +324,43 @@ const environments = {
         return hash in environments._data;
     },
 
-    compatibleEnvironments(hash) {
-        let ret = [];
-        if (hash in environments._data)
-            ret.push(hash);
-        return ret;
+    compatibleEnvironments(srcHash) {
+        let compatible = [];
+        if (srcHash in environments._data)
+            compatible.push(srcHash);
+        let data = environments._compatibilities[srcHash];
+        if (data)
+            return compatible.concat(data.targetHashes);
+        return compatible;
+    },
+
+    link(srcHash, targetHash, args, blacklist) {
+        let data = environments._compatibilities[srcHash];
+        if (!data)
+            data = environments._compatibilities[srcHash] = new Compatibilities();
+        data.set(targetHash, args, blacklist);
+        return this.syncCompatibilities();
+    },
+
+    unlink(srcHash, targetHash) {
+        if (!srcHash) {
+            for (let src in environments._compatibilities) {
+                let targets = environments._compatibilities[src];
+                targets.unset(targetHash);
+                if (!targets.size) {
+                    delete environments._compatibilities[src];
+                }
+            }
+        } else if (!targetHash) {
+            delete environments._compatibilities[srcHash];
+        } else {
+            let targets = environments._compatibilities[srcHash];
+            targets.unset(targetHash);
+            if (!targets.size) {
+                delete environments._compatibilities[srcHash];
+            }
+        }
+        return this.syncCompatibilities();
     },
 
     requestEnvironments(slave) {
@@ -275,10 +377,25 @@ const environments = {
         return environments._data[hash];
     },
 
-    remove(hash) {
+    compatibilitiesInfo() {
+        let obj = {};
+        for (let srcHash in this._compatibilities) {
+            obj[srcHash] = this._compatibilities[srcHash].targets;
+        }
+        return obj;
+    },
+
+    syncCompatibilities() {
+        return this._db.set("compatibilities", this.compatibilitiesInfo());
+    },
+
+    remove(hash) { // ### this should be promisified
         try {
             fs.removeSync(environments._data[hash].path);
             delete environments._data[hash];
+            this.unlink(hash);
+            this.unlink(undefined, hash);
+            this.syncCompatibilities();
         } catch (err) {
             console.error("Failed to remove environment", environments._data[hash].path, err);
             return;
