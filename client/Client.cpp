@@ -957,7 +957,6 @@ std::string Client::prepareEnvironmentForUpload()
         return std::string();
     }
 
-
     {
         std::string stdOut, stdErr;
         TinyProcessLib::Process proc(sData.resolvedCompiler + " -v", dir,
