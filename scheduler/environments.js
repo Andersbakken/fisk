@@ -254,6 +254,13 @@ const environments = {
         return hash in environments._data;
     },
 
+    compatibleEnvironments(hash) {
+        let ret = [];
+        if (hash in environments._data)
+            ret.push(hash);
+        return ret;
+    },
+
     requestEnvironments(slave) {
         socket.requestEnvironments(slave);
     },

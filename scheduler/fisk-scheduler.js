@@ -350,8 +350,80 @@ server.on("slave", slave => {
 
 });
 
-let semaphoreMaintenanceTimers = {};
 let pendingEnvironments = {};
+function requestEnvironment(compile)
+{
+    if (compile.environment in pendingEnvironments)
+        return false;
+    pendingEnvironments[compile.environment] = true;
+
+    console.log(`Asking ${compile.name} ${compile.ip} to upload ${compile.environment}`);
+    compile.send({ type: "needsEnvironment" });
+
+    let file;
+    let gotLast = false;
+    compile.on("uploadEnvironment", environment => {
+        file = Environments.prepare(environment);
+        console.log("Got environment message", environment, typeof file);
+        if (!file) {
+            // we already have this environment
+            console.error("already got environment", environment.message);
+            compile.send({ error: "already got environment" });
+            compile.close();
+            return;
+        }
+        let hash = environment.hash;
+        compile.on("uploadEnvironmentData", environment => {
+            if (!file) {
+                console.error("no pending file");
+                compile.send({ error: "no pending file" });
+                compile.close();
+                return;
+            }
+            if (environment.last) {
+                gotLast = true;
+                console.log("Got environmentdata message", environment.data.length, environment.last);
+            }
+            file.save(environment.data).then(() => {
+                if (environment.last) {
+                    file.close();
+                    compile.close();
+                    Environments.complete(file);
+                    file = undefined;
+                    // send any new environments to slaves
+                    delete pendingEnvironments[hash];
+                    purgeEnvironmentsToMaxSize().then(() => {
+                        syncEnvironments();
+                    }).catch(error => {
+                        console.error("Got some error here", error);
+                    });
+                }
+            }).catch(err => {
+                console.log("file error", err);
+                file = undefined;
+            });
+        });
+    });
+    compile.on("error", msg => {
+        console.error(`upload error '${msg}' from ${compile.ip}`);
+        if (file) {
+            file.discard();
+            file = undefined;
+        }
+        delete pendingEnvironments[compile.environment];
+    });
+    compile.once("close", () => {
+        if (file && !gotLast) {
+            console.log("compile with upload closed", compile.environment, "discarding");
+            file.discard();
+            file = undefined;
+        }
+        delete pendingEnvironments[compile.environment];
+    });
+    return true;
+}
+
+let semaphoreMaintenanceTimers = {};
 server.on("compile", compile => {
     if (compile.npmVersion) {
         let match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(compile.npmVersion);
@@ -370,96 +442,15 @@ server.on("compile", compile => {
             return;
         }
     }
-    // console.log("request", compile.hostname, compile.ip, compile.environments);
-    let found = false;
-    for (let i=0; i<compile.environments.length; ++i) {
-        if (Environments.hasEnvironment(compile.environments[i])) {
-            found = true;
-            break;
-        }
+    // console.log("request", compile.hostname, compile.ip, compile.environment);
+    const usableEnvs = Environments.compatibleEnvironments(compile.environment);
+    if (!Environments.hasEnvironment(compile.environment) && requestEnvironment(compile)) {
+        return;
     }
-    let needed = [];
-    if (!found) {
-        compile.environments.forEach(env => {
-            // console.log(`checking ${env} ${pendingEnvironments} ${env in pendingEnvironments}`);
-            if (!(env in pendingEnvironments)) {
-                needed.push(env);
-                pendingEnvironments[env] = true;
-            }
-        });
-        if (!needed.length) {
-            console.log(`We're already waiting for ${compile.environments}`);
-            compile.send("slave", {});
-            return;
-        }
-        console.log(`Asking ${compile.name} ${compile.ip} to upload ${needed}`);
-        compile.send({ type: "needsEnvironment", environments: needed });
 
-        let file;
-        let gotLast = false;
-        compile.on("uploadEnvironment", environment => {
-            file = Environments.prepare(environment);
-            console.log("Got environment message", environment, typeof file);
-            if (!file) {
-                // we already have this environment
-                console.error("already got environment", environment.message);
-                compile.send({ error: "already got environment" });
-                compile.close();
-                return;
-            }
-            let hash = environment.hash;
-            compile.on("uploadEnvironmentData", environment => {
-                if (!file) {
-                    console.error("no pending file");
-                    compile.send({ error: "no pending file" });
-                    compile.close();
-                    return;
-                }
-                if (environment.last) {
-                    gotLast = true;
-                    console.log("Got environmentdata message", environment.data.length, environment.last);
-                }
-                file.save(environment.data).then(() => {
-                    if (environment.last) {
-                        file.close();
-                        compile.close();
-                        Environments.complete(file);
-                        file = undefined;
-                        // send any new environments to slaves
-                        delete pendingEnvironments[hash];
-                        purgeEnvironmentsToMaxSize().then(() => {
-                            syncEnvironments();
-                        }).catch(error => {
-                            console.error("Got some error here", error);
-                        });
-                    }
-                }).catch(err => {
-                    console.log("file error", err);
-                    file = undefined;
-                });
-            });
-        });
-        compile.on("error", msg => {
-            console.error(`upload error '${msg}' from ${compile.ip}`);
-            if (file) {
-                file.discard();
-                file = undefined;
-            }
-            needed.forEach(env => {
-                delete pendingEnvironments[env];
-            });
-        });
-        compile.once("close", () => {
-            if (file && !gotLast) {
-                console.log("compile with upload closed", needed, "discarding");
-                file.discard();
-                file = undefined;
-            }
-            needed.forEach(env => {
-                delete pendingEnvironments[env];
-            });
-        });
-
+    if (!usableEnvs.length) {
+        console.log(`We're already waiting for ${compile.environment} and we don't have any compatible ones`);
+        compile.send("slave", {});
         return;
     }
 
@@ -471,33 +462,25 @@ server.on("compile", compile => {
     let slave;
     let bestScore;
     forEachSlave(s => {
-        found = false;
-        for (let i=0; i<compile.environments.length; ++i) {
-            if (compile.environments[i] in s.environments) {
-                found = true;
+        if (compile.slave && compile.slave != s.ip && compile.slave != s.name) 
+            return;
+        
+        for (let i=0; i<usableEnvs.length; ++i) {
+            if (usableEnvs[i] in s.environments) {
+                const slaveScore = score(s);
+                // console.log("comparing", slaveScore, bestScore);
+                if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
+                    bestScore = slaveScore;
+                    slave = s;
+                }
                 break;
             }
         }
-
-        // console.log(`Any finds for ${compile.environments} ${found}`);
-
-        if (found) {
-            let slaveScore;
-            // console.log("Got compile.slave", compile.slave, s.ip);
-            if (compile.slave && (compile.slave == s.ip || compile.slave == s.name)) {
-                slaveScore = Infinity;
-            } else {
-                slaveScore = score(s);
-            }
-            // console.log("comparing", slaveScore, bestScore);
-            if (!slave || slaveScore > bestScore || (slaveScore == bestScore && s.lastJob < slave.lastJob)) {
-                bestScore = slaveScore;
-                slave = s;
-            }
-        // } else {
-        //     console.log("Dude't havethe compiler", s.ip);
-        }
     });
+    if (!slave) {
+        console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
+        compile.send("slave", {});        
+    }
     let data = {};
     // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
     if (compile.ip in semaphoreMaintenanceTimers) {

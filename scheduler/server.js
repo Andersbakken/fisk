@@ -142,13 +142,13 @@ class Server extends EventEmitter {
                 console.log("Balls", req.headers);
                 return;
             }
-            const compileEnvironments = req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').filter(x => x);
+            const compileEnvironment = req.headers["x-fisk-environments"];
 
             let data = {
                 ws: ws,
                 ip: ip,
                 type: Client.Type.Compile,
-                environments: compileEnvironments,
+                environment: compileEnvironment,
                 sourceFile: req.headers["x-fisk-sourcefile"]
             };
             const npmVersion = req.headers["x-fisk-npm-version"];
