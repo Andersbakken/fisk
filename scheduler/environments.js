@@ -102,6 +102,10 @@ class Environment {
         console.log("Created environment", JSON.stringify(this), originalPath);
     }
 
+    toString() {
+        return JSON.stringify(this, null, 4);
+    }
+
     get file() {
         return `${this.hash}_${this.system}.tar.gz`;
     }
@@ -136,6 +140,10 @@ class File {
         this.hash = hash;
         this.system = system;
         this.originalPath = originalPath;
+    }
+
+    toString() {
+        return JSON.stringify(this, null, 4);
     }
 
     save(data) {
@@ -198,11 +206,19 @@ class CompatibilityProperties {
         this.arguments = args || [];
         this.blacklist = blacklist || [];
     }
+
+    toString() {
+        return JSON.stringify(this, null, 4);
+    }
 };
 
 class Compatibilities {
     constructor() {
         this._targets = {};
+    }
+
+    toString() {
+        return JSON.stringify(this, null, 4);
     }
 
     get targets() {
