@@ -90,7 +90,7 @@ Separator s8("Identity:");
 Getter<std::string> hostname("hostname", "Set hostname", std::string(), [](const std::string &value) {
         if (!value.empty())
             return value;
-        std::string name(_POSIX_HOST_NAME_MAX + 1, ' ');
+        std::string name(256, ' ');
         ::gethostname(&name[0], name.size());
         name.resize(strlen(name.c_str()));
         return name;
