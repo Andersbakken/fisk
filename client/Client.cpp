@@ -528,7 +528,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
     if (!sem) {
         ERROR("Failed to open semaphore %s for %zu slots: %d %s",
               Client::Slot::typeToString(type), slots, errno, strerror(errno));
-        return std::make_unique<Client::Slot>(type, nullptr);
+        return std::unique_ptr<Client::Slot>(new Client::Slot(type, nullptr));
     }
     int ret;
     EINTRWRAP(ret, sem_wait(sem));
@@ -544,7 +544,7 @@ std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
     }
 
     assert(!ret);
-    return std::make_unique<Client::Slot>(type, sem);
+    return std::unique_ptr<Client::Slot>(new Client::Slot(type, sem));
 }
 
 void Client::writeStatistics()
@@ -618,11 +618,11 @@ std::unique_ptr<Client::Slot> Client::tryAcquireSlot(Client::Slot::Type type)
     if (!sem) {
         ERROR("Failed to open semaphore %s for %zu slots: %d %s",
               Client::Slot::typeToString(type), slots, errno, strerror(errno));
-        return std::make_unique<Client::Slot>(type, nullptr);
+        return std::unique_ptr<Client::Slot>(new Client::Slot(type, nullptr));
     }
     int ret = sem_trywait(sem);
     if (!ret) {
-        return std::make_unique<Client::Slot>(type, sem);
+        return std::unique_ptr<Client::Slot>(new Client::Slot(type, sem));
     }
     return std::unique_ptr<Client::Slot>();
 }
