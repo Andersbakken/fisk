@@ -638,18 +638,23 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         argvCopy[sData.argc] = 0;
         for (size_t i=0; i<3; ++i) {
             ::execv(sData.compiler.c_str(), argvCopy);
-            DEBUG("Trying execv(%s) again errno: %d %s", sData.compiler.c_str(), errno, strerror(errno));
+            ERROR("Trying execv(%s) again errno: %d %s", sData.compiler.c_str(), errno, strerror(errno));
             usleep(75000);
         }
         ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
     pid_t pid;
-    for (size_t i=0; i<3; ++i) {
+    enum { Increment = 75000 };
+    size_t micros = 0;
+    while (true) {
         pid = fork();
         if (pid == -1 && errno == EAGAIN) {
-            DEBUG("Fork failed (%s) again errno: %d %s. Trying again...", sData.compiler.c_str(), errno, strerror(errno));
-            usleep(75000);
+            if (micros < Increment * 10)
+                micros += Increment;
+            ERROR("Fork failed (%s) again errno: %d %s. Trying again... in %zums",
+                  sData.compiler.c_str(), errno, strerror(errno), micros / 1000);
+            usleep(micros);
         } else {
             break;
         }
