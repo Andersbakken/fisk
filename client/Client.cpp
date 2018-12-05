@@ -661,6 +661,7 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
     }
     if (pid == -1) { // errpr
         ERROR("Failed to fork: %d %s", errno, strerror(errno));
+        slot.reset();
         run();
         exit(101);
     } else if (pid == 0) { // child
