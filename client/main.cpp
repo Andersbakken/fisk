@@ -10,7 +10,6 @@
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
-#include <regex>
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
