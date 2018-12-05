@@ -226,8 +226,14 @@ int main(int argc, char **argv)
     if (url.find("://") == std::string::npos)
         url.insert(0, "ws://");
 
-    std::regex regex(":[0-9]+$", std::regex_constants::ECMAScript);
-    if (!std::regex_search(url, regex))
+    size_t colon = url.find(':', 6);
+    if (colon != std::string::npos) {
+        ++colon;
+        while (std::isdigit(url[colon])) {
+            ++colon;
+        }
+    }
+    if (colon != url.size())
         url.append(":8097");
 
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
