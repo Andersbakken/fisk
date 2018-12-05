@@ -629,6 +629,7 @@ std::unique_ptr<Client::Slot> Client::tryAcquireSlot(Client::Slot::Type type)
 
 void Client::runLocal(std::unique_ptr<Slot> &&slot)
 {
+    enum { Increment = 75000 };
     auto run = []() {
         char **argvCopy = new char*[sData.argc + 1];
         argvCopy[0] = strdup(sData.compiler.c_str());
@@ -636,16 +637,18 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
             argvCopy[i] = sData.argv[i];
         }
         argvCopy[sData.argc] = 0;
-        for (size_t i=0; i<3; ++i) {
+        size_t micros = 0;
+        while (true) {
             ::execv(sData.compiler.c_str(), argvCopy);
-            ERROR("Trying execv(%s) again errno: %d %s", sData.compiler.c_str(), errno, strerror(errno));
+            if (micros < Increment * 10)
+                micros += Increment;
+            ERROR("Trying execv(%s) again in %zu ms errno: %d %s", sData.compiler.c_str(), micros / 1000, errno, strerror(errno));
             usleep(75000);
         }
         ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
     };
 
     pid_t pid;
-    enum { Increment = 75000 };
     size_t micros = 0;
     while (true) {
         pid = fork();
