@@ -53,14 +53,22 @@ int main(int argc, char **argv)
     if (!Config::init(argc, argv)) {
         return 1;
     }
+
+    if (unsigned long long delay = Config::delay) {
+        DEBUG("Sleeping for %llu ms", delay);
+        usleep(delay * 1000);
+    }
+
     if (Config::help) {
         Config::usage(stdout);
         return 0;
     }
+
     if (Config::version) {
         printf("%s\n", npm_version);
         return 0;
     }
+
     if (Config::dumpSemaphores) {
 #ifdef __APPLE__
         fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");

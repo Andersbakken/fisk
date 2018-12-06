@@ -217,5 +217,6 @@ extern Getter<bool> debug;
 extern Getter<bool> discardComments;
 extern Getter<bool> dumpSemaphores;
 extern Getter<bool> cleanSemaphores;
+extern Getter<unsigned long long> delay;
 }
 #endif /* CONFIG_H */
