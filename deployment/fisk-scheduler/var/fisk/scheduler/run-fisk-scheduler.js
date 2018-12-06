@@ -54,7 +54,7 @@ function startFisk()
             checkForUpdate();
         }
 
-        fisk = child_process.execFile("node", [ "./fisk-scheduler.js" ],
+        fisk = child_process.execFile("node", [ "--max_old_space_size=8192", "./fisk-scheduler.js" ],
                                       {
                                           maxBuffer: 1024 * 1024 * 16,
                                           cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
