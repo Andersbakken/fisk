@@ -23,6 +23,8 @@ class Compile extends EventEmitter {
             case '-MF':
             case '-MQ':
             case '-MT':
+                ++i;
+                continue;
             case '-o':
                 ++i;
                 output = args[i];
