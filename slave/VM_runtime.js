@@ -32,12 +32,14 @@ if (pwd) {
     process.setgid(pwd.gid);
     process.setuid(pwd.uid);
 }
-process.send({type: "ready"});
+setTimeout(() => { // hack
+    process.send({type: "ready"});
+}, 1000);
 
 let compiles = {};
 let destroying = false;
 
-process.on('message', (msg) => {
+process.on('message', msg => {
     switch (msg.type) {
     case 'destroy':
         if (!compiles.length) {
