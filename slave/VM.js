@@ -51,12 +51,14 @@ class VM extends EventEmitter
         if (user)
             args.push(`--user=${user}`);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
+        let gotReady = false;
         this.child.on('message', (msg) => {
             // console.log("GOT MESSAGE", msg);
             let that;
             switch (msg.type) {
             case 'ready':
-                this.emit('ready');
+                gotReady = true;
+                this.emit('ready', { success: true });
                 break;
             case 'compileStdOut':
                 that = this.compiles[msg.id];
@@ -93,6 +95,13 @@ class VM extends EventEmitter
                     fs.remove(this.compiles[msg.id].dir);
                 delete this.compiles[msg.id];
                 break;
+            }
+        });
+        this.child.on('error', err => {
+            if (!gotReady) {
+                this.emit('ready', { success: false, error: err });
+            } else {
+                console.error("Got error", err.toString());
             }
         });
         this.child.on('exit', evt => {

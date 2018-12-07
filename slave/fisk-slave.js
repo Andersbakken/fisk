@@ -240,7 +240,21 @@ client.on("data", message => {
             console.log(`Unlink ${pending.file} ${pending.hash}`);
             return fs.unlink(pending.file);
         }).then(() => {
-            environments[pending.hash] = new VM(pending.dir, pending.hash);
+            let vm = new VM(pending.dir, pending.hash);
+            return new Promise((resolve, reject) => {
+                let done = false;
+                vm.on('error', err => {
+                    if (!done) {
+                        reject(err);
+                    }
+                });
+                vm.on('ready', () => {
+                    done = true;
+                    resolve(vm);
+                });
+            });
+        }).then(vm => {
+            environments[pending.hash] = vm;
             inform();
         }).catch((err) => {
             console.error("Got failure setting up environment", err);
