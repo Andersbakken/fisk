@@ -5,7 +5,7 @@ const path = require('path');
 const EventEmitter = require('events');
 
 class Compile extends EventEmitter {
-    constructor(args, argv0, dir) {
+    constructor(args, argv0, dir, debug) {
         super();
 
         if (!args || !args.length || !dir || !argv0) {
@@ -14,26 +14,35 @@ class Compile extends EventEmitter {
         }
         let compiler = args.shift();
         const isClang = compiler.indexOf('clang') != -1;
-        let output;
 
+        let output;
+        let depfile;
+        let hasDashO = false;
+        let hasMF = false;
+        let hasM = false;
         let hasDashX = false;
         let sourceFile;
         for (let i=0; i<args.length; ++i) {
+            // console.log(i, args[i]);
             switch (args[i]) {
-            case '-MF':
-            case '-MQ':
-            case '-MT':
-                ++i;
-                continue;
-            case '-o':
-                ++i;
-                output = args[i];
-                args[i] = path.join(dir, "output.o");
-                continue;
+            case '-o': {
+                hasDashO = true;
+                output = args[++i];
+                args[i] = "output.o";
+                break; }
+            case '-MF': {
+                hasMF = true;
+                depfile = args[++i];
+                args[i] = "output.d";
+                break; }
             case '-MMD':
             case '-MD':
             case '-MM':
             case '-M':
+                hasM = true;
+                continue;
+            case '-MT':
+                ++i;
                 continue;
             case '-cxx-isystem':
             case '-isysroot':
@@ -111,7 +120,6 @@ class Compile extends EventEmitter {
             if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
                 args.unshift(isClang ? 'c++' : 'c++-cpp-output');
             } else {
-                console.log("Got shit", sourceFile);
                 switch (path.extname(sourceFile)) {
                 case '.C':
                 case '.cc':
@@ -167,14 +175,20 @@ class Compile extends EventEmitter {
             args.push('-Wno-stdlibcxx-not-found');
         }
 
-        if (!output) {
-            let out = path.join(dir, "output.o");
-            args.push("-o", out);
-            var suffix = path.extname(sourceFile);
+        if (!hasDashO) {
+            args.push("-o", "output.o");
+            let suffix = path.extname(sourceFile);
             output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
         }
 
-        // console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
+        if (hasM && !hasMF) {
+            args.push("-MF", "output.d");
+            let suffix = path.extname(sourceFile);
+            depfile = sourceFile.substr(0, sourceFile.length - suffix) + ".d";
+        }
+
+        if (debug)
+            console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
         let proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
@@ -206,6 +220,8 @@ class Compile extends EventEmitter {
                             } else if (stat.isFile()) {
                                 if (file == "output.o") {
                                     files.push({ path: output, mapped: path.join(prefix, file) });
+                                } else if (file == "output.d") {
+                                    files.push({ path: depfile, mapped: path.join(prefix, file) });
                                 } else if (file == "output.gcno") {
                                     // console.log("mapping", output, prefix, file);
                                     files.push({ path: output.substr(0, output.length - 1) + "gcno", mapped: path.join(prefix, file) });
@@ -214,10 +230,11 @@ class Compile extends EventEmitter {
                                 } else {
                                     files.push({ path: path.join(prefix, file) });
                                 }
+                                if (debug)
+                                    console.log("Added file", file, files[files.length - 1]);
                             }
                         } catch (err) {
                         }
-                        // console.log("ADDED FILE", file, files[files.length - 1]);
                     });
                 } catch (err) {
                     that.emit('exit', { exitCode: 101, files: [], error: err, sourceFile: sourceFile });
@@ -228,6 +245,7 @@ class Compile extends EventEmitter {
             this.emit('exit', { exitCode: exitCode, files: files, sourceFile: sourceFile });
         });
     }
+
     kill() {
         this.proc.kill();
     }
