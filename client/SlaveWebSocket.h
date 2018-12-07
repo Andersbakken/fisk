@@ -17,7 +17,8 @@ public:
     {
         DEBUG("GOT MESSAGE %s %zu bytes", type == WebSocket::Text ? "text" : "binary", len);
         if (type == WebSocket::Text) {
-            DEBUG("GOT MSG [%s]", std::string(reinterpret_cast<const char *>(data), len).c_str());
+            WARN("Got message from slave %s %s", url().c_str(),
+                 std::string(reinterpret_cast<const char *>(data), len).c_str());
             std::string err;
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
             if (!err.empty()) {

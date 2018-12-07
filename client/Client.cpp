@@ -627,6 +627,17 @@ std::unique_ptr<Client::Slot> Client::tryAcquireSlot(Client::Slot::Type type)
     return std::unique_ptr<Client::Slot>();
 }
 
+static std::string argsAsString()
+{
+    std::string ret = sData.compiler;
+    for (int i=1; i<sData.argc; ++i) {
+        ret += sData.argv[i];
+        ret += ' ';
+    }
+    ret.resize(ret.size() - 1);
+    return ret;
+}
+
 void Client::runLocal(std::unique_ptr<Slot> &&slot)
 {
     enum { Increment = 75000 };
@@ -639,6 +650,7 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot)
         argvCopy[sData.argc] = 0;
         size_t micros = 0;
         while (true) {
+            WARN("Running local: %s", argsAsString().c_str());
             ::execv(sData.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;

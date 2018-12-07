@@ -32,6 +32,7 @@ public:
         WaitingForUpgrade,
         ConnectedWebSocket
     };
+    std::string url() const { return mUrl; }
     State state() const { return mState; }
 
     const std::vector<std::string> &handshakeResponseHeaders() const { return mHandshakeResponseHeaders; }

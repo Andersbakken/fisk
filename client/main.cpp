@@ -45,7 +45,7 @@ int main(int argc, char **argv)
                                               watchdog->timings[i] - watchdog->timings[i - 1],
                                               watchdog->timings[i] - Client::started);
                     }
-                    Log::log(Log::Warn, str);
+                    Log::log(Log::Debug, str);
                 }
             }
         });
