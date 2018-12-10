@@ -112,6 +112,8 @@ Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\",
                              "error"
 #endif
     );
+
+Getter<bool> logTimePrefix("log-time-prefix", "Add a time prefix to logs", false);
 Getter<bool> debug("debug", "Set log level to \"debug\"", false);
 Getter<bool> verbose("verbose", "Set log level to \"verbose\"", false);
 Separator s11;

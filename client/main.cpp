@@ -54,11 +54,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (unsigned long long delay = Config::delay) {
-        DEBUG("Sleeping for %llu ms", delay);
-        usleep(delay * 1000);
-    }
-
     if (Config::help) {
         Config::usage(stdout);
         return 0;
@@ -104,21 +99,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    Watchdog watchdog;
-    Client::Data &data = Client::data();
-    data.argv = argv;
-    data.argc = argc;
-    data.watchdog = &watchdog;
-    auto signalHandler = [](int) {
-        for (sem_t *semaphore : Client::data().semaphores) {
-            sem_post(semaphore);
-        }
-        _exit(1);
-    };
-    for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
-        std::signal(signal, signalHandler);
-    }
-
     std::string clientName = Config::name;
 
     Log::Level level = Log::Silent;
@@ -139,6 +119,26 @@ int main(int argc, char **argv)
     std::string preresolved = Config::compiler;
 
     Log::init(level, Config::logFile, Config::logFileAppend ? Log::Append : Log::Overwrite);
+
+    if (unsigned long long delay = Config::delay) {
+        DEBUG("Sleeping for %llu ms", delay);
+        usleep(delay * 1000);
+    }
+
+    Watchdog watchdog;
+    Client::Data &data = Client::data();
+    data.argv = argv;
+    data.argc = argc;
+    data.watchdog = &watchdog;
+    auto signalHandler = [](int) {
+        for (sem_t *semaphore : Client::data().semaphores) {
+            sem_post(semaphore);
+        }
+        _exit(1);
+    };
+    for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
+        std::signal(signal, signalHandler);
+    }
 
     if (preresolved.empty()) {
         std::string fn;

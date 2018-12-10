@@ -212,6 +212,7 @@ extern Getter<std::string> name;
 extern Getter<std::string> logFile;
 extern Getter<bool> logFileAppend;
 extern Getter<std::string> logLevel;
+extern Getter<bool> logTimePrefix;
 extern Getter<bool> verbose;
 extern Getter<bool> debug;
 extern Getter<bool> discardComments;

@@ -6,7 +6,7 @@
 Watchdog::Watchdog()
     : mState(Config::watchdog ? Running : Stopped)
 {
-    mTransitionTime = Watchdog::timings[Initial] = Client::started;
+    mTransitionTime = Watchdog::timings[Initial] = Client::mono();
 }
 
 void Watchdog::transition(Stage stage)

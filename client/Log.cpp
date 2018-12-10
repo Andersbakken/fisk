@@ -6,7 +6,7 @@
 static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
-// static const pid_t sPid = getpid();
+static const unsigned long long sPid = getpid();
 static std::mutex sMutex;
 std::string sLogFileName;
 
@@ -70,14 +70,12 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
 
     std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
-    // const unsigned long long elapsed = Client::mono() - Client::started;
-// #ifdef __linux__
-//     const char *format = "%05d %llu.%03llu: ";
-// #else
-//     const char *format = "%08d %llu.%03llu: ";
-// #endif
-    // fprintf(stdout, format, sPid, elapsed / 1000, elapsed % 1000);
-    fwrite(string.c_str(), 1, string.size(), stderr);
+    const unsigned long long elapsed = Client::mono() - Client::started;
+    if (level >= sLevel) {
+        if (Config::logTimePrefix)
+            fprintf(stderr, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
+        fwrite(string.c_str(), 1, string.size(), stderr);
+    }
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
         sLogFile = fopen(sLogFileName.c_str(), "a");
@@ -88,7 +86,8 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     }
 
     if (sLogFile) {
-        // fprintf(sLogFile, format, sPid, elapsed / 1000, elapsed % 1000);
+        if (Config::logTimePrefix)
+            fprintf(sLogFile, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
