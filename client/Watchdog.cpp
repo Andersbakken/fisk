@@ -69,7 +69,7 @@ void Watchdog::onTimeout()
 {
     if (mState == Running && Client::mono() >= mTimeoutTime) {
         ERROR("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
     }
 }
 

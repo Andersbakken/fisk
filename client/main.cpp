@@ -162,14 +162,14 @@ int main(int argc, char **argv)
 
     if (!Config::noDesire) {
         if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-            Client::runLocal(std::move(slot));
+            Client::runLocal(std::move(slot), "nodesire");
             return 0;
         }
     }
 
     if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "disabled");
         return 0; // unreachable
     }
 
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "compiler args parse failure");
         return 0; // unreachable
     }
 
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
     if (!data.preprocessed) {
         ERROR("Failed to preprocess");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess failure");
         return 0; // unreachable
     }
 
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error");
         return 0; // unreachable
     }
 
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
         if (!schedulerWebsocket.done) {
             DEBUG("Have to run locally because no server 2");
             watchdog.stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error 2");
             return 0; // unreachable
         }
     }
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
         if (!tarball.empty()) {
             Client::uploadEnvironment(&schedulerWebsocket, tarball);
         }
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "needs environment");
         return 0;
     }
 
@@ -300,7 +300,7 @@ int main(int argc, char **argv)
         || !schedulerWebsocket.slavePort) {
         DEBUG("Have to run locally because no slave");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "no slave");
         return 0; // unreachable
     }
 
@@ -321,7 +321,7 @@ int main(int argc, char **argv)
                                                schedulerWebsocket.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure");
         return 0; // unreachable
     }
 
@@ -339,7 +339,7 @@ int main(int argc, char **argv)
     if (data.preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
         return 0; // unreachable
     }
 
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             watchdog.stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 5");
             return 0; // unreachable
         }
     }
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 3");
         return 0; // unreachable
     }
 
@@ -390,7 +390,7 @@ int main(int argc, char **argv)
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
         watchdog.stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 4");
         return 0; // unreachable
     }
 

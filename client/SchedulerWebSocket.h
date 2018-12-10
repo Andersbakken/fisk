@@ -23,7 +23,7 @@ public:
             if (!err.empty()) {
                 ERROR("Failed to parse json from scheduler: %s", err.c_str());
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile));
+                Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler json parse error");
                 return;
             }
             DEBUG("GOT JSON\n%s", msg.dump().c_str());
