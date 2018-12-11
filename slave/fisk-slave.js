@@ -224,10 +224,12 @@ client.on("data", message => {
     ++pendingVMS;
     function inform()
     {
-        if (!--pendingVMS && !pendingEnvironment) {
-            client.send("environments", { environments: Object.keys(environments) });
-            console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
-        }
+        setTimeout(() => {
+            if (!--pendingVMS && !pendingEnvironment) {
+                client.send("environments", { environments: Object.keys(environments) });
+                console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
+            }
+        }, 30000);
     }
     exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
         then(() => {
