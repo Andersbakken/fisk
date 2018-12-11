@@ -187,8 +187,12 @@ class Compile extends EventEmitter {
             depfile = sourceFile.substr(0, sourceFile.length - suffix) + ".d";
         }
 
+        // debug = true;
         if (debug)
             console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
+        if (!fs.existsSync("/usr/bin/as")) {
+            this.emit("stderr", "as doesn't exist");
+        }
         let proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
