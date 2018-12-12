@@ -395,7 +395,6 @@ server.on("job", (job) => {
                 // job.close();
                 const end = Date.now();
                 // console.log("GOT ID", j);
-                client.send("log", `Did job for ${job.ip}`);
                 client.send("jobFinished", {
                     id: j.id,
                     cppSize: event.cppSize,
