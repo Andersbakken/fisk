@@ -7,7 +7,7 @@ import { FiskService } from '../fisk.service';
     styleUrls: ['./logs.component.css']
 })
 export class LogsComponent implements AfterViewInit {
-    private files:any;
+    public files:any;
     private expanded:string = "";
 
     constructor(private fisk: FiskService) {
