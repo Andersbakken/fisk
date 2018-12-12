@@ -60,6 +60,10 @@ export class FiskService {
         }
     }
 
+    send(message: any) {
+        this.ws.send(message);
+    }
+
     private resolvePending(ok: boolean) {
         if (this.pendingConnect.length > 0) {
             const pending = this.pendingConnect.shift();

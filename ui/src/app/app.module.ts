@@ -4,8 +4,7 @@ import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 
-import { MatCardModule, MatTabsModule,
-         MatInputModule, MatSnackBarModule } from '@angular/material';
+import { MatCardModule, MatTabsModule, MatListModule, MatInputModule, MatSnackBarModule } from '@angular/material';
 
 import { AppComponent } from './app.component';
 import { WebSocketService } from './websocket.service';
@@ -16,15 +15,15 @@ import { MessageService } from './message.service';
 import { ConfigComponent } from './config/config.component';
 import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
+import { LogsComponent } from './logs/logs.component';
+import { LogComponent } from './log/log.component';
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
     { path: 'chart', component: ChartComponent },
+    { path: 'logs', component: LogsComponent },
     { path: 'main', component: MainComponent },
-    { path: '',
-      redirectTo: '/main',
-      pathMatch: 'full'
-    }
+    { path: '', redirectTo: '/main', pathMatch: 'full' }
 ];
 
 @NgModule({
@@ -32,7 +31,9 @@ const appRoutes: Routes = [
         AppComponent,
         ConfigComponent,
         ChartComponent,
-        MainComponent
+        MainComponent,
+        LogsComponent,
+        LogComponent
     ],
     imports: [
         BrowserModule,
@@ -42,6 +43,7 @@ const appRoutes: Routes = [
         MatTabsModule,
         MatInputModule,
         MatSnackBarModule,
+        MatListModule,
         RouterModule.forRoot(appRoutes)
     ],
     providers: [

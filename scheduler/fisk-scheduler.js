@@ -31,8 +31,14 @@ const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
 let jobId = 0;
-let db = new Database(path.join(common.cacheDir(), "db.json"));
-let pendingUsers = {};
+const db = new Database(path.join(common.cacheDir(), "db.json"));
+const logFileDir = path.join(common.cacheDir(), "logs");
+try {
+    fs.mkdirSync(logFileDir);
+} catch (err) {
+}
+
+const pendingUsers = {};
 
 function slaveKey() {
     if (arguments.length == 1) {
@@ -261,6 +267,45 @@ server.on("listen", app => {
     });
 });
 
+try {
+    fs.watch(logFileDir, (type, filename) => {
+        if (type == "rename" && monitors.length) {
+            fs.readdir(logFileDir, (err, files) => {
+                const msg = { type: "logFiles", files: files || [] };
+                // console.log("sending files", msg);
+                monitors.forEach(monitor => monitor.send(msg));
+            });
+        }
+    });
+} catch (err) {
+}
+
+function formatDate(date)
+{
+    const year = date.getFullYear(),
+          month = date.getMonth() + 1, // months are zero indexed
+          day = date.getDate(),
+          hour = date.getHours(),
+          minute = date.getMinutes(),
+          second = date.getSeconds();
+
+    if (month < 10)
+        month = '0' + month;
+    if (day < 10)
+        day = '0' + day;
+    if (hour < 10)
+        hour = '0' + hour;
+    if (minute < 10)
+        minute = "0" + minute;
+    if (second < 10)
+        second = "0" + second;
+    return `${month}_${day}_${hour}:${minute}:${second}`;
+}
+
+function addLogFile(log) {
+    fs.writeFile(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents);
+}
+
 server.on("slave", slave => {
     if (slave.npmVersion != schedulerNpmVersion) {
         console.log("slave has bad npm version", slave.npmVersion, "should have been", schedulerNpmVersion);
@@ -276,6 +321,10 @@ server.on("slave", slave => {
         slave.environments = {};
         message.environments.forEach(env => slave.environments[env] = true);
         syncEnvironments(slave);
+    });
+
+    slave.on("log", event => {
+        addLogFile({ source: "slave", ip: slave.ip, contents: event.message });
     });
 
     slave.on("error", msg => {
@@ -425,6 +474,10 @@ function requestEnvironment(compile)
 
 let semaphoreMaintenanceTimers = {};
 server.on("compile", compile => {
+    compile.on("log", event => {
+        addLogFile({ source: "client", ip: compile.ip, contents: event.message });
+    });
+
     if (compile.npmVersion) {
         let match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(compile.npmVersion);
         let ok = false;
@@ -570,6 +623,8 @@ function randomBytes(bytes)
     });
 }
 
+
+
 server.on("monitor", client => {
     monitors.push(client);
     function remove()
@@ -596,6 +651,25 @@ server.on("monitor", client => {
             return;
         }
         switch (message.type) {
+        case 'logFiles':
+            // console.log("logFiles:", message);
+            fs.readdir(logFileDir, (err, files) => {
+                console.log("sending files", files);
+                client.send({ type: "logFiles", files: files || [] });
+            });
+            break;
+        case 'logFile':
+            // console.log("logFile:", message);
+            if (message.file.indexOf("../") != -1 || message.file.indexOf("/..") != -1) {
+                client.close();
+                return;
+            }
+            const f = path.join(logFileDir, message.file);
+            fs.readFile(f, "utf8", (err, contents) => {
+                // console.log("sending file", f, contents.length);
+                client.send({ type: "logFile", file: f, contents: contents || ""});
+       });
+            break;
         case 'readConfiguration':
             break;
         case 'writeConfiguration':

@@ -1,0 +1,11 @@
+<mat-card>
+  <div *ngFor="let file of files" (click)="onClicked(file)" class="spacing">
+    <div class="file">
+      {{file}}
+      <div *ngIf="file == this.expanded">
+        <app-log [file]="file">
+        </app-log>
+      </div>
+    </div>
+  </div>
+</mat-card>

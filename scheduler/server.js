@@ -185,6 +185,11 @@ class Server extends EventEmitter {
                         error("Unable to parse string message as JSON");
                         return;
                     }
+
+                    if (json.type == 'log') {
+                        client.emit("log", json);
+                        return;
+                    }
                     if (json.type != "uploadEnvironment") {
                         error("Expected type: \"uploadEnvironment\"");
                         return;
