@@ -295,6 +295,10 @@ void WebSocket::acceptUpgrade()
 
 bool WebSocket::send(MessageType type, const void *msg, size_t len)
 {
+    assert(msg);
+    assert(len);
+    assert(this);
+    assert(mContext);
     wslay_event_msg wmsg = {
         static_cast<uint8_t>(type == Text ? WSLAY_TEXT_FRAME : WSLAY_BINARY_FRAME),
         reinterpret_cast<const uint8_t *>(msg),
