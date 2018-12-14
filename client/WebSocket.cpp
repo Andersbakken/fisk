@@ -1,6 +1,5 @@
 #include "WebSocket.h"
 #include "Log.h"
-#include "Watchdog.h"
 #include "Client.h"
 
 #include <arpa/inet.h>
