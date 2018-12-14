@@ -167,15 +167,15 @@ bool Client::findCompiler(const std::string &preresolved)
         sData.resolvedCompiler = exec;
     } else {
         resolveSymlink(exec, [](const std::string &p) -> CheckResult {
-                std::string base;
-                parsePath(p, &base, 0);
-                // Log::debug("GOT BASE %s", base.c_str());
-                if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
-                    sData.resolvedCompiler = p;
-                    return Stop;
-                }
-                return Continue;
-            });
+            std::string base;
+            parsePath(p, &base, 0);
+            // Log::debug("GOT BASE %s", base.c_str());
+            if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
+                sData.resolvedCompiler = p;
+                return Stop;
+            }
+            return Continue;
+        });
     }
     if (sData.resolvedCompiler.empty())
         sData.resolvedCompiler = exec;
@@ -363,139 +363,139 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
     Preprocessed *ptr = new Preprocessed;
     std::unique_ptr<Client::Preprocessed> ret(ptr);
     ret->mThread = std::thread([ptr, args, compiler, started] {
-            std::string out, err;
-            ptr->stdOut.reserve(1024 * 1024);
-            std::string commandLine = compiler;
-            const size_t count = args->commandLine.size();
-            auto append = [&commandLine](const std::string &arg) {
-                // std::string copy;
-                // size_t slashes = 0;
-                // for (size_t i=0; i<arg.size(); ++i) {
-                //     const char ch = arg.at(i);
-                //     if (ch == '\\') {
-                //         ++slashes;
-                //         continue;
-                //     }
-                //     if (ch == '\'') {
-                //         if (slashes % 2 == 0) {
-                //             if (copy.empty()) {
-                //                 copy.assign(arg.c_str(), i);
-                //             } else {
+        std::string out, err;
+        ptr->stdOut.reserve(1024 * 1024);
+        std::string commandLine = compiler;
+        const size_t count = args->commandLine.size();
+        auto append = [&commandLine](const std::string &arg) {
+            // std::string copy;
+            // size_t slashes = 0;
+            // for (size_t i=0; i<arg.size(); ++i) {
+            //     const char ch = arg.at(i);
+            //     if (ch == '\\') {
+            //         ++slashes;
+            //         continue;
+            //     }
+            //     if (ch == '\'') {
+            //         if (slashes % 2 == 0) {
+            //             if (copy.empty()) {
+            //                 copy.assign(arg.c_str(), i);
+            //             } else {
 
-                //             }
-                //         }
-                //     }
-                //     slashes = 0;
-                // }
-                const size_t idx = arg.find('\'');
-                if (idx != std::string::npos) {
-                    // ### gotta escape quotes
-                }
-                commandLine += arg;
+            //             }
+            //         }
+            //     }
+            //     slashes = 0;
+            // }
+            const size_t idx = arg.find('\'');
+            if (idx != std::string::npos) {
+                // ### gotta escape quotes
+            }
+            commandLine += arg;
 
-            };
-            std::string depFile;
-            std::string outputFile;
-            bool hasDepFile = false;
-            for (size_t i=1; i<count; ++i) {
-                const std::string arg = args->commandLine.at(i);
-                if (arg == "-o" && args->commandLine.size() > i + 1) {
-                    outputFile = args->commandLine.at(++i);
-                    continue;
-                }
+        };
+        std::string depFile;
+        std::string outputFile;
+        bool hasDepFile = false;
+        for (size_t i=1; i<count; ++i) {
+            const std::string arg = args->commandLine.at(i);
+            if (arg == "-o" && args->commandLine.size() > i + 1) {
+                outputFile = args->commandLine.at(++i);
+                continue;
+            }
 
+            commandLine += " '";
+            append(args->commandLine.at(i));
+            commandLine += '\'';
+
+            if (arg == "-MMD" || arg == "-MD" || arg == "-MM" || arg == "-M") {
+                hasDepFile = true;
+            } else if (arg == "-MF" && i + 1 < count) {
                 commandLine += " '";
-                append(args->commandLine.at(i));
+                append(args->commandLine.at(++i));
                 commandLine += '\'';
+            }
+        }
+        commandLine += " '-E'";
+        if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
+            commandLine += " '-frewrite-includes'";
+        } else {
+            commandLine += " '-fdirectives-only'";
+        }
+        if (!Config::discardComments) {
+            commandLine += " '-C'";
+        }
 
-                if (arg == "-MMD" || arg == "-MD" || arg == "-MM" || arg == "-M") {
-                    hasDepFile = true;
-                } else if (arg == "-MF" && i + 1 < count) {
-                    commandLine += " '";
-                    append(args->commandLine.at(++i));
-                    commandLine += '\'';
-                }
+        if (hasDepFile) {
+            if (depFile.empty()) {
+                if (outputFile.empty())
+                    outputFile = args->output();
+                depFile = outputFile + "d";
             }
-            commandLine += " '-E'";
-            if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
-                commandLine += " '-frewrite-includes'";
-            } else {
-                commandLine += " '-fdirectives-only'";
+            DEBUG("Depfile is %s", depFile.c_str());
+        }
+        DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
+        std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
+        ptr->slotDuration = Client::mono() - started;
+        DEBUG("Running preprocess: %s", commandLine.c_str());
+        if (args->flags & (CompilerArgs::CPreprocessed
+                           |CompilerArgs::ObjectiveCPreprocessed
+                           |CompilerArgs::ObjectiveCPlusPlusPreprocessed
+                           |CompilerArgs::CPlusPlusPreprocessed)) {
+            ptr->exitStatus = 0;
+            FILE *f;
+            long size = 0;
+            f = fopen(args->sourceFile().c_str(), "r");
+            if (!f) {
+                DEBUG("Failed to open %s for reading (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                ptr->exitStatus = 1;
+                goto end;
             }
-            if (!Config::discardComments) {
-                commandLine += " '-C'";
+            if (fseek(f, 0, SEEK_END)) {
+                DEBUG("Failed to fseek to end of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                ptr->exitStatus = 1;
+                goto end;
+            }
+            size = ftell(f);
+            if (fseek(f, 0, SEEK_SET)) {
+                DEBUG("Failed to fseek to beginning of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                ptr->exitStatus = 1;
+                goto end;
             }
 
-            if (hasDepFile) {
-                if (depFile.empty()) {
-                    if (outputFile.empty())
-                        outputFile = args->output();
-                    depFile = outputFile + "d";
-                }
-                DEBUG("Depfile is %s", depFile.c_str());
+            if (size < 0) {
+                DEBUG("Failed to ftell %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                ptr->exitStatus = 1;
+                goto end;
             }
-            DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
-            std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
-            ptr->slotDuration = Client::mono() - started;
-            DEBUG("Running preprocess: %s", commandLine.c_str());
-            if (args->flags & (CompilerArgs::CPreprocessed
-                               |CompilerArgs::ObjectiveCPreprocessed
-                               |CompilerArgs::ObjectiveCPlusPlusPreprocessed
-                               |CompilerArgs::CPlusPlusPreprocessed)) {
-                ptr->exitStatus = 0;
-                FILE *f;
-                long size = 0;
-                f = fopen(args->sourceFile().c_str(), "r");
-                if (!f) {
-                    DEBUG("Failed to open %s for reading (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                    ptr->exitStatus = 1;
-                    goto end;
-                }
-                if (fseek(f, 0, SEEK_END)) {
-                    DEBUG("Failed to fseek to end of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                    ptr->exitStatus = 1;
-                    goto end;
-                }
-                size = ftell(f);
-                if (fseek(f, 0, SEEK_SET)) {
-                    DEBUG("Failed to fseek to beginning of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                    ptr->exitStatus = 1;
-                    goto end;
-                }
-
-                if (size < 0) {
-                    DEBUG("Failed to ftell %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                    ptr->exitStatus = 1;
-                    goto end;
-                }
-                ptr->stdOut.resize(size);
-                if (fread(&ptr->stdOut[0], 1, size, f) != static_cast<size_t>(size)) {
-                    DEBUG("Failed to fread %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                    ptr->exitStatus = 1;
-                }
-          end:
-                if (f)
-                    fclose(f);
-            } else {
-                TinyProcessLib::Process proc(commandLine, std::string(),
-                                             [ptr](const char *bytes, size_t n) {
-                                                 VERBOSE("Preprocess appending %zu bytes to stdout", n);
-                                                 ptr->stdOut.append(bytes, n);
-                                             }, [ptr](const char *bytes, size_t n) {
-                                                 VERBOSE("Preprocess appending %zu bytes to stderr", n);
-                                                 ptr->stdErr.append(bytes, n);
-                                             });
-                ptr->exitStatus = proc.get_exit_status();
+            ptr->stdOut.resize(size);
+            if (fread(&ptr->stdOut[0], 1, size, f) != static_cast<size_t>(size)) {
+                DEBUG("Failed to fread %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
+                ptr->exitStatus = 1;
             }
-            slot.reset();
-            std::unique_lock<std::mutex> lock(ptr->mMutex);
-            ptr->mDone = true;
-            ptr->cppSize = ptr->stdOut.size();
-            ptr->duration = Client::mono() - started;
-            ptr->mCond.notify_one();
-            if (hasDepFile)
-                ptr->depFile = std::move(depFile);
-        });
+      end:
+            if (f)
+                fclose(f);
+        } else {
+            TinyProcessLib::Process proc(commandLine, std::string(),
+                                         [ptr](const char *bytes, size_t n) {
+                                             VERBOSE("Preprocess appending %zu bytes to stdout", n);
+                                             ptr->stdOut.append(bytes, n);
+                                         }, [ptr](const char *bytes, size_t n) {
+                                             VERBOSE("Preprocess appending %zu bytes to stderr", n);
+                                             ptr->stdErr.append(bytes, n);
+                                         });
+            ptr->exitStatus = proc.get_exit_status();
+        }
+        slot.reset();
+        std::unique_lock<std::mutex> lock(ptr->mMutex);
+        ptr->mDone = true;
+        ptr->cppSize = ptr->stdOut.size();
+        ptr->duration = Client::mono() - started;
+        ptr->mCond.notify_one();
+        if (hasDepFile)
+            ptr->depFile = std::move(depFile);
+    });
     return ret;
 }
 
