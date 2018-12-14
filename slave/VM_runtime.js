@@ -32,8 +32,27 @@ if (pwd) {
     process.setgid(pwd.gid);
     process.setuid(pwd.uid);
 }
+
+process.on("error", error => {
+    console.error(`Got process error ${error}. Going down`);
+    process.exit();
+});
+
+function send(message) {
+    try {
+        process.send(message);
+    } catch (err) {
+        console.error(`Couldn't send message ${message.type}. Going down`);
+        process.exit();
+    }
+}
 setTimeout(() => { // hack
-    process.send({type: "ready"});
+    try {
+        send({type: "ready"});
+    } catch (err) {
+        console.error("Couldn't send ready. Going down");
+        process.exit();
+    }
 }, 1000);
 
 let compiles = {};
@@ -58,18 +77,18 @@ process.on('message', msg => {
             // console.log("compiling for );
             let compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug);
             // console.log("running thing", msg.commandLine);
-            compile.on('stdout', data => process.send({ type: 'compileStdOut', id: msg.id, data: data }));
-            compile.on('stderr', data => process.send({ type: 'compileStdErr', id: msg.id, data: data }));
+            compile.on('stdout', data => send({ type: 'compileStdOut', id: msg.id, data: data }));
+            compile.on('stderr', data => send({ type: 'compileStdErr', id: msg.id, data: data }));
             compile.on('exit', event => {
                 delete compiles[msg.id];
-                process.send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
+                send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
                 if (destroying && !compiles.length)
                     process.exit();
             });
             compiles[msg.id] = compile;
         } catch (err) {
             delete compiles[msg.id];
-            process.send({type: 'compileFinished', success: false, id: msg.id, files: [], exitCode: -1, error: err.toString() });
+            send({type: 'compileFinished', success: false, id: msg.id, files: [], exitCode: -1, error: err.toString() });
         }
         break;
     }
