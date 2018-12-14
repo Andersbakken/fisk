@@ -100,7 +100,7 @@ private:
 std::unique_ptr<Slot> tryAcquireSlot(Slot::Type type);
 std::unique_ptr<Slot> acquireSlot(Slot::Type type);
 void writeStatistics();
-[[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot, const char *reason);
+[[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);

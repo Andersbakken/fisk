@@ -638,10 +638,10 @@ static std::string argsAsString()
     return ret;
 }
 
-void Client::runLocal(std::unique_ptr<Slot> &&slot, const char *reason)
+void Client::runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason)
 {
     enum { Increment = 75000 };
-    auto run = [reason]() {
+    auto run = [&reason]() {
         char **argvCopy = new char*[sData.argc + 1];
         argvCopy[0] = strdup(sData.compiler.c_str());
         for (int i=1; i<sData.argc; ++i) {
@@ -650,7 +650,7 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot, const char *reason)
         argvCopy[sData.argc] = 0;
         size_t micros = 0;
         while (true) {
-            WARN("Running local: %s because %s", argsAsString().c_str(), reason);
+            WARN("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
             ::execv(sData.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;

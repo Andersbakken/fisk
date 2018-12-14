@@ -183,7 +183,8 @@ int main(int argc, char **argv)
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "compiler args parse failure");
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile),
+                         Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
         return 0; // unreachable
     }
 
