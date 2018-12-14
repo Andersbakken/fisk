@@ -5,6 +5,7 @@
 #include "SchedulerWebSocket.h"
 #include "Log.h"
 #include "Select.h"
+#include <execinfo.h>
 #include "Watchdog.h"
 #include "WebSocket.h"
 #include <json11.hpp>
@@ -28,27 +29,27 @@ int main(int argc, char **argv)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
-            const Client::Data &data = Client::data();
-            for (sem_t *semaphore : data.semaphores) {
-                if (!data.maintainSemaphores)
-                    sem_post(semaphore);
-                sem_close(semaphore);
-            }
-            if (Watchdog *watchdog = data.watchdog) {
-                if (Log::minLogLevel <= Log::Warn) {
-                    std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
-                                                     Client::milliseconds_since_epoch,
-                                                     preprocessedDuration,
-                                                     preprocessedSlotDuration);
-                    for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
-                        str += Client::format(" %s: %llu (%llu)\n", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
-                                              watchdog->timings[i] - watchdog->timings[i - 1],
-                                              watchdog->timings[i] - Client::started);
-                    }
-                    Log::log(Log::Debug, str);
+        const Client::Data &data = Client::data();
+        for (sem_t *semaphore : data.semaphores) {
+            if (!data.maintainSemaphores)
+                sem_post(semaphore);
+            sem_close(semaphore);
+        }
+        if (Watchdog *watchdog = data.watchdog) {
+            if (Log::minLogLevel <= Log::Warn) {
+                std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
+                                                 Client::milliseconds_since_epoch,
+                                                 preprocessedDuration,
+                                                 preprocessedSlotDuration);
+                for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
+                    str += Client::format(" %s: %llu (%llu)\n", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
+                                          watchdog->timings[i] - watchdog->timings[i - 1],
+                                          watchdog->timings[i] - Client::started);
                 }
+                Log::log(Log::Debug, str);
             }
-        });
+        }
+    });
 
     if (!Config::init(argc, argv)) {
         return 1;
@@ -130,11 +131,16 @@ int main(int argc, char **argv)
     data.argv = argv;
     data.argc = argc;
     data.watchdog = &watchdog;
-    auto signalHandler = [](int) {
+    auto signalHandler = [](int signal) {
         for (sem_t *semaphore : Client::data().semaphores) {
             sem_post(semaphore);
         }
-        _exit(1);
+        fprintf(stderr, "fiskc: Caught signal %d\n", signal);
+        void *buffer[64];
+        const int count = backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));
+        backtrace_symbols_fd(buffer, count, fileno(stderr));
+        fflush(stderr);
+        _exit(-signal);
     };
     for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
         std::signal(signal, signalHandler);
