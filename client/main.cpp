@@ -334,6 +334,12 @@ int main(int argc, char **argv)
 
     while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket && slaveWebSocket.state() > WebSocket::None)
         select.exec();
+    if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+        DEBUG("Have to run locally because no slave connection 2");
+        watchdog.stop();
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure 2");
+        return 0;
+    }
     watchdog.transition(Watchdog::ConnectedToSlave);
 
     DEBUG("Waiting for preprocessed");
