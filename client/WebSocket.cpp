@@ -27,7 +27,8 @@ static inline size_t random(void *data, size_t len)
         return 0;
     }
 
-    size_t ret = fread(data, 1, len, f);
+    int ret;
+    EINTRWRAP(ret, read(fileno(f), data, len));
     if (ret != len) {
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
@@ -90,8 +91,10 @@ WebSocket::~WebSocket()
 {
     if (mContext)
         wslay_event_context_free(mContext);
-    if (mFD != -1)
-        ::close(mFD);
+    if (mFD != -1) {
+        int ret;
+        EINTRWRAP(ret, ::close(mFD));
+    }
 }
 
 bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers)
@@ -166,7 +169,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
 
         if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
             ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            ::close(mFD);
+            int ret;
+            EINTRWRAP(ret, ::close(mFD));
             mFD = -1;
             continue;
         }
@@ -179,7 +183,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
-            ::close(mFD);
+            int ret;
+            EINTRWRAP(ret, ::close(mFD));
             ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
                   inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
                   mPort, errno, strerror(errno));
@@ -370,7 +375,8 @@ void WebSocket::onRead()
             mRecvBuffer.insert(mRecvBuffer.end(), buf, buf + r);
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
-        } else {
+        } else if (errno != EINTR) {
+            ERROR("Got read error: %d %s", errno, strerror(errno));
             mState = Error;
             break;
         }
@@ -382,7 +388,9 @@ void WebSocket::onRead()
     if (mState == ConnectedWebSocket) {
         while (true) {
             const size_t last = mRecvBuffer.size();
-            if (wslay_event_recv(mContext) != 0) {
+            const int r = wslay_event_recv(mContext);
+            if (r) {
+                ERROR("Got wslay_event_recv error: %d", r);
                 mState = Error;
                 return;
             }
@@ -406,7 +414,8 @@ void WebSocket::send()
             sendBufferOffset += r;
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
-        } else {
+        } else if (errno != EINTR) {
+            ERROR("Got write error: %d %s", errno, strerror(errno));
             mState = Error;
             break;
         }
