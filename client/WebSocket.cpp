@@ -29,7 +29,7 @@ static inline size_t random(void *data, size_t len)
 
     int ret;
     EINTRWRAP(ret, read(fileno(f), data, len));
-    if (ret != len) {
+    if (ret != static_cast<int>(len)) {
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
     }
