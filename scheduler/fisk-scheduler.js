@@ -853,7 +853,7 @@ function simulate(count)
     {
         let ip;
         do {
-            ip = [ parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256) ].join(".");                   
+            ip = [ parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256) ].join(".");
         } while (ip in usedIps);
         if (!transient)
             usedIps[ip] = true;
@@ -881,7 +881,7 @@ function simulate(count)
             system: "Linux x86_64",
             created: new Date(),
             npmVersion: schedulerNpmVersion,
-            environments: Object.keys(Environments.environments)            
+            environments: Object.keys(Environments.environments)
         };
         for (let j=0; j<fakeSlave.slots; ++j) {
             jobs.push({ slave: fakeSlave });
@@ -897,7 +897,23 @@ function simulate(count)
     function tick()
     {
         for (let i=0; i<jobs.length; ++i) {
-            if (Math.random() * 100 >= 10) {
+            const percentage = Math.random() * 100;
+            if (jobs[i].slave.gone) {
+                if (percentage <= 10) {
+                    jobs[i].slave.gone = false;
+                    insertSlave(jobs[i].slave);
+                } else {
+                    continue;
+                }
+            } else if (percentage <= 1) {
+                jobs[i].slave.gone = true;
+                removeSlave(jobs[i].slave);
+                while (jobs[i + 1] && jobs[i + 1].slave == jobs[i].slave) {
+                    ++i;
+                }
+                continue;
+            }
+            if (percentage <= 30) {
                 if (!jobs[i].client) {
                     jobs[i].client = clients[parseInt(Math.random() * clientCount)];
                     jobs[i].id = nextJobId();
