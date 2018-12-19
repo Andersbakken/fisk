@@ -59,42 +59,45 @@ class Server extends EventEmitter {
     }
 
     listen() {
-        this.app = express();
-        this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
-        this.emit("listen", this.app);
+        return new Promise((resolve, reject) => {
+            this.app = express();
+            this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
+            this.emit("listen", this.app);
 
-        this.app.all('/*', function(req, res, next) {
-            // Just send the index.html for other files to support HTML5Mode
-            res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
-        });
+            this.app.all('/*', function(req, res, next) {
+                // Just send the index.html for other files to support HTML5Mode
+                res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
+            });
 
-        this.server = http.createServer(this.app);
-        const port = this.option.int("port", 8097);
-        this.server.listen({port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
+            this.server = http.createServer(this.app);
+            const port = this.option.int("port", 8097);
+            this.server.listen({port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
 
-        this.server.on("error", error => {
-            if (error.code == "EADDRINUSE") {
-                console.log(`Port ${port} is in use...`);
-                setTimeout(() => {
-                    this.server.listen(port, this.option.int("backlog", 50));
-                }, 1000);
-            } else {
-                console.error("Got server error", error.toString());
-                throw error;
-            }
-        });
-        this.server.once("listening", () => {
-            this.ws = new WebSocket.Server({ server: this.server });
-            console.log("listening on", port);
-            this.ws.on('headers', (headers, request) => {
-                const url = Url.parse(request.url);
-                if (url.pathname == "/monitor") {
-                    const nonce = crypto.randomBytes(256).toString("base64");
-                    headers.push(`x-fisk-nonce: ${nonce}`);
-                    request.nonce = nonce;
+            this.server.on("error", error => {
+                if (error.code == "EADDRINUSE") {
+                    console.log(`Port ${port} is in use...`);
+                    setTimeout(() => {
+                        this.server.listen(port, this.option.int("backlog", 50));
+                    }, 1000);
+                } else {
+                    console.error("Got server error", error.toString());
+                    reject(error);
                 }
             });
-            this.ws.on("connection", this._handleConnection.bind(this));
+            this.server.once("listening", () => {
+                this.ws = new WebSocket.Server({ server: this.server });
+                console.log("listening on", port);
+                this.ws.on('headers', (headers, request) => {
+                    const url = Url.parse(request.url);
+                    if (url.pathname == "/monitor") {
+                        const nonce = crypto.randomBytes(256).toString("base64");
+                        headers.push(`x-fisk-nonce: ${nonce}`);
+                        request.nonce = nonce;
+                    }
+                });
+                this.ws.on("connection", this._handleConnection.bind(this));
+                resolve();
+            });
         });
     }
 

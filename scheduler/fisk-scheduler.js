@@ -40,6 +40,58 @@ try {
 
 const pendingUsers = {};
 
+function nextJobId()
+{
+    let id = ++jobId;
+    if (id == 2147483647)
+        id = 1;
+    return id;
+}
+
+function jobStarted(job)
+{
+    if (monitors.length) {
+        // console.log("GOT STUFF", job);
+        let info = {
+            type: "jobStarted",
+            client: {
+                hostname: job.client.hostname,
+                ip: job.client.ip,
+                name: job.client.name
+            },
+            sourceFile: job.sourceFile,
+            slave: {
+                hostname: job.slave.hostname,
+                ip: job.slave.ip,
+                name: job.slave.name,
+                port: job.slave.port
+            },
+            id: job.id
+        };
+        // console.log("send to monitors", info);
+        monitors.forEach(monitor => monitor.send(info));
+    }
+}
+
+function jobFinished(slave, job)
+{
+    ++slave.jobsPerformed;
+    slave.totalCompileSpeed += job.compileSpeed;
+    slave.totalUploadSpeed += job.uploadSpeed;
+    // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
+    if (monitors.length) {
+        const info = {
+            type: "jobFinished",
+            id: job.id,
+            cppSize: job.cppSize,
+            compileDuration: job.compileDuration,
+            uploadDuration: job.uploadDuration
+        };
+        // console.log("send to monitors", info);
+        monitors.forEach(monitor => monitor.send(info));
+    }
+}
+
 function slaveKey() {
     if (arguments.length == 1) {
         return arguments[0].ip + " " + arguments[0].port;
@@ -118,8 +170,8 @@ function purgeEnvironmentsToMaxSize()
                 let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);
                 if (!match)
                     return undefined;
-                var abs = path.join(p, file);
-                var stat;
+                let abs = path.join(p, file);
+                let stat;
                 try {
                     stat = fs.statSync(abs);
                 } catch (err) {
@@ -159,8 +211,8 @@ function syncEnvironments(slave)
         forEachSlave(syncEnvironments);
         return;
     }
-    var needs = [];
-    var unwanted = [];
+    let needs = [];
+    let unwanted = [];
     console.log("scheduler has", Object.keys(Environments.environments).sort());
     console.log("slave has", Object.keys(slave.environments).sort());
     for (let env in Environments.environments) {
@@ -341,50 +393,8 @@ server.on("slave", slave => {
         // console.log(message);
     });
 
-    slave.on("jobStarted", job => {
-        if (monitors.length) {
-            // console.log("GOT STUFF", job);
-            let info = {
-                type: "jobStarted",
-                client: {
-                    hostname: job.client.hostname,
-                    ip: job.client.ip,
-                    name: job.client.name
-                },
-                sourceFile: job.sourceFile,
-                slave: {
-                    hostname: job.slave.hostname,
-                    ip: job.slave.ip,
-                    name: job.slave.name,
-                    port: job.slave.port
-                },
-                id: job.id
-            };
-            // console.log("send to monitors", info);
-            monitors.forEach(monitor => monitor.send(info));
-        }
-        // console.log(`slave: ${job.slave.ip}:${job.slave.port} will build ${job.sourceFile} for ${job.client.name}`);
-    });
-
-    slave.on("jobFinished", job => {
-        ++slave.jobsPerformed;
-        slave.totalCompileSpeed += job.compileSpeed;
-        slave.totalUploadSpeed += job.uploadSpeed;
-        // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
-        if (monitors.length) {
-            const info = {
-                type: "jobFinished",
-                id: job.id,
-                cppSize: job.cppSize,
-                compileDuration: job.compileDuration,
-                compileSpeed: job.compileSpeed,
-                uploadDuration: job.uploadDuration,
-                uploadSpeed: job.uploadSpeed
-            };
-            // console.log("send to monitors", info);
-            monitors.forEach(monitor => monitor.send(info));
-        }
-    });
+    slave.on("jobStarted", job => jobStarted(job));
+    slave.on("jobFinished", job => jobFinished(slave, job));
 
     slave.on("jobAborted", job => {
         console.log(`slave: ${slave.ip}:${slave.port} aborted a job`, job);
@@ -561,9 +571,7 @@ server.on("compile", compile => {
         ++slave.jobsScheduled;
         console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} slave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
         slave.lastJob = Date.now();
-        let id = ++jobId;
-        if (id == 2147483647)
-            id = 0;
+        let id = nextJobId();
         data.id = id;
         data.ip = slave.ip;
         data.hostname = slave.hostname;
@@ -629,7 +637,7 @@ server.on("monitor", client => {
     monitors.push(client);
     function remove()
     {
-        var idx = monitors.indexOf(client);
+        let idx = monitors.indexOf(client);
         if (idx != -1) {
             monitors.splice(idx, 1);
         }
@@ -838,6 +846,79 @@ server.on("error", err => {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
+function simulate(count)
+{
+    let usedIps = {};
+    function randomIp(transient)
+    {
+        let ip;
+        do {
+            ip = [ parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256) ].join(".");                   
+        } while (ip in usedIps);
+        if (!transient)
+            usedIps[ip] = true;
+        return ip;
+    }
+
+    const randomWords = require('random-words');
+    function randomName() { return randomWords({ min: 1, max: 5, join: " " }); }
+    function randomSourceFile() { return randomWords({ min: 1, max: 2, join: "_" }) + ".cpp"; }
+    function randomHostname() { return randomWords({ exactly: 1, wordsPerString: 1 + parseInt(Math.random() * 2), separator: '-' }); }
+
+    let fakeSlaves = [];
+    let jobs = [];
+    for (let i=0; i<count; ++i) {
+        const ip = randomIp();
+        const fakeSlave = {
+            ip: ip,
+            name: randomName(),
+            hostname: randomHostname(),
+            slots: [4, 16, 32][parseInt(Math.random() * 3)],
+            port: 8097,
+            jobsPerformed: 0,
+            compileSpeed: 0,
+            uploadSpeed: 0,
+            system: "Linux x86_64",
+            created: new Date(),
+            npmVersion: schedulerNpmVersion,
+            environments: Object.keys(Environments.environments)            
+        };
+        for (let j=0; j<fakeSlave.slots; ++j) {
+            jobs.push({ slave: fakeSlave });
+        }
+        fakeSlaves.push(fakeSlave);
+        insertSlave(fakeSlave);
+    }
+    const clients = [];
+    const clientCount = count / 2 || 1;
+    for (let i=0; i<clientCount; ++i) {
+        clients[i] = { hostname: randomHostname(), ip: randomIp(true), name: randomName() };
+    }
+    function tick()
+    {
+        for (let i=0; i<jobs.length; ++i) {
+            if (Math.random() * 100 >= 10) {
+                if (!jobs[i].client) {
+                    jobs[i].client = clients[parseInt(Math.random() * clientCount)];
+                    jobs[i].id = nextJobId();
+                    jobStarted({ client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
+                } else {
+                    // const client = jobs[i].client;
+                    // const id = jobs[i].id;
+                    jobFinished(jobs[i].slave, { id: jobs[i].id,
+                                                 cppSize: parseInt(Math.random() * 1024 * 1024 * 4),
+                                                 compileDuration: parseInt(Math.random() * 5000),
+                                                 uploadDuration: parseInt(Math.random() * 500) });
+                    delete jobs[i].client;
+                    delete jobs[i].id;
+                }
+            }
+        }
+        setTimeout(tick, Math.random() * 2000);
+    }
+    tick();
+}
+
 Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environments")))
     .then(purgeEnvironmentsToMaxSize)
     // .then(() => {
@@ -847,7 +928,12 @@ Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environmen
     //     users = u || {};
     // })
     .then(() => server.listen())
-    .catch(e => {
+    .then(() => {
+        const simulateCount = option("simulate");
+        if (simulateCount) {
+            simulate(parseInt(simulateCount) || 64);
+        }
+    }).catch(e => {
         console.error(e);
         process.exit();
     });
