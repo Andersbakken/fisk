@@ -442,6 +442,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                            |CompilerArgs::ObjectiveCPreprocessed
                            |CompilerArgs::ObjectiveCPlusPlusPreprocessed
                            |CompilerArgs::CPlusPlusPreprocessed)) {
+            DEBUG("Already preprocessed. No need to do it");
             ptr->exitStatus = 0;
             FILE *f;
             long size = 0;
@@ -477,6 +478,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             if (f)
                 fclose(f);
         } else {
+            DEBUG("Executing:\n%s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
                                          [ptr](const char *bytes, size_t n) {
                                              VERBOSE("Preprocess appending %zu bytes to stdout", n);
@@ -485,7 +487,9 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                                              VERBOSE("Preprocess appending %zu bytes to stderr", n);
                                              ptr->stdErr.append(bytes, n);
                                          });
+            VERBOSE("Preprocess calling get_status");
             ptr->exitStatus = proc.get_exit_status();
+            DEBUG("Preprocess got status %d", ptr->exitStatus);
         }
         slot.reset();
         std::unique_lock<std::mutex> lock(ptr->mMutex);
