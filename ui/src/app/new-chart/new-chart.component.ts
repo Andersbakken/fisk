@@ -116,12 +116,17 @@ export class NewChartComponent implements AfterViewChecked {
             this.clientJobs.forEach(c => {
                 animateItem(c, "jobs", "animatedJobs", steps);
 
-                ctx.fillStyle = this._color(c.client.ip);
+                if (!c.color) {
+                    c.color = this._color(c.client.ip);
+                }
+
+                ctx.fillStyle = c.color;
                 ctx.beginPath();
                 ctx.moveTo(max/2, max/2);
                 ctx.arc(max/2, max/2, max/2, cur, cur + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
                 ctx.lineTo(max/2, max/2);
                 ctx.fill();
+
                 cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
             });
 
@@ -160,7 +165,7 @@ export class NewChartComponent implements AfterViewChecked {
         }
 
         function tohex(d) {
-            return ("0"+(Number(d).toString(16))).slice(-2).toUpperCase();
+            return ("0"+(Number(d).toString(16))).slice(-2);
         }
 
         const random = Alea(key);
@@ -224,7 +229,7 @@ export class NewChartComponent implements AfterViewChecked {
         }
 
         // clear out the jobs for this slave
-        console.log("foff", this.jobs);
+        // console.log("foff", this.jobs);
         const slaveid = this._slaveId(slave);
         this.jobs.forEach((job, id) => {
             if (slaveid == this._slaveId(job.slave)) {
@@ -239,7 +244,7 @@ export class NewChartComponent implements AfterViewChecked {
     }
 
     _jobStarted(job) {
-        console.log("job start", job);
+        // console.log("job start", job);
         this.jobs.set(job.id, job);
         this._adjustClients(job, 1, 1);
     }
