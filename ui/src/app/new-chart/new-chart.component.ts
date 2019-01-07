@@ -111,9 +111,24 @@ export class NewChartComponent implements AfterViewChecked {
             ctx.rect(0, 0, this.view.width, this.view.height);
             ctx.fill();
 
+            if (!this.maxJobs) {
+                this.clientJobs.forEach(c => {
+                    c.start = c.animatedStart = rad(270);
+                    c.jobs = c.animatedJobs = 0;
+                });
+                window.requestAnimationFrame(animate);
+                return;
+            }
+
+            ctx.font = "20px serif";
+
             let cur = rad(270);
 
             this.clientJobs.forEach(c => {
+                //console.log("puck", this.maxJobs, c);
+                c.start = cur;
+
+                animateItem(c, "start", "animatedStart", steps);
                 animateItem(c, "jobs", "animatedJobs", steps);
 
                 if (!c.color) {
@@ -123,9 +138,12 @@ export class NewChartComponent implements AfterViewChecked {
                 ctx.fillStyle = c.color;
                 ctx.beginPath();
                 ctx.moveTo(max/2, max/2);
-                ctx.arc(max/2, max/2, max/2, cur, cur + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
+                ctx.arc(max/2, max/2, max/2, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
                 ctx.lineTo(max/2, max/2);
                 ctx.fill();
+
+                ctx.fillStyle = "black";
+                ctx.fillText(c.client.name, 10, 50);
 
                 cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
             });
@@ -234,12 +252,12 @@ export class NewChartComponent implements AfterViewChecked {
         this.jobs.forEach((job, id) => {
             if (slaveid == this._slaveId(job.slave)) {
                 this.jobs.delete(id);
+                if (!this.clientJobs.has(job.client.ip)) {
+                    console.error("no client job for job", job);
+                    return;
+                }
+                this._adjustClients(job, -1, 0);
             }
-            if (!this.clientJobs.has(job.client.ip)) {
-                console.error("no client job for job", job);
-                return;
-            }
-            this._adjustClients(job, -1, 0);
         });
     }
 
