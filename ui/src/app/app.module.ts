@@ -17,10 +17,12 @@ import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
+import { NewChartComponent } from './new-chart/new-chart.component';
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
     { path: 'chart', component: ChartComponent },
+    { path: 'new-chart', component: NewChartComponent },
     { path: 'logs', component: LogsComponent },
     { path: 'main', component: MainComponent },
     { path: '', redirectTo: '/main', pathMatch: 'full' }
@@ -33,7 +35,8 @@ const appRoutes: Routes = [
         ChartComponent,
         MainComponent,
         LogsComponent,
-        LogComponent
+        LogComponent,
+        NewChartComponent
     ],
     imports: [
         BrowserModule,

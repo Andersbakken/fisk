@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { ConfigService } from './config.service';
 import { WebSocketService } from './websocket.service';
 import { BackoffService } from './backoff.service';
 
@@ -9,8 +10,38 @@ export class FiskService {
     private pendingConnect: Array<any> = [];
     private dataListeners: { (data: any): void; } [] = [];
     private openListeners: { (): void; } [] = [];
+    private _host: string;
+    private _port: number;
 
-    constructor(private ws: WebSocketService, private backoff: BackoffService) {
+    get host(): string
+    {
+        return this._host;
+    }
+    get port(): number
+    {
+        return this._port;
+    }
+
+    constructor(private ws: WebSocketService, private backoff: BackoffService, private config: ConfigService) {
+        this._host = this.config.get("host");
+        this._port = this.config.get("port", 8097);
+        if (this._host !== undefined) {
+            this.open(this._host, this._port);
+        }
+
+        this.config.onChange((key: string) => {
+            switch (key) {
+            case "host":
+            case "port":
+                this.close();
+                this._host = this.config.get("host");
+                this._port = this.config.get("port", 8097);
+                if (this._host !== undefined) {
+                    this.open(this._host, this._port);
+                }
+                break;
+            }
+        });
     }
 
     open(host: string, port: number) {

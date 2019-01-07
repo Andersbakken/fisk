@@ -10,9 +10,6 @@ import * as PIXI from 'pixi.js/dist/pixi.js'
   styleUrls: ['./chart.component.css']
 })
 export class ChartComponent implements AfterViewInit {
-    private host: string;
-    private port: number;
-
     title = 'app';
     data: any = undefined;
 
@@ -51,20 +48,8 @@ export class ChartComponent implements AfterViewInit {
             this.ngZone.runOutsideAngular(() => {
                 this._clear();
             });
-            this.message.showMessage("connected to " + this.host + ":" + this.port);
+            this.message.showMessage("connected to " + this.fisk.host + ":" + this.fisk.port);
         });
-        this.config.onChange((key: string) => {
-            switch (key) {
-            case "host":
-            case "port":
-                this.reconnect(this.config.get("host", location.hostname), this.config.get("port", location.port || 80));
-                break;
-            }
-        });
-        const host = this.config.get("host");
-        if (host !== undefined) {
-            this.reconnect(host, this.config.get("port", 8097));
-        }
 
         window.addEventListener("resize", () => {
             //console.log(window.innerWidth, window.innerHeight);
@@ -79,14 +64,6 @@ export class ChartComponent implements AfterViewInit {
                 this._rearrangeSlaves();
             });
         });
-    }
-
-    private reconnect(host: string, port: number) {
-        this.host = host;
-        this.port = port;
-
-        this.fisk.close();
-        this.fisk.open(host, port);
     }
 
     clicked(event) {
