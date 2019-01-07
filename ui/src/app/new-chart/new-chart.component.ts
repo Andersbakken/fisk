@@ -75,10 +75,28 @@ export class NewChartComponent implements AfterViewChecked {
         this.ctx = canvas.getContext("2d", { alpha: false });
 
         const max = Math.min(this.view.width, this.view.height) - 20;
+        const Step = 0.25;
+
+        const animateItem = (item, prop, animatedProp, steps) => {
+            const d = item[prop];
+            if (!(animatedProp in item)) {
+                item[animatedProp] = d;
+                return;
+            }
+            const a = item[animatedProp];
+            if (a == d)
+                return;
+            if (a < d) {
+                a = Math.min(a + (Step * steps), d);
+            } else {
+                a = Math.max(a - (Step * steps), d);
+            }
+            item[animatedProp] = a;
+        };
 
         const frameMs = (1 / 60) * 1000;
         let last = 0;
-        let animate = ts => {
+        const animate = ts => {
             const steps = (ts - last) / frameMs;
             last = ts;
 
@@ -96,13 +114,15 @@ export class NewChartComponent implements AfterViewChecked {
             let cur = rad(270);
 
             this.clientJobs.forEach(c => {
+                animateItem(c, "jobs", "animatedJobs", steps);
+
                 ctx.fillStyle = this._color(c.client.ip);
                 ctx.beginPath();
                 ctx.moveTo(max/2, max/2);
-                ctx.arc(max/2, max/2, max/2, cur, cur + (Math.PI * 2 * (c.jobs / this.maxJobs)), false);
+                ctx.arc(max/2, max/2, max/2, cur, cur + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
                 ctx.lineTo(max/2, max/2);
                 ctx.fill();
-                cur += Math.PI * 2 * (c.jobs / this.maxJobs);
+                cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
             });
 
             window.requestAnimationFrame(animate);
