@@ -111,6 +111,12 @@ export class NewChartComponent implements AfterViewChecked {
             ctx.rect(0, 0, this.view.width, this.view.height);
             ctx.fill();
 
+            ctx.fillStyle = "#ddd";
+            ctx.beginPath();
+            ctx.moveTo(max/2, max/2);
+            ctx.arc(max/2, max/2, max/2, 0, (Math.PI * 2), false);
+            ctx.fill();
+
             if (!this.maxJobs) {
                 this.clientJobs.forEach(c => {
                     c.start = c.animatedStart = rad(270);
