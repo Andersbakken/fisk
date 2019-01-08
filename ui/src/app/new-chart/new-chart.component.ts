@@ -83,7 +83,7 @@ export class NewChartComponent implements AfterViewChecked {
                 item[animatedProp] = d;
                 return;
             }
-            const a = item[animatedProp];
+            let a = item[animatedProp];
             if (a == d)
                 return;
             if (a < d) {
@@ -111,10 +111,14 @@ export class NewChartComponent implements AfterViewChecked {
             ctx.rect(0, 0, this.view.width, this.view.height);
             ctx.fill();
 
+            const space = 10;
+            const xy = max/2 + space;
+            const radius = max/2 - (space*2);
+
             ctx.fillStyle = "#ddd";
             ctx.beginPath();
-            ctx.moveTo(max/2, max/2);
-            ctx.arc(max/2, max/2, max/2, 0, (Math.PI * 2), false);
+            ctx.moveTo(xy, xy);
+            ctx.arc(xy, xy, radius, 0, Math.PI * 2, false);
             ctx.fill();
 
             if (!this.maxJobs) {
@@ -127,7 +131,6 @@ export class NewChartComponent implements AfterViewChecked {
             }
 
             ctx.font = "20px serif";
-
             let cur = rad(270);
 
             this.clientJobs.forEach(c => {
@@ -138,14 +141,14 @@ export class NewChartComponent implements AfterViewChecked {
                 animateItem(c, "jobs", "animatedJobs", steps);
 
                 if (!c.color) {
-                    c.color = this._color(c.client.ip);
+                    c.color = this._color(c.client.ip, false);
                 }
 
                 ctx.fillStyle = c.color;
                 ctx.beginPath();
-                ctx.moveTo(max/2, max/2);
-                ctx.arc(max/2, max/2, max/2, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
-                ctx.lineTo(max/2, max/2);
+                ctx.moveTo(xy, xy);
+                ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
+                ctx.lineTo(xy, xy);
                 ctx.fill();
 
                 ctx.fillStyle = "black";
