@@ -547,9 +547,10 @@ server.on("compile", compile => {
             }
         }
     });
-    if (!slave) {
+    if (!slave && compile.slave) {
         console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
         compile.send("slave", {});
+        return;
     }
     let data = {};
     // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
