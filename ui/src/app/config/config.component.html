@@ -5,4 +5,7 @@
   <mat-form-field class="full-width">
     <input matInput type="number" max="65536" placeholder="Port" [ngModel]="port" (ngModelChange)="updateInt('port', $event)">
   </mat-form-field>
+  <mat-form-field class="full-width">
+    <input matInput type="number" max="65536" placeholder="Legend Space" [ngModel]="chartLegendSpace" (ngModelChange)="updateInt('chartLegendSpace', $event)">
+  </mat-form-field>
 </div>

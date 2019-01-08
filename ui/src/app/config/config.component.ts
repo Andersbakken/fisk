@@ -9,10 +9,12 @@ import { ConfigService } from '../config.service';
 export class ConfigComponent implements OnInit {
     host: string;
     port: number;
+    chartLegendSpace: number;
 
     constructor(private config: ConfigService) {
         this.host = config.get("host", location.hostname);
         this.port = config.get("port", location.port || 80);
+        this.chartLegendSpace = config.get("chart-legend-space", 400);
 
         this.config.onChange((key: string) => {
             switch (key) {
@@ -21,6 +23,9 @@ export class ConfigComponent implements OnInit {
                 break;
             case "port":
                 this.port = config.get("port");
+                break;
+            case "chart-legend-space":
+                this.chartLegendSpace = config.get("chart-legend-space");
                 break;
             }
         });
@@ -45,7 +50,11 @@ export class ConfigComponent implements OnInit {
     updateInt(key: string, data: string) {
         let ok = false;
         let n: number;
+        let configName = key;
         switch (key) {
+        case "chartLegendSpace":
+            configName = "chart-legend-space";
+            // fall through
         case "port":
             n = parseInt(data);
             if (!isNaN(n)) {
@@ -55,7 +64,7 @@ export class ConfigComponent implements OnInit {
             break;
         }
         if (ok) {
-            this.config.set(key, n);
+            this.config.set(configName, n);
         }
     }
 }

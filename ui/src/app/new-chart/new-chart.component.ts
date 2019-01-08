@@ -74,7 +74,10 @@ export class NewChartComponent implements AfterViewChecked {
 
         this.ctx = canvas.getContext("2d", { alpha: false });
 
-        const max = Math.min(this.view.width, this.view.height) - 20;
+        const legendSpace = this.config.get("chart-legend-space", 400);
+        const legendX = this.view.width - legendSpace + 10;
+
+        const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
         const Step = 0.25;
 
         const animateItem = (item, prop, animatedProp, steps) => {
@@ -111,9 +114,9 @@ export class NewChartComponent implements AfterViewChecked {
             ctx.rect(0, 0, this.view.width, this.view.height);
             ctx.fill();
 
-            const space = 10;
-            const xy = max/2 + space;
-            const radius = max/2 - (space*2);
+            const paddingSpace = 10;
+            const xy = max/2 + paddingSpace;
+            const radius = max/2 - (paddingSpace*2);
 
             ctx.fillStyle = "#ddd";
             ctx.beginPath();
@@ -132,6 +135,7 @@ export class NewChartComponent implements AfterViewChecked {
 
             ctx.font = "20px serif";
             let cur = rad(270);
+            let legendY = 40;
 
             this.clientJobs.forEach(c => {
                 //console.log("puck", this.maxJobs, c);
@@ -151,10 +155,15 @@ export class NewChartComponent implements AfterViewChecked {
                 ctx.lineTo(xy, xy);
                 ctx.fill();
 
+                ctx.beginPath();
+                ctx.rect(legendX, legendY - 20, legendSpace, 30);
+                ctx.fill();
+
                 ctx.fillStyle = "black";
-                ctx.fillText(c.client.name, 10, 50);
+                ctx.fillText(c.client.name, legendX, legendY);
 
                 cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
+                legendY += 30;
             });
 
             window.requestAnimationFrame(animate);
