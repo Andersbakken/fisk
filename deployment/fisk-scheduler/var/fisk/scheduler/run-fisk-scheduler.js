@@ -205,4 +205,3 @@ function checkForUpdate()
 }
 
 checkForUpdate();
-
