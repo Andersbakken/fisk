@@ -18,12 +18,12 @@ import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
-import { NewChartComponent } from './new-chart/new-chart.component';
+import { PieChartComponent } from './pie-chart/pie-chart.component';
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
     { path: 'chart', component: ChartComponent },
-    { path: 'new-chart', component: NewChartComponent },
+    { path: 'pie-chart', component: PieChartComponent },
     { path: 'logs', component: LogsComponent },
     { path: 'main', component: MainComponent },
     { path: '', redirectTo: '/main', pathMatch: 'full' }
@@ -37,7 +37,7 @@ const appRoutes: Routes = [
         MainComponent,
         LogsComponent,
         LogComponent,
-        NewChartComponent
+        PieChartComponent
     ],
     imports: [
         BrowserModule,

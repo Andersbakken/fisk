@@ -5,12 +5,12 @@ import { MessageService } from '../message.service';
 import { TabChangedService } from '../tab-changed.service';
 
 @Component({
-    selector: 'app-new-chart',
-    templateUrl: './new-chart.component.html',
-    styleUrls: ['./new-chart.component.css']
+    selector: 'app-pie-chart',
+    templateUrl: './pie-chart.component.html',
+    styleUrls: ['./pie-chart.component.css']
 })
 
-export class NewChartComponent {
+export class PieChartComponent {
     view: any = { width: 0, height: 0 };
     canvas: any;
     ctx: any;
@@ -53,7 +53,7 @@ export class NewChartComponent {
         });
 
         this.tabChanged.onChanged((index, name) => {
-            if (name != "New Chart" || this.inited)
+            if (name != "Pie Chart" || this.inited)
                 return;
             this.inited = true;
 
