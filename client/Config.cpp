@@ -63,11 +63,11 @@ Getter<unsigned long long> delay("delay", "Delay this many milliseconds before s
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
 Separator s4("Timeouts:");
-Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 3000);
-Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 2000);
-Getter<unsigned long long> slaveConnectTimeout("slave-connect-timeout", "Set slave connect watchdog timeout", 1000);
-Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 3000);
-Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload job watchdog timeout", 5000);
+Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 5000);
+Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 3000);
+Getter<unsigned long long> slaveConnectTimeout("slave-connect-timeout", "Set slave connect watchdog timeout", 3000);
+Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 5000);
+Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload job watchdog timeout", 10000);
 Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))", 10000); // restarts on each heartbeat which happen every 5 seconds
 Getter<std::string> compiler("compiler", "Set fiskc's resolved compiler");
 Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir", getenv("HOME") ? std::string(getenv("HOME") + std::string("/.cache/fisk/client/")) : std::string(),
