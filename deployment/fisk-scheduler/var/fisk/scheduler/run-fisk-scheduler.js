@@ -54,23 +54,21 @@ function startFisk()
             checkForUpdate();
         }
 
-        fisk = child_process.execFile(process.execPath, [ "--max_old_space_size=8192", "./fisk-scheduler.js" ],
-                                      {
-                                          maxBuffer: 1024 * 1024 * 32,
-                                          cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
-                                      },
-                                      (error, stdout, stderr) => {
-                                          console.log("fisk exited: ", error);
-                                          if (!killed) {
-                                              fisk = undefined;
-                                              console.log("restarting in 1 second");
-                                              setTimeout(startFisk, 1000);
-                                          } else {
-                                              killed = false;
-                                          }
-                                      });
-        fisk.stdout.pipe(process.stdout);
-        fisk.stderr.pipe(process.stderr);
+        fisk = child_process.fork([ "--max_old_space_size=8192", "./fisk-scheduler.js" ],
+                                  {
+                                      stdio: "inherit",
+                                      cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
+                                  },
+                                  (error, stdout, stderr) => {
+                                      console.log("fisk exited: ", error);
+                                      if (!killed) {
+                                          fisk = undefined;
+                                          console.log("restarting in 1 second");
+                                          setTimeout(startFisk, 1000);
+                                      } else {
+                                          killed = false;
+                                      }
+                                  });
     }
 }
 
