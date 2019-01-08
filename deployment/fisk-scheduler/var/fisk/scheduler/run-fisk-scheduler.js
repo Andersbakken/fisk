@@ -54,7 +54,7 @@ function startFisk()
             checkForUpdate();
         }
 
-        fisk = child_process.fork([ "--max_old_space_size=8192", "./fisk-scheduler.js" ],
+        fisk = child_process.fork("./fisk-scheduler.js", [ "--max_old_space_size=8192" ],
                                   {
                                       stdio: "inherit",
                                       cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
