@@ -1,7 +1,8 @@
-import { Component, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { FiskService } from '../fisk.service';
 import { ConfigService } from '../config.service';
 import { MessageService } from '../message.service';
+import { TabChangedService } from '../tab-changed.service';
 
 @Component({
     selector: 'app-new-chart',
@@ -9,17 +10,18 @@ import { MessageService } from '../message.service';
     styleUrls: ['./new-chart.component.css']
 })
 
-export class NewChartComponent implements AfterViewChecked {
+export class NewChartComponent {
     view: any = { width: 0, height: 0 };
     canvas: any;
     ctx: any;
-    inited: number = 0;
     maxJobs: number = 0;
     jobs = new Map();
     clientJobs = new Map();
+    inited: boolean = false;
 
     constructor(private fisk: FiskService, private config: ConfigService,
-                private message: MessageService, private changeRef: ChangeDetectorRef) {
+                private tabChanged: TabChangedService, private message: MessageService,
+                private changeRef: ChangeDetectorRef) {
         this.fisk.on("data", (data: any) => {
             switch (data.type) {
             case "slaveAdded":
@@ -49,126 +51,122 @@ export class NewChartComponent implements AfterViewChecked {
             this.view.width = window.innerWidth - ((rect.x * 2) + 50);
             this.view.height = window.innerHeight - rect.y - 50;
         });
-    }
 
-    ngAfterViewChecked() {
-        if (this.inited == -1)
-            return;
-        const canvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
-        if (!canvas)
-            return;
-
-        const rect: any = canvas.getBoundingClientRect();
-        if (this.inited != rect.x) {
-            this.inited = rect.x;
-            return;
-        }
-
-        this.inited = -1;
-
-        this.view.width = window.innerWidth - ((rect.x * 2));
-        this.view.height = window.innerHeight - rect.y - 50;
-        //console.log("hey", this.view.width, this.view.height);
-
-        this.changeRef.detectChanges();
-
-        this.ctx = canvas.getContext("2d", { alpha: false });
-
-        const legendSpace = this.config.get("chart-legend-space", 400);
-        const legendX = this.view.width - legendSpace + 10;
-
-        const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
-        const Step = 0.25;
-
-        const animateItem = (item, prop, animatedProp, steps) => {
-            const d = item[prop];
-            if (!(animatedProp in item)) {
-                item[animatedProp] = d;
+        this.tabChanged.onChanged((index, name) => {
+            if (name != "New Chart" || this.inited)
                 return;
-            }
-            let a = item[animatedProp];
-            if (a == d)
+            this.inited = true;
+
+            const canvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
+            if (!canvas)
                 return;
-            if (a < d) {
-                a = Math.min(a + (Step * steps), d);
-            } else {
-                a = Math.max(a - (Step * steps), d);
-            }
-            item[animatedProp] = a;
-        };
 
-        const frameMs = (1 / 60) * 1000;
-        let last = 0;
-        const animate = ts => {
-            const steps = (ts - last) / frameMs;
-            last = ts;
+            const rect: any = canvas.getBoundingClientRect();
 
-            const rad = deg => {
-                return deg / (180 / Math.PI);
+            this.view.width = window.innerWidth - ((rect.x * 2));
+            this.view.height = window.innerHeight - rect.y - 50;
+            //console.log("hey", this.view.width, this.view.height);
+
+            this.changeRef.detectChanges();
+
+            this.ctx = canvas.getContext("2d", { alpha: false });
+
+            const legendSpace = this.config.get("chart-legend-space", 400);
+            const legendX = this.view.width - legendSpace + 10;
+
+            const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
+            const Step = 0.25;
+
+            const animateItem = (item, prop, animatedProp, steps) => {
+                const d = item[prop];
+                if (!(animatedProp in item)) {
+                    item[animatedProp] = d;
+                    return;
+                }
+                let a = item[animatedProp];
+                if (a == d)
+                    return;
+                if (a < d) {
+                    a = Math.min(a + (Step * steps), d);
+                } else {
+                    a = Math.max(a - (Step * steps), d);
+                }
+                item[animatedProp] = a;
             };
 
-            const ctx = this.ctx;
+            const frameMs = (1 / 60) * 1000;
+            let last = 0;
+            const animate = ts => {
+                const steps = (ts - last) / frameMs;
+                last = ts;
 
-            ctx.fillStyle = "white";
-            ctx.beginPath();
-            ctx.rect(0, 0, this.view.width, this.view.height);
-            ctx.fill();
+                const rad = deg => {
+                    return deg / (180 / Math.PI);
+                };
 
-            const paddingSpace = 10;
-            const xy = max/2 + paddingSpace;
-            const radius = max/2 - (paddingSpace*2);
+                const ctx = this.ctx;
 
-            ctx.fillStyle = "#ddd";
-            ctx.beginPath();
-            ctx.moveTo(xy, xy);
-            ctx.arc(xy, xy, radius, 0, Math.PI * 2, false);
-            ctx.fill();
+                ctx.fillStyle = "white";
+                ctx.beginPath();
+                ctx.rect(0, 0, this.view.width, this.view.height);
+                ctx.fill();
 
-            if (!this.maxJobs) {
-                this.clientJobs.forEach(c => {
-                    c.start = c.animatedStart = rad(270);
-                    c.jobs = c.animatedJobs = 0;
-                });
-                window.requestAnimationFrame(animate);
-                return;
-            }
+                const paddingSpace = 10;
+                const xy = max/2 + paddingSpace;
+                const radius = max/2 - (paddingSpace*2);
 
-            ctx.font = "20px serif";
-            let cur = rad(270);
-            let legendY = 40;
-
-            this.clientJobs.forEach(c => {
-                //console.log("puck", this.maxJobs, c);
-                c.start = cur;
-
-                animateItem(c, "start", "animatedStart", steps);
-                animateItem(c, "jobs", "animatedJobs", steps);
-
-                if (!c.color) {
-                    c.color = this._color(c.client.ip, false);
-                }
-
-                ctx.fillStyle = c.color;
+                ctx.fillStyle = "#ddd";
                 ctx.beginPath();
                 ctx.moveTo(xy, xy);
-                ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
-                ctx.lineTo(xy, xy);
+                ctx.arc(xy, xy, radius, 0, Math.PI * 2, false);
                 ctx.fill();
 
-                ctx.beginPath();
-                ctx.rect(legendX, legendY - 20, legendSpace, 30);
-                ctx.fill();
+                if (!this.maxJobs) {
+                    this.clientJobs.forEach(c => {
+                        c.start = c.animatedStart = rad(270);
+                        c.jobs = c.animatedJobs = 0;
+                    });
+                    window.requestAnimationFrame(animate);
+                    return;
+                }
 
-                ctx.fillStyle = "black";
-                ctx.fillText(c.client.name, legendX, legendY);
+                ctx.font = "20px serif";
+                let cur = rad(270);
+                let legendY = 40;
 
-                cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
-                legendY += 30;
-            });
+                this.clientJobs.forEach(c => {
+                    //console.log("puck", this.maxJobs, c);
+                    c.start = cur;
 
+                    animateItem(c, "start", "animatedStart", steps);
+                    animateItem(c, "jobs", "animatedJobs", steps);
+
+                    if (!c.color) {
+                        c.color = this._color(c.client.ip, false);
+                    }
+
+                    ctx.fillStyle = c.color;
+                    ctx.beginPath();
+                    ctx.moveTo(xy, xy);
+                    ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
+                    ctx.lineTo(xy, xy);
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.rect(legendX, legendY - 20, legendSpace, 30);
+                    ctx.fill();
+
+                    ctx.fillStyle = "black";
+                    ctx.fillText(c.client.name, legendX, legendY);
+
+                    cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
+                    legendY += 30;
+                });
+
+                window.requestAnimationFrame(animate);
+            };
             window.requestAnimationFrame(animate);
-        };
-        window.requestAnimationFrame(animate);
+        });
     }
 
     _color(key, invert) {
@@ -247,6 +245,9 @@ export class NewChartComponent implements AfterViewChecked {
         } else {
             const c = this.clientJobs.get(job.client.ip);
             c.jobs += inc;
+            if (!c.jobs) {
+                this.clientJobs.delete(job.client.ip);
+            }
         }
     }
 
@@ -280,7 +281,7 @@ export class NewChartComponent implements AfterViewChecked {
     }
 
     _jobStarted(job) {
-        // console.log("job start", job);
+        console.log("job start", job.client.ip);
         this.jobs.set(job.id, job);
         this._adjustClients(job, 1, 1);
     }

@@ -12,6 +12,7 @@ import { BackoffService } from './backoff.service';
 import { FiskService } from './fisk.service';
 import { ConfigService } from './config.service';
 import { MessageService } from './message.service';
+import { TabChangedService } from './tab-changed.service';
 import { ConfigComponent } from './config/config.component';
 import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
@@ -54,7 +55,8 @@ const appRoutes: Routes = [
         BackoffService,
         FiskService,
         ConfigService,
-        MessageService
+        MessageService,
+        TabChangedService
     ],
     bootstrap: [AppComponent]
 })

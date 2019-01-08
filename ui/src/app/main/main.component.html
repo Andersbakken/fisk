@@ -1,6 +1,6 @@
 <mat-card>
   <mat-card-content>
-    <mat-tab-group class="demo-tab-group">
+    <mat-tab-group class="demo-tab-group" (selectedTabChange)="onTabChanged($event)" (animationDone)="onAnimationDone()">
       <mat-tab label="Chart">
         <app-chart></app-chart>
       </mat-tab>
