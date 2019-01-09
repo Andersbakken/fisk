@@ -104,7 +104,7 @@ Getter<std::string> name("name", "Set name (used for visualization)", std::strin
 Separator s9;
 Separator s10("Logging:");
 Getter<std::string> logFile("log-file", "Log file");
-Getter<bool> logFileAppend("log-file-append", "Append to log file (rather overwriting)", false);
+Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
 Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\" or \"silent\")",
 #ifdef NDEBUG
                              "silent"
