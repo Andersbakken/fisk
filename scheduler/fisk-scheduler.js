@@ -582,11 +582,26 @@ server.on("compile", compile => {
         if (env != compile.environment)
             data.environment = env;
         ++activeJobs;
-        if (activeJobs > peakActiveJobs)
+        let peakInfo;
+        if (activeJobs > peakActiveJobs) {
             peakActiveJobs = activeJobs;
+            peakInfo = true;
+        }
         let utilization = (activeJobs / capacity);
-        if (utilization > peakUtilization)
+        if (utilization > peakUtilization) {
             peakUtilization = utilization;
+            peakInfo = true;
+        }
+
+        if (peakInfo && monitors.length) {
+            let info = {
+                type: "stats",
+                peakUtilization: peakUtilization,
+                peakActiveJobs: peakActiveJobs
+            };
+            // console.log("send to monitors", info);
+            monitors.forEach(monitor => monitor.send(info));
+        }
         let sendTime = Date.now();
         ++slave.activeClients;
         ++slave.jobsScheduled;
@@ -667,6 +682,7 @@ server.on("monitor", client => {
     forEachSlave(slave => {
         client.send(slaveToMonitorInfo(slave, "slaveAdded"));
     });
+    client.send({ type: "stats", peakUtilization: peakUtilization, peakActiveJobs: peakActiveJobs });
     let user;
     client.on("message", messageText => {
         // console.log("GOT MESSAGE", messageText);
