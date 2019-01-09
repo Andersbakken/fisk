@@ -11,6 +11,7 @@ const fs = require("fs-extra");
 const bytes = require("bytes");
 const crypto = require("crypto");
 const Database = require("./database");
+const Peak = require("./peak");
 
 process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
@@ -30,8 +31,6 @@ const slaves = {};
 const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
-let peakActiveJobs = 0;
-let peakUtilization = 0;
 let capacity = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
@@ -39,6 +38,21 @@ const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
 } catch (err) {
+}
+
+const peaks = [
+    new Peak(60 * 1000, "Last hour"),
+    new Peak(24 * 60 * 1000, "Last 24 hours"),
+    new Peak(7 * 24 * 60 * 1000, "Last 7 days"),
+    new Peak(30 * 24 * 60 * 1000, "Last 30 days"),
+    new Peak(undefined, "Forever")
+];
+
+function peakData()
+{
+    let ret = {};
+    peaks.forEach(peak => ret[peak.name] = peak.toObject());
+    return ret;
 }
 
 const pendingUsers = {};
@@ -301,9 +315,7 @@ server.on("listen", app => {
             configVersion: common.Version,
             capacity: capacity,
             activeJobs: activeJobs,
-            peakActiveJobs: peakActiveJobs,
-            utilization: activeJobs / capacity,
-            peakUtilization: peakUtilization
+            peaks: peakData()
         };
         res.send(JSON.stringify(obj, null, 4));
     });
@@ -582,24 +594,16 @@ server.on("compile", compile => {
         if (env != compile.environment)
             data.environment = env;
         ++activeJobs;
-        let peakInfo;
-        if (activeJobs > peakActiveJobs) {
-            peakActiveJobs = activeJobs;
-            peakInfo = true;
-        }
         let utilization = (activeJobs / capacity);
-        if (utilization > peakUtilization) {
-            peakUtilization = utilization;
-            peakInfo = true;
-        }
-
+        let peakInfo = false;
+        const now = Date.now();
+        peaks.forEach(peak => {
+            if (peak.record(now, activeJobs, utilization))
+                peakInfo = true;
+        });
         if (peakInfo && monitors.length) {
-            let info = {
-                type: "stats",
-                peakUtilization: peakUtilization,
-                peakActiveJobs: peakActiveJobs
-            };
-            // console.log("send to monitors", info);
+            let info = peakData();
+            info.type = "stats";
             monitors.forEach(monitor => monitor.send(info));
         }
         let sendTime = Date.now();
@@ -682,7 +686,9 @@ server.on("monitor", client => {
     forEachSlave(slave => {
         client.send(slaveToMonitorInfo(slave, "slaveAdded"));
     });
-    client.send({ type: "stats", peakUtilization: peakUtilization, peakActiveJobs: peakActiveJobs });
+    let info = peakData();
+    info.type = "stats";
+    client.send(info);
     let user;
     client.on("message", messageText => {
         // console.log("GOT MESSAGE", messageText);
