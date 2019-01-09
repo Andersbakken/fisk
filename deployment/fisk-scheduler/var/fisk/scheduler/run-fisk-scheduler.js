@@ -204,4 +204,11 @@ function checkForUpdate()
     });
 }
 
+
+process.on("SIGHUP", () => {
+    console.log("got SIGHUP", checkForUpdateActive);
+    if (!checkForUpdateActive)
+        checkForUpdate();
+});
+
 checkForUpdate();
