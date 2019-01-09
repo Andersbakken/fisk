@@ -286,13 +286,13 @@ int main(int argc, char **argv)
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket.done
+        while (!schedulerWebsocket.done && !schedulerWebsocket.responseDone
                && schedulerWebsocket.state() >= SchedulerWebSocket::None
                && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
         }
         DEBUG("Finished schedulerWebsocket");
-        if (!schedulerWebsocket.done) {
+        if (!schedulerWebsocket.done && !schedulerWebsocket.responseDone) {
             DEBUG("Have to run locally because no server 2");
             data.watchdog->stop();
             Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error 2");
@@ -324,6 +324,17 @@ int main(int argc, char **argv)
         }
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "needs environment");
         return 0;
+    }
+
+    if (schedulerWebsocket.responseDone) {
+        if (!data.preprocessed->stdErr.empty()) {
+            fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+        }
+        // data.watchdog->transition(Watchdog::Finished); // this would assert
+        data.watchdog->stop();
+        schedulerWebsocket.close("responsed");
+        Client::writeStatistics();
+        return data.exitCode;
     }
 
     if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())

@@ -4,11 +4,12 @@
 #include "WebSocket.h"
 #include "Client.h"
 #include "Watchdog.h"
+#include "JobReceiver.h"
 #include <string>
 
 extern "C" const char *npm_version;
 
-class SchedulerWebSocket : public WebSocket
+class SchedulerWebSocket : public WebSocket, public JobReceiver
 {
 public:
     virtual void onConected() override
@@ -17,6 +18,8 @@ public:
     }
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
+        if (handleMessage(type, data, len, &responseDone))
+            return;
         if (type == WebSocket::Text) {
             std::string err;
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
@@ -54,6 +57,7 @@ public:
     }
 
     bool done { false };
+    bool responseDone { false };
     bool needsEnvironment { false };
     int jobId { 0 };
     uint16_t slavePort { 0 };
