@@ -30,4 +30,5 @@ compile_commands.json
 json11.pc
 libjson11.a
 rules.ninja
+ui/dist.tar.gz
 .gdb*
