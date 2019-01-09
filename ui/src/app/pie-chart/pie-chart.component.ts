@@ -15,6 +15,7 @@ export class PieChartComponent {
     canvas: any;
     ctx: any;
     maxJobs: number = 0;
+    maxJobsData: any = {};
     jobs = new Map();
     clientJobs = new Map();
     inited: boolean = false;
@@ -137,6 +138,9 @@ export class PieChartComponent {
                 let cur = rad(270);
                 let legendY = 40;
 
+                ctx.fillStyle = "black";
+                ctx.fillText(this.maxJobsData.text, legendX - this.maxJobsData.width - 20, legendY);
+
                 this.clientJobs.forEach(c => {
                     //console.log("puck", this.maxJobs, c);
                     c.start = cur;
@@ -158,6 +162,7 @@ export class PieChartComponent {
                         }
                     }
 
+                    // pie arc
                     ctx.fillStyle = c.color;
                     ctx.beginPath();
                     ctx.moveTo(xy, xy);
@@ -165,12 +170,28 @@ export class PieChartComponent {
                     ctx.lineTo(xy, xy);
                     ctx.fill();
 
+                    // legend name background
                     ctx.beginPath();
                     ctx.rect(legendX, legendY - 20, legendSpace, 30);
                     ctx.fill();
 
+                    // legend name text
                     ctx.fillStyle = "black";
                     ctx.fillText(c.client.name, legendX, legendY);
+
+                    // legend usage
+                    const usage = c.jobs + " (" + Math.round(c.jobs / this.maxJobs * 1000) / 10 + "%)";
+                    const metrics = ctx.measureText(usage);
+
+                    // legend usage background
+                    ctx.fillStyle = c.color;
+                    ctx.beginPath();
+                    ctx.rect(legendX + legendSpace - metrics.width - 15, legendY - 20, metrics.width + 15, 30);
+                    ctx.fill();
+
+                    // legend usage text
+                    ctx.fillStyle = "black";
+                    ctx.fillText(usage, legendX + legendSpace - metrics.width - 10, legendY);
 
                     cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
                     legendY += 30;
@@ -270,10 +291,12 @@ export class PieChartComponent {
 
     _slaveAdded(slave) {
         this.maxJobs += slave.slots;
+        this._updateMaxJobsData();
     }
 
     _slaveRemoved(slave) {
         this.maxJobs -= slave.slots;
+        this._updateMaxJobsData();
         if (this.maxJobs < 0) {
             throw new Error("Negative jobs reached!");
         }
@@ -291,6 +314,11 @@ export class PieChartComponent {
                 this._adjustClients(job, -1, 0);
             }
         });
+    }
+
+    _updateMaxJobsData() {
+        this.maxJobsData.text = "Number of slots: " + this.maxJobs;
+        this.maxJobsData.width = this.ctx.measureText(this.maxJobsData.text).width;
     }
 
     _jobStarted(job) {
