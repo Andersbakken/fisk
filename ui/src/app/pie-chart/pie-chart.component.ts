@@ -12,7 +12,6 @@ import { TabChangedService } from '../tab-changed.service';
 
 export class PieChartComponent {
     view: any = { width: 0, height: 0 };
-    canvas: any;
     ctx: any;
     maxJobs: number = 0;
     maxJobsData: any = {};
@@ -41,6 +40,7 @@ export class PieChartComponent {
             }
         });
         this.fisk.on("open", () => {
+            this._reset();
             this.message.showMessage("connected to " + this.fisk.host + ":" + this.fisk.port);
         });
 
@@ -73,10 +73,6 @@ export class PieChartComponent {
 
             this.ctx = canvas.getContext("2d", { alpha: false });
 
-            const legendSpace = this.config.get("chart-legend-space", 400);
-            const legendX = this.view.width - legendSpace + 10;
-
-            const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
             const Step = 0.25;
 
             const animateItem = (item, prop, animatedProp, steps) => {
@@ -101,6 +97,11 @@ export class PieChartComponent {
             const frameMs = (1 / 60) * 1000;
             let last = 0;
             const animate = ts => {
+                const legendSpace = this.config.get("chart-legend-space", 400);
+                const legendX = this.view.width - legendSpace + 10;
+
+                const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
+
                 const steps = (ts - last) / frameMs;
                 last = ts;
 
@@ -201,6 +202,13 @@ export class PieChartComponent {
             };
             window.requestAnimationFrame(animate);
         });
+    }
+
+    _reset() {
+        this.maxJobs = 0;
+        this.maxJobsData = {};
+        this.jobs = new Map();
+        this.clientJobs = new Map();
     }
 
     _color(key, invert) {
