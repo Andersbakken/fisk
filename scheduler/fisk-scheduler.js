@@ -30,6 +30,9 @@ const slaves = {};
 const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
+let peakActiveJobs = 0;
+let peakUtilization = 0;
+let capacity = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 const logFileDir = path.join(common.cacheDir(), "logs");
@@ -122,6 +125,7 @@ function slaveToMonitorInfo(slave, type)
 function insertSlave(slave) {
     slaves[slaveKey(slave)] = slave;
     ++slaveCount;
+    capacity += slave.slots;
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveAdded");
         // console.log("send to monitors", info);
@@ -139,6 +143,7 @@ function forEachSlave(cb) {
 
 function removeSlave(slave) {
     --slaveCount;
+    capacity -= slave.slots;
     delete slaves[slaveKey(slave)];
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveRemoved");
@@ -290,7 +295,17 @@ server.on("listen", app => {
     });
 
     app.get("/info", (req, res, next) => {
-        res.send(JSON.stringify({ npmVersion: schedulerNpmVersion, environments: environmentsInfo(), configVersion: common.Version }, null, 4));
+        let obj = {
+            npmVersion: schedulerNpmVersion,
+            environments: environmentsInfo(),
+            configVersion: common.Version,
+            capacity: capacity,
+            activeJobs: activeJobs,
+            peakActiveJobs: peakActiveJobs,
+            utilization: activeJobs / capacity,
+            peakUtilization: peakUtilization
+        };
+        res.send(JSON.stringify(obj, null, 4));
     });
 
     app.get("/quit-slaves", (req, res, next) => {
@@ -567,6 +582,11 @@ server.on("compile", compile => {
         if (env != compile.environment)
             data.environment = env;
         ++activeJobs;
+        if (activeJobs > peakActiveJobs)
+            peakActiveJobs = activeJobs;
+        let utilization = (activeJobs / capacity);
+        if (utilization > peakUtilization)
+            peakUtilization = utilization;
         let sendTime = Date.now();
         ++slave.activeClients;
         ++slave.jobsScheduled;
