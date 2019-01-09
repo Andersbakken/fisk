@@ -35,20 +35,19 @@ int main(int argc, char **argv)
                 sem_post(semaphore);
             sem_close(semaphore);
         }
-        if (Watchdog *watchdog = data.watchdog) {
-            if (Log::minLogLevel <= Log::Warn) {
-                std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
-                                                 Client::milliseconds_since_epoch,
-                                                 preprocessedDuration,
-                                                 preprocessedSlotDuration);
-                for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
-                    str += Client::format(" %s: %llu (%llu)\n", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
-                                          watchdog->timings[i] - watchdog->timings[i - 1],
-                                          watchdog->timings[i] - Client::started);
-                }
-                Log::log(Log::Debug, str);
+        if (Log::minLogLevel <= Log::Warn) {
+            std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
+                                             Client::milliseconds_since_epoch,
+                                             preprocessedDuration,
+                                             preprocessedSlotDuration);
+            for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
+                str += Client::format("\n %s: %llu (%llu)", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
+                                      data.watchdog->timings[i] - data.watchdog->timings[i - 1],
+                                      data.watchdog->timings[i] - Client::started);
             }
+            Log::log(Log::Warn, str);
         }
+        delete data.watchdog;
     });
 
     if (!Config::init(argc, argv)) {
@@ -126,11 +125,10 @@ int main(int argc, char **argv)
         usleep(delay * 1000);
     }
 
-    Watchdog watchdog;
     Client::Data &data = Client::data();
+    data.watchdog = new Watchdog;
     data.argv = argv;
     data.argc = argc;
-    data.watchdog = &watchdog;
     auto signalHandler = [](int signal) {
         for (sem_t *semaphore : Client::data().semaphores) {
             sem_post(semaphore);
@@ -214,7 +212,7 @@ int main(int argc, char **argv)
     data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
     if (!data.preprocessed) {
         ERROR("Failed to preprocess");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess failure");
         return 0; // unreachable
     }
@@ -252,14 +250,14 @@ int main(int argc, char **argv)
 
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error");
         return 0; // unreachable
     }
 
     {
         Select select;
-        select.add(&watchdog);
+        select.add(data.watchdog);
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
@@ -271,7 +269,7 @@ int main(int argc, char **argv)
         DEBUG("Finished schedulerWebsocket");
         if (!schedulerWebsocket.done) {
             DEBUG("Have to run locally because no server 2");
-            watchdog.stop();
+            data.watchdog->stop();
             Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error 2");
             return 0; // unreachable
         }
@@ -293,7 +291,7 @@ int main(int argc, char **argv)
     }
 
     if (schedulerWebsocket.needsEnvironment) {
-        watchdog.stop();
+        data.watchdog->stop();
         const std::string tarball = Client::prepareEnvironmentForUpload();
         // printf("GOT TARBALL %s\n", tarball.c_str());
         if (!tarball.empty()) {
@@ -306,17 +304,17 @@ int main(int argc, char **argv)
     if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())
         || !schedulerWebsocket.slavePort) {
         DEBUG("Have to run locally because no slave");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "no slave");
         return 0; // unreachable
     }
 
     // usleep(1000 * 1000 * 16);
-    watchdog.transition(Watchdog::AcquiredSlave);
+    data.watchdog->transition(Watchdog::AcquiredSlave);
     SlaveWebSocket slaveWebSocket;
     Select select;
     select.add(&slaveWebSocket);
-    select.add(&watchdog);
+    select.add(data.watchdog);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
     headers["x-fisk-slave-ip"] = schedulerWebsocket.slaveIp;
     if (!schedulerWebsocket.environment.empty()) {
@@ -327,7 +325,7 @@ int main(int argc, char **argv)
                                                schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
                                                schedulerWebsocket.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure");
         return 0; // unreachable
     }
@@ -336,22 +334,22 @@ int main(int argc, char **argv)
         select.exec();
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because no slave connection 2");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure 2");
         return 0;
     }
-    watchdog.transition(Watchdog::ConnectedToSlave);
+    data.watchdog->transition(Watchdog::ConnectedToSlave);
 
     DEBUG("Waiting for preprocessed");
     data.preprocessed->wait();
-    watchdog.transition(Watchdog::PreprocessFinished);
+    data.watchdog->transition(Watchdog::PreprocessFinished);
     DEBUG("Preprocessed finished");
     preprocessedDuration = data.preprocessed->duration;
     preprocessedSlotDuration = data.preprocessed->slotDuration;
 
     if (data.preprocessed->exitStatus != 0) {
         ERROR("Failed to preprocess. Running locally");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
         return 0; // unreachable
     }
@@ -376,7 +374,7 @@ int main(int argc, char **argv)
             select.exec();
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
-            watchdog.stop();
+            data.watchdog->stop();
             Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 5");
             return 0; // unreachable
         }
@@ -389,12 +387,12 @@ int main(int argc, char **argv)
         select.exec();
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 3");
         return 0; // unreachable
     }
 
-    watchdog.transition(Watchdog::UploadedJob);
+    data.watchdog->transition(Watchdog::UploadedJob);
 
     // usleep(1000 * 500);
     // return 0;
@@ -402,7 +400,7 @@ int main(int argc, char **argv)
         select.exec();
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
-        watchdog.stop();
+        data.watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 4");
         return 0; // unreachable
     }
@@ -410,8 +408,8 @@ int main(int argc, char **argv)
     if (!data.preprocessed->stdErr.empty()) {
         fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
     }
-    watchdog.transition(Watchdog::Finished);
-    watchdog.stop();
+    data.watchdog->transition(Watchdog::Finished);
+    data.watchdog->stop();
     schedulerWebsocket.close("slaved");
 
     Client::writeStatistics();
