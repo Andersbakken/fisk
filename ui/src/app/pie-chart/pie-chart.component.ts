@@ -49,7 +49,7 @@ export class PieChartComponent {
             const canvas = document.getElementById("canvas-chart");
 
             const rect: any = canvas.getBoundingClientRect();
-            this.view.width = window.innerWidth - ((rect.x * 2) + 50);
+            this.view.width = window.innerWidth - (rect.x * 2);
             this.view.height = window.innerHeight - rect.y - 50;
         });
 
@@ -65,7 +65,7 @@ export class PieChartComponent {
 
             const rect: any = canvas.getBoundingClientRect();
 
-            this.view.width = window.innerWidth - ((rect.x * 2));
+            this.view.width = window.innerWidth - (rect.x * 2);
             this.view.height = window.innerHeight - rect.y - 50;
             //console.log("hey", this.view.width, this.view.height);
 
