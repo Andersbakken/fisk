@@ -490,6 +490,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             VERBOSE("Preprocess calling get_status");
             ptr->exitStatus = proc.get_exit_status();
             DEBUG("Preprocess got status %d", ptr->exitStatus);
+            MD5_Update(&Client::data().md5, ptr->stdOut.c_str(), ptr->stdOut.size());
         }
         slot.reset();
         std::unique_lock<std::mutex> lock(ptr->mMutex);

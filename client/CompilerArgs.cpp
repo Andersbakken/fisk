@@ -21,125 +21,127 @@
 struct OptionArg {
     const char *name;
     size_t args;
+    bool md5;
     bool operator<(const OptionArg &other) const { return strcmp(name, other.name) < 0; }
 };
 
 static const OptionArg argOptions[] = {
-    { "--CLASSPATH", 1 },
-    { "--assert", 1 },
-    { "--bootclasspath", 1 },
-    { "--classpath", 1 },
-    { "--config", 1 },
-    { "--define-macro", 1 },
-    { "--dyld-prefix", 1 },
-    { "--encoding", 1 },
-    { "--extdirs", 1 },
-    { "--for-linker", 1 },
-    { "--force-link", 1 },
-    { "--include-directory", 1 },
-    { "--include-directory-after", 1 },
-    { "--include-prefix", 1 },
-    { "--include-with-prefix", 1 },
-    { "--include-with-prefix-after", 1 },
-    { "--include-with-prefix-before", 1 },
-    { "--language", 1 },
-    { "--library-directory", 1 },
-    { "--mhwdiv", 1 },
-    { "--output", 1 },
-    { "--output-class-directory", 1 },
-    { "--param", 1 },
-    { "--prefix", 1 },
-    { "--print-file-name", 1 },
-    { "--print-prog-name", 1 },
-    { "--resource", 1 },
-    { "--rtlib", 1 },
-    { "--serialize-diagnostics", 1 },
-    { "--std", 1 },
-    { "--stdlib", 1 },
-    { "--sysroot", 1 },
-    { "--system-header-prefix", 1 },
-    { "--undefine-macro", 1 },
-    { "-I", 1 },
-    { "-Xanalyzer", 1 },
-    { "-Xassembler", 1 },
-    { "-Xclang", 1 },
-    { "-Xcuda-fatbinary", 1 },
-    { "-Xcuda-ptxas", 1 },
-    { "-Xlinker", 1 },
-    { "-Xopenmp-target", 1 },
-    { "-Xpreprocessor", 1 },
-    { "-allowable_client", 1 },
-    { "-arch", 1 },
-    { "-arch_only", 1 },
-    { "-arcmt-migrate-report-output", 1 },
-    { "-bundle_loader", 1 },
-    { "-cxx-isystem", 1 },
-    { "-dependency-dot", 1 },
-    { "-dependency-file", 1 },
-    { "-dylib_file", 1 },
-    { "-exported_symbols_list", 1 },
-    { "-filelist", 1 },
-    { "-fmodule-implementation-of", 1 },
-    { "-fmodule-name", 1 },
-    { "-fmodules-user-build-path", 1 },
-    { "-fnew-alignment", 1 },
-    { "-force_load", 1 },
-    { "-framework", 1 },
-    { "-frewrite-map-file", 1 },
-    { "-ftrapv-handler", 1 },
-    { "-gcc-toolchain", 1 },
-    { "-image_base", 1 },
-    { "-imultilib", 1 },
-    { "-include", 1 },
-    { "-include-pch", 1 },
-    { "-init", 1 },
-    { "-install_name", 1 },
-    { "-isysroot", 1 },
-    { "-isystem", 1 },
-    { "-lazy_framework", 1 },
-    { "-lazy_library", 1 },
-    { "-meabi", 1 },
-    { "-mllvm", 1 },
-    { "-module-dependency-dir", 1 },
-    { "-mthread-model", 1 },
-    { "-multiply_defined", 1 },
-    { "-multiply_defined_unused", 1 },
-    { "-o", 1 },
-    { "-read_only_relocs", 1 },
-    { "-rpath", 1 },
-    { "-sectalign", 3 },
-    { "-sectcreate", 3 },
-    { "-sectobjectsymbols", 2 },
-    { "-sectorder", 3 },
-    { "-seg_addr_table", 1 },
-    { "-seg_addr_table_filename", 1 },
-    { "-segaddr", 2 },
-    { "-segcreate", 3 },
-    { "-segprot", 3 },
-    { "-segs_read_only_addr", 1 },
-    { "-segs_read_write_addr", 1 },
-    { "-serialize-diagnostics", 1 },
-    { "-target", 1 },
-    { "-umbrella", 1 },
-    { "-unexported_symbols_list", 1 },
-    { "-weak_framework", 1 },
-    { "-weak_library", 1 },
-    { "-weak_reference_mismatches", 1 },
-    { "-x", 1 },
+    { "--CLASSPATH", 1, true },
+    { "--assert", 1, true },
+    { "--bootclasspath", 1, true },
+    { "--classpath", 1, true },
+    { "--config", 1, true },
+    { "--define-macro", 1, true },
+    { "--dyld-prefix", 1, true },
+    { "--encoding", 1, true },
+    { "--extdirs", 1, true },
+    { "--for-linker", 1, true },
+    { "--force-link", 1, true },
+    { "--include-directory", 1, true },
+    { "--include-directory-after", 1, true },
+    { "--include-prefix", 1, true },
+    { "--include-with-prefix", 1, true },
+    { "--include-with-prefix-after", 1, true },
+    { "--include-with-prefix-before", 1, true },
+    { "--language", 1, true },
+    { "--library-directory", 1, true },
+    { "--mhwdiv", 1, true },
+    { "--output", 1, true },
+    { "--output-class-directory", 1, true },
+    { "--param", 1, true },
+    { "--prefix", 1, true },
+    { "--print-file-name", 1, true },
+    { "--print-prog-name", 1, true },
+    { "--resource", 1, true },
+    { "--rtlib", 1, true },
+    { "--serialize-diagnostics", 1, true },
+    { "--std", 1, true },
+    { "--stdlib", 1, true },
+    { "--sysroot", 1, true },
+    { "--system-header-prefix", 1, true },
+    { "--undefine-macro", 1, true },
+    { "-I", 1, false },
+    { "-Xanalyzer", 1, true },
+    { "-Xassembler", 1, true },
+    { "-Xclang", 1, true },
+    { "-Xcuda-fatbinary", 1, true },
+    { "-Xcuda-ptxas", 1, true },
+    { "-Xlinker", 1, true },
+    { "-Xopenmp-target", 1, true },
+    { "-Xpreprocessor", 1, true },
+    { "-allowable_client", 1, true },
+    { "-arch", 1, true },
+    { "-arch_only", 1, true },
+    { "-arcmt-migrate-report-output", 1, true },
+    { "-bundle_loader", 1, true },
+    { "-cxx-isystem", 1, false },
+    { "-dependency-dot", 1, true },
+    { "-dependency-file", 1, true },
+    { "-dylib_file", 1, true },
+    { "-exported_symbols_list", 1, true },
+    { "-filelist", 1, true },
+    { "-fmodule-implementation-of", 1, true },
+    { "-fmodule-name", 1, true },
+    { "-fmodules-user-build-path", 1, true },
+    { "-fnew-alignment", 1, true },
+    { "-force_load", 1, true },
+    { "-framework", 1, true },
+    { "-frewrite-map-file", 1, true },
+    { "-ftrapv-handler", 1, true },
+    { "-gcc-toolchain", 1, true },
+    { "-image_base", 1, true },
+    { "-imultilib", 1, true },
+    { "-include", 1, true },
+    { "-include-pch", 1, true },
+    { "-init", 1, true },
+    { "-install_name", 1, true },
+    { "-isysroot", 1, true },
+    { "-isystem", 1, false },
+    { "-lazy_framework", 1, true },
+    { "-lazy_library", 1, true },
+    { "-meabi", 1, true },
+    { "-mllvm", 1, true },
+    { "-module-dependency-dir", 1, true },
+    { "-mthread-model", 1, true },
+    { "-multiply_defined", 1, true },
+    { "-multiply_defined_unused", 1, true },
+    { "-o", 1, true },
+    { "-read_only_relocs", 1, true },
+    { "-rpath", 1, true },
+    { "-sectalign", 3, true },
+    { "-sectcreate", 3, true },
+    { "-sectobjectsymbols", 2, true },
+    { "-sectorder", 3, true },
+    { "-seg_addr_table", 1, true },
+    { "-seg_addr_table_filename", 1, true },
+    { "-segaddr", 2, true },
+    { "-segcreate", 3, true },
+    { "-segprot", 3, true },
+    { "-segs_read_only_addr", 1, true },
+    { "-segs_read_write_addr", 1, true },
+    { "-serialize-diagnostics", 1, true },
+    { "-target", 1, true },
+    { "-umbrella", 1, true },
+    { "-unexported_symbols_list", 1, true },
+    { "-weak_framework", 1, true },
+    { "-weak_library", 1, true },
+    { "-weak_reference_mismatches", 1, true },
+    { "-x", 1, true },
     { "-z", 1 }
 };
 
-// { "-Xarch_<arg1> <arg2>", 1 },
-// { "-Xarch_<arg1> <arg2>", 1 },
-// { // -Xopenmp-target=<triple> 1 },
-// { // -Xopenmp-target=<triple>, 1 },
+// { "-Xarch_<arg1> <arg2>", 1, true },
+// { "-Xarch_<arg1> <arg2>", 1, true },
+// { // -Xopenmp-target=<triple> 1, true },
+// { // -Xopenmp-target=<triple>, 1, true },
 
-static inline size_t hasArg(const std::string &arg)
+static inline size_t hasArg(const std::string &arg, bool &md5)
 {
     const OptionArg a { arg.c_str(), 1 };
     const size_t idx = std::lower_bound(argOptions, argOptions + (sizeof(argOptions) / sizeof(argOptions[0])), a) - argOptions;
     if (idx < sizeof(argOptions) / sizeof(argOptions[0])) {
         if (!strcmp(arg.c_str(), argOptions[idx].name)) {
+            md5 = argOptions[idx].md5;
             return argOptions[idx].args;
         }
     }
@@ -161,6 +163,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
     }
 
     for (size_t i=1; i<args.size(); ++i) {
+        bool md5 = true;
         const std::string &arg = args[i];
         if (arg.empty()) {
         } else if (arg == "-c") {
@@ -297,7 +300,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             // to not using the pch file if it can't be found. Icecream code is
             // extremely confusing.
             ++i;
-        } else if (size_t count = hasArg(arg)) {
+        } else if (size_t count = hasArg(arg, md5)) {
             i += count;
         } else if (arg[0] != '-') {
             if (ret->sourceFileIndex != std::numeric_limits<size_t>::max()) {
@@ -357,10 +360,18 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     }
                 }
             }
+            md5 = false;
         } else if (arg == "-") {
             DEBUG("STDIN input, building local");
             *localReason = Local_StdinInput;
             return nullptr;
+        }
+
+        if (md5) {
+            MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+            VERBOSE("Md5'ing arg [%s]", arg.c_str());
+        } else {
+            VERBOSE("Not md5'ing arg [%s]", arg.c_str());
         }
     }
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
@@ -385,14 +396,19 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
     if (!(ret->flags & HasDashO)) {
         ret->commandLine.push_back("-o");
-        ret->commandLine.push_back(ret->output());
+        MD5_Update(&Client::data().md5, "-o", 2);
+        std::string out = ret->output();
+        MD5_Update(&Client::data().md5, out.c_str(), out.size());
+        ret->commandLine.push_back(std::move(out));
         ret->flags |= HasDashO;
     }
 
     if (ret->flags & (HasDashMMD|HasDashMD) && !(ret->flags & HasDashMF)) {
         const std::string out = ret->output();
-        std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
         ret->commandLine.push_back("-MF");
+        MD5_Update(&Client::data().md5, "-MF", 2);
+        std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
+        MD5_Update(&Client::data().md5, dfile.c_str(), dfile.size());
         ret->commandLine.push_back(std::move(dfile));
     }
     *localReason = Remote;

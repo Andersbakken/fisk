@@ -12,6 +12,8 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/md5.h>
+
 #include <semaphore.h>
 #include <set>
 #include <string.h>
@@ -47,6 +49,12 @@ struct Data
     std::shared_ptr<CompilerArgs> compilerArgs;
     Watchdog *watchdog { 0 };
     CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
+
+    MD5state_st md5 = []() {
+        MD5state_st ret;
+        MD5_Init(&ret);
+        return ret;
+    }();
 };
 Data &data();
 
