@@ -11,6 +11,7 @@
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
+#include <iomanip>
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
@@ -248,6 +249,30 @@ int main(int argc, char **argv)
     if (colon != url.size())
         url.append(":8097");
 
+    DEBUG("Waiting for preprocessed");
+    data.preprocessed->wait();
+    data.watchdog->transition(Watchdog::PreprocessFinished);
+    DEBUG("Preprocessed finished");
+    preprocessedDuration = data.preprocessed->duration;
+    preprocessedSlotDuration = data.preprocessed->slotDuration;
+
+    if (data.preprocessed->exitStatus != 0) {
+        ERROR("Failed to preprocess. Running locally");
+        data.watchdog->stop();
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
+        return 0; // unreachable
+    }
+
+    unsigned char md5Buf[MD5_DIGEST_LENGTH];
+    MD5_Final(md5Buf, &data.md5);
+    std::ostringstream ostr;
+    ostr << std::setfill('0') << std::setw(2) << std::hex;
+    for (size_t i=0; i<sizeof(md5Buf); ++i) {
+        ostr << static_cast<int>(md5Buf[i]);
+    }
+
+    headers["x-fisk-md5"] = ostr.str();
+
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         data.watchdog->stop();
@@ -340,20 +365,6 @@ int main(int argc, char **argv)
     }
     data.watchdog->transition(Watchdog::ConnectedToSlave);
 
-    DEBUG("Waiting for preprocessed");
-    data.preprocessed->wait();
-    data.watchdog->transition(Watchdog::PreprocessFinished);
-    DEBUG("Preprocessed finished");
-    preprocessedDuration = data.preprocessed->duration;
-    preprocessedSlotDuration = data.preprocessed->slotDuration;
-
-    if (data.preprocessed->exitStatus != 0) {
-        ERROR("Failed to preprocess. Running locally");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
-        return 0; // unreachable
-    }
-
     std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.slaveCompiler;
 
@@ -375,7 +386,7 @@ int main(int argc, char **argv)
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 5");
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 6");
             return 0; // unreachable
         }
     }

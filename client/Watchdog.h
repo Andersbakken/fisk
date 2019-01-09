@@ -14,10 +14,10 @@ public:
     Watchdog();
     enum Stage {
         Initial,
+        PreprocessFinished,
         ConnectedToScheduler,
         AcquiredSlave,
         ConnectedToSlave,
-        PreprocessFinished,
         UploadedJob,
         Finished
     };
