@@ -55,11 +55,12 @@ export class PieChartComponent {
         this.tabChanged.onChanged((index, name) => {
             if (name != "Pie Chart" || this.inited)
                 return;
-            this.inited = true;
 
             const canvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
             if (!canvas)
                 return;
+
+            this.inited = true;
 
             const rect: any = canvas.getBoundingClientRect();
 
@@ -93,6 +94,8 @@ export class PieChartComponent {
                 }
                 item[animatedProp] = a;
             };
+
+            const clientColor = { name: this.config.get("client"), color: this.config.get("color") };
 
             const frameMs = (1 / 60) * 1000;
             let last = 0;
@@ -142,7 +145,17 @@ export class PieChartComponent {
                     animateItem(c, "jobs", "animatedJobs", steps);
 
                     if (!c.color) {
-                        c.color = this._color(c.client.ip, false);
+                        if (clientColor.name && clientColor.color) {
+                            //console.log("determening", c.client);
+                            if (clientColor.name == c.client.ip ||
+                                clientColor.name == c.client.name ||
+                                clientColor.name == c.client.hostname) {
+                                c.color = clientColor.color;
+                            }
+                        }
+                        if (!c.color) {
+                            c.color = this._color(c.client.ip, false);
+                        }
                     }
 
                     ctx.fillStyle = c.color;

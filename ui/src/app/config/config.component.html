@@ -1,11 +1,17 @@
-<div class="space">
+<div class="space" [style.minHeight]="minHeight" id="configTab">
   <mat-form-field class="full-width">
-    <input matInput placeholder="Host" [ngModel]="host" (ngModelChange)="update('host', $event)">
+    <input matInput placeholder="Scheduler" [ngModel]="scheduler" (ngModelChange)="update('scheduler', $event)">
   </mat-form-field>
   <mat-form-field class="full-width">
     <input matInput type="number" max="65536" placeholder="Port" [ngModel]="port" (ngModelChange)="updateInt('port', $event)">
   </mat-form-field>
   <mat-form-field class="full-width">
     <input matInput type="number" max="65536" placeholder="Legend Space" [ngModel]="chartLegendSpace" (ngModelChange)="updateInt('chartLegendSpace', $event)">
+  </mat-form-field>
+  <mat-form-field class="full-width">
+    <input matInput placeholder="Client" [ngModel]="client" (ngModelChange)="update('client', $event)">
+  </mat-form-field>
+  <mat-form-field>
+    <input matInput [colorPicker]="color" (colorPickerChange)="update('color', $event)" [style.background]="color">
   </mat-form-field>
 </div>

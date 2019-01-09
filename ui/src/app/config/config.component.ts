@@ -1,25 +1,32 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { ConfigService } from '../config.service';
+import { TabChangedService } from '../tab-changed.service';
 
 @Component({
     selector: 'app-config',
     templateUrl: './config.component.html',
     styleUrls: ['./config.component.css']
 })
-export class ConfigComponent implements OnInit {
-    host: string;
+export class ConfigComponent implements AfterViewInit {
+    scheduler: string;
     port: number;
     chartLegendSpace: number;
+    color: string;
+    client: string;
+    minHeight: string = "";
+    inited: boolean = false;
 
-    constructor(private config: ConfigService) {
-        this.host = config.get("host", location.hostname);
+    constructor(private config: ConfigService, private tabChanged: TabChangedService) {
+        this.scheduler = config.get("scheduler", location.hostname);
         this.port = config.get("port", location.port || 80);
         this.chartLegendSpace = config.get("chart-legend-space", 400);
+        this.client = config.get("client", "");
+        this.color = config.get("color", "#ff0000");
 
         this.config.onChange((key: string) => {
             switch (key) {
-            case "host":
-                this.host = config.get("host");
+            case "scheduler":
+                this.scheduler = config.get("scheduler");
                 break;
             case "port":
                 this.port = config.get("port");
@@ -27,17 +34,34 @@ export class ConfigComponent implements OnInit {
             case "chart-legend-space":
                 this.chartLegendSpace = config.get("chart-legend-space");
                 break;
+            case "client":
+                this.client = config.get("client");
+                break;
+            case "color":
+                this.color = config.get("color");
+                break;
             }
         });
-    }
 
-    ngOnInit() {
+        this.tabChanged.onChanged((index, name) => {
+            if (name != "Config" || this.inited) {
+                return;
+            }
+            this.inited = true;
+
+            const tab = document.getElementById("configTab");
+            const rect: any = tab.getBoundingClientRect();
+
+            this.minHeight = (window.innerHeight - rect.y - 50) + "px";
+        }
     }
 
     update(key: string, data: string) {
         let ok = false;
         switch (key) {
-        case "host":
+        case "scheduler":
+        case "client":
+        case "color":
             ok = true;
             this[key] = data;
             break;

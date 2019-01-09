@@ -1,9 +1,11 @@
 <mat-card>
   <mat-card-content>
-    <mat-tab-group class="demo-tab-group" (selectedTabChange)="onTabChanged($event)" (animationDone)="onAnimationDone()">
+    <mat-tab-group class="fisk-tab-group" (selectedTabChange)="onTabChanged($event)" (animationDone)="onAnimationDone()" #fiskTabGroup>
+      <!--
       <mat-tab label="Chart">
         <app-chart></app-chart>
       </mat-tab>
+      -->
       <mat-tab label="Pie Chart">
         <app-pie-chart></app-pie-chart>
       </mat-tab>

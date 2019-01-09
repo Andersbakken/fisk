@@ -6,6 +6,8 @@ import { RouterModule, Routes } from '@angular/router';
 
 import { MatCardModule, MatTabsModule, MatListModule, MatInputModule, MatSnackBarModule } from '@angular/material';
 
+import { ColorPickerModule } from 'ngx-color-picker';
+
 import { AppComponent } from './app.component';
 import { WebSocketService } from './websocket.service';
 import { BackoffService } from './backoff.service';
@@ -14,7 +16,7 @@ import { ConfigService } from './config.service';
 import { MessageService } from './message.service';
 import { TabChangedService } from './tab-changed.service';
 import { ConfigComponent } from './config/config.component';
-import { ChartComponent } from './chart/chart.component';
+//import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
@@ -22,7 +24,7 @@ import { PieChartComponent } from './pie-chart/pie-chart.component';
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
-    { path: 'chart', component: ChartComponent },
+    //{ path: 'chart', component: ChartComponent },
     { path: 'pie-chart', component: PieChartComponent },
     { path: 'logs', component: LogsComponent },
     { path: 'main', component: MainComponent },
@@ -33,7 +35,7 @@ const appRoutes: Routes = [
     declarations: [
         AppComponent,
         ConfigComponent,
-        ChartComponent,
+        //ChartComponent,
         MainComponent,
         LogsComponent,
         LogComponent,
@@ -48,6 +50,7 @@ const appRoutes: Routes = [
         MatInputModule,
         MatSnackBarModule,
         MatListModule,
+        ColorPickerModule,
         RouterModule.forRoot(appRoutes)
     ],
     providers: [

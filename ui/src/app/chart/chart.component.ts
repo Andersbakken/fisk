@@ -371,7 +371,7 @@ export class ChartComponent implements AfterViewInit {
 
     _jobFinished(job) {
         if (!(job.id in this.jobs)) {
-            console.error("no such job", job);
+            // console.error("no such job", job);
             return;
         }
         const jobData = this.jobs[job.id];
