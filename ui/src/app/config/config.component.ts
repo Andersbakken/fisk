@@ -7,7 +7,7 @@ import { TabChangedService } from '../tab-changed.service';
     templateUrl: './config.component.html',
     styleUrls: ['./config.component.css']
 })
-export class ConfigComponent implements AfterViewInit {
+export class ConfigComponent {
     scheduler: string;
     port: number;
     chartLegendSpace: number;
@@ -53,7 +53,7 @@ export class ConfigComponent implements AfterViewInit {
             const rect: any = tab.getBoundingClientRect();
 
             this.minHeight = (window.innerHeight - rect.y - 50) + "px";
-        }
+        });
     }
 
     update(key: string, data: string) {
