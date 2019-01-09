@@ -16,7 +16,7 @@ import { ConfigService } from './config.service';
 import { MessageService } from './message.service';
 import { TabChangedService } from './tab-changed.service';
 import { ConfigComponent } from './config/config.component';
-//import { ChartComponent } from './chart/chart.component';
+import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
@@ -35,7 +35,7 @@ const appRoutes: Routes = [
     declarations: [
         AppComponent,
         ConfigComponent,
-        //ChartComponent,
+        ChartComponent,
         MainComponent,
         LogsComponent,
         LogComponent,
