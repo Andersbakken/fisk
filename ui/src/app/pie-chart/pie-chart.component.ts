@@ -158,8 +158,8 @@ export class PieChartComponent {
                 ctx.fillStyle = "black";
                 ctx.fillText(this.maxJobsData.text, legendX - this.maxJobsData.width - 75, legendY);
 
-                const max = this.pieBuilding ? this.currentJobs : this.maxJobs;
-                if (!max) {
+                const maxJobs = this.pieBuilding ? this.currentJobs : this.maxJobs;
+                if (!maxJobs) {
                     window.requestAnimationFrame(animate);
                     return;
                 }
@@ -202,7 +202,7 @@ export class PieChartComponent {
                     ctx.fillStyle = c.color;
                     ctx.beginPath();
                     ctx.moveTo(xy, xy);
-                    ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / max)), false);
+                    ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / maxJobs)), false);
                     ctx.lineTo(xy, xy);
                     ctx.fill();
 
@@ -216,7 +216,7 @@ export class PieChartComponent {
                     ctx.fillText(c.client.name, legendX, legendY);
 
                     // legend usage
-                    const usage = c.jobs + " (" + Math.round(c.jobs / max * 1000) / 10 + "%)";
+                    const usage = c.jobs + " (" + Math.round(c.jobs / maxJobs * 1000) / 10 + "%)";
                     const metrics = ctx.measureText(usage);
 
                     // legend usage background
@@ -229,7 +229,7 @@ export class PieChartComponent {
                     ctx.fillStyle = c.fg;
                     ctx.fillText(usage, legendX + legendSpace - metrics.width - 10, legendY);
 
-                    cur += Math.PI * 2 * (c.animatedJobs / max);
+                    cur += Math.PI * 2 * (c.animatedJobs / maxJobs);
                     legendY += 30;
                 });
 
