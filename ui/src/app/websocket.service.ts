@@ -12,9 +12,22 @@ export class WebSocketService {
     private closeListeners: { (): void; } [];
     private openListeners: { (): void; } [];
     private isopen: boolean;
+    private allListeners: Array<any>;
 
     constructor() {
         this.reset();
+    }
+
+    private addListener(name, listener) {
+        this.socket.addEventListener(name, listener);
+        this.allListeners.push([name, listener]);
+    }
+
+    private removeListeners() {
+        for (let i = 0; i < this.allListeners.length; ++i) {
+            const item = this.allListeners[i];
+            this.socket.removeEventListener(item[0], item[1]);
+        }
     }
 
     open(host: string, port: number) {
@@ -28,19 +41,21 @@ export class WebSocketService {
             return;
         }
 
-        this.socket.addEventListener('open', event => {
+        this.addListener('open', event => {
             this.isopen = true;
             // send all the pending stuff
-            for (let i = 0; i < this.pending.length; ++i) {
-                this.socket.send(this.pending[i]);
+            if (this.pending !== undefined) {
+                for (let i = 0; i < this.pending.length; ++i) {
+                    this.socket.send(this.pending[i]);
+                }
+                this.pending = undefined;
             }
-            this.pending = undefined;
 
             for (let i = 0; i < this.openListeners.length; ++i) {
                 this.openListeners[i]();
             }
         });
-        this.socket.addEventListener('message', event => {
+        this.addListener('message', event => {
             let data: any;
             try {
                 data = JSON.parse(event.data);
@@ -52,13 +67,14 @@ export class WebSocketService {
                 this.messageListeners[i](data);
             }
         });
-        this.socket.addEventListener('close', () => {
+        this.addListener('close', () => {
             for (let i = 0; i < this.closeListeners.length; ++i) {
                 this.closeListeners[i]();
             }
+            this.removeListeners();
             this.reset();
         });
-        this.socket.addEventListener('error', (err) => {
+        this.addListener('error', (err) => {
             for (let i = 0; i < this.errorListeners.length; ++i) {
                 this.errorListeners[i](err);
             }
@@ -88,6 +104,7 @@ export class WebSocketService {
     close(code?: number, reason?: string) {
         if (this.isopen) {
             this.socket.close(code, reason);
+            this.removeListeners();
             this.reset();
         }
     }
@@ -100,5 +117,6 @@ export class WebSocketService {
         this.errorListeners = [];
         this.openListeners = [];
         this.isopen = false;
+        this.allListeners = [];
     }
 }
