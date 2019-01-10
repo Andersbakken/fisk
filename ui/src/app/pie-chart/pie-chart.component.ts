@@ -13,6 +13,7 @@ import { TabChangedService } from '../tab-changed.service';
 export class PieChartComponent {
     view: any = { width: 0, height: 0 };
     ctx: any;
+    clientColor: any;
     maxJobs: number = 0;
     maxJobsData: any = {};
     jobs = new Map();
@@ -170,14 +171,19 @@ export class PieChartComponent {
                             }
                         }
                         if (!c.color) {
-                            const color = this._color(c.client.ip, false);
-                            c.color = color.hex;
-                            if (color.l < 0.5 && color.s < 0.4) {
+                            c.color = this._color(c.client.ip, false);
+
+                            const rgb = parseInt(c.color.substring(1), 16);   // convert rrggbb to decimal
+                            const r = (rgb >> 16) & 0xff;  // extract red
+                            const g = (rgb >>  8) & 0xff;  // extract green
+                            const b = (rgb >>  0) & 0xff;  // extract blue
+
+                            var luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                            if (luma < 128) {
                                 c.fg = "white";
                             } else {
                                 c.fg = "black";
                             }
-                            console.log("got color", color, c.fg);
                         }
                     }
 
@@ -296,7 +302,7 @@ export class PieChartComponent {
             b = hue2rgb(p, q, h - 1/3);
         }
 
-        return { hex: "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255), h: h, s: s, l: l };
+        return "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255);
     }
 
     _adjustClients(job, inc, init) {
