@@ -105,7 +105,6 @@ class Server extends EventEmitter {
 
     _handleConnection(ws, req) {
         let client = undefined;
-        let remaining = { bytes: undefined, type: undefined };
         let ip = req.connection.remoteAddress;
         // console.log("_handleConnection", ip);
 
@@ -168,8 +167,17 @@ class Server extends EventEmitter {
                 data.hostname = clientHostname;
             client = new Client(data);
             this.emit("compile", client);
+            let remaining = { bytes: undefined, type: undefined };
             ws.on('close', (status, reason) => client.emit('close', status, reason));
             ws.on('error', err => client.emit('error', err));
+            ws.on("close", (code, reason) => {
+                if (remaining.bytes)
+                    client.emit("error", "Got close while reading a binary message");
+                if (client)
+                    client.emit("close", { code: code, reason: reason });
+                ws.removeAllListeners();
+            });
+
             ws.on("message", msg => {
                 switch (typeof msg) {
                 case "string":
@@ -249,6 +257,15 @@ class Server extends EventEmitter {
             });
             break; }
         case "/slave": {
+            let index = [];
+            ws.on("close", (code, reason) => {
+                if (index.let)
+                    client.emit("error", "Got close while reading a binary message (index)");
+                if (client)
+                    client.emit("close", { code: code, reason: reason });
+                ws.removeAllListeners();
+            });
+
             if (!("x-fisk-port" in req.headers)) {
                 error("No x-fisk-port header");
                 return;
@@ -298,20 +315,56 @@ class Server extends EventEmitter {
                                   environments: environments,
                                   system: system });
             ws.on("message", msg => {
-                let json;
-                try {
-                    json = JSON.parse(msg);
-                } catch (e) {
-                }
-                if (json === undefined) {
-                    error("Unable to parse string message as JSON");
-                    return;
-                }
-                // console.log("GOT MESSAGE", json);
-                if ("type" in json) {
-                    client.emit(json.type, json);
-                } else {
-                    console.error("Bad message without type", json);
+                // console.log("Got message from slave", typeof msg, msg.length);
+                switch (typeof msg) {
+                case "string":
+                    if (index.length) {
+                        // bad, client have to send all the data in a binary message before sending JSON
+                        error(`Got JSON message while index ${index.length}`);
+                        return;
+                    }
+                    // assume JSON
+                    let json;
+                    try {
+                        json = JSON.parse(msg);
+                    } catch (e) {
+                    }
+
+                    if (json === undefined) {
+                        error("Unable to parse string message as JSON");
+                        return;
+                    }
+                    // console.log("GOT MESSAGE", json);
+                    if ("index" in json) {
+                        index = json.index;
+                        console.log("Got index", index);
+                    }
+                    if ("type" in json) {
+                        client.emit(json.type, json);
+                    } else {
+                        console.error("Bad message without type", json);
+                    }
+                case "object":
+                    if (msg instanceof Buffer) {
+                        if (!msg.length) {
+                            // no data?
+                            error("No data in buffer");
+                            return;
+                        }
+                        if (!index.length) {
+                            error("Got binary message without a preceeding json message describing the data");
+                            return;
+                        }
+                        if (msg.length != index[0].bytes) {
+                            error(`length ${msg.length} != ${index[0].bytes}`);
+                            return;
+                        }
+                        console.log(`got some bytes here for ${JSON.stringify(index[0])}`);
+                        index.splice(0, 1);
+                        // remaining.bytes -= msg.length;
+                        // client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                    }
+                    break;
                 }
             });
             // console.log("Got dude", envs);
@@ -323,21 +376,17 @@ class Server extends EventEmitter {
             // console.log("Got nonce", req.nonce);
             ws.on("message", message => client.emit("message", message));
             this.emit("monitor", client);
-            ws.on('close', (status, reason) => client.emit('close', status, reason));
+            ws.on('close', (code, reason) => {
+                ws.removeAllListeners();
+                client.emit('close', { code: code, reason: reason });
+            });
+
             ws.on('error', err => client.emit('error', err));
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
             return;
         }
-
-        ws.on("close", (code, reason) => {
-            if (remaining.bytes)
-                client.emit("error", "Got close while reading a binary message");
-            if (client)
-                client.emit("close", { code: code, reason: reason });
-            ws.removeAllListeners();
-        });
     }
 }
 

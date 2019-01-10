@@ -138,6 +138,13 @@ class Client extends EventEmitter {
         });
     }
 
+    sendBinary(blob) {
+        try {
+            this.ws.send(blob);
+        } catch (err) {
+            this.emit("err", err.toString());
+        }
+    }
     send(type, msg) {
         if (!this.ws) {
             this.emit("error", "No connected websocket");

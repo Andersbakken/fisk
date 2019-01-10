@@ -316,7 +316,7 @@ function startPending()
     }
 }
 
-server.on("job", (job) => {
+server.on("job", job => {
     let vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);
@@ -377,15 +377,19 @@ server.on("job", (job) => {
 
                 // this can't be async, the directory is removed after the event is fired
                 let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
-                job.send({
+                let response = {
                     type: "response",
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
                     success: event.success,
-                    exitCode: event.exitCode
-                });
+                    exitCode: event.exitCode,
+                    md5: job.md5
+                };
+                job.send(response);
+                client.send(response);
 
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
+                    client.sendBinary(contents[i].contents);
                 }
                 if (this.heartbeatTimer) {
                     clearTimeout(this.heartbeatTimer);

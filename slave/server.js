@@ -102,6 +102,7 @@ class Server extends EventEmitter {
                                name: name,
                                hostname: req.headers["x-fisk-client-hostname"],
                                sourceFile: req.headers["x-fisk-sourcefile"],
+                               md5: req.headers["x-fisk-md5"],
                                id: parseInt(req.headers["x-fisk-job-id"]),
                                slaveIp: req.headers["x-fisk-slave-ip"] });
 
