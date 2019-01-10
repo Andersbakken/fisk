@@ -566,7 +566,8 @@ server.on("compile", compile => {
         }
     }
 
-    console.log("objectCache", compile.md5, objectCache.has(compile.md5), objectCache.keys);
+    if (objectCache)
+        console.log("objectCache", compile.md5, objectCache.has(compile.md5), objectCache.keys);
     if (objectCache && objectCache.has(compile.md5)) {
         console.log("we have it cached", compile.md5);
         let fd;
