@@ -1,25 +1,26 @@
 #!/usr/bin/env node
 
-const path = require("path");
-const os = require("os");
-const option = require("@jhanssen/options")("fisk/scheduler", require('minimist')(process.argv.slice(2)));
-const Server = require("./server");
-const common = require("../common")(option);
-const Environments = require("./environments");
+const path = require('path');
+const os = require('os');
+const option = require('@jhanssen/options')('fisk/scheduler', require('minimist')(process.argv.slice(2)));
+const Server = require('./server');
+const common = require('../common')(option);
+const Environments = require('./environments');
 const server = new Server(option, common.Version);
-const fs = require("fs-extra");
-const bytes = require("bytes");
-const crypto = require("crypto");
-const Database = require("./database");
-const Peak = require("./peak");
+const fs = require('fs-extra');
+const bytes = require('bytes');
+const crypto = require('crypto');
+const Database = require('./database');
+const Peak = require('./peak');
+const ObjectCache = require('./objectcache');
 
-process.on("unhandledRejection", (reason, p) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
+process.on('unhandledRejection', (reason, p) => {
+    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
 });
 
 let schedulerNpmVersion;
 try {
-    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'))).version;
 } catch (err) {
     console.log("Couldn't parse package json", err);
     process.exit();
@@ -34,6 +35,12 @@ let activeJobs = 0;
 let capacity = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
+let objectCache;
+let objectCacheSize = bytes.parse(option('object-cache-size'));
+if (objectCacheSize) {
+    let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
+    objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
+}
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
@@ -434,6 +441,32 @@ server.on("slave", slave => {
             monitors.forEach(monitor => monitor.send(info));
         }
     });
+    let responses = [];
+    let files = [];
+    slave.on("response", event => {
+        console.log("got response", JSON.stringify(event));
+        responses.push(event);
+    });
+
+    slave.on("data", data => {
+        // console.log("Got data", data.length);
+        if (!responses.length) {
+            console.error("Unexpected response data");
+            return;
+        }
+        if (responses[0].index[files.length].bytes != data.length) {
+            console.error(`Unexpected response length. Wanted ${responses[0].index[files.length].length}, got ${data.length}`);
+            return;
+        }
+        files.push(data);
+        if (files.length == responses[0].index.length) {
+            // console.log("flush to disk");
+            objectCache.set(responses[0].md5, responses[0], files);
+            responses.splice(0, 1);
+            files = [];
+        }
+
+    });
 });
 
 let pendingEnvironments = {};
@@ -531,6 +564,33 @@ server.on("compile", compile => {
             compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion[0]}.${clientMinimumVersion[1]}.${clientMinimumVersion[2]}` });
             return;
         }
+    }
+
+    console.log("objectCache", compile.md5, objectCache.has(compile.md5), objectCache.keys);
+    if (objectCache && objectCache.has(compile.md5)) {
+        console.log("we have it cached", compile.md5);
+        let fd;
+        try {
+            let item = objectCache.get(compile.md5);
+            compile.send(item.response);
+            fd = fs.openSync(path.join(objectCache.dir, item.fileName), "r");
+            let pos = 4 + item.headerLength;
+            item.response.index.forEach(file => {
+                let buffer = Buffer.allocUnsafe(file.bytes);
+                if (fs.readSync(fd, buffer, 0, file.bytes, pos) != file.bytes) {
+                    throw new Error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.fileName)}`);
+                }
+                compile.send(buffer);
+                pos += file.bytes;
+            });
+        } catch (err) {
+            console.error("Got some error here", err);
+            if (fd)
+                fs.closeSync(fd);
+            compile.close();
+        }
+        console.log("The cache handled it");
+        return;
     }
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);

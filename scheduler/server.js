@@ -89,6 +89,7 @@ class Server extends EventEmitter {
                 console.log("listening on", port);
                 this.ws.on('headers', (headers, request) => {
                     const url = Url.parse(request.url);
+                    headers.push("x-fisk-objectcache: " + (this.option.int("object-cache-size") > 0 ? "true" : "false"));
                     if (url.pathname == "/monitor") {
                         const nonce = crypto.randomBytes(256).toString("base64");
                         headers.push(`x-fisk-nonce: ${nonce}`);
@@ -151,7 +152,8 @@ class Server extends EventEmitter {
                 ip: ip,
                 type: Client.Type.Compile,
                 environment: compileEnvironment,
-                sourceFile: req.headers["x-fisk-sourcefile"]
+                sourceFile: req.headers["x-fisk-sourcefile"],
+                md5: req.headers["x-fisk-md5"]
             };
             const npmVersion = req.headers["x-fisk-npm-version"];
             if (npmVersion)
@@ -257,10 +259,7 @@ class Server extends EventEmitter {
             });
             break; }
         case "/slave": {
-            let index = [];
             ws.on("close", (code, reason) => {
-                if (index.let)
-                    client.emit("error", "Got close while reading a binary message (index)");
                 if (client)
                     client.emit("close", { code: code, reason: reason });
                 ws.removeAllListeners();
@@ -318,11 +317,6 @@ class Server extends EventEmitter {
                 // console.log("Got message from slave", typeof msg, msg.length);
                 switch (typeof msg) {
                 case "string":
-                    if (index.length) {
-                        // bad, client have to send all the data in a binary message before sending JSON
-                        error(`Got JSON message while index ${index.length}`);
-                        return;
-                    }
                     // assume JSON
                     let json;
                     try {
@@ -335,10 +329,6 @@ class Server extends EventEmitter {
                         return;
                     }
                     // console.log("GOT MESSAGE", json);
-                    if ("index" in json) {
-                        index = json.index;
-                        console.log("Got index", index);
-                    }
                     if ("type" in json) {
                         client.emit(json.type, json);
                     } else {
@@ -346,23 +336,7 @@ class Server extends EventEmitter {
                     }
                 case "object":
                     if (msg instanceof Buffer) {
-                        if (!msg.length) {
-                            // no data?
-                            error("No data in buffer");
-                            return;
-                        }
-                        if (!index.length) {
-                            error("Got binary message without a preceeding json message describing the data");
-                            return;
-                        }
-                        if (msg.length != index[0].bytes) {
-                            error(`length ${msg.length} != ${index[0].bytes}`);
-                            return;
-                        }
-                        console.log(`got some bytes here for ${JSON.stringify(index[0])}`);
-                        index.splice(0, 1);
-                        // remaining.bytes -= msg.length;
-                        // client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                        client.emit("data", msg);
                     }
                     break;
                 }

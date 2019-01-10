@@ -271,6 +271,7 @@ int main(int argc, char **argv)
         ostr << static_cast<int>(md5Buf[i]);
     }
 
+    WARN("Got md5 %s", ostr.str().c_str());
     headers["x-fisk-md5"] = ostr.str();
 
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {

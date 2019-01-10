@@ -154,6 +154,7 @@ client.on("quit", message => {
     process.exit(message.code);
 });
 
+client.on("objectcache", enabled => objectCacheEnabled = enabled);
 client.on("dropEnvironments", message => {
     console.log(`Dropping environments ${message.environments}`);
     message.environments.forEach(env => {
@@ -385,11 +386,13 @@ server.on("job", job => {
                     md5: job.md5
                 };
                 job.send(response);
-                client.send(response);
+                if (objectCacheEnabled)
+                    client.send(response);
 
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
-                    client.sendBinary(contents[i].contents);
+                    if (objectCacheEnabled)
+                        client.sendBinary(contents[i].contents);
                 }
                 if (this.heartbeatTimer) {
                     clearTimeout(this.heartbeatTimer);
