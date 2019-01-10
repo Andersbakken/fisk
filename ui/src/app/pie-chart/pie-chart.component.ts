@@ -16,8 +16,10 @@ export class PieChartComponent {
     clientColor: any;
     maxJobs: number = 0;
     maxJobsData: any = {};
+    currentJobs: number = 0;
     jobs = new Map();
     clientJobs = new Map();
+    pieBuilding: boolean;
     inited: boolean = false;
 
     constructor(private fisk: FiskService, private config: ConfigService,
@@ -61,6 +63,8 @@ export class PieChartComponent {
                 this.clientJobs.forEach(c => {
                     delete c.color;
                 });
+            } else if (key == "pieBuilding") {
+                this.pieBuilding = this.config.get("pieBuilding");
             }
         });
 
@@ -104,6 +108,7 @@ export class PieChartComponent {
             };
 
             this.clientColor = { name: this.config.get("client"), fgcolor: this.config.get("fgcolor"), bgcolor: this.config.get("bgcolor") };
+            this.pieBuilding = this.config.get("pieBuilding");
 
             const frameMs = (1 / 60) * 1000;
             let last = 0;
@@ -153,6 +158,12 @@ export class PieChartComponent {
                 ctx.fillStyle = "black";
                 ctx.fillText(this.maxJobsData.text, legendX - this.maxJobsData.width - 75, legendY);
 
+                const max = this.pieBuilding ? this.currentJobs : this.maxJobs;
+                if (!max) {
+                    window.requestAnimationFrame(animate);
+                    return;
+                }
+
                 this.clientJobs.forEach(c => {
                     //console.log("puck", this.maxJobs, c);
                     c.start = cur;
@@ -191,7 +202,7 @@ export class PieChartComponent {
                     ctx.fillStyle = c.color;
                     ctx.beginPath();
                     ctx.moveTo(xy, xy);
-                    ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / this.maxJobs)), false);
+                    ctx.arc(xy, xy, radius, c.animatedStart, c.animatedStart + (Math.PI * 2 * (c.animatedJobs / max)), false);
                     ctx.lineTo(xy, xy);
                     ctx.fill();
 
@@ -205,7 +216,7 @@ export class PieChartComponent {
                     ctx.fillText(c.client.name, legendX, legendY);
 
                     // legend usage
-                    const usage = c.jobs + " (" + Math.round(c.jobs / this.maxJobs * 1000) / 10 + "%)";
+                    const usage = c.jobs + " (" + Math.round(c.jobs / max * 1000) / 10 + "%)";
                     const metrics = ctx.measureText(usage);
 
                     // legend usage background
@@ -218,7 +229,7 @@ export class PieChartComponent {
                     ctx.fillStyle = c.fg;
                     ctx.fillText(usage, legendX + legendSpace - metrics.width - 10, legendY);
 
-                    cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
+                    cur += Math.PI * 2 * (c.animatedJobs / max);
                     legendY += 30;
                 });
 
@@ -231,6 +242,7 @@ export class PieChartComponent {
     _reset() {
         this.maxJobs = 0;
         this.maxJobsData = {};
+        this.currentJobs = 0;
         this.jobs = new Map();
         this.clientJobs = new Map();
     }
@@ -349,7 +361,7 @@ export class PieChartComponent {
     }
 
     _updateMaxJobsData() {
-        this.maxJobsData.text = "Number of slots: " + this.maxJobs;
+        this.maxJobsData.text = "Slots " + this.currentJobs + " / " + this.maxJobs;
         this.maxJobsData.width = this.ctx.measureText(this.maxJobsData.text).width;
     }
 
@@ -357,6 +369,9 @@ export class PieChartComponent {
         //console.log("job start", job.client.ip);
         this.jobs.set(job.id, job);
         this._adjustClients(job, 1, 1);
+
+        this.currentJobs += 1;
+        this._updateMaxJobsData();
     }
 
     _jobFinished(job) {
@@ -364,6 +379,9 @@ export class PieChartComponent {
             console.error("No such job ", job);
             return;
         }
+        this.currentJobs -= 1;
+        this._updateMaxJobsData();
+
         const realjob = this.jobs.get(job.id);
         this.jobs.delete(job.id);
         if (!this.clientJobs.has(realjob.client.ip)) {

@@ -14,6 +14,7 @@ export class ConfigComponent {
     fgcolor: string;
     bgcolor: string;
     client: string;
+    pieBuilding: boolean;
     minHeight: string = "";
     inited: boolean = false;
 
@@ -24,6 +25,7 @@ export class ConfigComponent {
         this.client = config.get("client", "");
         this.fgcolor = config.get("fgcolor", "#ffffff");
         this.bgcolor = config.get("bgcolor", "#ff0000");
+        this.pieBuilding = config.get("pieBuilding", false);
 
         this.config.onChange((key: string) => {
             switch (key) {
@@ -44,6 +46,9 @@ export class ConfigComponent {
                 break;
             case "bgcolor":
                 this.bgcolor = config.get("bgcolor");
+                break;
+            case "pieBuilding":
+                this.pieBuilding = config.get("pieBuilding");
                 break;
             }
         });
@@ -95,6 +100,26 @@ export class ConfigComponent {
         }
         if (ok) {
             this.config.set(configName, n);
+        }
+    }
+
+    updateBool(key: string, data: any) {
+        let ok = false;
+        let val;
+        if (typeof data === "boolean")
+            val = data;
+        else if (typeof data === "string" && data === "true")
+            val = true;
+        else
+            val = false;
+        switch (key) {
+        case "pieBuilding":
+            ok = true;
+            this[key] = val;
+            break;
+        }
+        if (ok) {
+            this.config.set(key, val);
         }
     }
 }

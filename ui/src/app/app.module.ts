@@ -4,7 +4,7 @@ import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 
-import { MatCardModule, MatTabsModule, MatListModule, MatInputModule, MatSnackBarModule } from '@angular/material';
+import { MatCardModule, MatTabsModule, MatListModule, MatInputModule, MatSnackBarModule, MatCheckboxModule } from '@angular/material';
 
 import { ColorPickerModule } from 'ngx-color-picker';
 
@@ -50,6 +50,7 @@ const appRoutes: Routes = [
         MatInputModule,
         MatSnackBarModule,
         MatListModule,
+        MatCheckboxModule,
         ColorPickerModule,
         RouterModule.forRoot(appRoutes)
     ],

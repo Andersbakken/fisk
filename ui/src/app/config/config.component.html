@@ -17,4 +17,7 @@
   <mat-form-field>
     Foreground <input matInput [colorPicker]="fgcolor" (colorPickerChange)="update('fgcolor', $event)" [style.background]="fgcolor">
   </mat-form-field>
+  <div>
+    <mat-checkbox matInput [ngModel]="pieBuilding" (ngModelChange)="updateBool('pieBuilding', $event)">Represent 100% of pie chart as currently building jobs</mat-checkbox>
+  </div>
 </div>
