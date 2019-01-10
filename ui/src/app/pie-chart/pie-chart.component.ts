@@ -53,6 +53,16 @@ export class PieChartComponent {
             this.view.height = window.innerHeight - rect.y - 50;
         });
 
+        this.config.onChange((key: string) => {
+            if (key == "client" || key == "fgcolor" || key == "bgcolor") {
+                this.clientColor = { name: this.config.get("client"), fgcolor: this.config.get("fgcolor"), bgcolor: this.config.get("bgcolor") };
+
+                this.clientJobs.forEach(c => {
+                    delete c.color;
+                });
+            }
+        });
+
         this.tabChanged.onChanged((index, name) => {
             if (name != "Pie Chart" || this.inited)
                 return;
@@ -92,7 +102,7 @@ export class PieChartComponent {
                 item[animatedProp] = a;
             };
 
-            const clientColor = { name: this.config.get("client"), color: this.config.get("color") };
+            this.clientColor = { name: this.config.get("client"), fgcolor: this.config.get("fgcolor"), bgcolor: this.config.get("bgcolor") };
 
             const frameMs = (1 / 60) * 1000;
             let last = 0;
@@ -135,12 +145,12 @@ export class PieChartComponent {
                     return;
                 }
 
-                ctx.font = "20px serif";
+                ctx.font = "16px sans-serif";
                 let cur = rad(270);
                 let legendY = 40;
 
                 ctx.fillStyle = "black";
-                ctx.fillText(this.maxJobsData.text, legendX - this.maxJobsData.width - 20, legendY);
+                ctx.fillText(this.maxJobsData.text, legendX - this.maxJobsData.width - 75, legendY);
 
                 this.clientJobs.forEach(c => {
                     //console.log("puck", this.maxJobs, c);
@@ -150,16 +160,24 @@ export class PieChartComponent {
                     animateItem(c, "jobs", "animatedJobs", steps);
 
                     if (!c.color) {
-                        if (clientColor.name && clientColor.color) {
+                        if (this.clientColor.name && this.clientColor.fgcolor && this.clientColor.bgcolor) {
                             //console.log("determening", c.client);
-                            if (clientColor.name == c.client.ip ||
-                                clientColor.name == c.client.name ||
-                                clientColor.name == c.client.hostname) {
-                                c.color = clientColor.color;
+                            if (this.clientColor.name == c.client.ip ||
+                                this.clientColor.name == c.client.name ||
+                                this.clientColor.name == c.client.hostname) {
+                                c.color = this.clientColor.bgcolor;
+                                c.fg = this.clientColor.fgcolor;
                             }
                         }
                         if (!c.color) {
-                            c.color = this._color(c.client.ip, false);
+                            const color = this._color(c.client.ip, false);
+                            c.color = color.hex;
+                            if (color.l < 0.5 && color.s < 0.4) {
+                                c.fg = "white";
+                            } else {
+                                c.fg = "black";
+                            }
+                            console.log("got color", color, c.fg);
                         }
                     }
 
@@ -177,7 +195,7 @@ export class PieChartComponent {
                     ctx.fill();
 
                     // legend name text
-                    ctx.fillStyle = "black";
+                    ctx.fillStyle = c.fg;
                     ctx.fillText(c.client.name, legendX, legendY);
 
                     // legend usage
@@ -191,7 +209,7 @@ export class PieChartComponent {
                     ctx.fill();
 
                     // legend usage text
-                    ctx.fillStyle = "black";
+                    ctx.fillStyle = c.fg;
                     ctx.fillText(usage, legendX + legendSpace - metrics.width - 10, legendY);
 
                     cur += Math.PI * 2 * (c.animatedJobs / this.maxJobs);
@@ -278,7 +296,7 @@ export class PieChartComponent {
             b = hue2rgb(p, q, h - 1/3);
         }
 
-        return "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255);
+        return { hex: "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255), h: h, s: s, l: l };
     }
 
     _adjustClients(job, inc, init) {
@@ -330,7 +348,7 @@ export class PieChartComponent {
     }
 
     _jobStarted(job) {
-        console.log("job start", job.client.ip);
+        //console.log("job start", job.client.ip);
         this.jobs.set(job.id, job);
         this._adjustClients(job, 1, 1);
     }

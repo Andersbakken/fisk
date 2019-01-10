@@ -23,7 +23,7 @@ export class FiskService {
     }
 
     constructor(private ws: WebSocketService, private backoff: BackoffService, private config: ConfigService) {
-        this._host = this.config.get("host");
+        this._host = this.config.get("scheduler");
         this._port = this.config.get("port", 8097);
         if (this._host !== undefined) {
             this.open(this._host, this._port);
@@ -31,10 +31,10 @@ export class FiskService {
 
         this.config.onChange((key: string) => {
             switch (key) {
-            case "host":
+            case "scheduler":
             case "port":
                 this.close();
-                this._host = this.config.get("host");
+                this._host = this.config.get("scheduler");
                 this._port = this.config.get("port", 8097);
                 if (this._host !== undefined) {
                     this.open(this._host, this._port);

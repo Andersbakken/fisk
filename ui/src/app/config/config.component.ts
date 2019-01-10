@@ -11,7 +11,8 @@ export class ConfigComponent {
     scheduler: string;
     port: number;
     chartLegendSpace: number;
-    color: string;
+    fgcolor: string;
+    bgcolor: string;
     client: string;
     minHeight: string = "";
     inited: boolean = false;
@@ -21,7 +22,8 @@ export class ConfigComponent {
         this.port = config.get("port", location.port || 80);
         this.chartLegendSpace = config.get("chart-legend-space", 400);
         this.client = config.get("client", "");
-        this.color = config.get("color", "#ff0000");
+        this.fgcolor = config.get("fgcolor", "#ffffff");
+        this.bgcolor = config.get("bgcolor", "#ff0000");
 
         this.config.onChange((key: string) => {
             switch (key) {
@@ -37,8 +39,11 @@ export class ConfigComponent {
             case "client":
                 this.client = config.get("client");
                 break;
-            case "color":
-                this.color = config.get("color");
+            case "fgcolor":
+                this.fgcolor = config.get("fgcolor");
+                break;
+            case "bgcolor":
+                this.bgcolor = config.get("bgcolor");
                 break;
             }
         });
@@ -61,7 +66,8 @@ export class ConfigComponent {
         switch (key) {
         case "scheduler":
         case "client":
-        case "color":
+        case "fgcolor":
+        case "bgcolor":
             ok = true;
             this[key] = data;
             break;

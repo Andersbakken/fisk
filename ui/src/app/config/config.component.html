@@ -12,6 +12,9 @@
     <input matInput placeholder="Client" [ngModel]="client" (ngModelChange)="update('client', $event)">
   </mat-form-field>
   <mat-form-field>
-    <input matInput [colorPicker]="color" (colorPickerChange)="update('color', $event)" [style.background]="color">
+    Background <input matInput [colorPicker]="bgcolor" (colorPickerChange)="update('bgcolor', $event)" [style.background]="bgcolor">
+  </mat-form-field>
+  <mat-form-field>
+    Foreground <input matInput [colorPicker]="fgcolor" (colorPickerChange)="update('fgcolor', $event)" [style.background]="fgcolor">
   </mat-form-field>
 </div>
