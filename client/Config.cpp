@@ -265,6 +265,7 @@ bool Config::init(int &argc, char **&argv)
             return false;
         }
         consumeArg(1);
+        it->second->mDone = true;
     }
 
     if ((gotHelp || gotVersion) && static_cast<std::string>(compiler).empty()) {
