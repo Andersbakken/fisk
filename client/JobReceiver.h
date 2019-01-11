@@ -25,8 +25,8 @@ public:
             }
 
             const std::string type = msg["type"].string_value();
-
-            if (type == "stderr") {
+#warning remove after everyones updated
+            if (type == "stderr") { // backwards compatibility
                 const std::string output = msg["data"].string_value();
                 if (!output.empty()) {
                     fwrite(output.c_str(), 1, output.size(), stderr);
@@ -34,7 +34,7 @@ public:
                 return true;
             }
 
-            if (type == "stdout") {
+            if (type == "stdout") { // backwards compatibility
                 const std::string output = msg["data"].string_value();
                 if (!output.empty()) {
                     fwrite(output.c_str(), 1, output.size(), stdout);
@@ -56,6 +56,13 @@ public:
 
             json11::Json::array index = msg["index"].array_items();
             Client::data().exitCode = msg["exitCode"].int_value();
+            const std::string stdOut = msg["stdout"].string_value();
+            if (!stdOut.empty())
+                fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
+            const std::string stdErr = msg["stderr"].string_value();
+            if (!stdErr.empty())
+                fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
+
             if (!index.empty()) {
                 files.resize(index.size());
                 for (size_t i=0; i<index.size(); ++i) {

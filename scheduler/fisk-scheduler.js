@@ -327,6 +327,10 @@ server.on("listen", app => {
         res.send(JSON.stringify(obj, null, 4));
     });
 
+    app.get("/objectcache", (req, res, next) => {
+        res.send(JSON.stringify(objectCache ? objectCache.dump() : {}, null, 4) + "\n");
+    });
+
     app.get("/quit-slaves", (req, res, next) => {
         res.sendStatus(200);
         const msg = {
@@ -398,6 +402,7 @@ server.on("slave", slave => {
         slave.send({ type: "quit" });
         return;
     }
+    let activeResponses = [];
     slave.activeClients = 0;
     insertSlave(slave);
     console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
@@ -417,6 +422,7 @@ server.on("slave", slave => {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
     slave.on("close", () => {
+        activeResponses.forEach(response => response.abort());
         removeSlave(slave);
         console.log("slave disconnected", slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
         slave.removeAllListeners();
@@ -441,21 +447,19 @@ server.on("slave", slave => {
             monitors.forEach(monitor => monitor.send(info));
         }
     });
-    let active = [];
-    let pieces = [];
-    let working = false;
     slave.on("response", response => {
         console.log("got response", JSON.stringify(response));
-        active.push(objectCache.insert(response, success => {
-            console.log("We finished", response.md5, success);
-            active.splice(0, 1);
+        activeResponses.push(objectCache.insert(response, success => {
+            if (success)
+                console.log("Inserted", response.md5, "into the cache");
+            activeResponses.splice(0, 1);
         }));
         // responses.push({ response: response, feed: undefined, abort: undefined, cb: undefined });
     });
 
     slave.on("data", data => {
-        console.log("Got some data", data.length);
-        active[0].feed(data);
+        // console.log("Got some data", data.length);
+        activeResponses[0].feed(data);
     });
 });
 
@@ -562,28 +566,65 @@ server.on("compile", compile => {
         // console.log("we have it cached", compile.md5);
         let fd;
         // ### this should be async as well
+        let pointOfNoReturn = false;
         try {
             let item = objectCache.get(compile.md5);
             compile.send(item.response);
+            // console.log(`Found ${compile.md5} in cache`);
+            pointOfNoReturn = true;
             fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
             // console.log("here", item.response.md5, item.response);
-            let pos = 4 + item.headerLength;
-            item.response.index.forEach(file => {
-                let buffer = Buffer.allocUnsafe(file.bytes);
-                if (fs.readSync(fd, buffer, 0, file.bytes, pos) != file.bytes) {
-                    throw new Error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)}`);
-                }
-                compile.send(buffer);
-                pos += file.bytes;
-            });
+            let pos = 4 + item.headerSize;
+            let fileIdx = 0;
+            const work = () => {
+                const file = item.response.index[fileIdx];
+                const buffer = Buffer.allocUnsafe(file.bytes);
+                // console.log("reading from", pos);
+                fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
+                    if (err || read != file.bytes) {
+                        console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
+                        fs.closeSync(fd);
+                        objectCache.remove(compile.md5);
+                        compile.close();
+                    } else {
+                        // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
+                        compile.send(buffer);
+                        pos += read;
+                        if (++fileIdx < item.response.index.length) {
+                            work();
+                        } else {
+                            ++item.cacheHits;
+                            if (monitors.length) {
+                                // console.log("GOT STUFF", job);
+                                let info = {
+                                    type: "cacheHit",
+                                    client: {
+                                        hostname: compile.hostname,
+                                        ip: compile.ip,
+                                        name: compile.name
+                                    },
+                                    sourceFile: compile.sourceFile
+                                };
+                                // console.log("send to monitors", info);
+                                monitors.forEach(monitor => monitor.send(info));
+                            }
+                        }
+                    }
+                });
+            };
+            work();
+            return;            
         } catch (err) {
-            console.error("Got some error here", err);
+            if (err.code != "ENOENT") 
+                console.error("Got some error here", err);
             if (fd)
                 fs.closeSync(fd);
-            compile.close();
+            if (pointOfNoReturn) {
+                compile.close();
+                return; // hehe
+            }
         }
         // console.log("The cache handled it");
-        return;
     }
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);

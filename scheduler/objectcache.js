@@ -3,15 +3,15 @@ const path = require('path');
 
 class ObjectCacheItem
 {
-    constructor(response, headerSize, contentsSize)
+    constructor(response, headerSize)
     {
         this.headerSize = headerSize;
-        this.contentsSize = contentsSize;
         this.response = response;
+        this.cacheHits = 0;
     }
 
+    get contentsSize() { return this.response.index.reduce((total, item) => { return total + item.bytes; }, 0); }
     get fileSize() { return 4 + this.headerSize + this.contentsSize; }
-    // get contentsSize
     // get headerSize
 };
 
@@ -41,9 +41,8 @@ class ObjectCache
                         const response = JSON.parse(jsonBuffer.toString());
                         if (response.md5 != fileName)
                             throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
-                        let contentsSize = fs.fstatSync(fd).size - headerSize - 4;
                         fs.closeSync(fd);
-                        let item = new ObjectCacheItem(response, headerSize, contentsSize);
+                        let item = new ObjectCacheItem(response, headerSize);
                         this.size += item.fileSize;
                         this.cache[fileName] = item;
                     }
@@ -87,7 +86,6 @@ class ObjectCache
         const headerSizeBuffer = Buffer.allocUnsafe(4);
         let remaining = 0;
         response.index.forEach(file => { remaining += file.bytes; });
-        const contentsSize = remaining;
         headerSizeBuffer.writeUInt32LE(json.length);
         fs.writeSync(fd, headerSizeBuffer);
         fs.writeSync(fd, json);
@@ -129,7 +127,7 @@ class ObjectCache
                             console.error(`Failed to do something here for ${response.md5} ${e}`);
                         }
                     } else {
-                        let buf = new ObjectCacheItem(response, json.length, contentsSize);
+                        let buf = new ObjectCacheItem(response, json.length);
                         this.cache[response.md5] = buf;
                         this.size += buf.fileSize;
                         if (this.size > this.maxSize)
@@ -177,19 +175,39 @@ class ObjectCache
         };
     }
 
+    get cacheHits()
+    {
+        let ret = 0;
+        for (let md5 in this.cache) {
+            ret += this.cache[md5].cacheHits;
+        }
+        return ret;
+    }
+
+    dump()
+    {
+        return Object.assign({ cacheHits: this.cacheHits }, this);
+    }
+
+    remove(md5)
+    {
+        try {
+            fs.unlinkSync(path.join(this.dir, md5));
+            this.size -= this.cache[md5].fileSize;
+        } catch (err) {
+            console.error("Can't remove file", path.join(this.dir, md5), err.toString());
+        }
+
+    }
+
     purge(targetSize)
     {
         for (let md5 in this.cache) {
             if (this.size <= targetSize) {
                 break;
             }
-            try {
-                console.log(`purging ${md5} because ${this.size} >= ${targetSize}`);
-                fs.unlinkSync(path.join(this.dir, md5));
-                this.size -= this.cache[md5].fileSize;
-            } catch (err) {
-                console.error("Can't purge file", path.join(this.dir, md5), err.toString());
-            }
+            console.log(`purging ${md5} because ${this.size} >= ${targetSize}`);
+            this.remove(md5);
         }
     }
 
