@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <atomic>
 #include <string>
+#include <vector>
 
 class Watchdog : public Socket
 {
@@ -22,6 +23,7 @@ public:
         Finished
     };
 
+    std::vector<Stage> stages;
     unsigned long long timings[Finished + 1] { 0 };
     static inline const char *stageName(Stage stage)
     {
@@ -48,7 +50,7 @@ protected:
     virtual void onTimeout() override;
     virtual int timeout() override;
 private:
-    Watchdog::Stage mStage { Watchdog::Initial };
+    size_t mStage { 0 };
     enum State {
         Running,
         Stopped,

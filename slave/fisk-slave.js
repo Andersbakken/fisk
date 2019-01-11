@@ -386,12 +386,12 @@ server.on("job", job => {
                     md5: job.md5
                 };
                 job.send(response);
-                if (objectCacheEnabled)
+                if (objectCacheEnabled && response.md5)
                     client.send(response);
 
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
-                    if (objectCacheEnabled)
+                    if (objectCacheEnabled && response.md5)
                         client.sendBinary(contents[i].contents);
                 }
                 if (this.heartbeatTimer) {

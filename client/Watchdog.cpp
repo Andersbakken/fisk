@@ -11,12 +11,20 @@ Watchdog::Watchdog()
 
 void Watchdog::transition(Stage stage)
 {
-    assert(stage > 0);
-    assert(mStage + 1 == stage);
-    Watchdog::timings[stage] = Client::mono();
+    if (mStage == 0) {
+        if (Config::objectCache) {
+            stages = { Initial, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
+        } else {
+            stages = { Initial, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
+        }
+    }
+    Watchdog::timings[mStage + 1] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
-    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(mStage), stageName(stage), Watchdog::timings[stage] - Watchdog::timings[stage - 1]);
-    mStage = stage;
+    DEBUG("Watchdog transition from %s to %s (stage took %llu)",
+          stageName(stages[mStage]), stageName(stage),
+          Watchdog::timings[mStage + 1] - Watchdog::timings[mStage]);
+    assert(stages[mStage + 1] == stage);
+    ++mStage;
     mTransitionTime = Client::mono();
 }
 

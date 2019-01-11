@@ -441,31 +441,21 @@ server.on("slave", slave => {
             monitors.forEach(monitor => monitor.send(info));
         }
     });
-    let responses = [];
-    let files = [];
-    slave.on("response", event => {
-        console.log("got response", JSON.stringify(event));
-        responses.push(event);
+    let active = [];
+    let pieces = [];
+    let working = false;
+    slave.on("response", response => {
+        console.log("got response", JSON.stringify(response));
+        active.push(objectCache.insert(response, success => {
+            console.log("We finished", response.md5, success);
+            active.splice(0, 1);
+        }));
+        // responses.push({ response: response, feed: undefined, abort: undefined, cb: undefined });
     });
 
     slave.on("data", data => {
-        // console.log("Got data", data.length);
-        if (!responses.length) {
-            console.error("Unexpected response data");
-            return;
-        }
-        if (responses[0].index[files.length].bytes != data.length) {
-            console.error(`Unexpected response length. Wanted ${responses[0].index[files.length].length}, got ${data.length}`);
-            return;
-        }
-        files.push(data);
-        if (files.length == responses[0].index.length) {
-            // console.log("flush to disk");
-            objectCache.set(responses[0].md5, responses[0], files);
-            responses.splice(0, 1);
-            files = [];
-        }
-
+        console.log("Got some data", data.length);
+        active[0].feed(data);
     });
 });
 
@@ -567,19 +557,21 @@ server.on("compile", compile => {
     }
 
     if (objectCache)
-        console.log("objectCache", compile.md5, objectCache.has(compile.md5), objectCache.keys);
-    if (objectCache && objectCache.has(compile.md5)) {
+        console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
+    if (objectCache && objectCache.state(compile.md5) == "exists") {
         console.log("we have it cached", compile.md5);
         let fd;
+        // ### this should be async as well
         try {
             let item = objectCache.get(compile.md5);
             compile.send(item.response);
-            fd = fs.openSync(path.join(objectCache.dir, item.fileName), "r");
+            fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
+            console.log("here", item.response.md5, item.response);
             let pos = 4 + item.headerLength;
             item.response.index.forEach(file => {
                 let buffer = Buffer.allocUnsafe(file.bytes);
                 if (fs.readSync(fd, buffer, 0, file.bytes, pos) != file.bytes) {
-                    throw new Error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.fileName)}`);
+                    throw new Error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)}`);
                 }
                 compile.send(buffer);
                 pos += file.bytes;

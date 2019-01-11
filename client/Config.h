@@ -188,6 +188,7 @@ extern Getter<unsigned long long> responseTimeout;
 extern Getter<std::string> compiler;
 extern Getter<std::string> cacheDir;
 extern Getter<std::string> slave;
+extern Getter<bool> objectCache;
 extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<bool> help;
