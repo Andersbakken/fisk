@@ -556,17 +556,17 @@ server.on("compile", compile => {
         }
     }
 
-    if (objectCache)
-        console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
+    // if (objectCache)
+    //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
     if (objectCache && objectCache.state(compile.md5) == "exists") {
-        console.log("we have it cached", compile.md5);
+        // console.log("we have it cached", compile.md5);
         let fd;
         // ### this should be async as well
         try {
             let item = objectCache.get(compile.md5);
             compile.send(item.response);
             fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
-            console.log("here", item.response.md5, item.response);
+            // console.log("here", item.response.md5, item.response);
             let pos = 4 + item.headerLength;
             item.response.index.forEach(file => {
                 let buffer = Buffer.allocUnsafe(file.bytes);
@@ -582,7 +582,7 @@ server.on("compile", compile => {
                 fs.closeSync(fd);
             compile.close();
         }
-        console.log("The cache handled it");
+        // console.log("The cache handled it");
         return;
     }
     // console.log("request", compile.hostname, compile.ip, compile.environment);

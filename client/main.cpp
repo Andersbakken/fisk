@@ -11,7 +11,6 @@
 #include <json11.hpp>
 #include <climits>
 #include <cstdlib>
-#include <iomanip>
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
@@ -266,14 +265,10 @@ int main(int argc, char **argv)
 
         unsigned char md5Buf[MD5_DIGEST_LENGTH];
         MD5_Final(md5Buf, &data.md5);
-        std::ostringstream ostr;
-        ostr << std::setfill('0') << std::setw(2) << std::hex;
-        for (size_t i=0; i<sizeof(md5Buf); ++i) {
-            ostr << static_cast<int>(md5Buf[i]);
-        }
+        std::string md5 = Client::toHex(md5Buf, sizeof(md5Buf));
 
-        WARN("Got md5 %s", ostr.str().c_str());
-        headers["x-fisk-md5"] = ostr.str();
+        WARN("Got md5: %s", md5.c_str());
+        headers["x-fisk-md5"] = std::move(md5);
     }
 
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {

@@ -178,11 +178,10 @@ inline std::string sha1(const std::string &str)
 }
 
 std::string base64(const std::string &src);
-inline std::string toHex(const std::string &src)
+inline std::string toHex(const void *t, size_t s)
 {
-    size_t s = src.size();
     std::string ret(s * 2, ' ');
-    const unsigned char *in = reinterpret_cast<const unsigned char *>(src.c_str());
+    const unsigned char *in = reinterpret_cast<const unsigned char *>(t);
     const unsigned char hex[] = "0123456789ABCDEF";
     unsigned char *out = reinterpret_cast<unsigned char *>(&ret[0]);
     while (s--) {
@@ -198,6 +197,11 @@ inline std::string toHex(const std::string &src)
     }
 
     return ret;
+}
+
+inline std::string toHex(const std::string &src)
+{
+    return toHex(src.c_str(), src.size());
 }
 
 inline std::vector<std::string> split(const std::string &str, const std::string &delim)

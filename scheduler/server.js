@@ -142,7 +142,6 @@ class Server extends EventEmitter {
             const configVersion = req.headers["x-fisk-config-version"];
             if (configVersion != this.configVersion) {
                 error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
-                console.log("Balls", req.headers);
                 return;
             }
             const compileEnvironment = req.headers["x-fisk-environments"];
@@ -155,6 +154,11 @@ class Server extends EventEmitter {
                 sourceFile: req.headers["x-fisk-sourcefile"],
                 md5: req.headers["x-fisk-md5"]
             };
+
+            if (data.md5 && data.md5.length != 32) {
+                error(`Bad md5 sum: ${data.md5}`);
+                return;
+            }
             const npmVersion = req.headers["x-fisk-npm-version"];
             if (npmVersion)
                 data.npmVersion = npmVersion;

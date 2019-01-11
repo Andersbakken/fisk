@@ -59,7 +59,7 @@ Separator s3("Options:");
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
 Getter<bool> objectCache("object-cache", "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be configured with --object-cache-size");
-Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", true);
+Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", false);
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");

@@ -38,6 +38,8 @@ int Watchdog::timeout()
 {
     if (mState != Running)
         return -1;
+    fprintf(stderr, "WTF? %d\n", (int)Config::watchdog);
+    abort();
     const unsigned long long now = Client::mono();
     mTimeoutTime = mTransitionTime;
     switch (mStage) {
@@ -76,7 +78,8 @@ int Watchdog::timeout()
 void Watchdog::onTimeout()
 {
     if (mState == Running && Client::mono() >= mTimeoutTime) {
-        ERROR("Watchdog timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
+        fprintf(stderr, "WTF 2? %d %d\n", mState, (int)Config::watchdog);
+        ERROR("%d %d Watchdog timed out waiting for %s", mState, (int)Config::watchdog, stageName(static_cast<Stage>(stages[mState + 1])));
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
     }
 }

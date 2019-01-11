@@ -36,12 +36,12 @@ class ObjectCache
                         fd = fs.openSync(path.join(dir, fileName), "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
-                        const jsonBuffer = Buffer.allocUnsafe(this.headerSize);
-                        fs.readSync(fd, jsonBuffer, 0, this.headerSize);
+                        const jsonBuffer = Buffer.allocUnsafe(headerSize);
+                        fs.readSync(fd, jsonBuffer, 0, headerSize);
                         const response = JSON.parse(jsonBuffer.toString());
                         if (response.md5 != fileName)
                             throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
-                        let contentsSize = fs.fstatSync(fd).size - this.headerSize - 4;
+                        let contentsSize = fs.fstatSync(fd).size - headerSize - 4;
                         fs.closeSync(fd);
                         let item = new ObjectCacheItem(response, headerSize, contentsSize);
                         this.size += item.fileSize;
@@ -81,7 +81,6 @@ class ObjectCache
         let finished = false;
         let error = false;
 
-        console.log("motherfucker", this.dir, response.md5, response);
         const absolutePath = path.join(this.dir, response.md5);
         const fd = fs.openSync(absolutePath, "w");
         const json = Buffer.from(JSON.stringify(response));;
@@ -98,7 +97,7 @@ class ObjectCache
 
         let writing = false;
         const write = () => {
-            console.log(`write called for ${response.md5}`);
+            // console.log(`write called for ${response.md5}`);
             if (writing || !pieces.length)
                 return;
             writing = true;
@@ -117,7 +116,7 @@ class ObjectCache
                 writing = false;
                 if (err)
                     error = true;
-                console.log(`wrote ${piece.length} out of ${remaining}`);
+                // console.log(`wrote ${piece.length} out of ${remaining}`);
                 remaining -= piece.length;
                 if (!remaining) {
                     delete this.pending[response.md5];
@@ -149,7 +148,7 @@ class ObjectCache
 
         return {
             feed: (data) => {
-                console.log(`feed called for ${response.md5}`);
+                // console.log(`feed called for ${response.md5}`);
                 if (aborted)
                     throw new Error("You've already aborted you dolt");
                 if (finished)
