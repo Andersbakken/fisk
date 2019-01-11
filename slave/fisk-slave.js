@@ -350,6 +350,8 @@ server.on("job", job => {
         done: false,
         heartbeatTimer: undefined,
         buffers: [],
+        stdout: "",
+        stderr: "",
         start: function() {
             let job = this.job;
             this.heartbeatTimer = setInterval(() => {
@@ -363,8 +365,8 @@ server.on("job", job => {
                 job.send("resume", {});
             }
             delete this.buffers;
-            this.op.on("stdout", data => job.send({ type: "stdout", data: data }));
-            this.op.on("stderr", data => job.send({ type: "stderr", data: data }));
+            this.op.on("stdout", data => { this.stdout += data; }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
+            this.op.on("stderr", data => { this.stderr += data; });
             this.op.on("finished", event => {
                 this.done = true;
                 let idx = jobQueue.indexOf(j);
@@ -383,7 +385,9 @@ server.on("job", job => {
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
                     success: event.success,
                     exitCode: event.exitCode,
-                    md5: job.md5
+                    md5: job.md5,
+                    stderr: this.stderr,
+                    stdout: this.stdout
                 };
                 job.send(response);
                 if (objectCacheEnabled && response.md5)
