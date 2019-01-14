@@ -29,7 +29,6 @@ public:
                 Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler json parse error");
                 return;
             }
-            DEBUG("GOT JSON\n%s", msg.dump().c_str());
             const std::string type = msg["type"].string_value();
             if (type == "needsEnvironment") {
                 needsEnvironment = true;

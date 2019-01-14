@@ -24,6 +24,8 @@ public:
                 return true;
             }
 
+            DEBUG("GOT JSON\n%s", msg.dump().c_str());
+
             const std::string type = msg["type"].string_value();
 
             if (type == "stderr") {
