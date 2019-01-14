@@ -561,10 +561,9 @@ server.on("compile", compile => {
     if (objectCache && objectCache.state(compile.md5) == "exists") {
         // console.log("we have it cached", compile.md5);
         let fd;
-        // ### this should be async as well
         try {
             let item = objectCache.get(compile.md5);
-            compile.send(item.response);
+            compile.send(Object.assign({objectCache: true}, item.response));
             fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
             // console.log("here", item.response.md5, item.response);
             let pos = 4 + item.headerLength;
