@@ -372,9 +372,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
         if (objectCache) {
             if (md5) {
-                if (arg.find("/home/") != std::string::npos) {
-                    fprintf(stderr, "GOT FUCKING BAD ARG [%s]\n", arg.c_str());
-                }
                 MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
                 VERBOSE("Md5'ing arg [%s]", arg.c_str());
             } else {
@@ -408,9 +405,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-o", 2);
             MD5_Update(&Client::data().md5, out.c_str(), out.size());
-            if (out.find("/home/") != std::string::npos) {
-                printf("GOT FUCKING BAD ARG [%s]\n", out.c_str());
-            }
         }
         ret->commandLine.push_back(std::move(out));
         ret->flags |= HasDashO;
@@ -423,9 +417,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-MF", 2);
             MD5_Update(&Client::data().md5, dfile.c_str(), dfile.size());
-            if (dfile.find("/home/") != std::string::npos) {
-                printf("GOT FUCKING BAD ARG [%s]\n", dfile.c_str());
-            }
         }
         ret->commandLine.push_back(std::move(dfile));
     }
