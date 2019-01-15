@@ -317,6 +317,7 @@ server.on("listen", app => {
 
     app.get("/info", (req, res, next) => {
         let obj = {
+            slaveCount: Object.keys(slaves).length,
             npmVersion: schedulerNpmVersion,
             environments: environmentsInfo(),
             configVersion: common.Version,
