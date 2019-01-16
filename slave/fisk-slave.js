@@ -327,21 +327,6 @@ server.on("job", job => {
     const jobStartTime = Date.now();
     let uploadDuration;
 
-    client.send("jobStarted", {
-        id: job.id,
-        sourceFile: job.sourceFile,
-        client: {
-            name: job.name,
-            hostname: job.hostname,
-            ip: job.ip
-        },
-        slave: {
-            ip: job.slaveIp,
-            name: option("name"),
-            hostname: option("hostname") || os.hostname(),
-            port: server.port
-        }
-    });
     // console.log("sending to server");
     var j = {
         id: job.id,
@@ -354,6 +339,22 @@ server.on("job", job => {
         stderr: "",
         start: function() {
             let job = this.job;
+            client.send("jobStarted", {
+                id: job.id,
+                sourceFile: job.sourceFile,
+                client: {
+                    name: job.name,
+                    hostname: job.hostname,
+                    ip: job.ip
+                },
+                slave: {
+                    ip: job.slaveIp,
+                    name: option("name"),
+                    hostname: option("hostname") || os.hostname(),
+                    port: server.port
+                }
+            });
+
             this.heartbeatTimer = setInterval(() => {
                 // console.log("sending heartbeat");
                 job.send("heartbeat", {});

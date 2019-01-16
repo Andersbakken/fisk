@@ -72,12 +72,12 @@ function nextJobId()
     return id;
 }
 
-function jobStarted(job)
+function jobStartedOrScheduled(type, job)
 {
     if (monitors.length) {
         // console.log("GOT STUFF", job);
         let info = {
-            type: "jobStarted",
+            type: type,
             client: {
                 hostname: job.client.hostname,
                 ip: job.client.ip,
@@ -437,7 +437,7 @@ server.on("slave", slave => {
         // console.log(message);
     });
 
-    slave.on("jobStarted", job => jobStarted(job));
+    slave.on("jobStarted", job => jobStartedOrScheduled("jobStarted", job));
     slave.on("jobFinished", job => jobFinished(slave, job));
 
     slave.on("jobAborted", job => {
@@ -708,6 +708,7 @@ server.on("compile", compile => {
         data.hostname = slave.hostname;
         data.port = slave.port;
         compile.send("slave", data);
+        jobStartedOrScheduled("jobScheduled", { client: compile, slave: slave, id: id, sourceFile: compile.sourceFile });
     } else {
         console.log("No slave for you", compile.ip);
         compile.send("slave", data);
@@ -765,6 +766,7 @@ function randomBytes(bytes)
 
 
 server.on("monitor", client => {
+    console.log("Got monitor");
     monitors.push(client);
     function remove()
     {
@@ -1051,7 +1053,8 @@ function simulate(count)
                 if (!jobs[i].client) {
                     jobs[i].client = clients[parseInt(Math.random() * clientCount)];
                     jobs[i].id = nextJobId();
-                    jobStarted({ client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
+                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
+                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
                 } else {
                     // const client = jobs[i].client;
                     // const id = jobs[i].id;
