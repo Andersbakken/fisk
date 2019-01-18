@@ -403,8 +403,10 @@ server.on("slave", slave => {
         slave.send({ type: "quit" });
         return;
     }
-    let activeResponses = [];
     slave.activeClients = 0;
+    let stream;
+    if (objectCache)
+        stream = objectCache.createStream(slave.ip, slave.port);
     insertSlave(slave);
     console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     syncEnvironments(slave);
@@ -423,7 +425,8 @@ server.on("slave", slave => {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
     slave.on("close", () => {
-        activeResponses.forEach(response => response.abort());
+        if (stream)
+            stream.close();
         removeSlave(slave);
         console.log("slave disconnected", slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
         slave.removeAllListeners();
@@ -449,18 +452,13 @@ server.on("slave", slave => {
         }
     });
     slave.on("response", response => {
-        console.log("got response", JSON.stringify(response));
-        activeResponses.push(objectCache.insert(response, success => {
-            if (success)
-                console.log("Inserted", response.md5, "into the cache");
-            activeResponses.splice(0, 1);
-        }));
-        // responses.push({ response: response, feed: undefined, abort: undefined, cb: undefined });
+        // console.log("got response", JSON.stringify(response));
+        stream.addResponse(response);
     });
 
     slave.on("data", data => {
         // console.log("Got some data", data.length);
-        activeResponses[0].feed(data);
+        stream.addData(data);
     });
 });
 

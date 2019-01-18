@@ -1,5 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
+const EventEmitter = require("events");
 
 class ObjectCacheItem
 {
@@ -15,6 +16,43 @@ class ObjectCacheItem
     // get headerSize
 };
 
+class PendingItem
+{
+    constructor(response, path, redundant, dataBytes) // not including the metadata
+    {
+        this.response = response;
+        this.path = path;
+        this.remaining = dataBytes;
+        if (!redundant)
+            this.file = fs.createWriteStream(path);
+    }
+};
+
+class Stream extends EventEmitter
+{
+    constructor(key)
+    {
+        super();
+        this.key = key;
+        this.pending = [];
+    }
+
+    addResponse(response)
+    {
+        this.emit("response", response);
+    }
+
+    addData(data)
+    {
+        this.emit("data", data);;
+    }
+
+    close()
+    {
+        this.emit("close");
+    }
+};
+
 class ObjectCache
 {
     constructor(dir, maxSize, purgeSize)
@@ -25,6 +63,7 @@ class ObjectCache
         this.purgeSize = purgeSize;
         this.cache = {};
         this.pending = {};
+        this.streams = {};
         this.size = 0;
         // console.log(fs.readdirSync(this.dir, { withFileTypes: true }));
         try {
@@ -38,16 +77,21 @@ class ObjectCache
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
                         const jsonBuffer = Buffer.allocUnsafe(headerSize);
                         fs.readSync(fd, jsonBuffer, 0, headerSize);
+                        fs.closeSync(fd);
                         const response = JSON.parse(jsonBuffer.toString());
                         if (response.md5 != fileName)
                             throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
-                        fs.closeSync(fd);
                         let item = new ObjectCacheItem(response, headerSize);
                         this.size += item.fileSize;
                         this.cache[fileName] = item;
                     }
                 } catch (err) {
-                    console.log("got failure", err);
+                    console.error("got failure", err);
+                    try {
+                        fs.unlinkSync(path.join(dir, fileName));
+                    } catch (doubleError) {
+                        console.error("Can't even delete this one", doubleError);
+                    }
                 }
                 return undefined;
             });
@@ -71,108 +115,76 @@ class ObjectCache
         return Object.keys(this.cache);
     }
 
-    insert(response, cb)
+    createStream(ip, port)
     {
-        if (this.state(response.md5) != "none")
-            throw new Error(`Already doing this response.md5: ${response.md5}`);
+        const key = ip + ":" + port;
+        if (key in this.streams) {
+            throw new Error("We already have this stream", key);
+        }
 
-        let aborted = false;
-        let finished = false;
-        let error = false;
-
-        const absolutePath = path.join(this.dir, response.md5);
-        const fd = fs.openSync(absolutePath, "w");
-        const json = Buffer.from(JSON.stringify(response));;
-        const headerSizeBuffer = Buffer.allocUnsafe(4);
-        let remaining = 0;
-        response.index.forEach(file => { remaining += file.bytes; });
-        headerSizeBuffer.writeUInt32LE(json.length);
-        fs.writeSync(fd, headerSizeBuffer);
-        fs.writeSync(fd, json);
-        this.pending[response.md5] = true;
-
-        const pieces = [];
-
-        let writing = false;
-        const write = () => {
-            // console.log(`write called for ${response.md5}`);
-            if (writing || !pieces.length)
-                return;
-            writing = true;
-            const piece = pieces.splice(0, 1)[0];
-            const onWrite = (err) => {
-                if (aborted) {
+        const stream = new Stream;
+        stream.on("close", () => {
+            stream.pending.forEach(item => {
+                if (item.file) {
+                    item.file.close();
                     try {
-                        fs.closeSync(fd);
-                        fs.unlinkSync(fd);
+                        fs.unlinkSync(item.path);
                     } catch (err) {
+                        console.error(`Failed to unlink ${item.path} ${err}`);
                     }
-                    delete this.pending[response.md5];
-                    cb(false);
-                    return;
+                    delete this.pending[item.md5];
                 }
-                writing = false;
-                if (err)
-                    error = true;
-                // console.log(`wrote ${piece.length} out of ${remaining}`);
-                remaining -= piece.length;
-                if (!remaining) {
-                    delete this.pending[response.md5];
-                    finished = true;
-                    if (error) {
-                        try {
-                            fs.closeSync(fd);
-                            fd.unlinkSync(fd);
-                        } catch (e) {
-                            console.error(`Failed to do something here for ${response.md5} ${e}`);
-                        }
-                    } else {
-                        let buf = new ObjectCacheItem(response, json.length);
-                        this.cache[response.md5] = buf;
-                        this.size += buf.fileSize;
-                        if (this.size > this.maxSize)
-                            this.purge(this.purgeSize);
-                    }
-                    cb(!error);
-                }
-            };
-
-            if (error) {
-                onWrite(undefined);
+            });
+            delete this.streams[key];
+        });
+        stream.on("response", response => {
+            let redundant = false;
+            if (this.state(response.md5) != 'none') {
+                redundant = true;
             } else {
-                fs.write(fd, piece, onWrite);
+                this.pending[response.md5] = key;
             }
-        };
+            let remaining = 0;
+            response.index.forEach(file => { remaining += file.bytes; });
+            let absolutePath = path.join(this.dir, response.md5);
+            const item = new PendingItem(response, absolutePath, redundant, remaining);
+            if (!redundant) {
+                const json = Buffer.from(JSON.stringify(response));
+                const headerSizeBuffer = Buffer.allocUnsafe(4);
+                headerSizeBuffer.writeUInt32LE(json.length);
+                item.file.write(headerSizeBuffer);
+                item.file.write(json);
+                item.jsonLength = json.length;
+            }
+            stream.pending.push(item);
+        });
 
-        return {
-            feed: (data) => {
-                // console.log(`feed called for ${response.md5}`);
-                if (aborted)
-                    throw new Error("You've already aborted you dolt");
-                if (finished)
-                    throw new Error("You've already finished you nitwit");
+        stream.on("data", data => {
+            const item = stream.pending[0];
+            if (data.length > item.remaining)
+                throw new Error(`Got too much data here from ${key}. Needed ${item.remaining} got ${data.length}`);
+            if (item.file)
+                item.file.write(data);
+            item.remaining -= data.length;
+            // console.log("Got some bytes here", item.path, data.length, item.remaining, item.redundant ? "redundant" : "");
+            if (!item.remaining) {
+                // console.log("finished a file");
+                stream.pending.splice(0, 1);
 
-                pieces.push(data);
-                write();
-            },
-            abort: (data) => {
-                if (aborted)
-                    throw new Error("You've already finished you dunce");
-                if (finished)
-                    throw new Error("You've already finished you chump");
-
-                aborted = true;
-                if (!writing) {
-                    try {
-                        fs.closeSync(fd);
-                        fs.unlinkSync(fd);
-                    } catch (err) {
-                    }
-                    delete this.pending[response.md5];
-                    cb(undefined, false);
+                if (item.file) {
+                    item.file.close();
+                    let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
+                    this.cache[item.response.md5] = cacheItem;
+                    this.size += cacheItem.fileSize;
+                    if (this.size > this.maxSize)
+                        this.purge(this.purgeSize);
+                    delete this.pending[item.response.md5];
                 }
             }
-        };
+        });
+
+        this.streams[key] = stream;
+        return stream;
     }
 
     get cacheHits()
@@ -186,7 +198,7 @@ class ObjectCache
 
     dump()
     {
-        return Object.assign({ cacheHits: this.cacheHits }, this);
+        return Object.assign({ cacheHits: this.cacheHits, usage: this.size / this.maxSize }, this);
     }
 
     remove(md5)
