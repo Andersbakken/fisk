@@ -168,6 +168,9 @@ class Server extends EventEmitter {
             const clientName = req.headers["x-fisk-client-name"];
             if (clientName)
                 data.name = clientName;
+            const user = req.headers["x-fisk-user"];
+            if (user)
+                data.user = user;
             const clientHostname = req.headers["x-fisk-client-hostname"];
             if (clientHostname)
                 data.hostname = clientHostname;

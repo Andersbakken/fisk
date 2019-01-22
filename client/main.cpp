@@ -219,6 +219,13 @@ int main(int argc, char **argv)
 
     data.hash = Client::environmentHash(data.resolvedCompiler);
     std::map<std::string, std::string> headers;
+    {
+        char buf[1024];
+        if (!getlogin_r(buf, sizeof(buf))) {
+            headers["x-fisk-user"] = buf;
+        }
+    }
+
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
     headers["x-fisk-client-name"] = Config::name;

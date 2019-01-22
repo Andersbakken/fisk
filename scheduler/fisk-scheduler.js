@@ -81,7 +81,8 @@ function jobStartedOrScheduled(type, job)
             client: {
                 hostname: job.client.hostname,
                 ip: job.client.ip,
-                name: job.client.name
+                name: job.client.name,
+                user: job.client.user
             },
             sourceFile: job.sourceFile,
             slave: {
