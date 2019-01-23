@@ -17,6 +17,16 @@ const ObjectCache = require('./objectcache');
 const serverStartTime = Date.now();
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+    addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}` }, () => {
+        process.exit();
+    });
+});
+
+process.on('uncaughtException', err => {
+    console.error(`Uncaught exception: ${err}`);
+    addLogFile({ source: "no source file", ip: "self", contents: err.toString() }, () => {
+        process.exit();
+    });
 });
 
 let schedulerNpmVersion;
@@ -397,8 +407,8 @@ function formatDate(date)
     return `${month}_${day}_${hour}:${minute}:${second}`;
 }
 
-function addLogFile(log) {
-    fs.writeFile(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents);
+function addLogFile(log, cb) {
+    fs.writeFile(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents, cb);
 }
 
 server.on("slave", slave => {
