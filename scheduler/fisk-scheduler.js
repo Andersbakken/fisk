@@ -241,7 +241,7 @@ function syncEnvironments(slave)
     let needs = [];
     let unwanted = [];
     console.log("scheduler has", Object.keys(Environments.environments).sort());
-    console.log("slave has", Object.keys(slave.environments).sort());
+    console.log("slave has", slave.ip, Object.keys(slave.environments).sort());
     for (let env in Environments.environments) {
         if (env in slave.environments) {
             slave.environments[env] = -1;
