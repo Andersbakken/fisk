@@ -637,8 +637,10 @@ server.on("compile", compile => {
         }
     };
 
-    if (getFromCache())
+    if (getFromCache()) {
+        console.log(`${compile.hostname} ${compile.ip} got ${compile.sourceFile} from cache`);
         return;
+    }
 
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);
