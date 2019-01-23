@@ -26,7 +26,7 @@ try {
     process.exit();
 }
 
-const clientMinimumVersion = [ 1, 1, 84 ];
+const clientMinimumVersion = [ 1, 4, 1 ];
 
 const slaves = {};
 const monitors = [];
