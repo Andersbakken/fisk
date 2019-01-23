@@ -270,6 +270,8 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
 
+        MD5_Update(&Client::data().md5, data.hash.c_str(), data.hash.size());
+
         unsigned char md5Buf[MD5_DIGEST_LENGTH];
         MD5_Final(md5Buf, &data.md5);
         std::string md5 = Client::toHex(md5Buf, sizeof(md5Buf));
