@@ -114,7 +114,7 @@ function updateFisk()
         }).then(() => {
             return npm("install --unsafe-perm @andersbakken/fisk", { cwd: "/var/fisk/stage" });
         }).then(() => {
-            return npm("install", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
+            return npm("install --unsafe-perm", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
         }).then(() => {
             return npm("run dist", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
         }).then(() => {
