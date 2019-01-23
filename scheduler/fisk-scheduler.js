@@ -549,8 +549,10 @@ server.on("compile", compile => {
             let major = parseInt(match[1]);
             let minor = parseInt(match[2]);
             let patch = parseInt(match[3]);
-            if (major == clientMinimumVersion[0]
-                && (minor > clientMinimumVersion[1] || (minor == clientMinimumVersion[1] && patch >= clientMinimumVersion[2]))) {
+            if (major > clientMinimumVersion[0]
+                || (major == clientMinimumVersion[0]
+                    && (minor > clientMinimumVersion[1]
+                        || (minor == clientMinimumVersion[1] && patch >= clientMinimumVersion[2])))) {
                 ok = true;
             }
         }
