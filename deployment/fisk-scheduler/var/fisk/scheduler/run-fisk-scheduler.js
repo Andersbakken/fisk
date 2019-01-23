@@ -178,17 +178,10 @@ function checkForConnection()
             method: "HEAD"
         };
         const req = http.request(options, res => {
-            var responseString = "";
-
-            res.on("data", function (data) {
-                responseString += data;
-                // save all the data from response
-            });
             res.on("end", function () {
-                console.log(responseString);
                 resolve(false);
-                // print to console when response ends
             });
+            res.end();
         });
         req.on("error", error => {
             console.error("Got error trying to connect to webserver", error);
