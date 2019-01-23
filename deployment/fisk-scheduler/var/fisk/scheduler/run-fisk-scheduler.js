@@ -33,7 +33,7 @@ function removeDirContents(path)
 function npm(args, options)
 {
     return new Promise((resolve, reject) => {
-        console.log(`Running /usr/bin/env/npm ${args}`);
+        console.log(`Running /usr/bin/env npm ${args}`);
         let proc = child_process.exec(`/usr/bin/env npm ${args}`, options, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
