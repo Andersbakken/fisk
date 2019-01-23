@@ -14,6 +14,7 @@ const Database = require('./database');
 const Peak = require('./peak');
 const ObjectCache = require('./objectcache');
 
+const serverStartTime = Date.now();
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
 });
@@ -324,7 +325,9 @@ server.on("listen", app => {
             configVersion: common.Version,
             capacity: capacity,
             activeJobs: activeJobs,
-            peaks: peakData()
+            peaks: peakData(),
+            uptime: Date.now() - serverStartTime,
+            serverStartTime: new Date(serverStartTime).toString()
         };
         res.send(JSON.stringify(obj, null, 4));
     });
