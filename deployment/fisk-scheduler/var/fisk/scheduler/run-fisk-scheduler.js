@@ -181,13 +181,12 @@ function checkForConnection()
             res.on("end", function () {
                 resolve(false);
             });
-            res.end();
         });
         req.on("error", error => {
             console.error("Got error trying to connect to webserver", error);
             resolve(true);
         });
-
+        req.end();
     });
 }
 
