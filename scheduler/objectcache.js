@@ -149,6 +149,18 @@ class ObjectCache
             let absolutePath = path.join(this.dir, response.md5);
             const item = new PendingItem(response, absolutePath, redundant, remaining);
             if (!redundant) {
+                item.file.on("error", error => {
+                    console.error("Got error writing file", error, absolutePath);
+                    item.file.close();
+                    delete item.file;
+                    delete this.pending[response.md5];
+                    try {
+                        fs.unlinkSync(item.path);
+                    } catch (err) {
+                        if (err.code != "ENOENT")
+                            console.error(`Failed to unlink ${item.path} ${err}`);
+                    }
+                });
                 const json = Buffer.from(JSON.stringify(response));
                 const headerSizeBuffer = Buffer.allocUnsafe(4);
                 headerSizeBuffer.writeUInt32LE(json.length);
