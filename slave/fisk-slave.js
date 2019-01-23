@@ -230,7 +230,7 @@ client.on("data", message => {
                 client.send("environments", { environments: Object.keys(environments) });
                 console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
             }
-        }, option.int("inform-delay", 5000));
+        }, option.int("inform-delay", 30000));
     }
     exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
         then(() => {
