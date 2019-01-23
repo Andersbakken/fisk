@@ -560,12 +560,21 @@ server.on("compile", compile => {
         }
     }
 
-    // if (objectCache)
-    //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
-    if (objectCache && objectCache.state(compile.md5) == "exists") {
+    const getFromCache = () => {
+        // if (objectCache)
+        //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
+        if (!objectCache || objectCache.state(compile.md5) != "exists") 
+            return false;
+        const file = path.join(objectCache.dir, compile.md5);
+        if (!fs.existsSync(file)) {
+            console.log("The file is not even there", file);
+            objectCache.remove(compile.md5);
+            return false;
+        }
         // console.log("we have it cached", compile.md5);
-        let fd;
+
         let pointOfNoReturn = false;
+        let fd;
         try {
             let item = objectCache.get(compile.md5);
             compile.send(Object.assign({objectCache: true}, item.response));
@@ -611,7 +620,7 @@ server.on("compile", compile => {
                 });
             };
             work();
-            return;
+            return true;
         } catch (err) {
             if (err.code != "ENOENT")
                 console.error("Got some error here", err);
@@ -619,11 +628,16 @@ server.on("compile", compile => {
                 fs.closeSync(fd);
             if (pointOfNoReturn) {
                 compile.close();
-                return; // hehe
+                return true; // hehe
             }
+            return false;
+            // console.log("The cache handled it");
         }
-        // console.log("The cache handled it");
-    }
+    };
+
+    if (getFromCache())
+        return;
+
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);
     if (!Environments.hasEnvironment(compile.environment) && requestEnvironment(compile)) {

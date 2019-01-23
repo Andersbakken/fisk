@@ -23,8 +23,23 @@ class PendingItem
         this.response = response;
         this.path = path;
         this.remaining = dataBytes;
-        if (!redundant)
+        if (!redundant) {
             this.file = fs.createWriteStream(path);
+            this.file.on("drain", () => {
+                let buf = this.buffer;
+                this.buffer = undefined;
+                buf.forEach(b => this.write(b));
+            });
+            this.buffer = undefined;
+        }
+    }
+
+    write(data) {
+        if (this.buffer) {
+            this.buffer.push(data);
+        } else if (!this.file.write(data)) {
+            this.buffer = [ data ];
+        }
     }
 };
 
@@ -164,8 +179,8 @@ class ObjectCache
                 const json = Buffer.from(JSON.stringify(response));
                 const headerSizeBuffer = Buffer.allocUnsafe(4);
                 headerSizeBuffer.writeUInt32LE(json.length);
-                item.file.write(headerSizeBuffer);
-                item.file.write(json);
+                item.write(headerSizeBuffer);
+                item.write(json);
                 item.jsonLength = json.length;
             }
             stream.pending.push(item);
@@ -176,22 +191,23 @@ class ObjectCache
             if (data.length > item.remaining)
                 throw new Error(`Got too much data here from ${key}. Needed ${item.remaining} got ${data.length}`);
             if (item.file)
-                item.file.write(data);
+                item.write(data);
             item.remaining -= data.length;
             // console.log("Got some bytes here", item.path, data.length, item.remaining, item.redundant ? "redundant" : "");
             if (!item.remaining) {
-                // console.log("finished a file");
-                stream.pending.splice(0, 1);
-
                 if (item.file) {
-                    item.file.close();
-                    let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
-                    this.cache[item.response.md5] = cacheItem;
-                    this.size += cacheItem.fileSize;
-                    if (this.size > this.maxSize)
-                        this.purge(this.purgeSize);
-                    delete this.pending[item.response.md5];
+                    item.file.end();
+                    if (item.file) { // can end emit an error synchronously?
+                        let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
+                        this.cache[item.response.md5] = cacheItem;
+                        this.size += cacheItem.fileSize;
+                        if (this.size > this.maxSize)
+                            this.purge(this.purgeSize);
+                        delete this.pending[item.response.md5];
+                        // console.log("finished a file", item.response.md5);
+                    }
                 }
+                stream.pending.splice(0, 1);
             }
         });
 
@@ -216,8 +232,9 @@ class ObjectCache
     remove(md5)
     {
         try {
-            fs.unlinkSync(path.join(this.dir, md5));
             this.size -= this.cache[md5].fileSize;
+            delete this.cache[md5];
+            fs.unlinkSync(path.join(this.dir, md5));
         } catch (err) {
             console.error("Can't remove file", path.join(this.dir, md5), err.toString());
         }
