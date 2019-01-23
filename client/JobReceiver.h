@@ -27,23 +27,6 @@ public:
             DEBUG("GOT JSON\n%s", msg.dump().c_str());
 
             const std::string type = msg["type"].string_value();
-#warning remove after everyones updated
-            if (type == "stderr") { // backwards compatibility
-                const std::string output = msg["data"].string_value();
-                if (!output.empty()) {
-                    fwrite(output.c_str(), 1, output.size(), stderr);
-                }
-                return true;
-            }
-
-            if (type == "stdout") { // backwards compatibility
-                const std::string output = msg["data"].string_value();
-                if (!output.empty()) {
-                    fwrite(output.c_str(), 1, output.size(), stdout);
-                }
-                return true;
-            }
-
             if (type != "response") {
                 return false;
             }
