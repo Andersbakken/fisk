@@ -2,6 +2,10 @@
 
 const child_process = require('child_process');
 const fs = require('fs');
+const http = require("http");
+const option = require('@jhanssen/options')('fisk/scheduler', {});
+
+const port = option.int("port", 8097);
 
 process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
@@ -29,7 +33,8 @@ function removeDirContents(path)
 function npm(args, options)
 {
     return new Promise((resolve, reject) => {
-        let proc = child_process.exec(`npm ${args}`, options, (error, stdout, stderr) => {
+        console.log(`Running /usr/bin/env/npm ${args}`);
+        let proc = child_process.exec(`/usr/bin/env npm ${args}`, options, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
                 return;
@@ -101,23 +106,18 @@ function updateFisk()
         }
 
         needsUpdate().then(update => {
-            console.log("1", update);
             if (!update) {
                 throw !fs.existsSync("/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js");
             } else {
                 return npm("cache clear --force");
             }
         }).then(() => {
-            console.log("a");
             return npm("install --unsafe-perm @andersbakken/fisk", { cwd: "/var/fisk/stage" });
         }).then(() => {
-            console.log("b");
             return npm("install", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
         }).then(() => {
-            console.log("c");
             return npm("run dist", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
         }).then(() => {
-            console.log("d");
             resolve(true);
         }).catch(error => {
             // console.log("got error", error);
@@ -164,6 +164,40 @@ function killFisk()
     });
 }
 
+function checkForConnection()
+{
+    return new Promise((resolve, reject) => {
+        if (!fisk) {
+            resolve();
+            return;
+        }
+        const options = {
+            host: "localhost",
+            path: "/",
+            port: port,
+            method: "HEAD"
+        };
+        const req = http.request(options, res => {
+            var responseString = "";
+
+            res.on("data", function (data) {
+                responseString += data;
+                // save all the data from response
+            });
+            res.on("end", function () {
+                console.log(responseString);
+                resolve(false);
+                // print to console when response ends
+            });
+        });
+        req.on("error", error => {
+            console.error("Got error trying to connect to webserver", error);
+            resolve(true);
+        });
+
+    });
+}
+
 let checkForUpdateTimer;
 let checkForUpdateActive = false;
 function checkForUpdate()
@@ -175,18 +209,25 @@ function checkForUpdate()
     }
     function final() // node 8 doesn't have finally
     {
-        checkForUpdateActive = false;
         console.log("do I have fisk?", typeof fisk);
         if (!fisk)
             startFisk();
+        checkForUpdateActive = false;
         checkForUpdateTimer = setTimeout(checkForUpdate, 5 * 60000);
     }
     console.log("checking if fisk needs to be updated");
     updateFisk().then(updated => {
-        if (!updated) {
-            throw undefined;
+        if (updated) {
+            console.log("fisk is updated, stopping fisk");
+            return true;
+        } else {
+            return checkForConnection();
         }
-        console.log("fisk is updated, stopping fisk");
+    }).then(needsUpdate => {
+        console.log("needsUpdate is", needsUpdate);
+        if (!needsUpdate)
+            throw undefined;
+        console.log("killing fisk");
         return killFisk();
     }).then(() => {
         console.log("fisk stopped, copying to prod");
@@ -195,6 +236,7 @@ function checkForUpdate()
         console.log("Fisk updated, restarting");
         final();
     }).catch(error => {
+        console.log("got here", error);
         if (!error) {
             console.log("Nothing to update");
         } else {

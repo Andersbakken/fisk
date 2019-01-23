@@ -1,0 +1,14 @@
+{
+  "name": "run-fisk-scheduler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "run-fisk-scheduler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@jhanssen/options": "^1.0.12"
+  }
+}
