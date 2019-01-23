@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -rf /var/fisk/scheduler/data
 sudo service fisk-scheduler stop
-npm  --unsafe-perm uninstall -g @andersbakken/fisk
+rm -rf /var/fisk/scheduler/data
+rm -rf /var/fisk/scheduler/node_modules
 sudo systemctl disable fisk-scheduler.service

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 mkdir -p /var/fisk/scheduler/data
-npm install --unsafe-perm -g @andersbakken/fisk
+cd /var/fisk/scheduler
+npm install --unsafe-perm
 sudo systemctl enable fisk-scheduler.service
 sudo service fisk-scheduler start
 
