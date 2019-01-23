@@ -490,8 +490,28 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             VERBOSE("Preprocess calling get_status");
             ptr->exitStatus = proc.get_exit_status();
             DEBUG("Preprocess got status %d", ptr->exitStatus);
-            if (Config::objectCache)
-                MD5_Update(&Client::data().md5, ptr->stdOut.c_str(), ptr->stdOut.size());
+            if (Config::objectCache) {
+                const char *ch = ptr->stdOut.c_str();
+                const char *last = ch;
+                while (*ch) {
+                    // VERBOSE("GETTING CHAR [%c]", *ch);
+                    if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
+                        if (ch > last) {
+                            VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
+                            MD5_Update(&Client::data().md5, last, ch - last);
+                        }
+                        while (*ch && *ch != '\n')
+                            ++ch;
+                        last = ch;
+                    } else {
+                        ++ch;
+                    }
+                }
+                if (last < ch) {
+                    VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
+                    MD5_Update(&Client::data().md5, last, ch - last);
+                }
+            }
         }
         slot.reset();
         std::unique_lock<std::mutex> lock(ptr->mMutex);
