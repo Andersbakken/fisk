@@ -68,13 +68,14 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     if (level < sLevel && !sLogFile)
         return;
 
+    static FILE *f = Config::logStdOut ? stdout : stderr;
     std::unique_lock<std::mutex> lock(sMutex);
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - Client::started;
     if (level >= sLevel) {
         if (Config::logTimePrefix)
-            fprintf(stderr, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
-        fwrite(string.c_str(), 1, string.size(), stderr);
+            fprintf(f, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
+        fwrite(string.c_str(), 1, string.size(), f);
     }
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
@@ -91,7 +92,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
-        fwrite("\n", 1, 1, stderr);
+        fwrite("\n", 1, 1, f);
         if (sLogFile)
             fwrite("\n", 1, 1, sLogFile);
     }
