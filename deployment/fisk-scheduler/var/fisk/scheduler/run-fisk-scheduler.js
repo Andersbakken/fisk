@@ -1,39 +1,35 @@
 #!/usr/bin/env node
 
 const child_process = require('child_process');
-const fs = require('fs');
+const fs = require("fs-extra");
 const http = require("http");
-const option = require('@jhanssen/options')('fisk/scheduler', {});
+const path = require('path');
+const minimist = require('minimist');
+const option = require('@jhanssen/options')('fisk/scheduler', minimist(process.argv.slice(2)));
 
 const port = option.int("port", 8097);
+const root = option("root", "/var/fisk");
+
+try {
+    fs.mkdirpSync(root);
+} catch (err) {
+}
 
 process.on("unhandledRejection", (reason, p) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
+    console.error("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
 });
 
-function removeDirContents(path)
-{
-    function go(path, rmdir) {
-        if (fs.existsSync(path)) {
-            fs.readdirSync(path).forEach(function(file, index) {
-                const curPath = path + "/" + file;
-                if (fs.lstatSync(curPath).isDirectory()) { // recurse
-                    go(curPath, true);
-                } else { // delete file
-                    fs.unlinkSync(curPath);
-                }
-            });
-            if (rmdir)
-                fs.rmdirSync(path);
-        }
-    }
-    go(path, false);
-}
+process.on("unhandledException", exception => {
+    console.error("Unhandled exception at: ", exception);
+});
 
 function npm(args, options)
 {
     return new Promise((resolve, reject) => {
-        console.log(`Running /usr/bin/env npm ${args}`);
+        let str = `Running /usr/bin/env npm ${args}`;
+        if (options && options.cwd)
+            str += ` in ${options.cwd}`;
+        console.log(str);
         let proc = child_process.exec(`/usr/bin/env npm ${args}`, options, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
@@ -50,8 +46,13 @@ function npm(args, options)
     });
 }
 
+// setInterval(() => {
+//     console.log("foo", checkForUpdateActive);
+// }, 5000);
+
 let fisk;
 let killed = false;
+let lastStart = 0;
 function startFisk()
 {
     if (!fisk) {
@@ -59,29 +60,44 @@ function startFisk()
             checkForUpdate();
         }
 
-        fisk = child_process.fork("./fisk-scheduler.js", [ "--max_old_space_size=8192" ],
-                                  {
-                                      stdio: "inherit",
-                                      cwd: "/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/"
-                                  },
-                                  (error, stdout, stderr) => {
-                                      console.log("fisk exited: ", error);
-                                      if (!killed) {
-                                          fisk = undefined;
-                                          console.log("restarting in 1 second");
-                                          setTimeout(startFisk, 1000);
-                                      } else {
-                                          killed = false;
-                                      }
-                                  });
+        const opts = {
+            stdio: "inherit",
+            cwd: path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/")
+        };
+
+        lastStart = Date.now();
+        fisk = child_process.fork("./fisk-scheduler.js", [ "--max_old_space_size=8192" ], opts);
+        fisk.on("error", error => {
+            console.log("Got error from fork", error, path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/"));
+        });
+
+        fisk.on("exit", args => {
+            console.log("fisk exited: ", args);
+            if (!killed) {
+                fisk = undefined;
+                if (Date.now() - lastStart > 10000) {
+                    console.log("restarting in 1 second");
+                    setTimeout(startFisk, 1000);
+                } else {
+                    console.log("something wrong with the fisk install, lets remove it");
+                    let ret = child_process.exec(`rm -rf ${path.join(root, "prod")}`, () => setTimeout(checkForUpdate, 1000));
+                }
+            } else {
+                killed = false;
+            }
+        });
+
+        // fisk.on("close", () => console.log("got close"));
+        // fisk.on("exit", () => console.log("got exit"));
+        // fisk.on("disconnect", () => console.log("got disconnect"));
     }
 }
 
 function needsUpdate()
 {
     return new Promise((resolve, reject) => {
-        if (fs.existsSync("/var/fisk/stage/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js")) {
-            npm("outdated @andersbakken/fisk", { cwd: "/var/fisk/stage" }).then(() => {
+        if (fs.existsSync(path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js"))) {
+            npm("outdated @andersbakken/fisk", { cwd: path.join(root, "prod") }).then(() => {
                 resolve(false);
             }).catch(error => {
                 resolve(true);
@@ -95,32 +111,36 @@ function needsUpdate()
 function updateFisk()
 {
     return new Promise((resolve, reject) => {
-        // console.log("0");
         try {
-            fs.mkdirSync("/var/fisk/prod");
+            fs.mkdirpSync(path.join(root, "/prod"));
+            fs.writeFileSync(path.join(root, "/prod/package.json"), "{}");
         } catch (err) {
         }
         try {
-            fs.mkdirSync("/var/fisk/stage");
+            fs.mkdirpSync(path.join(root, "/stage"));
+            fs.writeFileSync(path.join(root, "/stage/package.json"), "{}");
         } catch (err) {
         }
 
         needsUpdate().then(update => {
             if (!update) {
-                throw !fs.existsSync("/var/fisk/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js");
+                throw !fs.existsSync(path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js"));
             } else {
                 return npm("cache clear --force");
             }
         }).then(() => {
-            return npm("install --unsafe-perm @andersbakken/fisk", { cwd: "/var/fisk/stage" });
+            return npm("install --unsafe-perm @andersbakken/fisk", { cwd: path.join(root, "stage") });
         }).then(() => {
-            return npm("install --unsafe-perm", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
+            if (option("ui") === false)
+                return;
+            return npm("install --unsafe-perm", { cwd: path.join(root, "/stage/node_modules/@andersbakken/fisk/ui") });
         }).then(() => {
-            return npm("run dist", { cwd: "/var/fisk/stage/node_modules/@andersbakken/fisk/ui" });
+            if (option("ui") === false)
+                return;
+            return npm("run dist", { cwd: path.join(root, "/stage/node_modules/@andersbakken/fisk/ui") });
         }).then(() => {
             resolve(true);
         }).catch(error => {
-            // console.log("got error", error);
             if (typeof error !== 'boolean') {
                 console.error(`Something failed ${error}`);
                 reject(error);
@@ -134,7 +154,7 @@ function updateFisk()
 function copyToProd()
 {
     return new Promise((resolve, reject) => {
-        child_process.exec("rm -rf /var/fisk/prod && cp -ra /var/fisk/stage /var/fisk/prod", (error, stdout, stderr) => {
+        child_process.exec(`rm -rf ${path.join(root, "prod")} && mv ${path.join(root, "stage")} ${path.join(root, "prod")}`, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
             } else {
@@ -144,7 +164,7 @@ function copyToProd()
     });
 }
 
-function killFisk()
+function killFisk(state)
 {
     return new Promise((resolve, reject) => {
         if (fisk) {
@@ -155,12 +175,12 @@ function killFisk()
             fisk.once("exit", () => {
                 clearTimeout(id);
                 fisk = undefined;
-                resolve();
+                resolve(state);
             });
             fisk.kill();
             return;
         }
-        resolve();
+        resolve(state);
     });
 }
 
@@ -168,23 +188,22 @@ function checkForConnection()
 {
     return new Promise((resolve, reject) => {
         if (!fisk) {
-            resolve();
+            resolve("not running");
             return;
         }
         const options = {
             host: "localhost",
             path: "/",
             port: port,
-            method: "HEAD"
+            method: "HEAD",
+            timeout: 15000
         };
         const req = http.request(options, res => {
-            res.on("end", function () {
-                resolve(false);
-            });
+            resolve("connected");
         });
         req.on("error", error => {
             console.error("Got error trying to connect to webserver", error);
-            resolve(true);
+            resolve("not connected");
         });
         req.end();
     });
@@ -201,31 +220,39 @@ function checkForUpdate()
     }
     function final() // node 8 doesn't have finally
     {
-        console.log("do I have fisk?", typeof fisk);
+        console.log("do I have fisk?", !!fisk);
         if (!fisk)
             startFisk();
         checkForUpdateActive = false;
-        checkForUpdateTimer = setTimeout(checkForUpdate, 5 * 60000);
+        checkForUpdateTimer = setTimeout(checkForUpdate, option.int("check-interval", 5 * 60000));
     }
     console.log("checking if fisk needs to be updated");
     updateFisk().then(updated => {
+        console.log("needs update is", updated);
         if (updated) {
             console.log("fisk is updated, stopping fisk");
-            return true;
+            return "updated";
         } else {
+            console.log("checking for connection");
             return checkForConnection();
         }
-    }).then(needsUpdate => {
-        console.log("needsUpdate is", needsUpdate);
-        if (!needsUpdate)
+    }).then(state => {
+        switch (state) {
+        case "updated":
+        case "not connected":
+            break;
+        case "connected":
+        case "not running":
             throw undefined;
+        }
         console.log("killing fisk");
-        return killFisk();
-    }).then(() => {
+        return killFisk(state);
+    }).then(state => {
         console.log("fisk stopped, copying to prod");
-        return copyToProd();
+        if (state == "updated")
+            return copyToProd();
     }).then(() => {
-        console.log("Fisk updated, restarting");
+        console.log("Restarting fisk");
         final();
     }).catch(error => {
         console.log("got here", error);
