@@ -387,12 +387,12 @@ try {
 
 function formatDate(date)
 {
-    const year = date.getFullYear(),
-          month = date.getMonth() + 1, // months are zero indexed
-          day = date.getDate(),
-          hour = date.getHours(),
-          minute = date.getMinutes(),
-          second = date.getSeconds();
+    let year = date.getFullYear(),
+        month = date.getMonth() + 1, // months are zero indexed
+        day = date.getDate(),
+        hour = date.getHours(),
+        minute = date.getMinutes(),
+        second = date.getSeconds();
 
     if (month < 10)
         month = '0' + month;
