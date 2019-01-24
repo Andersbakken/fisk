@@ -704,14 +704,16 @@ server.on("compile", compile => {
     }
     let data = {};
     // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
-    if (compile.ip in semaphoreMaintenanceTimers) {
-        clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
-    } else {
-        data.maintain_semaphores = true;
+    if (option("maintain-semaphores")) {
+        if (compile.ip in semaphoreMaintenanceTimers) {
+            clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
+        } else {
+            data.maintain_semaphores = true;
+        }
+        semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
+            delete semaphoreMaintenanceTimers[compile.ip];
+        }, 60 * 60000);
     }
-    semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
-        delete semaphoreMaintenanceTimers[compile.ip];
-    }, 60 * 60000);
 
     if (slave) {
         if (env != compile.environment)
