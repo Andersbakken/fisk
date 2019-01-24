@@ -31,8 +31,7 @@ int main(int argc, char **argv)
     std::atexit([]() {
         const Client::Data &data = Client::data();
         for (sem_t *semaphore : data.semaphores) {
-            if (!data.maintainSemaphores)
-                sem_post(semaphore);
+            sem_post(semaphore);
             sem_close(semaphore);
         }
         if (Log::minLogLevel <= Log::Warn) {
