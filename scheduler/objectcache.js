@@ -1,6 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const EventEmitter = require("events");
+const prettysize = require('prettysize');
 
 class ObjectCacheItem
 {
@@ -224,9 +225,15 @@ class ObjectCache
         return ret;
     }
 
-    dump()
+    dump(includeObjects)
     {
-        return Object.assign({ cacheHits: this.cacheHits, usage: this.size / this.maxSize }, this);
+        const ret = Object.assign({ cacheHits: this.cacheHits, usage: ((this.size / this.maxSize) * 100).toFixed(1) }, this);
+        if (!includeObjects)
+            delete ret.cache;
+        for (let key in [ "maxSize", "size", "purgeSize" ]) {
+            ret[key] = prettysize(ret[key], true);
+        }
+        return ret;
     }
 
     remove(md5)
