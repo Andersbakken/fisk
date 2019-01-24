@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
         fprintf(stderr, "Recursive invocation of fiskc detected.\n");
-        return 1;
+        return 104;
     }
     setenv("FISKC_INVOKED", "1", 1);
     // usleep(500 * 1000);
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     });
 
     if (!Config::init(argc, argv)) {
-        return 1;
+        return 105;
     }
 
     if (Config::help) {
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
         level = Log::stringToLevel(logLevel.c_str(), &ok);
         if (!ok) {
             fprintf(stderr, "Invalid log level: %s (\"Verbose\", \"Debug\", \"Warn\", \"Error\" or \"Silent\")\n", logLevel.c_str());
-            return 1;
+            return 106;
         }
     }
     if (Config::debug) {
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
     }
     if (!Client::findCompiler(preresolved)) {
         ERROR("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
-        return 1;
+        return 107;
     }
     DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
           data.argv[0], preresolved.c_str(),

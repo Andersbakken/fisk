@@ -46,7 +46,7 @@ public:
             } else if (type == "version_mismatch") {
                 ERROR("Version mismatch detected, client version: %s minimum client version required: %s",
                       npm_version, msg["minimum_version"].string_value().c_str());
-                _exit(1);
+                _exit(108);
             } else {
                 ERROR("Unexpected message type: %s", type.c_str());
             }
