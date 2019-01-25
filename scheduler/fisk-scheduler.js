@@ -419,8 +419,15 @@ server.on("slave", slave => {
     }
     slave.activeClients = 0;
     let stream;
-    if (objectCache)
-        stream = objectCache.createStream(slave.ip, slave.port);
+    if (objectCache) {
+        try {
+            stream = objectCache.createStream(slave.ip, slave.port);
+        } catch (err) {
+            console.log("Something wrong with this stream apparently", slave.ip, slave.port);
+            slave.close();
+            return;
+        }
+    }
     insertSlave(slave);
     console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     syncEnvironments(slave);
@@ -472,7 +479,12 @@ server.on("slave", slave => {
 
     slave.on("data", data => {
         // console.log("Got some data", data.length);
-        stream.addData(data);
+        try {
+            stream.addData(data);
+        } catch (err) {
+            console.error("Got error from stream", err);
+            slave.close();
+        }
     });
 });
 
