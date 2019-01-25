@@ -274,8 +274,7 @@ function syncEnvironments(slave)
         slave.send({ type: "dropEnvironments", environments: unwanted });
     }
     if (needs.length) {
-        needs.forEach(env => Environments.environments[env].send(slave));
-        // Environments.requestEnvironments(slave);
+        slave.send({ type: "getEnvironments", environments: needs });
     }
 }
 
@@ -357,6 +356,23 @@ server.on("listen", app => {
         for (let ip in slaves) {
             slaves[ip].send(msg);
         }
+    });
+
+    app.get('/environment/*', function(req, res, next) {
+        const hash = req.path.substr(13);
+        const env = Environments.environment(hash);
+        console.log("got env request", hash, env);
+        if (!env) {
+            res.sendStatus(404);
+            return;
+        }
+
+        const rstream = fs.createReadStream(env.path);
+        rstream.on("error", err => {
+            console.error("Got read stream error for", env.path, err);
+            res.close();
+        });
+        rstream.pipe(res);
     });
 
     app.get("/quit", (req, res, next) => {

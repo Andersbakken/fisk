@@ -1,94 +1,6 @@
 const fs = require("fs-extra");
 const path = require("path");
 
-const socket = {
-    _queue: new Map(),
-
-    requestEnvironments(client) {
-        console.log("queueing requestEnvironments");
-        let key = client.ip + " " + client.port;
-        if (!socket._queue[key])
-            socket._queue[key] = { client: client, sending: false, messages: [] };
-        socket._queue[key].messages.push({ requestEnvironments: true });
-        if (!socket._queue[key].sending) {
-            socket._next(key);
-        }
-    },
-    enqueue(client, hash, system, file) {
-        console.log("queuing", file, hash, "for", client.ip);
-        let key = client.ip + " " + client.port;
-        if (!socket._queue[key])
-            socket._queue[key] = { client: client, sending: false, messages: [] };
-
-        let found = false;
-        if (!socket._queue[key].messages.find(pending => pending.hash == hash && pending.system == system && pending.file == file)) {
-            socket._queue[key].messages.push({ hash: hash, system: system, file: file });
-            if (!socket._queue[key].sending) {
-                socket._next(key);
-            }
-        }
-    },
-
-    _next(key) {
-        let data = socket._queue[key];
-        if (data.sending)
-            throw new Error("We're already sending!");
-        data.sending = true;
-        let client = data.client;
-        const q = data.messages.shift();
-        console.log("about to send", q, "to", key);
-        if (q.requestEnvironments) {
-            client.send({ type: "requestEnvironments" });
-            data.sending = false;
-            if (data.messages.length)
-                process.nextTick(socket._next, key);
-            return;
-        }
-        let size;
-        // console.log("About to send", q.file, "to", client.ip, ":", client.port);
-        fs.stat(q.file).then(st => {
-            if (!st.isFile())
-                throw new Error(`${q.file} not a file`);
-            size = st.size;
-            return fs.open(q.file, "r");
-        }).then(fd => {
-            let remaining = size;
-            // send file size to client
-            client.send({ type: "environment", bytes: remaining, hash: q.hash, system: q.system });
-            // read file in chunks and send
-            let idx = 0;
-            let last = undefined;
-            const readNext = () => {
-                if (!remaining) {
-                    data.sending = false;
-                    console.log("Finished sending env", q.file, data.messages.length, key);
-                    if (data.messages.length) {
-                        process.nextTick(socket._next, key);
-                    } else {
-                        delete socket._queue[key];
-                        console.log(`queue for ${key} is empty`);
-                    }
-                    return;
-                }
-                const bytes = Math.min(32768, remaining);
-                const buf = Buffer.allocUnsafe(bytes);
-
-                remaining -= bytes;
-                fs.read(fd, buf, 0, bytes).then(() => {
-                    client.send(buf);
-                    readNext();
-                }).catch(e => {
-                    throw e;
-                });
-            };
-            readNext();
-        }).catch(e => {
-            data.sending = false;
-            console.error("Got error when sending", e.message, e.stack);
-        });
-    }
-};
-
 class Environment {
     constructor(path, hash, system, originalPath) {
         this.path = path;
@@ -108,10 +20,6 @@ class Environment {
 
     get file() {
         return `${this.hash}_${this.system}.tar.gz`;
-    }
-
-    send(client) {
-        socket.enqueue(client, this.hash, this.system, this.path);
     }
 
     canRun(system) {
@@ -378,10 +286,6 @@ const environments = {
             }
         }
         return this.syncCompatibilities();
-    },
-
-    requestEnvironments(slave) {
-        socket.requestEnvironments(slave);
     },
 
     get environments() {

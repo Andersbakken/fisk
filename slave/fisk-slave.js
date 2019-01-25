@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const option = require("@jhanssen/options")("fisk/slave", require('minimist')(process.argv.slice(2)));
+const request = require("request");
 const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
@@ -16,6 +17,8 @@ if (process.getuid() !== 0) {
     console.error("fisk slave needs to run as root to be able to chroot");
     process.exit(1);
 }
+
+let objectCacheEnabled = false;
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
@@ -140,7 +143,6 @@ function loadEnvironments()
     });
 }
 
-let pendingEnvironment;
 let connectInterval;
 client.on("quit", message => {
     console.log(`Server wants us to quit: ${message.code || 0} purge environments: ${message.purgeEnvironments}`);
@@ -168,106 +170,101 @@ client.on("dropEnvironments", message => {
     });
 });
 
+client.on("getEnvironments", message => {
+    console.log(`Getting environments ${message.environments}`);
+    message.environments.forEach(env => {
+        let url = option("scheduler", "localhost:8097");
+        let idx = url.indexOf("://");
+        if (idx != -1)
+            url = url.substr(idx + 3);
+        url = "http://" + url;
+        if (!/:[0-9]+$/.exec(url))
+            url += ":8097";
+        url += "/environment/" + env;
+        console.log("got url", url);
+
+        // request('http://google.com/doodle.png').
+        //     pipe(fs.createWriteStream('doodle.png'))
+        // console.log("getting env", env);
+        const dir = path.join(environmentsRoot, env);
+        try {
+            fs.removeSync(dir);
+        } catch (err) {
+        }
+        if (!fs.mkdirpSync(dir)) {
+            console.error("Can't create environment directory for slave: " + dir);
+            return;
+        }
+
+        function inform()
+        {
+            setTimeout(() => {
+                client.send("environments", { environments: Object.keys(environments) });
+                console.log("Informing scheduler about our environments:", Object.keys(environments));
+            }, option.int("inform-delay", 30000));
+        }
+
+        let file = path.join(dir, "env.tar.gz");
+        let stream = fs.createWriteStream(file);
+        request.get(url)
+            .on('error', err => {
+                console.log("Got error from request", err);
+                stream.close();
+                try {
+                    fs.removeSync(dir);
+                } catch (err) {
+                }
+                if (!fs.mkdirpSync(dir)) {
+                    console.error("Can't create environment directory for slave: " + dir);
+                }
+                return;
+            }).on('end', event => {
+                stream.close();
+                console.log("Got end", env);
+                exec("tar xf '" + file + "'", { cwd: dir }).
+                    then(() => {
+                        console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
+                        return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
+                    }).then(() => {
+                        console.log("Write json file");
+                        return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
+                    }).then(() => {
+                        console.log(`Unlink ${file} ${env}`);
+                        return fs.unlink(file);
+                    }).then(() => {
+                        let vm = new VM(dir, env);
+                        return new Promise((resolve, reject) => {
+                            let done = false;
+                            vm.on('error', err => {
+                                if (!done) {
+                                    reject(err);
+                                }
+                            });
+                            vm.on('ready', () => {
+                                done = true;
+                                resolve(vm);
+                            });
+                        });
+                    }).then(vm => {
+                        environments[env] = vm;
+                        inform();
+                    }).catch((err) => {
+                        console.error("Got failure setting up environment", err);
+                        try {
+                            fs.removeSync(dir);
+                        } catch (rmdirErr) {
+                            console.error("Failed to remove directory", dir, rmdirErr);
+                        }
+                        inform();
+                    });
+            }).pipe(stream);
+
+    });
+});
+
 client.on("requestEnvironments", message => {
     console.log("scheduler wants us to inform of current environments", Object.keys(environments));
     client.send("environments", { environments: Object.keys(environments) });
-});
-
-client.on("environment", message => {
-    if (pendingEnvironment) {
-        throw new Error("We already have a pending environment");
-    }
-    if (!message.hash) {
-        throw new Error("Bad environment without hash");
-    }
-
-    if (message.hash in environments) {
-        throw new Error("We already have this environment: " + message.hash);
-    }
-
-    console.log("Got env", message);
-    const dir = path.join(environmentsRoot, message.hash);
-    try {
-        fs.removeSync(dir);
-    } catch (err) {
-    }
-    if (!fs.mkdirpSync(dir)) {
-        throw new Error("Can't create environment directory for slave: " + dir);
-    }
-
-    let file = path.join(dir, "env.tar.gz");
-    let fd = fs.openSync(file, "w");
-    if (fd == -1)
-        throw new Error("Couldn't open file " + file + " for writing");
-    pendingEnvironment = { hash: message.hash, fd: fd, dir: dir, file: file, done: false };
-    // environment from scheduler
-});
-
-let pendingVMS = 0;
-client.on("data", message => {
-    if (!pendingEnvironment || pendingEnvironment.done)
-        throw new Error("We're not expecting data");
-
-    if (message.last)
-        pendingEnvironment.done = true;
-
-    fs.writeSync(pendingEnvironment.fd, message.data);
-    if (!message.last)
-        return;
-
-    fs.closeSync(pendingEnvironment.fd);
-    pendingEnvironment.fd = undefined;
-
-    var pending = pendingEnvironment;
-    pendingEnvironment = undefined;
-
-    console.log(`untar ${pending.file}`);
-    ++pendingVMS;
-    function inform()
-    {
-        setTimeout(() => {
-            if (!--pendingVMS && !pendingEnvironment) {
-                client.send("environments", { environments: Object.keys(environments) });
-                console.log("Informing scheduler about our environments:", Object.keys(environments), pendingEnvironment);
-            }
-        }, option.int("inform-delay", 30000));
-    }
-    exec("tar xf '" + pending.file + "'", { cwd: pending.dir }).
-        then(() => {
-            console.log("Checking that the environment runs", path.join(pending.dir, "bin", "true"));
-            return exec(`"${path.join(pending.dir, "bin", "true")}"`, { cwd: pending.dir });
-        }).then(() => {
-            console.log("Write json file");
-            return fs.writeFile(path.join(pending.dir, "environment.json"), JSON.stringify({ hash: pending.hash, created: new Date().toString() }));
-        }).then(() => {
-            console.log(`Unlink ${pending.file} ${pending.hash}`);
-            return fs.unlink(pending.file);
-        }).then(() => {
-            let vm = new VM(pending.dir, pending.hash);
-            return new Promise((resolve, reject) => {
-                let done = false;
-                vm.on('error', err => {
-                    if (!done) {
-                        reject(err);
-                    }
-                });
-                vm.on('ready', () => {
-                    done = true;
-                    resolve(vm);
-                });
-            });
-        }).then(vm => {
-            environments[pending.hash] = vm;
-            inform();
-        }).catch((err) => {
-            console.error("Got failure setting up environment", err);
-            try {
-                fs.removeSync(pending.dir);
-            } catch (rmdirErr) {
-                console.error("Failed to remove directory", pending.dir, rmdirErr);
-            }
-            inform();
-        });
 });
 
 client.on("connect", () => {
