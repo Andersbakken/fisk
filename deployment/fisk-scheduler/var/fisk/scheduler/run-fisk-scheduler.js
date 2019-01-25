@@ -113,12 +113,10 @@ function updateFisk()
     return new Promise((resolve, reject) => {
         try {
             fs.mkdirpSync(path.join(root, "/prod"));
-            fs.writeFileSync(path.join(root, "/prod/package.json"), "{}");
         } catch (err) {
         }
         try {
             fs.mkdirpSync(path.join(root, "/stage"));
-            fs.writeFileSync(path.join(root, "/stage/package.json"), "{}");
         } catch (err) {
         }
 
