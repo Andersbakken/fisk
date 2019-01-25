@@ -343,7 +343,7 @@ server.on("listen", app => {
     });
 
     app.get("/objectcache", (req, res, next) => {
-        res.send(JSON.stringify(objectCache ? objectCache.dump(res.query.objects) : {}, null, 4) + "\n");
+        res.send(JSON.stringify(objectCache ? objectCache.dump(res.query ? res.query.objects : false) : {}, null, 4) + "\n");
     });
 
     app.get("/quit-slaves", (req, res, next) => {
