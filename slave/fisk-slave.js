@@ -172,15 +172,25 @@ client.on("dropEnvironments", message => {
 
 client.on("getEnvironments", message => {
     console.log(`Getting environments ${message.environments}`);
-    message.environments.forEach(env => {
-        let url = option("scheduler", "localhost:8097");
-        let idx = url.indexOf("://");
-        if (idx != -1)
-            url = url.substr(idx + 3);
-        url = "http://" + url;
-        if (!/:[0-9]+$/.exec(url))
-            url += ":8097";
-        url += "/environment/" + env;
+    let base = option("scheduler", "localhost:8097");
+    let idx = base.indexOf("://");
+    if (idx != -1)
+        base = base.substr(idx + 3);
+    base = "http://" + base;
+    if (!/:[0-9]+$/.exec(base))
+        base += ":8097";
+    base += "/environment/"
+    function work()
+    {
+        if (!message.environments.length) {
+            setTimeout(() => {
+                client.send("environments", { environments: Object.keys(environments) });
+                console.log("Informing scheduler about our environments:", Object.keys(environments));
+            }, option.int("inform-delay", 30000));
+            return;
+        }
+        let env = message.environments.splice(0, 1)[0];
+        const url = base + env;
         console.log("got url", url);
 
         // request('http://google.com/doodle.png').
@@ -193,15 +203,8 @@ client.on("getEnvironments", message => {
         }
         if (!fs.mkdirpSync(dir)) {
             console.error("Can't create environment directory for slave: " + dir);
+            setTimeout(work, 0);
             return;
-        }
-
-        function inform()
-        {
-            setTimeout(() => {
-                client.send("environments", { environments: Object.keys(environments) });
-                console.log("Informing scheduler about our environments:", Object.keys(environments));
-            }, option.int("inform-delay", 30000));
         }
 
         let file = path.join(dir, "env.tar.gz");
@@ -216,6 +219,7 @@ client.on("getEnvironments", message => {
                 }
                 if (!fs.mkdirpSync(dir)) {
                     console.error("Can't create environment directory for slave: " + dir);
+                    setTimeout(work, 0);
                 }
                 return;
             }).on('end', event => {
@@ -247,7 +251,7 @@ client.on("getEnvironments", message => {
                         });
                     }).then(vm => {
                         environments[env] = vm;
-                        inform();
+                        setTimeout(work, 0);
                     }).catch((err) => {
                         console.error("Got failure setting up environment", err);
                         try {
@@ -255,11 +259,11 @@ client.on("getEnvironments", message => {
                         } catch (rmdirErr) {
                             console.error("Failed to remove directory", dir, rmdirErr);
                         }
-                        inform();
+                        setTimeout(work, 0);
                     });
             }).pipe(stream);
-
-    });
+    }
+    work();
 });
 
 client.on("requestEnvironments", message => {
