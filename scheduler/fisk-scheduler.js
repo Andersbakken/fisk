@@ -371,6 +371,7 @@ server.on("listen", app => {
         rstream.on("error", err => {
             console.error("Got read stream error for", env.path, err);
             res.close();
+            rstream.close();
         });
         rstream.pipe(res);
     });
