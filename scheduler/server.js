@@ -77,11 +77,11 @@ class Server extends EventEmitter {
                 if (error.code == "EADDRINUSE") {
                     console.log(`Port ${port} is in use...`);
                     setTimeout(() => {
-                        this.server.listen(port, this.option.int("backlog", 50));
+                        this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
                     }, 1000);
                 } else {
                     console.error("Got server error", error.toString());
-                    reject(error);
+                    this.emit("error", error);
                 }
             });
             this.server.once("listening", () => {

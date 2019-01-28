@@ -29,6 +29,9 @@ process.on('uncaughtException', err => {
     });
 });
 
+server.on("error", error => {
+    throw new error;
+});
 let schedulerNpmVersion;
 try {
     schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'))).version;
