@@ -3,6 +3,7 @@
 const path = require('path');
 const os = require('os');
 const option = require('@jhanssen/options')('fisk/scheduler', require('minimist')(process.argv.slice(2)));
+const posix = require('posix');
 const Server = require('./server');
 const common = require('../common')(option);
 const Environments = require('./environments');
@@ -1139,6 +1140,13 @@ function simulate(count)
 }
 
 Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environments")))
+    .then(() => {
+        const limit = option.int('max-file-descriptors');
+        if (limit) {
+            console.log("setting limit", limit);
+            posix.setrlimit('nofile', { soft: limit });
+        }
+    })
     .then(purgeEnvironmentsToMaxSize)
     // .then(() => {
     //     return db.get("users");
