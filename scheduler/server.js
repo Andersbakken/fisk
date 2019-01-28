@@ -5,6 +5,7 @@ const http = require("http");
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
+const slowdown = require('express-slow-down');
 
 class Client extends EventEmitter {
     constructor(obj) {
@@ -62,6 +63,13 @@ class Server extends EventEmitter {
         return new Promise((resolve, reject) => {
             this.app = express();
             this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
+            const speedLimiter = slowdown({
+                windowMs: 10000, // 10s
+                delayAfter: 500, // allow 500 requests per 10 seconds
+                delayMs: 500 // begin adding 500ms of delay per request
+            });
+
+            this.app.use(speedLimiter);
             this.emit("listen", this.app);
 
             this.app.all('/*', function(req, res, next) {
