@@ -132,11 +132,13 @@ int main(int argc, char **argv)
         for (sem_t *semaphore : Client::data().semaphores) {
             sem_post(semaphore);
         }
-        fprintf(stderr, "fiskc: Caught signal %d\n", signal);
-        void *buffer[64];
-        const int count = backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));
-        backtrace_symbols_fd(buffer, count, fileno(stderr));
-        fflush(stderr);
+        if (signal != SIGINT) {
+            fprintf(stderr, "fiskc: Caught signal %d\n", signal);
+            void *buffer[64];
+            const int count = backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));
+            backtrace_symbols_fd(buffer, count, fileno(stderr));
+            fflush(stderr);
+        }
         _exit(-signal);
     };
     for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
