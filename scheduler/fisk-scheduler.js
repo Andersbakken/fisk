@@ -351,7 +351,6 @@ server.on("listen", app => {
             return;
         }
 
-        console.log(req.query);
         if (req.query && "clear" in req.query) {
             objectCache.clear();
             res.sendStatus(200);
