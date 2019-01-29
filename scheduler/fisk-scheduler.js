@@ -643,7 +643,29 @@ server.on("compile", compile => {
             let pos = 4 + item.headerSize;
             let fileIdx = 0;
             const work = () => {
+                function finish()
+                {
+                    ++item.cacheHits;
+                    if (monitors.length) {
+                        // console.log("GOT STUFF", job);
+                        let info = {
+                            type: "cacheHit",
+                            client: {
+                                hostname: compile.hostname,
+                                ip: compile.ip,
+                                name: compile.name
+                            },
+                            sourceFile: compile.sourceFile
+                        };
+                        // console.log("send to monitors", info);
+                        monitors.forEach(monitor => monitor.send(info));
+                    }
+                }
                 const file = item.response.index[fileIdx];
+                if (!file) {
+                    finish();
+                    return;
+                }
                 const buffer = Buffer.allocUnsafe(file.bytes);
                 // console.log("reading from", pos);
                 fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
@@ -659,21 +681,7 @@ server.on("compile", compile => {
                         if (++fileIdx < item.response.index.length) {
                             work();
                         } else {
-                            ++item.cacheHits;
-                            if (monitors.length) {
-                                // console.log("GOT STUFF", job);
-                                let info = {
-                                    type: "cacheHit",
-                                    client: {
-                                        hostname: compile.hostname,
-                                        ip: compile.ip,
-                                        name: compile.name
-                                    },
-                                    sourceFile: compile.sourceFile
-                                };
-                                // console.log("send to monitors", info);
-                                monitors.forEach(monitor => monitor.send(info));
-                            }
+                            finish();
                         }
                     }
                 });

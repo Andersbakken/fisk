@@ -157,6 +157,25 @@ class ObjectCache
             });
             delete this.streams[key];
         });
+
+        let finishItem = (item) => {
+            if (item.file) {
+                item.file.end();
+                if (item.file) { // can end emit an error synchronously?
+                    let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
+                    this.cache[item.response.md5] = cacheItem;
+                    this.size += cacheItem.fileSize;
+                    if (this.size > this.maxSize)
+                        this.purge(this.purgeSize);
+                    delete this.pending[item.response.md5];
+                    // console.log("finished a file", item.response.md5);
+                }
+            }
+            stream.pending.splice(0, 1);
+            if (stream.pending.length && !stream.pending[0].remaining)
+                finishItem(stream.pending[0]);
+        };
+
         stream.on("response", response => {
             let redundant = false;
             if (this.state(response.md5) != 'none') {
@@ -189,6 +208,9 @@ class ObjectCache
                 item.jsonLength = json.length;
             }
             stream.pending.push(item);
+            if (stream.pending.length == 1 && !stream.pending[0].remaining)
+                finishItem(stream.pending[0]);
+
         });
 
         stream.on("data", data => {
@@ -200,19 +222,7 @@ class ObjectCache
             item.remaining -= data.length;
             // console.log("Got some bytes here", item.path, data.length, item.remaining, item.redundant ? "redundant" : "");
             if (!item.remaining) {
-                if (item.file) {
-                    item.file.end();
-                    if (item.file) { // can end emit an error synchronously?
-                        let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
-                        this.cache[item.response.md5] = cacheItem;
-                        this.size += cacheItem.fileSize;
-                        if (this.size > this.maxSize)
-                            this.purge(this.purgeSize);
-                        delete this.pending[item.response.md5];
-                        // console.log("finished a file", item.response.md5);
-                    }
-                }
-                stream.pending.splice(0, 1);
+                finishItem(item);
             }
         });
 
