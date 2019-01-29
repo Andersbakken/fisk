@@ -5,7 +5,6 @@ const http = require("http");
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
-const slowdown = require('express-slow-down');
 
 class Client extends EventEmitter {
     constructor(object, ws) {
@@ -77,13 +76,6 @@ class Server extends EventEmitter {
         return new Promise((resolve, reject) => {
             this.app = express();
             this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
-            const speedLimiter = slowdown({
-                windowMs: 10000, // 10s
-                delayAfter: 500, // allow 500 requests per 10 seconds
-                delayMs: 500 // begin adding 500ms of delay per request
-            });
-
-            this.app.use(speedLimiter);
             this.emit("listen", this.app);
 
             this.app.all('/*', function(req, res, next) {
@@ -92,8 +84,25 @@ class Server extends EventEmitter {
             });
 
             this.server = http.createServer(this.app);
+            this.ws = new WebSocket.Server({ noServer: true });
             const port = this.option.int("port", 8097);
-            this.server.listen({port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
+            this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
+
+            this.server.on("upgrade", (req, socket, head) => {
+                this.ws.handleUpgrade(req, socket, head, (ws) => {
+                    this._handleConnection(ws, req);
+                });
+            });
+
+            this.ws.on('headers', (headers, request) => {
+                const url = Url.parse(request.url);
+                headers.push("x-fisk-objectcache: " + (this.option.int("object-cache-size") > 0 ? "true" : "false"));
+                if (url.pathname == "/monitor") {
+                    const nonce = crypto.randomBytes(256).toString("base64");
+                    headers.push(`x-fisk-nonce: ${nonce}`);
+                    request.nonce = nonce;
+                }
+            });
 
             this.server.on("error", error => {
                 if (error.code == "EADDRINUSE") {
@@ -107,18 +116,7 @@ class Server extends EventEmitter {
                 }
             });
             this.server.once("listening", () => {
-                this.ws = new WebSocket.Server({ server: this.server });
                 console.log("listening on", port);
-                this.ws.on('headers', (headers, request) => {
-                    const url = Url.parse(request.url);
-                    headers.push("x-fisk-objectcache: " + (this.option.int("object-cache-size") > 0 ? "true" : "false"));
-                    if (url.pathname == "/monitor") {
-                        const nonce = crypto.randomBytes(256).toString("base64");
-                        headers.push(`x-fisk-nonce: ${nonce}`);
-                        request.nonce = nonce;
-                    }
-                });
-                this.ws.on("connection", this._handleConnection.bind(this));
                 resolve();
             });
         });
