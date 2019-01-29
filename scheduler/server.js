@@ -8,11 +8,16 @@ const crypto = require("crypto");
 const slowdown = require('express-slow-down');
 
 class Client extends EventEmitter {
-    constructor(obj) {
+    constructor(object, ws) {
         super();
-        for (let key in obj)
-            this[key] = obj[key];
         this.created = new Date();
+        this.assign(object);
+    }
+
+    assign(object) {
+        for (let key in object) {
+            this[key] = object[key];
+        }
     }
 
     send(type, msg) {
@@ -35,6 +40,15 @@ class Client extends EventEmitter {
             }
         } catch (err) {
 
+        }
+    }
+
+    error(message) {
+        try {
+            this.ws.send(`{"error": "${msg}"}`);
+            this.ws.close();
+            this.emit("error", msg);
+        } catch (err) {
         }
     }
 
@@ -112,26 +126,242 @@ class Server extends EventEmitter {
 
     get express() { return this.app; }
 
+    _handleCompile(req, client) {
+        // look at headers
+        if (!("x-fisk-environments" in req.headers)) {
+            client.error("No x-fisk-environments header");
+            return;
+        }
+
+        const configVersion = req.headers["x-fisk-config-version"];
+        if (configVersion != this.configVersion) {
+            client.error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
+            return;
+        }
+        const compileEnvironment = req.headers["x-fisk-environments"];
+
+        let data = {
+            environment: compileEnvironment,
+            sourceFile: req.headers["x-fisk-sourcefile"],
+            md5: req.headers["x-fisk-md5"]
+        };
+
+        if (data.md5 && data.md5.length != 32) {
+            client.error(`Bad md5 sum: ${data.md5}`);
+            return;
+        }
+        const npmVersion = req.headers["x-fisk-npm-version"];
+        if (npmVersion)
+            data.npmVersion = npmVersion;
+        const preferredSlave = req.headers["x-fisk-slave"];
+        if (preferredSlave)
+            data.slave = preferredSlave;
+        const clientName = req.headers["x-fisk-client-name"];
+        if (clientName)
+            data.name = clientName;
+        const user = req.headers["x-fisk-user"];
+        if (user)
+            data.user = user;
+        const clientHostname = req.headers["x-fisk-client-hostname"];
+        if (clientHostname)
+            data.hostname = clientHostname;
+        client.assign(data);
+        this.emit("compile", client);
+        let remaining = { bytes: undefined, type: undefined };
+        client.ws.on('close', (status, reason) => client.emit('close', status, reason));
+        client.ws.on('error', err => client.emit('error', err));
+        client.ws.on("close", (code, reason) => {
+            if (remaining.bytes)
+                client.emit("error", "Got close while reading a binary message");
+            if (client)
+                client.emit("close", { code: code, reason: reason });
+            client.ws.removeAllListeners();
+        });
+
+        client.ws.on("message", msg => {
+            switch (typeof msg) {
+            case "string":
+                if (remaining.bytes) {
+                    // bad, client have to send all the data in a binary message before sending JSON
+                    client.error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
+                    return;
+                }
+                // assume JSON
+                let json;
+                try {
+                    json = JSON.parse(msg);
+                } catch (e) {
+                }
+                if (json === undefined) {
+                    client.error("Unable to parse string message as JSON");
+                    return;
+                }
+
+                if (json.type == 'log') {
+                    client.emit("log", json);
+                    return;
+                }
+                if (json.type != "uploadEnvironment") {
+                    client.error("Expected type: \"uploadEnvironment\"");
+                    return;
+                }
+
+                if (!("system" in json)) {
+                    console.log(json);
+                    client.error("Need a systen property");
+                    return;
+                }
+                if (!("hash" in json)) {
+                    console.log(json);
+                    client.error("Need a hash property");
+                    return;
+                }
+                if (!("bytes" in json)) {
+                    console.log(json);
+                    client.error("Need a bytes property");
+                    return;
+                }
+
+                if (!("originalPath" in json)) {
+                    console.log(json);
+                    client.error("Need an originalPath property");
+                    return;
+                }
+
+                remaining.type = "uploadEnvironmentData";
+                remaining.bytes = json.bytes;
+
+                client.emit("uploadEnvironment", json);
+                break;
+            case "object":
+                if (msg instanceof Buffer) {
+                    if (!msg.length) {
+                        // no data?
+                        client.error("No data in buffer");
+                        return;
+                    }
+                    if (!remaining.bytes) {
+                        client.error("Got binary message without a preceeding json message describing the data");
+                        return;
+                    }
+                    if (msg.length > remaining.bytes) {
+                        // woops
+                        client.error(`length ${msg.length} > ${remaining.bytes}`);
+                        return;
+                    }
+                    remaining.bytes -= msg.length;
+                    client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                }
+                break;
+            }
+        });
+    }
+
+    _handleSlave(req, client) {
+        client.ws.on("close", (code, reason) => {
+            if (client)
+                client.emit("close", { code: code, reason: reason });
+            client.ws.removeAllListeners();
+        });
+
+        if (!("x-fisk-port" in req.headers)) {
+            client.error("No x-fisk-port header");
+            return;
+        }
+
+        if (!("x-fisk-environments" in req.headers)) {
+            client.error("No x-fisk-slave-environment header");
+            return;
+        }
+
+        if (!("x-fisk-slots" in req.headers) || !parseInt(req.headers["x-fisk-slots"])) {
+            client.error("No x-fisk-slots header");
+            return;
+        }
+
+        const confVersion = req.headers["x-fisk-config-version"];
+        if (confVersion != this.configVersion) {
+            client.error(`Bad config version, expected ${this.configVersion}, got ${confVersion}`);
+            return;
+        }
+
+        const port = parseInt(req.headers["x-fisk-port"]);
+        const name = req.headers["x-fisk-slave-name"];
+        const hostname = req.headers["x-fisk-slave-hostname"];
+        const system = req.headers["x-fisk-system"];
+        const slots = parseInt(req.headers["x-fisk-slots"]);
+        const npmVersion = req.headers["x-fisk-npm-version"];
+        let environments = {};
+        req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
+            if (env)
+                environments[env] = true;
+        });
+        client.assign({ port: port,
+                        name: name,
+                        slots: slots,
+                        jobsPerformed: 0,
+                        jobsScheduled: 0,
+                        totalCompileSpeed: 0,
+                        totalUploadSpeed: 0,
+                        lastJob: 0,
+                        load: 0,
+                        npmVersion: npmVersion,
+                        hostname: hostname,
+                        environments: environments,
+                        system: system });
+        client.ws.on("message", msg => {
+            // console.log("Got message from slave", typeof msg, msg.length);
+            switch (typeof msg) {
+            case "string":
+                // assume JSON
+                let json;
+                try {
+                    json = JSON.parse(msg);
+                } catch (e) {
+                }
+
+                if (json === undefined) {
+                    client.error("Unable to parse string message as JSON");
+                    return;
+                }
+                // console.log("GOT MESSAGE", json);
+                if ("type" in json) {
+                    client.emit(json.type, json);
+                } else {
+                    console.error("Bad message without type", json);
+                }
+            case "object":
+                if (msg instanceof Buffer) {
+                    client.emit("data", msg);
+                }
+                break;
+            }
+        });
+        // console.log("Got dude", envs);
+        this.emit("slave", client);
+    }
+
+    _handleMonitor(req, client) {
+        client.nonce = req.nonce;
+        // console.log("Got nonce", req.nonce);
+        client.ws.on("message", message => client.emit("message", message));
+        this.emit("monitor", client);
+        client.ws.on('close', (code, reason) => {
+            client.ws.removeAllListeners();
+            client.emit('close', { code: code, reason: reason });
+        });
+
+        client.ws.on('error', err => client.emit('error', err));
+    }
+
     _handleConnection(ws, req) {
         let client = undefined;
         let ip = req.connection.remoteAddress;
         // console.log("_handleConnection", ip);
 
-        const error = msg => {
-            try {
-                ws.send(`{"error": "${msg}"}`);
-                ws.close();
-                if (client) {
-                    client.emit("error", msg);
-                } else {
-                    this.emit("error", { ip: ip, message: msg });
-                }
-            } catch (err) {
-            }
-        };
-
         if (!ip) {
-            error("No ip for some reason");
+            ws.send('{"error": "no ip for some reason"}');
+            ws.close();
             return;
         }
         if (ip.substr(0, 7) == "::ffff:") {
@@ -140,237 +370,17 @@ class Server extends EventEmitter {
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
-        case "/compile": {
-            // look at headers
-            if (!("x-fisk-environments" in req.headers)) {
-                error("No x-fisk-environments header");
-                return;
-            }
-
-            const configVersion = req.headers["x-fisk-config-version"];
-            if (configVersion != this.configVersion) {
-                error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
-                return;
-            }
-            const compileEnvironment = req.headers["x-fisk-environments"];
-
-            let data = {
-                ws: ws,
-                ip: ip,
-                type: Client.Type.Compile,
-                environment: compileEnvironment,
-                sourceFile: req.headers["x-fisk-sourcefile"],
-                md5: req.headers["x-fisk-md5"]
-            };
-
-            if (data.md5 && data.md5.length != 32) {
-                error(`Bad md5 sum: ${data.md5}`);
-                return;
-            }
-            const npmVersion = req.headers["x-fisk-npm-version"];
-            if (npmVersion)
-                data.npmVersion = npmVersion;
-            const preferredSlave = req.headers["x-fisk-slave"];
-            if (preferredSlave)
-                data.slave = preferredSlave;
-            const clientName = req.headers["x-fisk-client-name"];
-            if (clientName)
-                data.name = clientName;
-            const user = req.headers["x-fisk-user"];
-            if (user)
-                data.user = user;
-            const clientHostname = req.headers["x-fisk-client-hostname"];
-            if (clientHostname)
-                data.hostname = clientHostname;
-            client = new Client(data);
-            this.emit("compile", client);
-            let remaining = { bytes: undefined, type: undefined };
-            ws.on('close', (status, reason) => client.emit('close', status, reason));
-            ws.on('error', err => client.emit('error', err));
-            ws.on("close", (code, reason) => {
-                if (remaining.bytes)
-                    client.emit("error", "Got close while reading a binary message");
-                if (client)
-                    client.emit("close", { code: code, reason: reason });
-                ws.removeAllListeners();
-            });
-
-            ws.on("message", msg => {
-                switch (typeof msg) {
-                case "string":
-                    if (remaining.bytes) {
-                        // bad, client have to send all the data in a binary message before sending JSON
-                        error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
-                        return;
-                    }
-                    // assume JSON
-                    let json;
-                    try {
-                        json = JSON.parse(msg);
-                    } catch (e) {
-                    }
-                    if (json === undefined) {
-                        error("Unable to parse string message as JSON");
-                        return;
-                    }
-
-                    if (json.type == 'log') {
-                        client.emit("log", json);
-                        return;
-                    }
-                    if (json.type != "uploadEnvironment") {
-                        error("Expected type: \"uploadEnvironment\"");
-                        return;
-                    }
-
-                    if (!("system" in json)) {
-                        console.log(json);
-                        error("Need a systen property");
-                        return;
-                    }
-                    if (!("hash" in json)) {
-                        console.log(json);
-                        error("Need a hash property");
-                        return;
-                    }
-                    if (!("bytes" in json)) {
-                        console.log(json);
-                        error("Need a bytes property");
-                        return;
-                    }
-
-                    if (!("originalPath" in json)) {
-                        console.log(json);
-                        error("Need an originalPath property");
-                        return;
-                    }
-
-                    remaining.type = "uploadEnvironmentData";
-                    remaining.bytes = json.bytes;
-
-                    client.emit("uploadEnvironment", json);
-                    break;
-                case "object":
-                    if (msg instanceof Buffer) {
-                        if (!msg.length) {
-                            // no data?
-                            error("No data in buffer");
-                            return;
-                        }
-                        if (!remaining.bytes) {
-                            error("Got binary message without a preceeding json message describing the data");
-                            return;
-                        }
-                        if (msg.length > remaining.bytes) {
-                            // woops
-                            error(`length ${msg.length} > ${remaining.bytes}`);
-                            return;
-                        }
-                        remaining.bytes -= msg.length;
-                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
-                    }
-                    break;
-                }
-            });
-            break; }
-        case "/slave": {
-            ws.on("close", (code, reason) => {
-                if (client)
-                    client.emit("close", { code: code, reason: reason });
-                ws.removeAllListeners();
-            });
-
-            if (!("x-fisk-port" in req.headers)) {
-                error("No x-fisk-port header");
-                return;
-            }
-
-            if (!("x-fisk-environments" in req.headers)) {
-                error("No x-fisk-slave-environment header");
-                return;
-            }
-
-            if (!("x-fisk-slots" in req.headers) || !parseInt(req.headers["x-fisk-slots"])) {
-                error("No x-fisk-slots header");
-                return;
-            }
-
-            const confVersion = req.headers["x-fisk-config-version"];
-            if (confVersion != this.configVersion) {
-                error(`Bad config version, expected ${this.configVersion}, got ${confVersion}`);
-                return;
-            }
-
-            const port = parseInt(req.headers["x-fisk-port"]);
-            const name = req.headers["x-fisk-slave-name"];
-            const hostname = req.headers["x-fisk-slave-hostname"];
-            const system = req.headers["x-fisk-system"];
-            const slots = parseInt(req.headers["x-fisk-slots"]);
-            const npmVersion = req.headers["x-fisk-npm-version"];
-            let environments = {};
-            req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
-                if (env)
-                    environments[env] = true;
-            });
-            client = new Client({ ws: ws,
-                                  ip: ip,
-                                  port: port,
-                                  type: Client.Type.Slave,
-                                  name: name,
-                                  slots: slots,
-                                  jobsPerformed: 0,
-                                  jobsScheduled: 0,
-                                  totalCompileSpeed: 0,
-                                  totalUploadSpeed: 0,
-                                  lastJob: 0,
-                                  load: 0,
-                                  npmVersion: npmVersion,
-                                  hostname: hostname,
-                                  environments: environments,
-                                  system: system });
-            ws.on("message", msg => {
-                // console.log("Got message from slave", typeof msg, msg.length);
-                switch (typeof msg) {
-                case "string":
-                    // assume JSON
-                    let json;
-                    try {
-                        json = JSON.parse(msg);
-                    } catch (e) {
-                    }
-
-                    if (json === undefined) {
-                        error("Unable to parse string message as JSON");
-                        return;
-                    }
-                    // console.log("GOT MESSAGE", json);
-                    if ("type" in json) {
-                        client.emit(json.type, json);
-                    } else {
-                        console.error("Bad message without type", json);
-                    }
-                case "object":
-                    if (msg instanceof Buffer) {
-                        client.emit("data", msg);
-                    }
-                    break;
-                }
-            });
-            // console.log("Got dude", envs);
-            this.emit("slave", client);
-            break; }
+        case "/compile":
+            client = new Client({ type: Client.Compile, ws: ws, ip: ip });
+            this._handleCompile(req, client);
+            break;
+        case "/slave":
+            client = new Client({ type: Client.Slave, ws: ws, ip: ip });
+            this._handleSlave(req, client);
+            break;
         case "/monitor":
-            client = new Client({ ws: ws, ip: ip, type: Client.Type.Monitor});
-            client.nonce = req.nonce;
-            // console.log("Got nonce", req.nonce);
-            ws.on("message", message => client.emit("message", message));
-            this.emit("monitor", client);
-            ws.on('close', (code, reason) => {
-                ws.removeAllListeners();
-                client.emit('close', { code: code, reason: reason });
-            });
-
-            ws.on('error', err => client.emit('error', err));
+            client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });
+            this._handleMonitor(req, client);
             break;
         default:
             error(`Invalid pathname ${url.pathname}`);
