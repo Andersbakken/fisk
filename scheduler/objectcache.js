@@ -24,22 +24,39 @@ class PendingItem
         this.response = response;
         this.path = path;
         this.remaining = dataBytes;
+        this.endCB = undefined;
         if (!redundant) {
             this.file = fs.createWriteStream(path);
             this.file.on("drain", () => {
+                // console.log("Got drain", this.buffer.length);
                 let buf = this.buffer;
                 this.buffer = undefined;
                 buf.forEach(b => this.write(b));
+                if (!this.buffer && this.endCB) {
+                    this.file.end();
+                    this.endCB();
+                }
             });
             this.buffer = undefined;
         }
     }
 
     write(data) {
+        // console.log("GOT DATA", this.path, data.length, this.buffer);
         if (this.buffer) {
             this.buffer.push(data);
         } else if (!this.file.write(data)) {
-            this.buffer = [ data ];
+            // console.log("Failed to write", data.length);
+            this.buffer = [];
+        }
+    }
+    end(cb)
+    {
+        if (this.buffer) {
+            this.endCB = cb;
+        } else {
+            this.file.end();
+            cb();
         }
     }
 };
@@ -85,25 +102,30 @@ class ObjectCache
         try {
             fs.readdirSync(this.dir).forEach(fileName => {
                 try {
+                    let fd;
                     if (fileName.length == 32) {
-                        let fd;
                         const headerSizeBuffer = Buffer.allocUnsafe(4);
                         fd = fs.openSync(path.join(dir, fileName), "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
                         const jsonBuffer = Buffer.allocUnsafe(headerSize);
                         fs.readSync(fd, jsonBuffer, 0, headerSize);
-                        fs.closeSync(fd);
                         const response = JSON.parse(jsonBuffer.toString());
                         if (response.md5 != fileName)
                             throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
                         let item = new ObjectCacheItem(response, headerSize);
+                        const stat = fs.fstatSync(fd);
+                        if (item.fileSize != stat.size)
+                            throw new Error(`Got bad size for ${fileName} expected ${item.fileSize} got ${stat.size}`);
+                        fs.closeSync(fd);
                         this.size += item.fileSize;
                         this.cache[fileName] = item;
                     } else {
                         throw new Error("Unexpected file " + fileName);
                     }
                 } catch (err) {
+                    if (fd)
+                        fs.closeSync(fd);
                     console.error("got failure", err);
                     try {
                         fs.unlinkSync(path.join(dir, fileName));
@@ -162,8 +184,8 @@ class ObjectCache
 
         let finishItem = (item) => {
             if (item.file) {
-                item.file.end();
-                if (item.file) { // can end emit an error synchronously?
+                item.end(() => {
+                    // ### what if we get an error before this?
                     let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
                     this.cache[item.response.md5] = cacheItem;
                     this.size += cacheItem.fileSize;
@@ -171,7 +193,7 @@ class ObjectCache
                         this.purge(this.purgeSize);
                     delete this.pending[item.response.md5];
                     // console.log("finished a file", item.response.md5);
-                }
+                });
             }
             stream.pending.splice(0, 1);
             if (stream.pending.length && !stream.pending[0].remaining)
