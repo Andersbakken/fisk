@@ -630,6 +630,7 @@ server.on("compile", compile => {
             const work = () => {
                 function finish()
                 {
+                    fs.closeSync(fd);
                     ++item.cacheHits;
                     if (monitors.length) {
                         // console.log("GOT STUFF", job);
@@ -654,8 +655,8 @@ server.on("compile", compile => {
                 const buffer = Buffer.allocUnsafe(file.bytes);
                 // console.log("reading from", pos);
                 fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
-                    fs.closeSync(fd);
                     if (err || read != file.bytes) {
+                        fs.closeSync(fd);
                         console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
                         objectCache.remove(compile.md5);
                         compile.close();
