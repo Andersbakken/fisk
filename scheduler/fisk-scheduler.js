@@ -14,7 +14,9 @@ const crypto = require('crypto');
 const Database = require('./database');
 const Peak = require('./peak');
 const ObjectCache = require('./objectcache');
+const compareVersions = require('compare-versions');
 
+const clientMinimumVersion = "1.4.1";
 const serverStartTime = Date.now();
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
@@ -40,8 +42,6 @@ try {
     console.log("Couldn't parse package json", err);
     process.exit();
 }
-
-const clientMinimumVersion = [ 1, 4, 1 ];
 
 const slaves = {};
 const monitors = [];
@@ -444,8 +444,8 @@ function addLogFile(log, cb) {
 }
 
 server.on("slave", slave => {
-    if (slave.npmVersion != schedulerNpmVersion) {
-        console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been: ${schedulerNpmVersion}`);
+    if (compareVersions(schedulerNpmVersion, slave.npmVersion) > 1) {
+        console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been at least: ${schedulerNpmVersion}`);
         slave.send({ type: "quit" });
         return;
     }
@@ -599,24 +599,9 @@ server.on("compile", compile => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
 
-    if (compile.npmVersion) {
-        let match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(compile.npmVersion);
-        let ok = false;
-        if (match) {
-            let major = parseInt(match[1]);
-            let minor = parseInt(match[2]);
-            let patch = parseInt(match[3]);
-            if (major > clientMinimumVersion[0]
-                || (major == clientMinimumVersion[0]
-                    && (minor > clientMinimumVersion[1]
-                        || (minor == clientMinimumVersion[1] && patch >= clientMinimumVersion[2])))) {
-                ok = true;
-            }
-        }
-        if (!ok) {
-            compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion[0]}.${clientMinimumVersion[1]}.${clientMinimumVersion[2]}` });
-            return;
-        }
+    if (compareVersions(clientMinimumVersion, compile.npmVersion) > 1) {
+        compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
+        return;
     }
 
     const getFromCache = () => {
