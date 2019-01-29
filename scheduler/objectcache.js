@@ -247,7 +247,7 @@ class ObjectCache
         if (!includeObjects)
             delete ret.cache;
         [ "maxSize", "size", "purgeSize" ].forEach(key => {
-            ret[key] = prettysize(ret[key], true);
+            ret[key] = prettysize(ret[key], ret[key] >= 1024); // don't want 0Bytes
         });
         return ret;
     }
