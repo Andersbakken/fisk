@@ -185,6 +185,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             }
             ret->flags |= HasDashO;
             ret->objectFileIndex = ++i;
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &out = args[i];
+                MD5_Update(&Client::data().md5, out.c_str(), out.size());
+                VERBOSE("Md5'ing arg [%s]", out.c_str());
+            }
+            continue;
         } else if (arg == "-m32") {
             ret->flags |= HasDashM32;
         } else if (arg == "-m64") {
@@ -192,6 +200,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         } else if (arg == "-MF") {
             ret->flags |= HasDashMF;
             ++i;
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &out = args[i];
+                MD5_Update(&Client::data().md5, out.c_str(), out.size());
+                VERBOSE("Md5'ing arg [%s]", out.c_str());
+            }
+            continue;
         } else if (arg == "-MD") {
             ret->flags |= HasDashMD;
         } else if (arg == "-MMD") {
@@ -199,6 +215,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         } else if (arg == "-MT") {
             ret->flags |= HasDashMT;
             ++i;
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &out = args[i];
+                MD5_Update(&Client::data().md5, out.c_str(), out.size());
+                VERBOSE("Md5'ing arg [%s]", out.c_str());
+            }
+            continue;
         } else if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
             DEBUG("%s, running local", arg.c_str());
             *localReason = Local_Preprocess;
@@ -263,6 +287,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 *localReason = Local_ExtraFiles;
                 return nullptr;
             }
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &clang = args[i];
+                MD5_Update(&Client::data().md5, clang.c_str(), clang.size());
+                VERBOSE("Md5'ing arg [%s]", clang.c_str());
+            }
+            continue;
         } else if (arg == "-arch") {
             if (hasArch) {
                 DEBUG("multiple -arch options, building locally");
@@ -271,6 +303,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             }
             hasArch = true;
             ++i;
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &arch = args[i];
+                MD5_Update(&Client::data().md5, arch.c_str(), arch.size());
+                VERBOSE("Md5'ing arg [%s]", arch.c_str());
+            }
+            continue;
         } else if (arg == "-x") {
             ret->flags |= HasDashX;
             if (++i == args.size())
@@ -296,13 +336,39 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     break;
                 }
             }
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &x = args[i];
+                MD5_Update(&Client::data().md5, x.c_str(), x.size());
+                VERBOSE("Md5'ing arg [%s]", x.c_str());
+            }
+            continue;
         } else if (arg == "-include" || arg == "-include-pch") {
             // we may have to handle this differently, gcc apparently falls back
             // to not using the pch file if it can't be found. Icecream code is
             // extremely confusing.
             ++i;
+            if (objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                const std::string &file = args[i];
+                MD5_Update(&Client::data().md5, file.c_str(), file.size());
+                VERBOSE("Md5'ing arg [%s]", file.c_str());
+            }
+            continue;
         } else if (size_t count = hasArg(arg, md5)) {
+            if (md5 && objectCache) {
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("Md5'ing arg [%s]", arg.c_str());
+                for (size_t ii=i + 1; ii<i + count + 1; ++ii) {
+                    const std::string &a = args[ii];
+                    MD5_Update(&Client::data().md5, a.c_str(), a.size());
+                    VERBOSE("Md5'ing arg [%s]", a.c_str());
+                }
+            }
             i += count;
+            continue;
         } else if (!strncmp("-I", arg.c_str(), 2)) {
             md5 = false;
         } else if (arg[0] != '-') {
@@ -355,9 +421,9 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                         { "s", AssemblerWithCpp },
                         { 0, None }
                     };
-                    for (size_t i=0; suffixes[i].suffix; ++i) {
-                        if (!strcmp(ext, suffixes[i].suffix)) {
-                            ret->flags |= suffixes[i].flag;
+                    for (size_t ii=0; suffixes[ii].suffix; ++ii) {
+                        if (!strcmp(ext, suffixes[ii].suffix)) {
+                            ret->flags |= suffixes[ii].flag;
                             break;
                         }
                     }
