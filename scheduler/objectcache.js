@@ -244,9 +244,9 @@ class ObjectCache
         const ret = Object.assign({ cacheHits: this.cacheHits, usage: ((this.size / this.maxSize) * 100).toFixed(1) }, this);
         if (!includeObjects)
             delete ret.cache;
-        for (let key in [ "maxSize", "size", "purgeSize" ]) {
+        [ "maxSize", "size", "purgeSize" ].forEach(key => {
             ret[key] = prettysize(ret[key], true);
-        }
+        });
         return ret;
     }
 
