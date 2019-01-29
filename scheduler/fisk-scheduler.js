@@ -346,7 +346,18 @@ server.on("listen", app => {
     });
 
     app.get("/objectcache", (req, res, next) => {
-        res.send(JSON.stringify(objectCache ? objectCache.dump(res.query ? res.query.objects : false) : {}, null, 4) + "\n");
+        if (!objectCache) {
+            res.sendStatus(404);
+            return;
+        }
+
+        console.log(req.query);
+        if (req.query && req.query.clear) {
+            objectCache.clear();
+            res.sendStatus(200);
+        } else {
+            res.send(JSON.stringify(objectCache.dump(req.query ? req.query.objects : false), null, 4) + "\n");
+        }
     });
 
     app.get("/quit-slaves", (req, res, next) => {

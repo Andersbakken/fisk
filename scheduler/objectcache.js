@@ -131,6 +131,10 @@ class ObjectCache
         return Object.keys(this.cache);
     }
 
+    clear() {
+        this.purge(0);
+    }
+
     createStream(ip, port)
     {
         const key = ip + ":" + port;
