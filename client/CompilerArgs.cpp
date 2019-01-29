@@ -157,77 +157,141 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
     ret->objectFileIndex = -1;
     bool hasDashC = false;
     bool hasArch = false;
+    bool hasProfileDir = false;
+    bool hasProfiling = false;
     if (Log::minLogLevel <= Log::Verbose) {
         for (size_t i=0; i<args.size(); ++i) {
             VERBOSE("%zu/%zu: %s", i+1, args.size(), args[i].c_str());
         }
     }
 
-    for (size_t i=1; i<args.size(); ++i) {
-        bool md5 = true;
+    size_t i;
+
+    auto md5 = [&i, &args, objectCache](size_t count = 1) {
+        if (objectCache) {
+            for (size_t aa = i; aa < i + count; ++aa) {
+                const std::string &arg = args[aa];
+                VERBOSE("Md5'ing arg %zu [%s]", aa, arg.c_str());
+                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+            }
+        }
+    };
+
+    for (i=1; i<args.size(); ++i) {
         const std::string &arg = args[i];
-        if (arg.empty()) {
-        } else if (arg == "-c") {
-            hasDashC = true;
-        } else if (arg == "-S") {
+
+        if (arg == "-S") {
             DEBUG("-S, running local");
             *localReason = Local_DoNotAssemble;
             return nullptr;
-        } else if (arg == "-E") {
+        }
+
+        if (arg == "-E") {
             DEBUG("-E, running local");
             *localReason = Local_Preprocess;
             return nullptr;
-        } else if (arg == "-o") {
+        }
+
+        if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
+            DEBUG("%s, running local", arg.c_str());
+            *localReason = Local_Preprocess;
+            return nullptr;
+        }
+
+        if (arg == "-march=native" || arg == "-mcpu=native" || arg == "-mtune=native") {
+            DEBUG("Local archicture optimizations: %s. Run local", arg.c_str());
+            *localReason = Local_NativeArch;
+            return nullptr;
+        }
+
+        if (arg == "-fexec-charset" || arg == "-fwide-exec-charset" || arg == "-finput-charset") {
+            DEBUG("build environment charset conversions: %s. Run local", arg.c_str());
+            *localReason = Local_Charset;
+            return nullptr;
+        }
+
+        if (!strncmp(arg.c_str(), "-fplugin=", 9) || !strncmp(arg.c_str(), "-fsanitize-blacklist=", 21)) {
+            DEBUG("Extra files: %s. Run local", arg.c_str());
+            *localReason = Local_ExtraFiles;
+            return nullptr;
+        }
+
+        if (arg == "-") {
+            DEBUG("STDIN input, building local");
+            *localReason = Local_StdinInput;
+            return nullptr;
+        }
+
+        if (arg == "-c") {
+            hasDashC = true;
+            md5();
+            continue;
+        }
+
+        if (arg == "-o") {
             if (i + 1 < args.size() && args[i + 1] == "-") {
                 DEBUG("-o - This means different things for different compilers. Run local");
                 *localReason = Local_StdOutOutput;
                 return nullptr;
             }
             ret->flags |= HasDashO;
-            ret->objectFileIndex = ++i;
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &out = args[i];
-                MD5_Update(&Client::data().md5, out.c_str(), out.size());
-                VERBOSE("Md5'ing arg [%s]", out.c_str());
-            }
+            ret->objectFileIndex = i;
+            md5(2);
+            ++i;
             continue;
-        } else if (arg == "-m32") {
+        }
+
+        if (!strncmp(arg.c_str(), "-fprofile-dir=", 14)) {
+            hasProfileDir = true;
+            md5();
+            continue;
+        }
+
+        if (arg == "-ftest-coverage" || arg == "-fprofile-arcs") {
+            hasProfiling = true;
+            md5();
+            continue;
+        }
+
+        if (arg == "-m32") {
             ret->flags |= HasDashM32;
-        } else if (arg == "-m64") {
+            md5();
+            continue;
+        }
+
+        if (arg == "-m64") {
             ret->flags |= HasDashM64;
-        } else if (arg == "-MF") {
+            md5();
+            continue;
+        }
+
+        if (arg == "-MF") {
             ret->flags |= HasDashMF;
+            md5(2);
             ++i;
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &out = args[i];
-                MD5_Update(&Client::data().md5, out.c_str(), out.size());
-                VERBOSE("Md5'ing arg [%s]", out.c_str());
-            }
             continue;
-        } else if (arg == "-MD") {
+        }
+
+        if (arg == "-MD") {
             ret->flags |= HasDashMD;
-        } else if (arg == "-MMD") {
-            ret->flags |= HasDashMMD;
-        } else if (arg == "-MT") {
-            ret->flags |= HasDashMT;
-            ++i;
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &out = args[i];
-                MD5_Update(&Client::data().md5, out.c_str(), out.size());
-                VERBOSE("Md5'ing arg [%s]", out.c_str());
-            }
+            md5();
             continue;
-        } else if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
-            DEBUG("%s, running local", arg.c_str());
-            *localReason = Local_Preprocess;
-            return nullptr;
-        } else if (!strncmp(arg.c_str(), "-Wa,", 4)) {
+        }
+
+        if (arg == "-MMD") {
+            ret->flags |= HasDashMMD;
+            md5();
+            continue;
+        }
+
+        if (arg == "-MT") {
+            ret->flags |= HasDashMT;
+            md5(2);
+            ++i;
+            continue;
+        }
+
+        if (!strncmp(arg.c_str(), "-Wa,", 4)) {
             // stolen from icecc
             const char *pos = arg.c_str() + 4;
 
@@ -269,51 +333,35 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 *localReason = Local_ParseError;
                 return nullptr;
             }
-        } else if (arg == "-march=native" || arg == "-mcpu=native" || arg == "-mtune=native") {
-            DEBUG("Local archicture optimizations: %s. Run local", arg.c_str());
-            *localReason = Local_NativeArch;
-            return nullptr;
-        } else if (arg == "-fexec-charset" || arg == "-fwide-exec-charset" || arg == "-finput-charset") {
-            DEBUG("build environment charset conversions: %s. Run local", arg.c_str());
-            *localReason = Local_Charset;
-            return nullptr;
-        } else if (!strncmp(arg.c_str(), "-fplugin=", 9) || !strncmp(arg.c_str(), "-fsanitize-blacklist=", 21)) {
-            DEBUG("Extra files: %s. Run local", arg.c_str());
-            *localReason = Local_ExtraFiles;
-            return nullptr;
-        } else if (arg == "-Xclang") {
-            if (++i < args.size() && args[i] == "-load") {
+            continue;
+        }
+
+        if (arg == "-Xclang") {
+            if (i + 1 < args.size() && args[i] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
                 *localReason = Local_ExtraFiles;
                 return nullptr;
             }
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &clang = args[i];
-                MD5_Update(&Client::data().md5, clang.c_str(), clang.size());
-                VERBOSE("Md5'ing arg [%s]", clang.c_str());
-            }
+            md5(2);
+            ++i;
             continue;
-        } else if (arg == "-arch") {
+        }
+
+        if (arg == "-arch") {
             if (hasArch) {
                 DEBUG("multiple -arch options, building locally");
                 *localReason = Local_MultiArch;
                 return nullptr;
             }
             hasArch = true;
+            md5(2);
             ++i;
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &arch = args[i];
-                MD5_Update(&Client::data().md5, arch.c_str(), arch.size());
-                VERBOSE("Md5'ing arg [%s]", arch.c_str());
-            }
             continue;
-        } else if (arg == "-x") {
+        }
+
+        if (arg == "-x") {
             ret->flags |= HasDashX;
-            if (++i == args.size())
+            if (i + 1 == args.size())
                 return std::shared_ptr<CompilerArgs>();
             const std::string lang = args.at(i);
             const CompilerArgs::Flag languages[] = {
@@ -336,42 +384,35 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     break;
                 }
             }
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &x = args[i];
-                MD5_Update(&Client::data().md5, x.c_str(), x.size());
-                VERBOSE("Md5'ing arg [%s]", x.c_str());
-            }
+            md5(2);
+            ++i;
             continue;
-        } else if (arg == "-include" || arg == "-include-pch") {
+        }
+
+        if (arg == "-include" || arg == "-include-pch") {
             // we may have to handle this differently, gcc apparently falls back
             // to not using the pch file if it can't be found. Icecream code is
             // extremely confusing.
+            md5(2);
             ++i;
-            if (objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                const std::string &file = args[i];
-                MD5_Update(&Client::data().md5, file.c_str(), file.size());
-                VERBOSE("Md5'ing arg [%s]", file.c_str());
-            }
             continue;
-        } else if (size_t count = hasArg(arg, md5)) {
-            if (md5 && objectCache) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-                for (size_t ii=i + 1; ii<i + count + 1; ++ii) {
-                    const std::string &a = args[ii];
-                    MD5_Update(&Client::data().md5, a.c_str(), a.size());
-                    VERBOSE("Md5'ing arg [%s]", a.c_str());
-                }
+        }
+
+        {
+            bool needMd5 = false;
+            if (size_t count = hasArg(arg, needMd5)) {
+                if (needMd5)
+                    md5(count + 1);
+                i += count;
+                continue;
             }
-            i += count;
+        }
+
+        if (!strncmp("-I", arg.c_str(), 2)) {
             continue;
-        } else if (!strncmp("-I", arg.c_str(), 2)) {
-            md5 = false;
-        } else if (arg[0] != '-') {
+        }
+
+        if (arg[0] != '-') {
             if (ret->sourceFileIndex != std::numeric_limits<size_t>::max()) {
                 if (!hasDashC) {
                     while (i < args.size()) {
@@ -429,22 +470,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     }
                 }
             }
-            md5 = false;
-        } else if (arg == "-") {
-            DEBUG("STDIN input, building local");
-            *localReason = Local_StdinInput;
-            return nullptr;
         }
 
-        if (objectCache) {
-            if (md5) {
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
-                VERBOSE("Md5'ing arg [%s]", arg.c_str());
-            } else {
-                VERBOSE("Not md5'ing arg [%s]", arg.c_str());
-            }
-        }
+        VERBOSE("Unhandled arg %s", arg.c_str());
+        md5();
     }
+
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
         DEBUG("No src file, building local");
         *localReason = Local_NoSources;
@@ -471,9 +502,24 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-o", 2);
             MD5_Update(&Client::data().md5, out.c_str(), out.size());
+            VERBOSE("Md5'ing arg [-o]");
+            VERBOSE("Md5'ing arg [%s]", out.c_str());
         }
         ret->commandLine.push_back(std::move(out));
         ret->flags |= HasDashO;
+    }
+
+    if (hasProfiling && !hasProfileDir) {
+        std::string dir;
+        Client::parsePath(ret->output(), 0, &dir);
+        if (objectCache) {
+            MD5_Update(&Client::data().md5, "-fprofile-dir", 13);
+            MD5_Update(&Client::data().md5, dir.c_str(), dir.size());
+            VERBOSE("Md5'ing arg [-fprofile-dir]");
+            VERBOSE("Md5'ing arg [%s]", dir.c_str());
+        }
+        ret->commandLine.push_back("-fprofile-dir");
+        ret->commandLine.push_back(std::move(dir));
     }
 
     if (ret->flags & (HasDashMMD|HasDashMD) && !(ret->flags & HasDashMF)) {
@@ -483,9 +529,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-MF", 2);
             MD5_Update(&Client::data().md5, dfile.c_str(), dfile.size());
+            VERBOSE("Md5'ing arg [-MF]");
+            VERBOSE("Md5'ing arg [%s]", dfile.c_str());
         }
         ret->commandLine.push_back(std::move(dfile));
     }
+
     *localReason = Remote;
     return ret;
 }
