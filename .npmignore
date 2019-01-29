@@ -20,6 +20,7 @@ bin/fiskc
 bin/g++
 bin/gcc
 build.ninja
+deployment/*
 client/*
 client/CMakeFiles/*
 client/cmake_install.cmake
