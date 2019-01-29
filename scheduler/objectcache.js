@@ -100,6 +100,8 @@ class ObjectCache
                         let item = new ObjectCacheItem(response, headerSize);
                         this.size += item.fileSize;
                         this.cache[fileName] = item;
+                    } else {
+                        throw new Error("Unexpected file " + fileName);
                     }
                 } catch (err) {
                     console.error("got failure", err);
