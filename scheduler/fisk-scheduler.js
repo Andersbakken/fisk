@@ -356,7 +356,7 @@ server.on("listen", app => {
             objectCache.clear();
             res.sendStatus(200);
         } else {
-            res.send(JSON.stringify(objectCache.dump(req.query ? req.query.objects : false), null, 4) + "\n");
+            res.send(JSON.stringify(objectCache.dump(req.query ? "objects" in req.query : false), null, 4) + "\n");
         }
     });
 
@@ -654,9 +654,9 @@ server.on("compile", compile => {
                 const buffer = Buffer.allocUnsafe(file.bytes);
                 // console.log("reading from", pos);
                 fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
+                    fs.closeSync(fd);
                     if (err || read != file.bytes) {
                         console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
-                        fs.closeSync(fd);
                         objectCache.remove(compile.md5);
                         compile.close();
                     } else {
