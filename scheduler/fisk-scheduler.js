@@ -24,7 +24,7 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 process.on('uncaughtException', err => {
-    console.error(`Uncaught exception: ${err}`);
+    console.error("Uncaught exception", err);
     addLogFile({ source: "no source file", ip: "self", contents: err.toString() }, () => {
         process.exit();
     });
