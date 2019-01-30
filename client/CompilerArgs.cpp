@@ -513,13 +513,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         std::string dir;
         Client::parsePath(ret->output(), 0, &dir);
         if (objectCache) {
-            MD5_Update(&Client::data().md5, "-fprofile-dir", 13);
+            MD5_Update(&Client::data().md5, "-fprofile-dir=", 14);
             MD5_Update(&Client::data().md5, dir.c_str(), dir.size());
-            VERBOSE("Md5'ing arg [-fprofile-dir]");
-            VERBOSE("Md5'ing arg [%s]", dir.c_str());
+            VERBOSE("Md5'ing arg [-fprofile-dir=%s]", dir.c_str());
         }
-        ret->commandLine.push_back("-fprofile-dir");
-        ret->commandLine.push_back(std::move(dir));
+        ret->commandLine.push_back("-fprofile-dir=" + dir);
     }
 
     if (ret->flags & (HasDashMMD|HasDashMD) && !(ret->flags & HasDashMF)) {
