@@ -199,7 +199,7 @@ function findSlave(ip, port) {
 function purgeEnvironmentsToMaxSize()
 {
     return new Promise((resolve, reject) => {
-        let maxSize = bytes.parse(option("max-cache-size"));
+        let maxSize = bytes.parse(option("max-environment-size"));
         if (!maxSize) {
             resolve(false);
             return;
@@ -285,8 +285,8 @@ function syncEnvironments(slave)
 function environmentsInfo()
 {
     let ret = Object.assign({}, Environments.environments);
-    ret.maxSize = option("max-cache-size") || 0;
-    ret.maxSizeBytes = bytes.parse(option("max-cache-size")) || 0;
+    ret.maxSize = option("max-environment-size") || 0;
+    ret.maxSizeBytes = bytes.parse(option("max-environment-size")) || 0;
     ret.usedSizeBytes = 0;
     for (let hash in Environments.environments) {
         let env = Environments.environments[hash];
@@ -606,7 +606,7 @@ server.on("compile", compile => {
     const getFromCache = () => {
         // if (objectCache)
         //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
-        if (!objectCache || objectCache.state(compile.md5) != "exists") 
+        if (!objectCache || objectCache.state(compile.md5) != "exists")
             return false;
         const file = path.join(objectCache.dir, compile.md5);
         if (!fs.existsSync(file)) {
