@@ -38,8 +38,6 @@ int Watchdog::timeout()
 {
     if (mState != Running)
         return -1;
-    fprintf(stderr, "WTF? %d\n", (int)Config::watchdog);
-    abort();
     const unsigned long long now = Client::mono();
     mTimeoutTime = mTransitionTime;
     switch (mStage) {
