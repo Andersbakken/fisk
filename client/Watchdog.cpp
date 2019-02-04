@@ -76,7 +76,6 @@ int Watchdog::timeout()
 void Watchdog::onTimeout()
 {
     if (mState == Running && Client::mono() >= mTimeoutTime) {
-        fprintf(stderr, "WTF 2? %d %d\n", mState, (int)Config::watchdog);
         ERROR("%d %d Watchdog timed out waiting for %s", mState, (int)Config::watchdog, stageName(static_cast<Stage>(stages[mState + 1])));
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
     }
