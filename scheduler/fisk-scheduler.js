@@ -90,6 +90,7 @@ function statsMessage()
     info.jobs = jobs;
     info.jobsFailed = jobsFailed;
     info.jobsScheduled = jobsScheduled;
+    info.jobsStarted = jobsStarted;
     info.cacheHits = objectCache ? objectCache.cacheHits : 0;
     return info;
 }
