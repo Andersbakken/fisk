@@ -209,6 +209,10 @@ class ObjectCache
             let remaining = 0;
             response.index.forEach(file => { remaining += file.bytes; });
             let absolutePath = path.join(this.dir, response.md5);
+            try {
+                fs.mkdirpSync(this.dir);
+            } catch (err) {
+            }
             const item = new PendingItem(response, absolutePath, redundant, remaining);
             if (!redundant) {
                 item.file.on("error", error => {
