@@ -51,6 +51,7 @@ let slaveCount = 0;
 let activeJobs = 0;
 let capacity = 0;
 let jobsFailed = 0;
+let jobsStarted = 0;
 let jobsScheduled = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
@@ -144,6 +145,7 @@ function jobFinished(slave, job)
             compileDuration: job.compileDuration,
             uploadDuration: job.uploadDuration,
             jobs: jobs,
+            jobsStarted: jobsStarted,
             jobsFailed: jobsFailed,
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.cacheHits : 0
@@ -368,6 +370,7 @@ server.on("listen", app => {
             activeJobs: activeJobs,
             peaks: peakData(),
             jobsFailed: percentage(jobsFailed),
+            jobsStarted: jobsStarted,
             jobs: jobs,
             jobsScheduled: percentage(jobsScheduled),
             cacheHits: percentage(objectCache ? objectCache.cacheHits : 0),
@@ -522,7 +525,10 @@ server.on("slave", slave => {
         // console.log(message);
     });
 
-    slave.on("jobStarted", job => jobStartedOrScheduled("jobStarted", job));
+    slave.on("jobStarted", job => {
+        ++jobsStarted;
+        jobStartedOrScheduled("jobStarted", job);
+    });
     slave.on("jobFinished", job => jobFinished(slave, job));
 
     slave.on("jobAborted", job => {
@@ -677,6 +683,7 @@ server.on("compile", compile => {
                             sourceFile: compile.sourceFile,
                             jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
                             jobsFailed: jobsFailed,
+                            jobsStarted: jobsStarted,
                             jobsScheduled: jobsScheduled,
                             cacheHits: objectCache ? objectCache.cacheHits : 0
                         };
