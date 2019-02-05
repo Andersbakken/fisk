@@ -332,8 +332,8 @@ export class PieChartComponent {
                 console.error("no client job for job", job);
                 return false;
             }
-            if (job.client.name.indexOf(":") == -1) {
-                job.client.name = "dev:" + job.client.name;
+            if (job.client.name === job.client.hostname) {
+                job.client.name = "dev:" + job.client.user + "@" + job.client.hostname;
             }
             this.clientJobs.push({ client: job.client, jobs: init });
 
