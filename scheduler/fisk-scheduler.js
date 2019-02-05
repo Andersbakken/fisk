@@ -673,12 +673,12 @@ server.on("compile", compile => {
                                 hostname: compile.hostname,
                                 ip: compile.ip,
                                 name: compile.name,
-                                jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
-                                jobsFailed: jobsFailed,
-                                jobsScheduled: jobsScheduled,
-                                cacheHits: objectCache ? objectCache.cacheHits : 0
                             },
-                            sourceFile: compile.sourceFile
+                            sourceFile: compile.sourceFile,
+                            jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
+                            jobsFailed: jobsFailed,
+                            jobsScheduled: jobsScheduled,
+                            cacheHits: objectCache ? objectCache.cacheHits : 0
                         };
                         // console.log("send to monitors", info);
                         monitors.forEach(monitor => monitor.send(info));
