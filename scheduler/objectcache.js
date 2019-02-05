@@ -101,8 +101,8 @@ class ObjectCache
         // console.log(fs.readdirSync(this.dir, { withFileTypes: true }));
         try {
             fs.readdirSync(this.dir).forEach(fileName => {
+                let fd;
                 try {
-                    let fd;
                     if (fileName.length == 32) {
                         const headerSizeBuffer = Buffer.allocUnsafe(4);
                         fd = fs.openSync(path.join(dir, fileName), "r");
