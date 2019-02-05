@@ -186,10 +186,20 @@ class ObjectCache
                 item.end(() => {
                     // ### what if we get an error before this?
                     let cacheItem = new ObjectCacheItem(item.response, item.jsonLength);
-                    this.cache[item.response.md5] = cacheItem;
-                    this.size += cacheItem.fileSize;
-                    if (this.size > this.maxSize)
-                        this.purge(this.purgeSize);
+                    let stat;
+                    try {
+                        stat = fs.statSync(path.join(this.dir, item.response.md5));
+                        // console.log("stat is", stat.size, "for", path.join(this.dir, item.response.md5));
+                        if (cacheItem.fileSize != stat.size) {
+                            throw new Error(`Wrong file size for ${path.join(this.dir, item.response.md5)}, should have been ${cacheItem.fileSize} but ended up being ${stat.size}`);
+                        }
+                        this.cache[item.response.md5] = cacheItem;
+                        this.size += cacheItem.fileSize;
+                        if (this.size > this.maxSize)
+                            this.purge(this.purgeSize);
+                    } catch (err) {
+                        console.error("Something wrong", err);
+                    }
                     delete this.pending[item.response.md5];
                     // console.log("finished a file", item.response.md5);
                 });
