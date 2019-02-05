@@ -81,6 +81,18 @@ function peakData()
     return ret;
 }
 
+function statsMessage()
+{
+    let info = peakData();
+    info.type = "stats";
+    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
+    info.jobs = jobs;
+    info.jobsFailed = jobsFailed;
+    info.jobsScheduled = jobsScheduled;
+    info.cacheHits = objectCache ? objectCache.cacheHits : 0;
+    return info;
+}
+
 const pendingUsers = {};
 
 function nextJobId()
@@ -793,8 +805,7 @@ server.on("compile", compile => {
                 peakInfo = true;
         });
         if (peakInfo && monitors.length) {
-            let info = peakData();
-            info.type = "stats";
+            let info = statsMessage();
             monitors.forEach(monitor => monitor.send(info));
         }
         let sendTime = Date.now();
@@ -881,13 +892,7 @@ server.on("monitor", client => {
     forEachSlave(slave => {
         client.send(slaveToMonitorInfo(slave, "slaveAdded"));
     });
-    let info = peakData();
-    info.type = "stats";
-    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
-    info.jobs = jobs;
-    info.jobsFailed = jobsFailed;
-    info.jobsScheduled = jobsScheduled;
-    info.cacheHits = objectCache ? objectCache.cacheHits : 0;
+    let info = statsMessage();
 
     client.send(info);
     let user;
