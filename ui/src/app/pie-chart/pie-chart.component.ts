@@ -174,31 +174,6 @@ export class PieChartComponent {
                     return;
                 }
 
-                ctx.fillStyle = "#fff";
-                ctx.fillRect(5, this.view.height - statsHeight - 5, this.view.width - 10, statsHeight);
-                let statsTotal = 0;
-                if (this.stats) {
-                    statsTotal = this.stats.cacheHits + this.stats.jobsFailed + this.stats.jobsStarted;
-                }
-                if (statsTotal > 0) {
-                    let pos = 5;
-                    let tpos = 5;
-                    ctx.fillStyle = "#3d3";
-                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.cacheHits / statsTotal), statsHeight);
-                    pos += (this.view.width - 10) * (this.stats.cacheHits / statsTotal);
-                    ctx.fillText(this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText(this.stats.cacheHits).width + 10;
-                    ctx.fillStyle = "#33d";
-                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsStarted / statsTotal), statsHeight);
-                    pos += (this.view.width - 10) * (this.stats.jobsStarted / statsTotal);
-                    ctx.fillText(this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText(this.stats.jobsStarted).width + 10;
-                    ctx.fillStyle = "#d33";
-                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsFailed / statsTotal), statsHeight);
-                    ctx.fillText(this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
-                }
-
-
                 this.clientJobs.forEach(c => {
                     //console.log("puck", this.maxJobs, c);
                     c.start = cur;
@@ -271,6 +246,30 @@ export class PieChartComponent {
                     cur += Math.PI * 2 * (c.animatedJobs / maxJobs);
                     legendY += 30;
                 });
+
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(0, this.view.height - statsHeight - 10, this.view.width, statsHeight + 10);
+                let statsTotal = 0;
+                if (this.stats) {
+                    statsTotal = this.stats.cacheHits + this.stats.jobsFailed + this.stats.jobsStarted;
+                }
+                if (statsTotal > 0) {
+                    let pos = 5;
+                    let tpos = 5;
+                    ctx.fillStyle = "#3d3";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.cacheHits / statsTotal), statsHeight);
+                    pos += (this.view.width - 10) * (this.stats.cacheHits / statsTotal);
+                    ctx.fillText(this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(this.stats.cacheHits).width + 10;
+                    ctx.fillStyle = "#33d";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsStarted / statsTotal), statsHeight);
+                    pos += (this.view.width - 10) * (this.stats.jobsStarted / statsTotal);
+                    ctx.fillText(this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(this.stats.jobsStarted).width + 10;
+                    ctx.fillStyle = "#d33";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsFailed / statsTotal), statsHeight);
+                    ctx.fillText(this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
+                }
 
                 window.requestAnimationFrame(animate);
             };
