@@ -20,4 +20,7 @@
   <div>
     <mat-checkbox matInput [ngModel]="pieBuilding" (ngModelChange)="updateBool('pieBuilding', $event)">Represent 100% of pie chart as currently building jobs</mat-checkbox>
   </div>
+  <div>
+    <mat-checkbox matInput [ngModel]="noAnimate" (ngModelChange)="updateBool('noAnimate', $event)">Don't animate the pie chart</mat-checkbox>
+  </div>
 </div>

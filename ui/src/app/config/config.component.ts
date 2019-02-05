@@ -15,6 +15,7 @@ export class ConfigComponent {
     bgcolor: string;
     client: string;
     pieBuilding: boolean;
+    noAnimate: boolean;
     minHeight: string = "";
     inited: boolean = false;
 
@@ -26,6 +27,7 @@ export class ConfigComponent {
         this.fgcolor = config.get("fgcolor", "#ffffff");
         this.bgcolor = config.get("bgcolor", "#ff0000");
         this.pieBuilding = config.get("pieBuilding", false);
+        this.noAnimate = config.get("noAnimate", false);
 
         this.config.onChange((key: string) => {
             switch (key) {
@@ -49,6 +51,9 @@ export class ConfigComponent {
                 break;
             case "pieBuilding":
                 this.pieBuilding = config.get("pieBuilding");
+                break;
+            case "noAnimate":
+                this.noAnimate = config.get("noAnimate");
                 break;
             }
         });
@@ -114,6 +119,7 @@ export class ConfigComponent {
             val = false;
         switch (key) {
         case "pieBuilding":
+        case "noAnimate":
             ok = true;
             this[key] = val;
             break;

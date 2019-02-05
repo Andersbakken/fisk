@@ -21,6 +21,7 @@ export class PieChartComponent {
     jobs = new Map();
     clientJobs = [];
     pieBuilding: boolean;
+    noAnimate: boolean;
     inited: boolean = false;
 
     constructor(private fisk: FiskService, private config: ConfigService,
@@ -71,8 +72,9 @@ export class PieChartComponent {
                 this.clientJobs.forEach(c => {
                     delete c.color;
                 });
-            } else if (key == "pieBuilding") {
-                this.pieBuilding = this.config.get("pieBuilding");
+            } else if (key == "pieBuilding"
+                       || key == "noAnimate") {
+                this[key] = this.config.get(key);
             }
         });
 
@@ -100,7 +102,7 @@ export class PieChartComponent {
 
             const animateItem = (item, prop, animatedProp, steps) => {
                 const d = item[prop];
-                if (!(animatedProp in item)) {
+                if (this.noAnimate || !(animatedProp in item)) {
                     item[animatedProp] = d;
                     return;
                 }
@@ -117,6 +119,7 @@ export class PieChartComponent {
 
             this.clientColor = { name: this.config.get("client"), fgcolor: this.config.get("fgcolor"), bgcolor: this.config.get("bgcolor") };
             this.pieBuilding = this.config.get("pieBuilding");
+            this.noAnimate = this.config.get("noAnimate");
 
             const frameMs = (1 / 60) * 1000;
             let last = 0;
@@ -366,7 +369,7 @@ export class PieChartComponent {
         let idx = this._clientJobIndex(client);
         if (idx == -1) {
             if (inc < 0 || cacheinc < 0) {
-                console.error("no client job for job", job);
+                console.error("no client job for job client", client);
                 return false;
             }
             if (client.name === client.hostname) {
