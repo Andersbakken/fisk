@@ -124,12 +124,17 @@ function jobFinished(slave, job)
     slave.totalUploadSpeed += job.uploadSpeed;
     // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
     if (monitors.length) {
+        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
         const info = {
             type: "jobFinished",
             id: job.id,
             cppSize: job.cppSize,
             compileDuration: job.compileDuration,
-            uploadDuration: job.uploadDuration
+            uploadDuration: job.uploadDuration,
+            jobs: jobs,
+            jobsFailed: jobsFailed,
+            jobsScheduled: jobsScheduled,
+            cacheHits: objectCache ? objectCache.cacheHits : 0
         };
         // console.log("send to monitors", info);
         monitors.forEach(monitor => monitor.send(info));
@@ -874,6 +879,12 @@ server.on("monitor", client => {
     });
     let info = peakData();
     info.type = "stats";
+    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
+    info.jobs = jobs;
+    info.jobsFailed = jobsFailed;
+    info.jobsScheduled = jobsScheduled;
+    info.cacheHits = objectCache ? objectCache.cacheHits : 0;
+
     client.send(info);
     let user;
     client.on("message", messageText => {
