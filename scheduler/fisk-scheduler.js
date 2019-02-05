@@ -20,14 +20,14 @@ const clientMinimumVersion = "1.4.1";
 const serverStartTime = Date.now();
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
-    addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}` }, () => {
+    addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}\n` }, () => {
         process.exit();
     });
 });
 
 process.on('uncaughtException', err => {
     console.error("Uncaught exception", err);
-    addLogFile({ source: "no source file", ip: "self", contents: err.toString() }, () => {
+    addLogFile({ source: "no source file", ip: "self", contents: err.toString() + err.stack + "\n" }, () => {
         process.exit();
     });
 });
