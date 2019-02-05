@@ -106,14 +106,14 @@ class ObjectCache
                         let stat = fs.statSync(ret.path);
                         if (stat.isFile()) {
                             ret.size = stat.size;
-                            ret.mtime = stat.mtimeMs;
+                            ret.atime = stat.atimeMs;
                         }
                     } catch (err) {
                         console.error("Got error stating", ret.path, err);
                     }
                 }
                 return ret;
-            }).sort((a, b) => a.mtime - b.mtime).forEach(file => {
+            }).sort((a, b) => a.atime - b.atime).forEach(file => {
                 // console.log("got file", file);
                 let fd;
                 try {
@@ -331,7 +331,12 @@ class ObjectCache
 
     get(md5)
     {
-        return this.cache[md5];
+        let ret = this.cache[md5];
+        if (ret) {
+            delete this.cache[md5];
+            this.cache[md5] = ret;
+        }
+        return ret;
     }
 };
 
