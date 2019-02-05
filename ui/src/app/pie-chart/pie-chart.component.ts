@@ -374,8 +374,8 @@ export class PieChartComponent {
             }
             if (client.name === client.hostname) {
                 client.modifiedName = "dev:" + (client.user || "nobody") + "@" + client.hostname;
-            } else if (client.name.length > 0 && client.name[0] === ':') {
-                client.modifiedName = "dev:" + (client.user || "nobody") + "@" + client.name.substr(1);
+            } else if (client.name.length > 0 && client.name[0] === '-') {
+                client.modifiedName = "dev:" + (client.user || "nobody") + client.name;
             } else {
                 client.modifiedName = client.name;
             }
