@@ -358,7 +358,7 @@ server.on("listen", app => {
             objectCache.clear();
             res.sendStatus(200);
         } else {
-            res.send(JSON.stringify(objectCache.dump(req.query ? "objects" in req.query : false), null, 4) + "\n");
+            res.send(JSON.stringify(objectCache.dump(req.query || {}), null, 4) + "\n");
         }
     });
 

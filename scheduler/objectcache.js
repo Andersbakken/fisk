@@ -266,11 +266,16 @@ class ObjectCache
         return ret;
     }
 
-    dump(includeObjects)
+    dump(query)
     {
         const ret = Object.assign({ cacheHits: this.cacheHits, usage: ((this.size / this.maxSize) * 100).toFixed(1) }, this);
-        if (!includeObjects)
+        ret.count = Object.keys(ret.cache).length;
+        if (!("objects" in query))
             delete ret.cache;
+        if (!("streams" in query))
+            delete ret.streams;
+        if (!("pending" in query))
+            delete ret.pending;
         [ "maxSize", "size", "purgeSize" ].forEach(key => {
             ret[key] = prettysize(ret[key], ret[key] >= 1024); // don't want 0Bytes
         });
