@@ -341,7 +341,7 @@ server.on("listen", app => {
 
     app.get("/info", (req, res, next) => {
         const now = Date.now();
-        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);;;;
+        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
         function percentage(count)
         {
             return { count: count, percentage: (count ? count * 100 / jobs : 0).toFixed(1) + "%" };
@@ -660,7 +660,11 @@ server.on("compile", compile => {
                             client: {
                                 hostname: compile.hostname,
                                 ip: compile.ip,
-                                name: compile.name
+                                name: compile.name,
+                                jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobScheduled,
+                                jobsFailed: jobsFailed,
+                                jobsScheduled: jobsScheduled,
+                                cacheHits: objectCache ? objectCache.cacheHits : 0
                             },
                             sourceFile: compile.sourceFile
                         };
