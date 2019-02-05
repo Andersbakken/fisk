@@ -99,35 +99,49 @@ class ObjectCache
         this.size = 0;
         // console.log(fs.readdirSync(this.dir, { withFileTypes: true }));
         try {
-            fs.readdirSync(this.dir).forEach(fileName => {
+            fs.readdirSync(this.dir).map(fileName => {
+                let ret = { fileName: fileName, path: path.join(this.dir, fileName) };
+                if (fileName.length == 32) {
+                    try {
+                        let stat = fs.statSync(ret.path);
+                        if (stat.isFile()) {
+                            ret.size = stat.size;
+                            ret.mtime = stat.mtimeMs;
+                        }
+                    } catch (err) {
+                        console.error("Got error stating", ret.path, err);
+                    }
+                }
+                return ret;
+            }).sort((a, b) => a.mtime - b.mtime).forEach(file => {
+                // console.log("got file", file);
                 let fd;
                 try {
-                    if (fileName.length == 32) {
+                    if (file.fileName.length == 32) {
                         const headerSizeBuffer = Buffer.allocUnsafe(4);
-                        fd = fs.openSync(path.join(dir, fileName), "r");
+                        fd = fs.openSync(file.path, "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
                         const jsonBuffer = Buffer.allocUnsafe(headerSize);
                         fs.readSync(fd, jsonBuffer, 0, headerSize);
                         const response = JSON.parse(jsonBuffer.toString());
-                        if (response.md5 != fileName)
-                            throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
+                        if (response.md5 != file.fileName)
+                            throw new Error(`Got bad filename: ${file.fileName} vs ${response.md5}`);
                         let item = new ObjectCacheItem(response, headerSize);
-                        const stat = fs.fstatSync(fd);
-                        if (item.fileSize != stat.size)
-                            throw new Error(`Got bad size for ${fileName} expected ${item.fileSize} got ${stat.size}`);
+                        if (item.fileSize != file.size)
+                            throw new Error(`Got bad size for ${fileName} expected ${item.fileSize} got ${file.size}`);
                         fs.closeSync(fd);
                         this.size += item.fileSize;
-                        this.cache[fileName] = item;
+                        this.cache[file.fileName] = item;
                     } else {
-                        throw new Error("Unexpected file " + fileName);
+                        throw new Error("Unexpected file " + file.fileName);
                     }
                 } catch (err) {
                     if (fd)
                         fs.closeSync(fd);
                     console.error("got failure", err);
                     try {
-                        fs.unlinkSync(path.join(dir, fileName));
+                        fs.removeSync(file.path);
                     } catch (doubleError) {
                         console.error("Can't even delete this one", doubleError);
                     }
