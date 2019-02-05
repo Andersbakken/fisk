@@ -680,6 +680,7 @@ server.on("compile", compile => {
                                 hostname: compile.hostname,
                                 ip: compile.ip,
                                 name: compile.name,
+                                user: compile.user
                             },
                             sourceFile: compile.sourceFile,
                             jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
