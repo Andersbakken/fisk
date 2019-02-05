@@ -14,6 +14,7 @@ export class PieChartComponent {
     view: any = { width: 0, height: 0 };
     ctx: any;
     clientColor: any;
+    stats: any;
     maxJobs: number = 0;
     maxJobsData: any = {};
     currentJobs: number = 0;
@@ -37,8 +38,15 @@ export class PieChartComponent {
                 this._jobStarted(data);
                 break;
             case "jobFinished":
+                this._updateStats(data);
+                // fall through
             case "jobAborted":
                 this._jobFinished(data);
+                break;
+            case "cacheHit":
+                this._cacheHit(data);
+            case "stats":
+                this._updateStats(data);
                 break;
             }
         });
@@ -115,15 +123,14 @@ export class PieChartComponent {
             const animate = ts => {
                 const legendSpace = this.config.get("chart-legend-space", 400);
                 const legendX = this.view.width - legendSpace + 10;
+                const statsHeight = 30;
 
-                const max = Math.min(this.view.width - legendSpace, this.view.height) - 20;
+                const pieMax = Math.min(this.view.width - legendSpace, this.view.height - statsHeight - 10) - 20;
 
                 const steps = (ts - last) / frameMs;
                 last = ts;
 
-                const rad = deg => {
-                    return deg / (180 / Math.PI);
-                };
+                const rad = deg => deg / (180 / Math.PI);
 
                 const ctx = this.ctx;
 
@@ -133,8 +140,8 @@ export class PieChartComponent {
                 ctx.fill();
 
                 const paddingSpace = 10;
-                const xy = max/2 + paddingSpace;
-                const radius = max/2 - (paddingSpace*2);
+                const xy = pieMax/2 + paddingSpace;
+                const radius = pieMax/2 - (paddingSpace*2);
 
                 ctx.fillStyle = "#ddd";
                 ctx.beginPath();
@@ -164,6 +171,31 @@ export class PieChartComponent {
                     return;
                 }
 
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(5, this.view.height - statsHeight - 5, this.view.width - 10, statsHeight);
+                let statsTotal = 0;
+                if (this.stats) {
+                    statsTotal = this.stats.cacheHits + this.stats.jobsFailed + this.stats.jobsStarted;
+                }
+                if (statsTotal > 0) {
+                    let pos = 5;
+                    let tpos = 5;
+                    ctx.fillStyle = "#3d3";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.cacheHits / statsTotal), statsHeight);
+                    pos += (this.view.width - 10) * (this.stats.cacheHits / statsTotal);
+                    ctx.fillText(this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(this.stats.cacheHits).width + 10;
+                    ctx.fillStyle = "#33d";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsStarted / statsTotal), statsHeight);
+                    pos += (this.view.width - 10) * (this.stats.jobsStarted / statsTotal);
+                    ctx.fillText(this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(this.stats.jobsStarted).width + 10;
+                    ctx.fillStyle = "#d33";
+                    ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsFailed / statsTotal), statsHeight);
+                    ctx.fillText(this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
+                }
+
+
                 this.clientJobs.forEach(c => {
                     //console.log("puck", this.maxJobs, c);
                     c.start = cur;
@@ -173,7 +205,7 @@ export class PieChartComponent {
 
                     if (!c.color) {
                         if (this.clientColor.name && this.clientColor.fgcolor && this.clientColor.bgcolor) {
-                            //console.log("determening", c.client);
+                            //console.log("determining", c.client);
                             if (this.clientColor.name == c.client.ip ||
                                 this.clientColor.name == c.client.name ||
                                 this.clientColor.name == c.client.hostname) {
@@ -213,10 +245,14 @@ export class PieChartComponent {
 
                     // legend name text
                     ctx.fillStyle = c.fg;
-                    ctx.fillText(c.client.name, legendX, legendY);
+                    ctx.fillText(c.client.modifiedName, legendX, legendY);
 
                     // legend usage
-                    const usage = c.jobs + " (" + Math.round(c.jobs / maxJobs * 1000) / 10 + "%)";
+                    let usage = "";
+                    if (c.cacheJobs) {
+                        usage = c.cacheJobs + " / ";
+                    }
+                    usage += c.jobs + " (" + Math.round(c.jobs / maxJobs * 1000) / 10 + "%)";
                     const metrics = ctx.measureText(usage);
 
                     // legend usage background
@@ -250,12 +286,12 @@ export class PieChartComponent {
     _color(key, invert) {
         // taken from https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
         function Alea(seed) {
-            if(seed === undefined) {seed = +new Date() + Math.random();}
+            if (seed === undefined) { seed = Date.now() + Math.random(); }
             function Mash() {
                 var n = 4022871197;
                 return function(r) {
                     var f;
-                    for(var t, s, u = 0, e = 0.02519603282416938; u < r.length; u++)
+                    for (var t, s, u = 0, e = 0.02519603282416938; u < r.length; u++)
                         s = r.charCodeAt(u), f = (e * (n += s) - (n*e|0)),
                     n = 4294967296 * ((t = f * (e*n|0)) - (t|0)) + (t|0);
                     return (n|0) * 2.3283064365386963e-10;
@@ -317,35 +353,39 @@ export class PieChartComponent {
         return "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255);
     }
 
-    _clientJobIndex(ip) {
+    _clientJobIndex(client) {
         for (let i = 0; i < this.clientJobs.length; ++i) {
-            if (this.clientJobs[i].client.ip === ip)
+            if (this.clientJobs[i].client.ip === client.ip
+                && this.clientJobs[i].client.name === client.name)
                 return i;
         }
         return -1;
     }
 
-    _adjustClients(job, inc, init) {
-        let idx = this._clientJobIndex(job.client.ip);
+    _adjustClients(client, inc, cacheinc) {
+        let idx = this._clientJobIndex(client);
         if (idx == -1) {
-            if (inc < 0) {
+            if (inc < 0 || cacheinc < 0) {
                 console.error("no client job for job", job);
                 return false;
             }
-            if (job.client.name === job.client.hostname) {
-                job.client.name = "dev:" + (job.client.user || "nobody") + "@" + job.client.hostname;
-            } else if (job.client.name.length > 0 && job.client.name[0] === ':') {
-                job.client.name = "dev:" + (job.client.user || "nobody") + "@" + job.client.name.substr(1);
+            if (client.name === client.hostname) {
+                client.modifiedName = "dev:" + (client.user || "nobody") + "@" + client.hostname;
+            } else if (client.name.length > 0 && client.name[0] === ':') {
+                client.modifiedName = "dev:" + (client.user || "nobody") + "@" + client.name.substr(1);
+            } else {
+                client.modifiedName = client.name;
             }
-            this.clientJobs.push({ client: job.client, jobs: init });
+            this.clientJobs.push({ client: client, jobs: inc, cacheJobs: cacheinc });
 
             this.clientJobs.sort((a, b) => {
-                return a.client.name.localeCompare(b.client.name);
+                return a.client.modifiedName.localeCompare(b.client.modifiedName);
             });
         } else {
             const c = this.clientJobs[idx];
             c.jobs += inc;
-            if (!c.jobs) {
+            c.cacheJobs += cacheinc;
+            if (!c.jobs && !c.cacheJobs) {
                 this.clientJobs.splice(idx, 1);
             }
         }
@@ -374,7 +414,7 @@ export class PieChartComponent {
         this.jobs.forEach((job, id) => {
             if (slaveid == this._slaveId(job.slave)) {
                 this.jobs.delete(id);
-                this._adjustClients(job, -1, 0);
+                this._adjustClients(job.client, -1, 0);
             }
         });
     }
@@ -387,7 +427,7 @@ export class PieChartComponent {
     _jobStarted(job) {
         //console.log("job start", job.client.ip);
         this.jobs.set(job.id, job);
-        this._adjustClients(job, 1, 1);
+        this._adjustClients(job.client, 1, 0);
 
         this.currentJobs += 1;
         this._updateMaxJobsData();
@@ -403,6 +443,15 @@ export class PieChartComponent {
 
         const realjob = this.jobs.get(job.id);
         this.jobs.delete(job.id);
-        this._adjustClients(realjob, -1, 0);
+        this._adjustClients(realjob.client, -1, 0);
+    }
+
+    _updateStats(stats) {
+        this.stats = stats;
+    }
+
+    _cacheHit(hit) {
+        this._adjustClients(hit.client, 0, 1);
+        setTimeout(() => this._adjustClients(hit.client, 0, -1), 1000);
     }
 }
