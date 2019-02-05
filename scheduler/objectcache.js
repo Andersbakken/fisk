@@ -55,8 +55,7 @@ class PendingItem
         if (this.buffer) {
             this.endCB = cb;
         } else {
-            this.file.end();
-            cb();
+            this.file.end(cb);
         }
     }
 };
