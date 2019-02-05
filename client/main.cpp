@@ -224,6 +224,10 @@ int main(int argc, char **argv)
         char buf[1024];
         if (!getlogin_r(buf, sizeof(buf))) {
             headers["x-fisk-user"] = buf;
+        } else if (const char *user = getenv("USER")) {
+            headers["x-fisk-user"] = user;
+        } else if (const char *user = getenv("USERNAME")) {
+            headers["x-fisk-user"] = user;
         }
     }
 
