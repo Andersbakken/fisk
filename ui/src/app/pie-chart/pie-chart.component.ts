@@ -18,7 +18,7 @@ export class PieChartComponent {
     maxJobsData: any = {};
     currentJobs: number = 0;
     jobs = new Map();
-    clientJobs = new Map();
+    clientJobs = [];
     pieBuilding: boolean;
     inited: boolean = false;
 
@@ -244,7 +244,7 @@ export class PieChartComponent {
         this.maxJobsData = {};
         this.currentJobs = 0;
         this.jobs = new Map();
-        this.clientJobs = new Map();
+        this.clientJobs = [];
     }
 
     _color(key, invert) {
@@ -317,16 +317,37 @@ export class PieChartComponent {
         return "#" + tohex(r * 255) + tohex(g * 255) + tohex(b * 255);
     }
 
+    _clientJobIndex(ip) {
+        for (let i = 0; i < this.clientJobs.length; ++i) {
+            if (this.clientJobs[i].client.ip === ip)
+                return i;
+        }
+        return -1;
+    }
+
     _adjustClients(job, inc, init) {
-        if (!this.clientJobs.has(job.client.ip)) {
-            this.clientJobs.set(job.client.ip, { client: job.client, jobs: init });
+        let idx = this._clientJobIndex(job.client.ip);
+        if (idx == -1) {
+            if (inc < 0) {
+                console.error("no client job for job", job);
+                return false;
+            }
+            if (job.client.name.indexOf(":") == -1) {
+                job.client.name = "dev:" + job.client.name;
+            }
+            this.clientJobs.push({ client: job.client, jobs: init });
+
+            this.clientJobs.sort((a, b) => {
+                return a.client.name.localeCompare(b.client.name);
+            });
         } else {
-            const c = this.clientJobs.get(job.client.ip);
+            const c = this.clientJobs[idx];
             c.jobs += inc;
             if (!c.jobs) {
-                this.clientJobs.delete(job.client.ip);
+                this.clientJobs.splice(idx, 1);
             }
         }
+        return true;
     }
 
     _slaveId(slave) {
@@ -351,10 +372,6 @@ export class PieChartComponent {
         this.jobs.forEach((job, id) => {
             if (slaveid == this._slaveId(job.slave)) {
                 this.jobs.delete(id);
-                if (!this.clientJobs.has(job.client.ip)) {
-                    console.error("no client job for job", job);
-                    return;
-                }
                 this._adjustClients(job, -1, 0);
             }
         });
@@ -384,10 +401,6 @@ export class PieChartComponent {
 
         const realjob = this.jobs.get(job.id);
         this.jobs.delete(job.id);
-        if (!this.clientJobs.has(realjob.client.ip)) {
-            console.error("No client job for job", realjob);
-            return;
-        }
         this._adjustClients(realjob, -1, 0);
     }
 }
