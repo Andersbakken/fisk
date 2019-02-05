@@ -15,7 +15,7 @@ const Database = require('./database');
 const Peak = require('./peak');
 const ObjectCache = require('./objectcache');
 const compareVersions = require('compare-versions');
-const humanizeDuration = require('humanize-duration')
+const humanizeDuration = require('humanize-duration');
 
 const clientMinimumVersion = "1.4.1";
 const serverStartTime = Date.now();
@@ -36,6 +36,7 @@ process.on('uncaughtException', err => {
 server.on("error", error => {
     throw new error;
 });
+
 let schedulerNpmVersion;
 try {
     schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'))).version;
@@ -49,6 +50,8 @@ const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
 let capacity = 0;
+let jobsFailed = 0;
+let jobsScheduled = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 let objectCache;
@@ -333,6 +336,12 @@ server.on("listen", app => {
 
     app.get("/info", (req, res, next) => {
         const now = Date.now();
+        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);;;;
+        function percentage(count)
+        {
+            return { count: count, percentage: (count ? count * 100 / jobs : 0).toFixed(1) + "%" };
+        }
+
         let obj = {
             slaveCount: Object.keys(slaves).length,
             npmVersion: schedulerNpmVersion,
@@ -341,6 +350,10 @@ server.on("listen", app => {
             capacity: capacity,
             activeJobs: activeJobs,
             peaks: peakData(),
+            jobsFailed: percentage(jobsFailed),
+            jobs: jobs,
+            jobsScheduled: percentage(jobsScheduled),
+            cacheHits: percentage(objectCache ? objectCache.cacheHits : 0),
             uptimeMS: now - serverStartTime,
             uptime: humanizeDuration(now - serverStartTime),
             serverStartTime: new Date(serverStartTime).toString()
@@ -602,6 +615,7 @@ server.on("compile", compile => {
     });
 
     if (compareVersions(clientMinimumVersion, compile.npmVersion) > 1) {
+        ++jobsFailed;
         compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
         return;
     }
@@ -698,6 +712,7 @@ server.on("compile", compile => {
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);
     if (!Environments.hasEnvironment(compile.environment) && requestEnvironment(compile)) {
+        ++jobsFailed;
         return;
     }
     // console.log("compatible environments", usableEnvs);
@@ -705,6 +720,7 @@ server.on("compile", compile => {
     if (!usableEnvs.length) {
         console.log(`We're already waiting for ${compile.environment} and we don't have any compatible ones`);
         compile.send("slave", {});
+        ++jobsFailed;
         return;
     }
 
@@ -738,6 +754,7 @@ server.on("compile", compile => {
         }
     });
     if (!slave && compile.slave) {
+        ++jobsFailed;
         console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
         compile.send("slave", {});
         return;
@@ -783,7 +800,9 @@ server.on("compile", compile => {
         data.port = slave.port;
         compile.send("slave", data);
         jobStartedOrScheduled("jobScheduled", { client: compile, slave: slave, id: id, sourceFile: compile.sourceFile });
+        ++jobsScheduled;
     } else {
+        ++jobsFailed;
         console.log("No slave for you", compile.ip);
         compile.send("slave", data);
     }
