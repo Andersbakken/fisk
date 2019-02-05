@@ -333,9 +333,9 @@ export class PieChartComponent {
                 return false;
             }
             if (job.client.name === job.client.hostname) {
-                job.client.name = "dev:" + job.client.user + "@" + job.client.hostname;
+                job.client.name = "dev:" + (job.client.user || "nobody") + "@" + job.client.hostname;
             } else if (job.client.name.length > 0 && job.client.name[0] === ':') {
-                job.client.name = "dev:" + job.client.user + "@" + job.client.name;
+                job.client.name = "dev:" + (job.client.user || "nobody") + "@" + job.client.name.substr(1);
             }
             this.clientJobs.push({ client: job.client, jobs: init });
 
