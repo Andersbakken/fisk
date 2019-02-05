@@ -334,6 +334,8 @@ export class PieChartComponent {
             }
             if (job.client.name === job.client.hostname) {
                 job.client.name = "dev:" + job.client.user + "@" + job.client.hostname;
+            } else if (job.client.name.length > 0 && job.client.name[0] === ':') {
+                job.client.name = "dev:" + job.client.user + "@" + job.client.name;
             }
             this.clientJobs.push({ client: job.client, jobs: init });
 
