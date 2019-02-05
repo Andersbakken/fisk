@@ -15,6 +15,7 @@ const Database = require('./database');
 const Peak = require('./peak');
 const ObjectCache = require('./objectcache');
 const compareVersions = require('compare-versions');
+const humanizeDuration = require('humanize-duration')
 
 const clientMinimumVersion = "1.4.1";
 const serverStartTime = Date.now();
@@ -331,6 +332,7 @@ server.on("listen", app => {
     });
 
     app.get("/info", (req, res, next) => {
+        const now = Date.now();
         let obj = {
             slaveCount: Object.keys(slaves).length,
             npmVersion: schedulerNpmVersion,
@@ -339,7 +341,8 @@ server.on("listen", app => {
             capacity: capacity,
             activeJobs: activeJobs,
             peaks: peakData(),
-            uptime: Date.now() - serverStartTime,
+            uptimeMS: now - serverStartTime,
+            uptime: humanizeDuration(now - serverStartTime),
             serverStartTime: new Date(serverStartTime).toString()
         };
         res.send(JSON.stringify(obj, null, 4));
