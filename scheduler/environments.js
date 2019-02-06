@@ -1,5 +1,34 @@
-const fs = require("fs-extra");
-const path = require("path");
+const fs = require('fs-extra');
+const path = require('path');
+const child_process = require('child_process');
+const mktemp = require('mktemp');
+
+function untarFile(archive, file, encoding)
+{
+    return new Promise((resolve, reject) => {
+        mktemp.createDir("/tmp/fisk_env_infoXXXX").then(tmpdir => {
+            child_process.exec(`tar -zxf "${archive}" ${file}`, { cwd: tmpdir }, (err, stdout, stderr) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                fs.readFile(path.join(tmpdir, file), encoding || "utf8", (err, data) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        fs.remove(tmpdir, (err) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(data);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    });
+}
 
 class Environment {
     constructor(path, hash, system, originalPath) {
@@ -7,6 +36,7 @@ class Environment {
         this.hash = hash;
         this.system = system;
         this.originalPath = originalPath;
+        this.info = undefined;
         try {
             this.size = fs.statSync(path).size;
         } catch (err) {
@@ -193,20 +223,31 @@ const environments = {
                         // we're good
                         environments._path = p;
                         fs.readdir(p).then(files => {
+                            let promises = [];
                             files.forEach(e => {
                                 let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(e);
                                 if (match) {
                                     const hash = match[1];
                                     const system = match[2];
                                     const originalPath = decodeURIComponent(match[3]);
-                                    environments._data[hash] = new Environment(path.join(p, e), hash, system, originalPath);
+                                    const tarFile = path.join(p, e);
+                                    let env = new Environment(tarFile, hash, system, originalPath);
+                                    promises.push(untarFile(tarFile, "etc/compiler_info").then(data => {
+                                        env.info = data;
+                                        environments._data[hash] = env;
+                                    }).catch(err => {
+                                        console.error("Failed to extract compiler_info", err);
+                                    }));
                                 }
                             });
+                            Promise.all(promises).then(() => {
+                                resolve();
+                            });
+
                             // setTimeout(() => {
                             //     // console.log(JSON.stringify(environments._links, null, 4));
                             //     environments.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", [], []);
                             // }, 1000);
-                            resolve();
                         });
                     } else {
                         reject(`Can't use path ${p}`);
