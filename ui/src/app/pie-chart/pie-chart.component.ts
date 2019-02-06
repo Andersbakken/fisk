@@ -454,6 +454,6 @@ export class PieChartComponent {
 
     _cacheHit(hit) {
         this._adjustClients(hit.client, 0, 1);
-        setTimeout(() => this._adjustClients(hit.client, 0, -1), 1000);
+        setTimeout(() => this._adjustClients(hit.client, 0, -1), 5000);
     }
 }
