@@ -275,6 +275,13 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
 
+        if (data.preprocessed->stdOut.empty()) {
+            ERROR("Empty preprocessed output. Running locally");
+            data.watchdog->stop();
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 3");
+            return 0; // unreachable
+        }
+
         MD5_Update(&Client::data().md5, data.hash.c_str(), data.hash.size());
 
         unsigned char md5Buf[MD5_DIGEST_LENGTH];
@@ -398,7 +405,14 @@ int main(int argc, char **argv)
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
             data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 4");
+            return 0; // unreachable
+        }
+
+        if (data.preprocessed->stdOut.empty()) {
+            ERROR("Empty preprocessed output. Running locally");
+            data.watchdog->stop();
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 5");
             return 0; // unreachable
         }
     }
