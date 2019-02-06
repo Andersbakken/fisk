@@ -934,7 +934,7 @@ server.on("monitor", client => {
             fs.readFile(f, "utf8", (err, contents) => {
                 // console.log("sending file", f, contents.length);
                 client.send({ type: "logFile", file: f, contents: contents || ""});
-       });
+            });
             break;
         case 'readConfiguration':
             break;
@@ -944,6 +944,9 @@ server.on("monitor", client => {
                 return;
             }
             writeConfiguration(message);
+            break;
+        case 'listEnvironments':
+            client.send({ type: "listEnvironments", environments: environmentsInfo(), compatibilities: Environments.compatibilitiesInfo() });
             break;
         case 'linkEnvironments':
             Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist);
