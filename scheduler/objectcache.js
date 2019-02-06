@@ -176,7 +176,8 @@ class ObjectCache
     {
         const key = ip + ":" + port;
         if (key in this.streams) {
-            throw new Error("We already have this stream", key);
+            console.log("We already have this stream", key);
+            // throw new Error("We already have this stream", key);
         }
 
         const stream = new Stream;
@@ -192,7 +193,8 @@ class ObjectCache
                     delete this.pending[item.md5];
                 }
             });
-            delete this.streams[key];
+            if (this.streams[key] == stream)
+                delete this.streams[key];
         });
 
         let finishItem = (item) => {
