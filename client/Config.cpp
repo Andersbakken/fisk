@@ -129,24 +129,10 @@ bool Config::init(int &argc, char **&argv)
 {
     std::vector<json11::Json> jsons;
     auto load = [](const std::string &path, std::vector<json11::Json> &j) {
-        FILE *f = fopen(path.c_str(), "r");
-        if (!f)
-            return true;
-        fseek(f, 0, SEEK_END);
-        const long size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (!size) {
-            fclose(f);
-            return false;
-        }
-
-        std::string contents(size, ' ');
-        const size_t read = fread(&contents[0], 1, size, f);
-        fclose(f);
-        if (read != static_cast<size_t>(size)) {
-            fprintf(stderr, "Failed to read from file: %s (%d %s)\n", path.c_str(), errno, strerror(errno));
-            return false;
-        }
+        std::string contents;
+        bool opened;
+        if (!Client::readFile(path, contents, &opened))
+            return !opened;
 
         std::string err;
         json11::Json parsed = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);

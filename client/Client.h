@@ -3,6 +3,7 @@
 
 #include "Config.h"
 #include "CompilerArgs.h"
+#include "Log.h"
 #include <assert.h>
 #include <condition_variable>
 #include <cstdarg>
@@ -242,6 +243,48 @@ inline FileType fileType(const std::string &path, struct stat *st = 0)
         return File;
     printf("BAD MODE %d\n", stat.st_mode);
     return Invalid;
+}
+
+template <typename T>
+inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr)
+{
+    FILE *f = fopen(fileName.c_str(), "r");
+    if (opened)
+        *opened = f;
+    if (!f) {
+        ERROR("Failed to open %s for reading (%d %s)", fileName.c_str(), errno, strerror(errno));
+        return false;
+    }
+
+    if (fseek(f, 0, SEEK_END)) {
+        ERROR("Failed to fseek to end of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
+        fclose(f);
+        return false;
+    }
+
+    const long size = ftell(f);
+    if (fseek(f, 0, SEEK_SET)) {
+        ERROR("Failed to fseek to beginning of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
+        fclose(f);
+        return false;
+    }
+
+    if (size < 0) {
+        ERROR("Failed to ftell %s (%d %s)", fileName.c_str(), errno, strerror(errno));
+        fclose(f);
+        return false;
+    }
+
+    t.resize(size);
+    int read;
+    EINTRWRAP(read, fread(&t[0], sizeof(char), t.size(), f));
+    fclose(f);
+    if (read != size) {
+        ERROR("Failed to read from %s (%d %s)", fileName.c_str(), errno, strerror(errno));
+        return false;
+    }
+
+    return true;
 }
 
 std::string environmentHash(const std::string &compiler);

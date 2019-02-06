@@ -1,6 +1,5 @@
 #include "Client.h"
 
-#include "Log.h"
 #include <unistd.h>
 #include "SchedulerWebSocket.h"
 #include "Select.h"
@@ -443,40 +442,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
                            |CompilerArgs::ObjectiveCPlusPlusPreprocessed
                            |CompilerArgs::CPlusPlusPreprocessed)) {
             DEBUG("Already preprocessed. No need to do it");
-            ptr->exitStatus = 0;
-            FILE *f;
-            long size = 0;
-            f = fopen(args->sourceFile().c_str(), "r");
-            if (!f) {
-                DEBUG("Failed to open %s for reading (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                ptr->exitStatus = 1;
-                goto end;
-            }
-            if (fseek(f, 0, SEEK_END)) {
-                DEBUG("Failed to fseek to end of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                ptr->exitStatus = 1;
-                goto end;
-            }
-            size = ftell(f);
-            if (fseek(f, 0, SEEK_SET)) {
-                DEBUG("Failed to fseek to beginning of %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                ptr->exitStatus = 1;
-                goto end;
-            }
-
-            if (size < 0) {
-                DEBUG("Failed to ftell %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                ptr->exitStatus = 1;
-                goto end;
-            }
-            ptr->stdOut.resize(size);
-            if (fread(&ptr->stdOut[0], 1, size, f) != static_cast<size_t>(size)) {
-                DEBUG("Failed to fread %s (%d %s)", args->sourceFile().c_str(), errno, strerror(errno));
-                ptr->exitStatus = 1;
-            }
-      end:
-            if (f)
-                fclose(f);
+            ptr->exitStatus = readFile(args->sourceFile(), ptr->stdOut) ? 0 : 1;
         } else {
             DEBUG("Executing:\n%s", commandLine.c_str());
             TinyProcessLib::Process proc(commandLine, std::string(),
