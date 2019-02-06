@@ -109,7 +109,7 @@ class File {
     }
 }
 
-class CompatibilityProperties {
+class LinkProperties {
     constructor(args, blacklist) {
         this.arguments = args || [];
         this.blacklist = blacklist || [];
@@ -120,7 +120,7 @@ class CompatibilityProperties {
     }
 };
 
-class Compatibilities {
+class Links {
     constructor() {
         this._targets = {};
     }
@@ -152,7 +152,7 @@ class Compatibilities {
     }
 
     set(targetHash, args, blacklist) {
-        this._targets[targetHash] = new CompatibilityProperties(args, blacklist);
+        this._targets[targetHash] = new LinkProperties(args, blacklist);
     }
 
     unset(targetHash) {
@@ -170,17 +170,17 @@ class Compatibilities {
 
 const environments = {
     _data: {}, // key: hash, value: class Environment
-    _compatibilities: {}, // key: srcHash, value: class Compatibilities { targetHash, CompatibilityProperties { arguments, blacklist } }
+    _links: {}, // key: srcHash, value: class Links { targetHash, LinkProperties { arguments, blacklist } }
     _path: undefined,
     _db: undefined,
 
     load(db, p) {
         this._db = db;
-        return db.get("compatibilities").then(compatibilities => {
-            if (compatibilities) {
-                for (var srcHash in compatibilities) {
-                    let targets = compatibilities[srcHash];
-                    let data = environments._compatibilities[srcHash] = new Compatibilities();
+        return db.get("links").then(links => {
+            if (links) {
+                for (var srcHash in links) {
+                    let targets = links[srcHash];
+                    let data = environments._links[srcHash] = new Links();
                     for (let target in targets) {
                         let obj = targets[target];
                         data.set(target, obj.arguments, obj.blacklist);
@@ -203,7 +203,7 @@ const environments = {
                                 }
                             });
                             // setTimeout(() => {
-                            //     // console.log(JSON.stringify(environments._compatibilities, null, 4));
+                            //     // console.log(JSON.stringify(environments._links, null, 4));
                             //     environments.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", [], []);
                             // }, 1000);
                             resolve();
@@ -252,40 +252,40 @@ const environments = {
         let compatible = [];
         if (srcHash in environments._data)
             compatible.push(srcHash);
-        // console.log("checking", srcHash, environments._compatibilities);
-        let data = environments._compatibilities[srcHash];
+        // console.log("checking", srcHash, environments._links);
+        let data = environments._links[srcHash];
         if (data)
             return compatible.concat(data.targetHashes);
         return compatible;
     },
 
     link(srcHash, targetHash, args, blacklist) {
-        let data = environments._compatibilities[srcHash];
+        let data = environments._link[srcHash];
         if (!data)
-            data = environments._compatibilities[srcHash] = new Compatibilities();
+            data = environments._links[srcHash] = new Links();
         data.set(targetHash, args, blacklist);
-        return this.syncCompatibilities();
+        return this.syncLinks();
     },
 
     unlink(srcHash, targetHash) {
         if (!srcHash) {
-            for (let src in environments._compatibilities) {
-                let targets = environments._compatibilities[src];
+            for (let src in environments._links) {
+                let targets = environments._links[src];
                 targets.unset(targetHash);
                 if (!targets.size) {
-                    delete environments._compatibilities[src];
+                    delete environments._links[src];
                 }
             }
         } else if (!targetHash) {
-            delete environments._compatibilities[srcHash];
+            delete environments._links[srcHash];
         } else {
-            let targets = environments._compatibilities[srcHash];
+            let targets = environments._links[srcHash];
             targets.unset(targetHash);
             if (!targets.size) {
-                delete environments._compatibilities[srcHash];
+                delete environments._links[srcHash];
             }
         }
-        return this.syncCompatibilities();
+        return this.syncLinks();
     },
 
     get environments() {
@@ -298,16 +298,16 @@ const environments = {
         return environments._data[hash];
     },
 
-    compatibilitiesInfo() {
+    linksInfo() {
         let obj = {};
-        for (let srcHash in this._compatibilities) {
-            obj[srcHash] = this._compatibilities[srcHash].targets;
+        for (let srcHash in this._links) {
+            obj[srcHash] = this._links[srcHash].targets;
         }
         return obj;
     },
 
-    syncCompatibilities() {
-        return this._db.set("compatibilities", this.compatibilitiesInfo());
+    syncLinks() {
+        return this._db.set("links", this.linksInfo());
     },
 
     remove(hash) { // ### this should be promisified
@@ -316,7 +316,7 @@ const environments = {
             delete environments._data[hash];
             this.unlink(hash);
             this.unlink(undefined, hash);
-            this.syncCompatibilities();
+            this.syncLinks();
         } catch (err) {
             console.error("Failed to remove environment", environments._data[hash].path, err);
             return;

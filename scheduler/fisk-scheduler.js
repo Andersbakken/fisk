@@ -318,7 +318,7 @@ function environmentsInfo()
             ret.usedSizeBytes += env.size;
     }
     ret.usedSize = bytes.format(ret.usedSizeBytes);
-    ret.compatibilities = Environments.compatibilitiesInfo();
+    ret.links = Environments.linksInfo();
     return ret;
 }
 
@@ -946,7 +946,7 @@ server.on("monitor", client => {
             writeConfiguration(message);
             break;
         case 'listEnvironments':
-            client.send({ type: "listEnvironments", environments: environmentsInfo(), compatibilities: Environments.compatibilitiesInfo() });
+            client.send({ type: "listEnvironments", environments: environmentsInfo() });
             break;
         case 'linkEnvironments':
             Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist);
