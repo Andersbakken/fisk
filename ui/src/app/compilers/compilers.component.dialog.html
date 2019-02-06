@@ -1,0 +1,12 @@
+<mat-card>
+  <div *ngFor="let e of others" class="env">
+    <mat-checkbox matInput [(ngModel)]="checked[e.hash]"></mat-checkbox> {{e.hash}} {{e.compiler.name}} {{e.compiler.version}} ({{e.target}})<br>
+    <mat-form-field>
+      <input matInput placeholder="Arguments" [(ngModel)]="args[e.hash]">
+    </mat-form-field>
+  </div>
+  <div mat-dialog-actions>
+    <button mat-button (click)="onNoClick()">Cancel</button>
+    <button mat-button [mat-dialog-close]="{ checked: checked, args: args }" cdkFocusInitial>Ok</button>
+  </div>
+</mat-card>

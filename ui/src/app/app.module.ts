@@ -4,7 +4,9 @@ import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 
-import { MatCardModule, MatTabsModule, MatListModule, MatInputModule, MatSnackBarModule, MatCheckboxModule } from '@angular/material';
+import { MatCardModule, MatTabsModule, MatListModule,
+         MatInputModule, MatSnackBarModule, MatCheckboxModule,
+         MatDialogModule, MatButtonModule } from '@angular/material';
 
 import { ColorPickerModule } from 'ngx-color-picker';
 
@@ -21,17 +23,22 @@ import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
 import { PieChartComponent } from './pie-chart/pie-chart.component';
+import { CompilersComponent, CompilersComponentDialog } from './compilers/compilers.component';
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
     //{ path: 'chart', component: ChartComponent },
     { path: 'pie-chart', component: PieChartComponent },
     { path: 'logs', component: LogsComponent },
+    { path: 'compilers', component: CompilersComponent },
     { path: 'main', component: MainComponent },
     { path: '', redirectTo: '/main', pathMatch: 'full' }
 ];
 
 @NgModule({
+    entryComponents: [
+        CompilersComponentDialog
+    ],
     declarations: [
         AppComponent,
         ConfigComponent,
@@ -39,15 +46,19 @@ const appRoutes: Routes = [
         MainComponent,
         LogsComponent,
         LogComponent,
-        PieChartComponent
+        PieChartComponent,
+        CompilersComponent,
+        CompilersComponentDialog
     ],
     imports: [
         BrowserModule,
         BrowserAnimationsModule,
         FormsModule,
+        MatButtonModule,
         MatCardModule,
         MatTabsModule,
         MatInputModule,
+        MatDialogModule,
         MatSnackBarModule,
         MatListModule,
         MatCheckboxModule,
