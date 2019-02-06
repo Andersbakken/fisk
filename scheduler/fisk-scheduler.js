@@ -17,7 +17,7 @@ const ObjectCache = require('./objectcache');
 const compareVersions = require('compare-versions');
 const humanizeDuration = require('humanize-duration');
 
-const clientMinimumVersion = "1.4.1";
+const clientMinimumVersion = "2.5.4";
 const serverStartTime = Date.now();
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
