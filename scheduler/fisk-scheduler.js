@@ -491,7 +491,7 @@ server.on("slave", slave => {
         try {
             stream = objectCache.createStream(slave.ip, slave.port);
         } catch (err) {
-            console.log("Something wrong with this stream apparently", slave.ip, slave.port);
+            console.log("Something wrong with this stream apparently", slave.ip, slave.port, err);
             slave.close();
             return;
         }
