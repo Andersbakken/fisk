@@ -116,8 +116,8 @@ class ObjectCache
             }).sort((a, b) => a.atime - b.atime).forEach(file => {
                 // console.log("got file", file);
                 let fd;
+                let jsonBuffer;
                 try {
-                    let jsonBuffer;
                     if (file.fileName.length == 32) {
                         const headerSizeBuffer = Buffer.allocUnsafe(4);
                         fd = fs.openSync(file.path, "r");
@@ -135,12 +135,12 @@ class ObjectCache
                         this.size += item.fileSize;
                         this.cache[file.fileName] = item;
                     } else {
-                        throw new Error("Unexpected file " + file.fileName + " " + jsonBuffer.toString());
+                        throw new Error("Unexpected file " + file.fileName);
                     }
                 } catch (err) {
                     if (fd)
                         fs.closeSync(fd);
-                    console.error("got failure", err);
+                    console.error("got failure", err,  jsonBuffer.toString());
                     try {
                         fs.removeSync(file.path);
                     } catch (doubleError) {
