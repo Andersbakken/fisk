@@ -234,8 +234,16 @@ function purgeEnvironmentsToMaxSize()
             fs.readdirSync(p).map(file => {
                 // console.log("got file", file);
                 let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);
-                if (!match)
+                if (!match) {
+                    const abs = path.join(p, file);
+                    try {
+                        console.log("Removing unexpected file", abs);
+                        fs.removeSync(abs);
+                    } catch (err) {
+                        console.error("Failed to remove file", abs, err);
+                    }
                     return undefined;
+                }
                 let abs = path.join(p, file);
                 let stat;
                 try {
@@ -597,17 +605,23 @@ function requestEnvironment(compile)
                 if (environment.last) {
                     file.close();
                     compile.close();
-                    Environments.complete(file);
+                    return Environments.complete(file);
+                }
+                return undefined;
+            }).then(() => {
+                if (environment.last) {
                     file = undefined;
                     // send any new environments to slaves
                     delete pendingEnvironments[hash];
-                    purgeEnvironmentsToMaxSize().then(() => {
-                        syncEnvironments();
-                    }).catch(error => {
-                        console.error("Got some error here", error);
-                    });
+                    return purgeEnvironmentsToMaxSize();
                 }
-            }).catch(err => {
+                return undefined;
+            }).then(() => {
+                if (environment.last) {
+                    syncEnvironments();
+                }
+            }).catch(error => {
+                console.error("Got some error here", error);
                 console.log("file error", err);
                 file = undefined;
             });

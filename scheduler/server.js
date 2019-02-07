@@ -204,11 +204,6 @@ class Server extends EventEmitter {
                     return;
                 }
 
-                if (!("system" in json)) {
-                    console.log(json);
-                    client.error("Need a systen property");
-                    return;
-                }
                 if (!("hash" in json)) {
                     console.log(json);
                     client.error("Need a hash property");
@@ -217,12 +212,6 @@ class Server extends EventEmitter {
                 if (!("bytes" in json)) {
                     console.log(json);
                     client.error("Need a bytes property");
-                    return;
-                }
-
-                if (!("originalPath" in json)) {
-                    console.log(json);
-                    client.error("Need an originalPath property");
                     return;
                 }
 

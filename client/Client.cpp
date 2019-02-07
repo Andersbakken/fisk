@@ -24,6 +24,16 @@
 #include <mach/mach_time.h>
 #endif
 
+#ifdef __APPLE__
+const char *systemName = "Darwin x86_64";
+#elif defined(__linux__) && defined(__i686)
+const char *systemName = "Linux i686"
+#elif defined(__linux__) && defined(__x86_64)
+const char *systemName = "Linux x86_64";
+#else
+#error unsupported platform
+#endif
+
 static Client::Data sData;
 const unsigned long long Client::started = Client::mono();
 const unsigned long long Client::milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
@@ -906,21 +916,10 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         return false;
     }
     {
-#ifdef __APPLE__
-        const char *system = "Darwin x86_64";
-#elif defined(__linux__) && defined(__i686)
-        const char *system = "Linux i686"
-#elif defined(__linux__) && defined(__x86_64)
-        const char *system = "Linux x86_64";
-#else
-#error unsupported platform
-#endif
         json11::Json::object msg {
             { "type", "uploadEnvironment" },
             { "hash", sData.hash },
-            { "bytes", static_cast<int>(st.st_size) },
-            { "originalPath", sData.resolvedCompiler },
-            { "system", system }
+            { "bytes", static_cast<int>(st.st_size) }
         };
 
         std::string json = json11::Json(msg).dump();
@@ -970,6 +969,9 @@ std::string Client::prepareEnvironmentForUpload()
         return std::string();
     }
 
+    fprintf(f, "{ \"hash\": \"%s\", \"system\": \"%s\", \"originalPath\": \"%s\" }\n",
+            sData.hash.c_str(), systemName, sData.resolvedCompiler.c_str());
+
     {
         std::string stdOut, stdErr;
         TinyProcessLib::Process proc(sData.resolvedCompiler + " -v", dir,
@@ -984,7 +986,9 @@ std::string Client::prepareEnvironmentForUpload()
         }
         stdOut += stdErr;
         filterCOLLECT(stdOut);
-        if (fwrite(stdOut.c_str(), 1, stdOut.size(), f) != stdOut.size()) {
+        int w;
+        EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
+        if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
             fclose(f);
             Client::recursiveMkdir(dir);

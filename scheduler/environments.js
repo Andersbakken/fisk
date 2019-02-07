@@ -69,15 +69,15 @@ class Environment {
 }
 
 class File {
-    constructor(path, hash, system, originalPath) {
+    constructor(path, hash) {
         this._fd = fs.openSync(path, "w");
         this._pending = [];
         this._writing = false;
 
         this.path = path;
         this.hash = hash;
-        this.system = system;
-        this.originalPath = originalPath;
+        this.system = undefined;
+        this.originalPath = undefined;
     }
 
     toString() {
@@ -225,15 +225,16 @@ const environments = {
                         fs.readdir(p).then(files => {
                             let promises = [];
                             files.forEach(e => {
-                                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(e);
-                                if (match) {
-                                    const hash = match[1];
-                                    const system = match[2];
-                                    const originalPath = decodeURIComponent(match[3]);
+                                if (e.length == 47 && e.indexOf(".tar.gz", 40) == 40) {
                                     const tarFile = path.join(p, e);
-                                    let env = new Environment(tarFile, hash, system, originalPath);
+                                    const hash = e.substr(0, 40);
+                                    let env = new Environment(tarFile);
                                     promises.push(untarFile(tarFile, "etc/compiler_info").then(data => {
-                                        env.info = data;
+                                        const idx = data.indexOf('\n');
+                                        const info = JSON.parse(data.substr(0, idx));
+                                        env.system = info.system;
+                                        env.originalPath = info.originalPath;
+                                        env.info = data.substr(idx + 1);
                                         environments._data[hash] = env;
                                     }).catch(err => {
                                         console.error("Failed to extract compiler_info", err);
@@ -277,12 +278,22 @@ const environments = {
         if (environment.hash in environments._data)
             return undefined;
         fs.mkdirpSync(environments._path);
-        return new File(path.join(environments._path, `${environment.hash}:${environment.system}:${encodeURIComponent(environment.originalPath)}.tar.gz`),
-                        environment.hash, environment.system, environment.originalPath);
+        return new File(path.join(environments._path, `${environment.hash}.tar.gz`), environment.hash);
     },
 
     complete(file) {
-        environments._data[file.hash] = new Environment(file.path, file.hash, file.system, file.originalPath);
+        return new Promise((resolve, reject) => {
+            untarFile(file.path, "etc/compiler_info").then(data => {
+                let env = new Environment(file.path, file.hash);
+                const idx = data.indexOf('\n');
+                const info = JSON.parse(data.substr(0, idx));
+                env.system = info.system;
+                env.originalPath = info.originalPath;
+                env.info = data.substr(idx + 1);
+                environments._data[file.hash] = env;
+                resolve();
+            });
+        });
     },
 
     hasEnvironment(hash) {
