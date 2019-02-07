@@ -282,7 +282,14 @@ const environments = {
     },
 
     complete(file) {
-        environments._data[file.hash] = new Environment(file.path, file.hash, file.system, file.originalPath);
+        return new Promise((resolve, reject) => {
+        untarFile(file.path, "etc/compiler_info").then(data => {
+            let env = new Environment(file.path, file.hash, file.system, file.originalPath);
+            env.info = data;
+            environments._data[file.hash] = env;
+            resolve();
+        }
+            env.info = data;
     },
 
     hasEnvironment(hash) {
