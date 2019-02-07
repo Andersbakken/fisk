@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
     std::string clientName = Config::name;
 
-    Log::Level level = Log::Silent;
+    Log::Level level = Log::Error;
     const std::string logLevel = Config::logLevel;
     if (!logLevel.empty()) {
         bool ok;
