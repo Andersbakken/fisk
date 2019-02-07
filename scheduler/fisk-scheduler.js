@@ -233,9 +233,8 @@ function purgeEnvironmentsToMaxSize()
             let purged = false;
             fs.readdirSync(p).map(file => {
                 // console.log("got file", file);
-                let match = /^([^:]*):([^:]*):([^:]*).tar.gz$/.exec(file);
-                if (!match) {
-                    const abs = path.join(p, file);
+                const abs = path.join(p, file);
+                if (file.length != 47 || file.indexOf(".tar.gz", 40) != 40) {
                     try {
                         console.log("Removing unexpected file", abs);
                         fs.removeSync(abs);
@@ -244,7 +243,6 @@ function purgeEnvironmentsToMaxSize()
                     }
                     return undefined;
                 }
-                let abs = path.join(p, file);
                 let stat;
                 try {
                     stat = fs.statSync(abs);
@@ -253,7 +251,7 @@ function purgeEnvironmentsToMaxSize()
                 }
                 return {
                     path: abs,
-                    hash: match[1],
+                    hash: file.substr(0, 40),
                     size: stat.size,
                     created: stat.birthtimeMs
                 };
