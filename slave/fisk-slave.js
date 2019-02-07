@@ -280,8 +280,10 @@ client.on("connect", () => {
     load.start(option("loadInterval", 1000));
 });
 
-client.on("error", (err) => {
+client.on("error", err => {
     console.error("client error", err);
+    if (load.running())
+        load.stop();
 });
 
 client.on("close", () => {
