@@ -429,7 +429,6 @@ server.on("listen", app => {
         const rstream = fs.createReadStream(env.path);
         rstream.on("error", err => {
             console.error("Got read stream error for", env.path, err);
-            res.close();
             rstream.close();
         });
         rstream.pipe(res);
@@ -622,7 +621,6 @@ function requestEnvironment(compile)
                 }
             }).catch(error => {
                 console.error("Got some error here", error);
-                console.log("file error", err);
                 file = undefined;
             });
         });
