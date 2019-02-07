@@ -652,7 +652,7 @@ server.on("compile", compile => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
 
-    if (compareVersions(clientMinimumVersion, compile.npmVersion) > 1) {
+    if (compareVersions(clientMinimumVersion, compile.npmVersion) >= 1) {
         ++jobsFailed;
         compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
         return;
