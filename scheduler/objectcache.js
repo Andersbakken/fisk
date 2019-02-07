@@ -117,24 +117,25 @@ class ObjectCache
                 // console.log("got file", file);
                 let fd;
                 try {
+                    let jsonBuffer;
                     if (file.fileName.length == 32) {
                         const headerSizeBuffer = Buffer.allocUnsafe(4);
                         fd = fs.openSync(file.path, "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
-                        const jsonBuffer = Buffer.allocUnsafe(headerSize);
+                        jsonBuffer = Buffer.allocUnsafe(headerSize);
                         fs.readSync(fd, jsonBuffer, 0, headerSize);
                         const response = JSON.parse(jsonBuffer.toString());
                         if (response.md5 != file.fileName)
                             throw new Error(`Got bad filename: ${file.fileName} vs ${response.md5}`);
                         let item = new ObjectCacheItem(response, headerSize);
                         if (item.fileSize != file.size)
-                            throw new Error(`Got bad size for ${fileName} expected ${item.fileSize} got ${file.size}`);
+                            throw new Error(`Got bad size for ${file.fileName} expected ${item.fileSize} got ${file.size}`);
                         fs.closeSync(fd);
                         this.size += item.fileSize;
                         this.cache[file.fileName] = item;
                     } else {
-                        throw new Error("Unexpected file " + file.fileName);
+                        throw new Error("Unexpected file " + file.fileName + " " + jsonBuffer.toString());
                     }
                 } catch (err) {
                     if (fd)
