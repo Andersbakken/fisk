@@ -4,6 +4,25 @@ const Compile = require('./compile');
 
 const argv = require('minimist')(process.argv.slice(2));
 
+function send(message) {
+    try {
+        process.send(message);
+    } catch (err) {
+        console.error(`Couldn't send message ${message.type}. Going down`);
+        process.exit();
+    }
+}
+
+process.on('unhandledRejection', (reason, p) => {
+    send({type: "error", message: `Unhandled rejection at: Promise ${p} reason: ${reason.stack}`});
+    console.error('Unhandled rejection at: Promise', p, 'reason:', reason.stack);
+});
+
+process.on('uncaughtException', err => {
+    send({type: "error", message: `Uncaught exception ${err.stack} ${err.toString()}`});
+    console.error("Uncaught exception", err);
+});
+
 let pwd;
 if (argv.user) {
     try {
@@ -38,14 +57,6 @@ process.on("error", error => {
     process.exit();
 });
 
-function send(message) {
-    try {
-        process.send(message);
-    } catch (err) {
-        console.error(`Couldn't send message ${message.type}. Going down`);
-        process.exit();
-    }
-}
 setTimeout(() => { // hack
     try {
         send({type: "ready"});

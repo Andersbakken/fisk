@@ -24,6 +24,10 @@ process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
 });
 
+process.on('uncaughtException', err => {
+    console.error("Uncaught exception", err);
+});
+
 let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
 if (ports.length) {
     var name = option("name") || option("hostname") || os.hostname();

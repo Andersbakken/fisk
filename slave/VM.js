@@ -19,6 +19,12 @@ class CompileJob extends EventEmitter
         this.startCompile = undefined;
     }
 
+    sendCallback(error) {
+        if (error) {
+            console.error("Got send error for", this.vmDir, this.id, this.commandLine);
+            this.vm.compileFinished({type: 'compileFinished', success: false, id: this.id, files: [], exitCode: -1, error: error.toString() });
+        }
+    }
 
     feed(data, last) {
         fs.writeSync(this.fd, data);
@@ -27,12 +33,12 @@ class CompileJob extends EventEmitter
             this.startCompile = Date.now();
             fs.close(this.fd);
             this.fd = undefined;
-            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir});
+            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir}, this.sendCallback);
         }
     }
 
     cancel() {
-        this.vm.child.send({ type: "cancel", id: this.id});
+        this.vm.child.send({ type: "cancel", id: this.id}, this.sendCallback);
     }
 };
 
@@ -44,6 +50,7 @@ class VM extends EventEmitter
         this.hash = hash;
         this.compiles = {};
         this.destroying = false;
+        this.keepCompiles = keepCompiles;
 
         fs.remove(path.join(root, 'compiles'));
 
@@ -52,48 +59,28 @@ class VM extends EventEmitter
             args.push(`--user=${user}`);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         let gotReady = false;
-        this.child.on('message', (msg) => {
+        this.child.on('message', msg => {
             // console.log("GOT MESSAGE", msg);
-            let that;
             switch (msg.type) {
             case 'ready':
                 gotReady = true;
                 this.emit('ready', { success: true });
                 break;
-            case 'compileStdOut':
-                that = this.compiles[msg.id];
-                if (that)
-                    that.emit('stdout', msg.data);
+            case 'error':
+                console.error("Got error from runtime", this.hash, msg.message);
                 break;
-            case 'compileStdErr':
-                that = this.compiles[msg.id];
-                if (that)
-                    that.emit('stderr', msg.data);
-                break;
+            case 'compileStdOut': {
+                let compile = this.compiles[msg.id];
+                if (compile)
+                    compile.emit('stdout', msg.data);
+                break; }
+            case 'compileStdErr': {
+                let compile = this.compiles[msg.id];
+                if (compile)
+                    compile.emit('stderr', msg.data);
+                break; }
             case 'compileFinished':
-                that = this.compiles[msg.id];
-                if (!that)
-                    return;
-                if (msg.error)
-                    console.error("Got some error", msg.error);
-                const now = Date.now();
-                that.emit('finished', {
-                    cppSize: that.cppSize,
-                    compileDuration: (now - that.startCompile),
-                    exitCode: msg.exitCode,
-                    success: msg.success,
-                    error: msg.error,
-                    sourceFile: msg.sourceFile,
-                    files: msg.files.map(file => {
-                        file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
-                        delete file.mapped;
-                        return file;
-                    })
-                });
-
-                if (!keepCompiles)
-                    fs.remove(this.compiles[msg.id].dir);
-                delete this.compiles[msg.id];
+                this.compileFinished(msg);
                 break;
             }
         });
@@ -101,7 +88,7 @@ class VM extends EventEmitter
             if (!gotReady) {
                 this.emit('ready', { success: false, error: err });
             } else {
-                console.error("Got error", err.toString());
+                console.error("Got error", err);
             }
         });
         this.child.on('exit', evt => {
@@ -113,9 +100,38 @@ class VM extends EventEmitter
         });
     }
 
+    compileFinished(msg) {
+        let compile = this.compiles[msg.id];
+        if (!compile)
+            return;
+        if (msg.error)
+            console.error("Got some error", msg.error);
+        const now = Date.now();
+        compile.emit('finished', {
+            cppSize: compile.cppSize,
+            compileDuration: (now - compile.startCompile),
+            exitCode: msg.exitCode,
+            success: msg.success,
+            error: msg.error,
+            sourceFile: msg.sourceFile,
+            files: msg.files.map(file => {
+                file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
+                delete file.mapped;
+                return file;
+            })
+        });
+
+        if (!this.keepCompiles)
+            fs.remove(this.compiles[msg.id].dir);
+        delete this.compiles[msg.id];
+    }
+
     destroy() {
         this.destroying = true;
-        this.child.send({type: 'destroy'});
+        this.child.send({type: 'destroy'}, err => {
+            console.error("Failed to send destroy message to child", this.hash, err);
+            this.child.kill();
+        });
     }
 
     startCompile(commandLine, argv0, id) {
