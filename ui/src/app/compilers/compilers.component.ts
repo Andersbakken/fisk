@@ -9,7 +9,7 @@ import { TabChangedService } from '../tab-changed.service';
     styleUrls: ['./compilers.component.css']
 })
 export class CompilersComponent {
-    private environments: any;
+    public environments: any;
     private compatibilities: any;
 
     constructor(private fisk: FiskService, private tabChanged: TabChangedService,
@@ -87,9 +87,9 @@ export class CompilersComponent {
     styleUrls: ['./compilers.component.dialog.css']
 })
 export class CompilersComponentDialog {
-    private others: any = [];
-    private checked: any = {};
-    private args: any = {};
+    public others: any = [];
+    public checked: any = {};
+    public args: any = {};
 
     constructor(public dialogRef: MatDialogRef<CompilersComponentDialog>,
                 @Inject(MAT_DIALOG_DATA) public data: any) {
