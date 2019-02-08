@@ -129,8 +129,10 @@ class VM extends EventEmitter
     destroy() {
         this.destroying = true;
         this.child.send({type: 'destroy'}, err => {
-            console.error("Failed to send destroy message to child", this.hash, err);
-            this.child.kill();
+            if (err) {
+                console.error("Failed to send destroy message to child", this.hash, err);
+                this.child.kill();
+            }
         });
     }
 
