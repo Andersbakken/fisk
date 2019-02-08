@@ -138,7 +138,7 @@ client.on("objectCache", enabled => {
     let objectCacheSize = bytes.parse(option('object-cache-size'));
     if (enabled && objectCacheSize) {
         const objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
-        
+
         objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
         objectCache.on("added", md5 => {
             client.send({ type: "objectCacheAdded", md5: md5 });
@@ -307,9 +307,6 @@ client.on("getEnvironments", message => {
         const url = base + env;
         console.log("got url", url);
 
-        // request('http://google.com/doodle.png').
-        //     pipe(fs.createWriteStream('doodle.png'))
-        // console.log("getting env", env);
         const dir = path.join(environmentsRoot, env);
         try {
             fs.removeSync(dir);
