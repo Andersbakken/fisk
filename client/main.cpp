@@ -434,8 +434,20 @@ int main(int argc, char **argv)
     slaveWebSocket.wait = wait;
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
-        while ((slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+        while (!slaveWebSocket.done && (slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
             select.exec();
+        if (slaveWebSocket.done) {
+            if (!data.preprocessed->stdErr.empty()) {
+                fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+            }
+            data.watchdog->transition(Watchdog::UploadedJob);
+            data.watchdog->transition(Watchdog::Finished);
+            data.watchdog->stop();
+            schedulerWebsocket.close("cachehit");
+
+            Client::writeStatistics();
+            return data.exitCode;
+        }
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             data.watchdog->stop();
