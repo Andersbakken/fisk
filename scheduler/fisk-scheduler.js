@@ -13,7 +13,7 @@ const bytes = require('bytes');
 const crypto = require('crypto');
 const Database = require('./database');
 const Peak = require('./peak');
-const ObjectCache = require('./objectcache');
+// const ObjectCache = require('./objectcache');
 const compareVersions = require('compare-versions');
 const humanizeDuration = require('humanize-duration');
 
@@ -56,11 +56,11 @@ let jobsScheduled = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 let objectCache;
-let objectCacheSize = bytes.parse(option('object-cache-size'));
-if (objectCacheSize) {
-    let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
-    objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
-}
+// let objectCacheSize = bytes.parse(option('object-cache-size'));
+// if (objectCacheSize) {
+//     let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
+//     objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
+// }
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
