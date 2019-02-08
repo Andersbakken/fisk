@@ -52,6 +52,96 @@ if (objectCacheSize) {
     objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
 }
 
+function getFromCache(compile)
+{
+    // if (objectCache)
+    //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
+    if (!objectCache || objectCache.state(compile.md5) != "exists")
+        return false;
+    const file = path.join(objectCache.dir, compile.md5);
+    if (!fs.existsSync(file)) {
+        console.log("The file is not even there", file);
+        objectCache.remove(compile.md5);
+        return false;
+    }
+    // console.log("we have it cached", compile.md5);
+
+    let pointOfNoReturn = false;
+    let fd;
+    try {
+        let item = objectCache.get(compile.md5);
+        compile.send(Object.assign({objectCache: true}, item.response));
+        pointOfNoReturn = true;
+        fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
+        // console.log("here", item.response.md5, item.response);
+        let pos = 4 + item.headerSize;
+        let fileIdx = 0;
+        const work = () => {
+            function finish()
+            {
+                fs.closeSync(fd);
+                ++item.cacheHits;
+                // console.log("GOT STUFF", job);
+                // let info = {
+                //     type: "cacheHit",
+                //     client: {
+                //         hostname: compile.hostname,
+                //         ip: compile.ip,
+                //         name: compile.name,
+                //         user: compile.user
+                //     },
+                //     sourceFile: compile.sourceFile,
+                //     jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
+                //     jobsFailed: jobsFailed,
+                //     jobsStarted: jobsStarted,
+                //     jobsScheduled: jobsScheduled,
+                //     cacheHits: objectCache ? objectCache.cacheHits : 0
+                // };
+                // // console.log("send to monitors", info);
+                // monitors.forEach(monitor => monitor.send(info));
+                // }
+            }
+            const file = item.response.index[fileIdx];
+            if (!file) {
+                finish();
+                return;
+            }
+            const buffer = Buffer.allocUnsafe(file.bytes);
+            // console.log("reading from", pos);
+            fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
+                if (err || read != file.bytes) {
+                    fs.closeSync(fd);
+                    console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
+                    objectCache.remove(compile.md5);
+                    compile.close();
+                } else {
+                    // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
+                    compile.send(buffer);
+                    pos += read;
+                    if (++fileIdx < item.response.index.length) {
+                        work();
+                    } else {
+                        finish();
+                    }
+                }
+            });
+        };
+        work();
+        return true;
+    } catch (err) {
+        if (err.code != "ENOENT")
+            console.error("Got some error here", err);
+        if (fd)
+            fs.closeSync(fd);
+        if (pointOfNoReturn) {
+            compile.close();
+            return true; // hehe
+        }
+        return false;
+        // console.log("The cache handled it");
+    }
+}
+
 let environments = {};
 const client = new Client(option, common.Version);
 const environmentsRoot = path.join(common.cacheDir(), "environments");
@@ -314,7 +404,8 @@ let jobQueue = [];
 
 server.on('headers', (headers, request) => {
     // console.log("request is", request.headers);
-    headers.push(`x-fisk-wait: ${jobQueue.length >= client.slots}`);
+    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(request.headers["x-fisk-md5"]) != "none"));
+    headers.push(`x-fisk-wait: ${wait}`);
 });
 
 function startPending()
@@ -352,6 +443,16 @@ server.on("job", job => {
         stderr: "",
         start: function() {
             let job = this.job;
+            if (getFromCache(job)) {
+                console.log("Got it from cache", job.sourceFile);
+                job.objectcache = true;
+                this.done = true;
+                let idx = jobQueue.indexOf(j);
+                console.log("Job finished from cache", this.id, job.sourceFile, "for", job.ip, job.name);
+                if (idx != -1)
+                    jobQueue.splice(idx, 1);
+                return;
+            }
             client.send("jobStarted", {
                 id: job.id,
                 sourceFile: job.sourceFile,
