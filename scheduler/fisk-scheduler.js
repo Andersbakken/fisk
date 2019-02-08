@@ -56,9 +56,6 @@ let jobsScheduled = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 let objectCache;
-if (option('object-cache')) {
-    objectCache = new ObjectCacheManager;
-}
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
@@ -129,12 +126,11 @@ function jobStartedOrScheduled(type, job)
     }
 }
 
-function cacheHit(job)
+function cacheHit(slave, job)
 {
     if (objectCache)
         ++objectCache.hits;
     if (monitors.length) {
-        // console.log("GOT STUFF", job);
         let info = {
             type: "cacheHit",
             client: {
@@ -145,19 +141,20 @@ function cacheHit(job)
             },
             sourceFile: job.sourceFile,
             slave: {
-                hostname: job.slave.hostname,
-                ip: job.slave.ip,
-                name: job.slave.name,
-                port: job.slave.port
+                hostname: slave.hostname,
+                ip: slave.ip,
+                name: slave.name,
+                port: slave.port
             },
             id: job.id,
-            jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
+            jobs: (objectCache ? objectCache.hits : 0) + jobsFailed + jobsScheduled,
             jobsFailed: jobsFailed,
             jobsStarted: jobsStarted,
             jobsScheduled: jobsScheduled,
-            cacheHits: objectCache ? objectCache.cacheHits : 0
+            cacheHits: objectCache ? objectCache.hits : 0
         };
         // console.log("send to monitors", info);
+        // console.log("sending info", info);
         monitors.forEach(monitor => monitor.send(info));
     }
 }
@@ -231,6 +228,19 @@ function forEachSlave(cb) {
     for (let key in slaves) {
         cb(slaves[key]);
     }
+}
+
+if (option('object-cache')) {
+    objectCache = new ObjectCacheManager;
+    objectCache.on("cleared", () => {
+        jobsFailed = 0;
+        jobsStarted = 0;
+        jobsScheduled = 0;
+        const msg = { type: "clearObjectCache" };
+        forEachSlave(slave => slave.send(msg));
+        let info = statsMessage();
+        monitors.forEach(monitor => monitor.send(info));
+    });
 }
 
 function removeSlave(slave) {
@@ -393,7 +403,7 @@ server.on("listen", app => {
 
     app.get("/info", (req, res, next) => {
         const now = Date.now();
-        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
+        const jobs = jobsFailed + jobsStarted + (objectCache ? objectCache.hits : 0);
         function percentage(count)
         {
             return { count: count, percentage: (count ? count * 100 / jobs : 0).toFixed(1) + "%" };
@@ -545,11 +555,11 @@ server.on("slave", slave => {
     });
 
     slave.on("objectCacheAdded", msg => {
-        objectCache.insert(msg.md5s, slave);
+        objectCache.insert(msg.md5, slave);
     });
 
     slave.on("objectCacheRemoved", msg => {
-        objectCache.remove(msg.md5s, slave);
+        objectCache.remove(msg.md5, slave);
     });
 
     slave.on("close", () => {
@@ -772,7 +782,8 @@ server.on("compile", compile => {
         let sendTime = Date.now();
         ++slave.activeClients;
         ++slave.jobsScheduled;
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} objectCache: ${foundInCache}.\nSlave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} objectCache: ${foundInCache}. `
+                    + `Slave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
         slave.lastJob = Date.now();
         let id = nextJobId();
         data.id = id;
@@ -854,6 +865,7 @@ server.on("monitor", client => {
         client.send(slaveToMonitorInfo(slave, "slaveAdded"));
     });
     let info = statsMessage();
+    // console.log("sending info", info);
 
     client.send(info);
     let user;
