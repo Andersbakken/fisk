@@ -218,8 +218,15 @@ bool Client::findCompiler(const std::string &preresolved)
             }
             return false;
         };
-        if (!findSlaveCompiler(exec) && !findSlaveCompiler(sData.resolvedCompiler)) {
-            sData.slaveCompiler = exec;
+        if (!findSlaveCompiler(exec)
+            && !findSlaveCompiler(sData.resolvedCompiler)
+            && !findSlaveCompiler(Client::realpath(exec))
+            && !findSlaveCompiler(Client::realpath(sData.resolvedCompiler))) {
+            if (exec.find("++") != std::string::npos) {
+                findSlaveCompiler("g++");
+            } else {
+                findSlaveCompiler("gcc");
+            }
         }
     }
     {
