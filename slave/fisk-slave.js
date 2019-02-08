@@ -85,9 +85,10 @@ function getFromCache(compile)
                         name: compile.name,
                         user: compile.user
                     },
-                    sourceFile: compile.sourceFile
+                    sourceFile: compile.sourceFile,
+                    id: compile.id
                 };
-                console.log("sending cachehit", info);
+                // console.log("sending cachehit", info);
                 client.send(info);
             }
             const file = item.response.index[fileIdx];
