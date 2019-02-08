@@ -266,9 +266,8 @@ client.on("quit", message => {
 });
 
 client.on("clearObjectCache", () => {
-    if (!objectCache) {
+    if (objectCache) {
         objectCache.clear();
-        client.send({ type: "objectCache", md5s: objectCache.keys() });
     }
 });
 
