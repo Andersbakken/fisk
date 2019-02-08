@@ -13,7 +13,7 @@ const bytes = require('bytes');
 const crypto = require('crypto');
 const Database = require('./database');
 const Peak = require('./peak');
-// const ObjectCache = require('./objectcache');
+const ObjectCacheManager = require('./objectcachemanager');
 const compareVersions = require('compare-versions');
 const humanizeDuration = require('humanize-duration');
 
@@ -56,11 +56,9 @@ let jobsScheduled = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 let objectCache;
-// let objectCacheSize = bytes.parse(option('object-cache-size'));
-// if (objectCacheSize) {
-//     let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
-//     objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
-// }
+if (option('object-cache')) {
+    objectCache = new ObjectCacheManager;
+}
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
@@ -86,12 +84,12 @@ function statsMessage()
 {
     let info = peakData();
     info.type = "stats";
-    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
+    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
     info.jobs = jobs;
     info.jobsFailed = jobsFailed;
     info.jobsScheduled = jobsScheduled;
     info.jobsStarted = jobsStarted;
-    info.cacheHits = objectCache ? objectCache.cacheHits : 0;
+    info.cacheHits = objectCache ? objectCache.hits : 0;
     return info;
 }
 
@@ -131,6 +129,39 @@ function jobStartedOrScheduled(type, job)
     }
 }
 
+function cacheHit(job)
+{
+    if (objectCache)
+        ++objectCache.hits;
+    if (monitors.length) {
+        // console.log("GOT STUFF", job);
+        let info = {
+            type: "cacheHit",
+            client: {
+                hostname: job.client.hostname,
+                ip: job.client.ip,
+                name: job.client.name,
+                user: job.client.user
+            },
+            sourceFile: job.sourceFile,
+            slave: {
+                hostname: job.slave.hostname,
+                ip: job.slave.ip,
+                name: job.slave.name,
+                port: job.slave.port
+            },
+            id: job.id,
+            jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
+            jobsFailed: jobsFailed,
+            jobsStarted: jobsStarted,
+            jobsScheduled: jobsScheduled,
+            cacheHits: objectCache ? objectCache.cacheHits : 0
+        };
+        // console.log("send to monitors", info);
+        monitors.forEach(monitor => monitor.send(info));
+    }
+}
+
 function jobFinished(slave, job)
 {
     ++slave.jobsPerformed;
@@ -138,7 +169,7 @@ function jobFinished(slave, job)
     slave.totalUploadSpeed += job.uploadSpeed;
     // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
     if (monitors.length) {
-        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
+        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
         const info = {
             type: "jobFinished",
             id: job.id,
@@ -149,7 +180,7 @@ function jobFinished(slave, job)
             jobsStarted: jobsStarted,
             jobsFailed: jobsFailed,
             jobsScheduled: jobsScheduled,
-            cacheHits: objectCache ? objectCache.cacheHits : 0
+            cacheHits: objectCache ? objectCache.hits : 0
         };
         // console.log("send to monitors", info);
         monitors.forEach(monitor => monitor.send(info));
@@ -362,7 +393,7 @@ server.on("listen", app => {
 
     app.get("/info", (req, res, next) => {
         const now = Date.now();
-        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.cacheHits : 0);
+        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
         function percentage(count)
         {
             return { count: count, percentage: (count ? count * 100 / jobs : 0).toFixed(1) + "%" };
@@ -380,7 +411,7 @@ server.on("listen", app => {
             jobsStarted: jobsStarted,
             jobs: jobs,
             jobsScheduled: percentage(jobsScheduled),
-            cacheHits: percentage(objectCache ? objectCache.cacheHits : 0),
+            cacheHits: percentage(objectCache ? objectCache.hits : 0),
             uptimeMS: now - serverStartTime,
             uptime: humanizeDuration(now - serverStartTime),
             serverStartTime: new Date(serverStartTime).toString()
@@ -491,16 +522,6 @@ server.on("slave", slave => {
         return;
     }
     slave.activeClients = 0;
-    let stream;
-    if (objectCache) {
-        try {
-            stream = objectCache.createStream(slave.ip, slave.port);
-        } catch (err) {
-            console.log("Something wrong with this stream apparently", slave.ip, slave.port, err);
-            slave.close();
-            return;
-        }
-    }
     insertSlave(slave);
     console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
     syncEnvironments(slave);
@@ -518,10 +539,23 @@ server.on("slave", slave => {
     slave.on("error", msg => {
         console.error(`slave error '${msg}' from ${slave.ip}`);
     });
+
+    slave.on("objectCache", msg => {
+        objectCache.addNode(slave, msg.md5s);
+    });
+
+    slave.on("objectCacheAdded", msg => {
+        objectCache.insert(msg.md5s, slave);
+    });
+
+    slave.on("objectCacheRemoved", msg => {
+        objectCache.remove(msg.md5s, slave);
+    });
+
     slave.on("close", () => {
-        if (stream)
-            stream.close();
         removeSlave(slave);
+        if (objectCache)
+            objectCache.removeNode(slave);
         console.log("slave disconnected", slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
         slave.removeAllListeners();
     });
@@ -536,6 +570,7 @@ server.on("slave", slave => {
         jobStartedOrScheduled("jobStarted", job);
     });
     slave.on("jobFinished", job => jobFinished(slave, job));
+    slave.on("cacheHit", job => cacheHit(slave, job));
 
     slave.on("jobAborted", job => {
         console.log(`slave: ${slave.ip}:${slave.port} aborted a job`, job);
@@ -546,20 +581,6 @@ server.on("slave", slave => {
             };
 
             monitors.forEach(monitor => monitor.send(info));
-        }
-    });
-    slave.on("response", response => {
-        // console.log("got response", JSON.stringify(response));
-        stream.addResponse(response);
-    });
-
-    slave.on("data", data => {
-        // console.log("Got some data", data.length);
-        try {
-            stream.addData(data);
-        } catch (err) {
-            console.error("Got error from stream", err);
-            slave.close();
         }
     });
 });
@@ -654,101 +675,6 @@ server.on("compile", compile => {
         return;
     }
 
-    const getFromCache = () => {
-        // if (objectCache)
-        //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
-        if (!objectCache || objectCache.state(compile.md5) != "exists")
-            return false;
-        const file = path.join(objectCache.dir, compile.md5);
-        if (!fs.existsSync(file)) {
-            console.log("The file is not even there", file);
-            objectCache.remove(compile.md5);
-            return false;
-        }
-        // console.log("we have it cached", compile.md5);
-
-        let pointOfNoReturn = false;
-        let fd;
-        try {
-            let item = objectCache.get(compile.md5);
-            compile.send(Object.assign({objectCache: true}, item.response));
-            pointOfNoReturn = true;
-            fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
-            // console.log("here", item.response.md5, item.response);
-            let pos = 4 + item.headerSize;
-            let fileIdx = 0;
-            const work = () => {
-                function finish()
-                {
-                    fs.closeSync(fd);
-                    ++item.cacheHits;
-                    if (monitors.length) {
-                        // console.log("GOT STUFF", job);
-                        let info = {
-                            type: "cacheHit",
-                            client: {
-                                hostname: compile.hostname,
-                                ip: compile.ip,
-                                name: compile.name,
-                                user: compile.user
-                            },
-                            sourceFile: compile.sourceFile,
-                            jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
-                            jobsFailed: jobsFailed,
-                            jobsStarted: jobsStarted,
-                            jobsScheduled: jobsScheduled,
-                            cacheHits: objectCache ? objectCache.cacheHits : 0
-                        };
-                        // console.log("send to monitors", info);
-                        monitors.forEach(monitor => monitor.send(info));
-                    }
-                }
-                const file = item.response.index[fileIdx];
-                if (!file) {
-                    finish();
-                    return;
-                }
-                const buffer = Buffer.allocUnsafe(file.bytes);
-                // console.log("reading from", pos);
-                fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
-                    if (err || read != file.bytes) {
-                        fs.closeSync(fd);
-                        console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
-                        objectCache.remove(compile.md5);
-                        compile.close();
-                    } else {
-                        // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
-                        compile.send(buffer);
-                        pos += read;
-                        if (++fileIdx < item.response.index.length) {
-                            work();
-                        } else {
-                            finish();
-                        }
-                    }
-                });
-            };
-            work();
-            return true;
-        } catch (err) {
-            if (err.code != "ENOENT")
-                console.error("Got some error here", err);
-            if (fd)
-                fs.closeSync(fd);
-            if (pointOfNoReturn) {
-                compile.close();
-                return true; // hehe
-            }
-            return false;
-            // console.log("The cache handled it");
-        }
-    };
-
-    if (getFromCache()) {
-        console.log(`${compile.hostname} ${compile.ip} got ${compile.sourceFile} from cache`);
-        return;
-    }
-
     // console.log("request", compile.hostname, compile.ip, compile.environment);
     const usableEnvs = Environments.compatibleEnvironments(compile.environment);
     if (!Environments.hasEnvironment(compile.environment) && requestEnvironment(compile)) {
@@ -775,24 +701,40 @@ server.on("compile", compile => {
     let extraArgs;
     let blacklistedArgs;
     // console.log("got usableEnvs", usableEnvs);
-    forEachSlave(s => {
-        if (compile.slave && compile.slave != s.ip && compile.slave != s.name)
-            return;
-
-        for (let i=0; i<usableEnvs.length; ++i) {
-            // console.log("checking slave", s.name, s.environments);
-            if (usableEnvs[i] in s.environments) {
+    let foundInCache = false;
+    if (objectCache) {
+        let cacheNodes = objectCache.get(compile.md5);
+        if (cacheNodes) {
+            cacheNodes.forEach(s => {
                 const slaveScore = score(s);
-                // console.log("comparing", slaveScore, bestScore);
                 if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
                     bestScore = slaveScore;
                     slave = s;
-                    env = usableEnvs[i];
+                    foundInCache = true;
                 }
-                break;
-            }
+            });
         }
-    });
+    }
+    if (!slave) {
+        forEachSlave(s => {
+            if (compile.slave && compile.slave != s.ip && compile.slave != s.name)
+                return;
+
+            for (let i=0; i<usableEnvs.length; ++i) {
+                // console.log("checking slave", s.name, s.environments);
+                if (usableEnvs[i] in s.environments) {
+                    const slaveScore = score(s);
+                    // console.log("comparing", slaveScore, bestScore);
+                    if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
+                        bestScore = slaveScore;
+                        slave = s;
+                        env = usableEnvs[i];
+                    }
+                    break;
+                }
+            }
+        });
+    }
     if (!slave && compile.slave) {
         ++jobsFailed;
         console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
@@ -830,7 +772,7 @@ server.on("compile", compile => {
         let sendTime = Date.now();
         ++slave.activeClients;
         ++slave.jobsScheduled;
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} slave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} objectCache: ${foundInCache}.\nSlave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
         slave.lastJob = Date.now();
         let id = nextJobId();
         data.id = id;

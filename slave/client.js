@@ -68,7 +68,7 @@ class Client extends EventEmitter {
             console.error("client websocket error", err.message);
         });
         this.ws.on("upgrade", res => {
-            this.emit("objectcache", res.headers["x-fisk-objectcache"] == "true");
+            this.emit("objectCache", res.headers["x-fisk-object-cache"] == "true");
         });
 
         this.ws.on("message", msg => {

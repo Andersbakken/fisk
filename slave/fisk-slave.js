@@ -45,12 +45,7 @@ if (ports.length) {
     process.exit();
 }
 
-let objectCacheSize = bytes.parse(option('object-cache-size'));
 let objectCache;
-if (objectCacheSize) {
-    let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
-    objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
-}
 
 function getFromCache(compile)
 {
@@ -82,24 +77,18 @@ function getFromCache(compile)
                 fs.closeSync(fd);
                 ++item.cacheHits;
                 // console.log("GOT STUFF", job);
-                // let info = {
-                //     type: "cacheHit",
-                //     client: {
-                //         hostname: compile.hostname,
-                //         ip: compile.ip,
-                //         name: compile.name,
-                //         user: compile.user
-                //     },
-                //     sourceFile: compile.sourceFile,
-                //     jobs: (objectCache ? objectCache.cacheHits : 0) + jobsFailed + jobsScheduled,
-                //     jobsFailed: jobsFailed,
-                //     jobsStarted: jobsStarted,
-                //     jobsScheduled: jobsScheduled,
-                //     cacheHits: objectCache ? objectCache.cacheHits : 0
-                // };
-                // // console.log("send to monitors", info);
-                // monitors.forEach(monitor => monitor.send(info));
-                // }
+                let info = {
+                    type: "cacheHit",
+                    client: {
+                        hostname: compile.hostname,
+                        ip: compile.ip,
+                        name: compile.name,
+                        user: compile.user
+                    },
+                    sourceFile: compile.sourceFile
+                };
+                console.log("sending cachehit", info);
+                client.send(info);
             }
             const file = item.response.index[fileIdx];
             if (!file) {
@@ -144,6 +133,24 @@ function getFromCache(compile)
 
 let environments = {};
 const client = new Client(option, common.Version);
+client.on("objectCache", enabled => {
+    let objectCacheSize = bytes.parse(option('object-cache-size'));
+    if (enabled && objectCacheSize) {
+        const objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
+        
+        objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
+        objectCache.on("added", md5 => {
+            client.send({ type: "objectCacheAdded", md5: md5 });
+        });
+
+        objectCache.on("removed", md5 => {
+            client.send({ type: "objectCacheRemoved", md5: md5 });
+        });
+    } else {
+        objectCache = undefined;
+    }
+});
+
 const environmentsRoot = path.join(common.cacheDir(), "environments");
 
 function exec(command, options)
@@ -255,6 +262,13 @@ client.on("quit", message => {
         }
     }
     process.exit(message.code);
+});
+
+client.on("clearObjectCache", () => {
+    if (!objectCache) {
+        objectCache.clear();
+        client.send({ type: "objectCache", md5s: objectCache.keys() });
+    }
 });
 
 client.on("dropEnvironments", message => {
@@ -378,6 +392,8 @@ client.on("connect", () => {
         connectInterval = undefined;
     }
     load.start(option("loadInterval", 1000));
+    if (objectCache)
+        client.send({ type: "objectCache", md5s: objectCache.keys() });
 });
 
 client.on("error", err => {
@@ -590,7 +606,7 @@ function start() {
         client.connect(Object.keys(environments));
         server.listen();
     }).catch((err) => {
-        console.error(`Failed to load environments ${err.message}`);
+        console.error(`Failed to initialize ${err.message}`);
         setTimeout(start, 1000);
     });
 }
