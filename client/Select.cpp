@@ -34,7 +34,7 @@ int Select::exec(int timeoutMs) const
         struct timeval *timeout = timeoutMs == -1 ? 0 : &t;
         if (timeout) {
             timeout->tv_sec = timeoutMs / 1000;
-            timeout->tv_usec = (timeoutMs % 1000) / 1000;
+            timeout->tv_usec = (timeoutMs % 1000) * 1000;
         }
         ret = select(max + 1, &r, &w, 0, timeout);
     } while (ret == EINTR);
@@ -44,6 +44,9 @@ int Select::exec(int timeoutMs) const
     }
 
     const unsigned long long after = ret ? 0 : Client::mono();
+    VERBOSE("Woke up from select timeout %dms after %llums with %d sockets fired",
+            timeoutMs, after - before, ret);
+
     size_t idx = 0;
     if (FD_ISSET(mPipe[0], &r)) {
         --ret;
