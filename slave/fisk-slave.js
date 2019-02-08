@@ -487,10 +487,6 @@ server.on("job", job => {
                 }
             });
 
-            this.heartbeatTimer = setInterval(() => {
-                // console.log("sending heartbeat");
-                job.send("heartbeat", {});
-            }, 5000);
             console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.wait);
             this.op = vm.startCompile(job.commandLine, job.argv0, job.id);
             this.buffers.forEach(data => this.op.feed(data.data, data.last));
@@ -559,6 +555,11 @@ server.on("job", job => {
             }
         }
     };
+
+    job.heartbeatTimer = setInterval(() => {
+        // console.log("sending heartbeat");
+        job.send("heartbeat", {});
+    }, 5000);
 
     job.on("error", (err) => {
         job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
