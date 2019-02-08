@@ -6,19 +6,19 @@ const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
 const Compile = require("./compile");
+const bytes = require('bytes');
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const child_process = require("child_process");
 const VM = require("./VM");
 const load = require("./load");
+const ObjectCache = require('./objectcache');
 
 if (process.getuid() !== 0) {
     console.error("fisk slave needs to run as root to be able to chroot");
     process.exit(1);
 }
-
-let objectCacheEnabled = false;
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
@@ -43,6 +43,13 @@ if (ports.length) {
         return ret;
     });
     process.exit();
+}
+
+let objectCacheSize = bytes.parse(option('object-cache-size'));
+let objectCache;
+if (objectCacheSize) {
+    let objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
+    objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
 }
 
 let environments = {};
@@ -160,7 +167,6 @@ client.on("quit", message => {
     process.exit(message.code);
 });
 
-client.on("objectcache", enabled => objectCacheEnabled = enabled);
 client.on("dropEnvironments", message => {
     console.log(`Dropping environments ${message.environments}`);
     message.environments.forEach(env => {
@@ -183,7 +189,7 @@ client.on("getEnvironments", message => {
     base = "http://" + base;
     if (!/:[0-9]+$/.exec(base))
         base += ":8097";
-    base += "/environment/"
+    base += "/environment/";
     function work()
     {
         if (!message.environments.length) {
@@ -399,13 +405,12 @@ server.on("job", job => {
                     stdout: this.stdout
                 };
                 job.send(response);
-                if (objectCacheEnabled && response.md5)
-                    client.send(response);
+                if (objectCache && response.md5) {
+                    objectCache.add(response, contents);
+                }
 
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
-                    if (objectCacheEnabled && response.md5)
-                        client.sendBinary(contents[i].contents);
                 }
                 if (this.heartbeatTimer) {
                     clearTimeout(this.heartbeatTimer);
