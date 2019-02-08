@@ -165,7 +165,7 @@ class Server extends EventEmitter {
         });
         ws.on("close", () => {
             // console.log("GOT WS CLOSE");
-            if (bytes)
+            if (bytes && !client.objectcache)
                 client.emit("error", "Got close while reading a binary message");
             if (client)
                 client.emit("close");
