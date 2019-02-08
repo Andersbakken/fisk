@@ -633,10 +633,9 @@ static std::string argsAsString()
 {
     std::string ret = sData.compiler;
     for (int i=1; i<sData.argc; ++i) {
-        ret += sData.argv[i];
         ret += ' ';
+        ret += sData.argv[i];
     }
-    ret.resize(ret.size() - 1);
     return ret;
 }
 
