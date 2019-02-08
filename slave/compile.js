@@ -169,7 +169,7 @@ class Compile extends EventEmitter {
             }
             args.unshift('-x');
         }
-        if (compiler.indexOf('clang') == -1) {
+        if (!isClang) {
             args.push('-fpreprocessed', '-fdirectives-only'); // this is not good for clang
         } else {
             args.push('-Wno-stdlibcxx-not-found');
