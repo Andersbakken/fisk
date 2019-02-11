@@ -446,7 +446,7 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             if (depFile.empty()) {
                 if (outputFile.empty())
                     outputFile = args->output();
-                depFile = outputFile + "d";
+                depFile = outputFile + ".d";
             }
             DEBUG("Depfile is %s", depFile.c_str());
         }
@@ -1059,3 +1059,17 @@ bool Client::isAtty()
     return false;
 }
 
+std::string Client::Data::commandLineAsString() const
+{
+    std::string ret;
+    if (compilerArgs) {
+        for (const std::string &arg : compilerArgs->commandLine) {
+            if (ret.size())
+                ret += ' ';
+            ret += arg;
+        }
+    } else {
+        ret = "none";
+    }
+    return ret;
+}

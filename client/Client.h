@@ -51,6 +51,8 @@ struct Data
     Watchdog *watchdog { 0 };
     CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
 
+    std::string commandLineAsString() const;
+
     MD5state_st md5 = []() {
         MD5state_st ret;
         MD5_Init(&ret);
