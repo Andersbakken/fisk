@@ -512,6 +512,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
     if (hasProfiling && !hasProfileDir) {
         std::string dir;
         Client::parsePath(ret->output(), 0, &dir);
+        dir = Client::realpath(dir);
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-fprofile-dir=", 14);
             MD5_Update(&Client::data().md5, dir.c_str(), dir.size());
