@@ -100,6 +100,9 @@ function getFromCache(job, cb)
             // console.log("reading from", pos);
             fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
                 if (err || read != file.bytes) {
+                    if (!err) {
+                        err = `Short read ${read}/${file.bytes}`;
+                    }
                     console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
                     finish(err);
                 } else {
