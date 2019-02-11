@@ -18,7 +18,6 @@ import { ConfigService } from './config.service';
 import { MessageService } from './message.service';
 import { TabChangedService } from './tab-changed.service';
 import { ConfigComponent } from './config/config.component';
-import { ChartComponent } from './chart/chart.component';
 import { MainComponent } from './main/main.component';
 import { LogsComponent } from './logs/logs.component';
 import { LogComponent } from './log/log.component';
@@ -27,7 +26,6 @@ import { CompilersComponent, CompilersComponentDialog } from './compilers/compil
 
 const appRoutes: Routes = [
     { path: 'config', component: ConfigComponent },
-    //{ path: 'chart', component: ChartComponent },
     { path: 'pie-chart', component: PieChartComponent },
     { path: 'logs', component: LogsComponent },
     { path: 'compilers', component: CompilersComponent },
@@ -42,7 +40,6 @@ const appRoutes: Routes = [
     declarations: [
         AppComponent,
         ConfigComponent,
-        ChartComponent,
         MainComponent,
         LogsComponent,
         LogComponent,
