@@ -427,7 +427,7 @@ function startPending()
     // console.log(`startPending called ${jobQueue.length}`);
     for (let idx=0; idx<jobQueue.length; ++idx) {
         let jj = jobQueue[idx];
-        if (!jj.op) {
+        if (!jj.op && !jj.objectCache) {
             // console.log("starting jj", jj.id);
             jj.start();
             break;
@@ -486,6 +486,7 @@ server.on("job", job => {
                     jobQueue.splice(idx, 1);
                 startPending();
             })) {
+                j.objectCache = true;
                 return;
             }
             client.send("jobStarted", {
