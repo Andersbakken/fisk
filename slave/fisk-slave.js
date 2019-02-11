@@ -536,7 +536,7 @@ server.on("job", job => {
                     stdout: this.stdout
                 };
                 job.send(response);
-                if (objectCache && response.md5) {
+                if (objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
                     objectCache.add(response, contents);
                 }
 
