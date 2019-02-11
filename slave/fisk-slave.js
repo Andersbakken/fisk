@@ -52,49 +52,44 @@ if (ports.length) {
 
 let objectCache;
 
-function getFromCache(compile)
+function getFromCache(job, cb)
 {
+    // console.log("got job", job.md5, objectCache ? objectCache.state(job.md5) : false);
     // if (objectCache)
-    //     console.log("objectCache", compile.md5, objectCache.state(compile.md5), objectCache.keys);
-    if (!objectCache || objectCache.state(compile.md5) != "exists")
+    //     console.log("objectCache", job.md5, objectCache.state(job.md5), objectCache.keys);
+    if (!objectCache || objectCache.state(job.md5) != "exists")
         return false;
-    const file = path.join(objectCache.dir, compile.md5);
+    const file = path.join(objectCache.dir, job.md5);
     if (!fs.existsSync(file)) {
         console.log("The file is not even there", file);
-        objectCache.remove(compile.md5);
+        objectCache.remove(job.md5);
         return false;
     }
-    // console.log("we have it cached", compile.md5);
+    // console.log("we have it cached", job.md5);
 
     let pointOfNoReturn = false;
     let fd;
     try {
-        let item = objectCache.get(compile.md5);
-        compile.send(Object.assign({objectCache: true}, item.response));
+        let item = objectCache.get(job.md5);
+        job.send(Object.assign({objectCache: true}, item.response));
+        job.objectcache = true;
         pointOfNoReturn = true;
         fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
         // console.log("here", item.response.md5, item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;
         const work = () => {
-            function finish()
+            function finish(err)
             {
                 fs.closeSync(fd);
-                ++item.cacheHits;
-                // console.log("GOT STUFF", job);
-                let info = {
-                    type: "cacheHit",
-                    client: {
-                        hostname: compile.hostname,
-                        ip: compile.ip,
-                        name: compile.name,
-                        user: compile.user
-                    },
-                    sourceFile: compile.sourceFile,
-                    id: compile.id
-                };
-                // console.log("sending cachehit", info);
-                client.send(info);
+                if (err) {
+                    objectCache.remove(job.md5);
+                    job.close();
+                } else {
+                    ++item.cacheHits;
+                }
+
+                cb(err);
             }
             const file = item.response.index[fileIdx];
             if (!file) {
@@ -105,13 +100,11 @@ function getFromCache(compile)
             // console.log("reading from", pos);
             fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
                 if (err || read != file.bytes) {
-                    fs.closeSync(fd);
                     console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
-                    objectCache.remove(compile.md5);
-                    compile.close();
+                    finish(err);
                 } else {
                     // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
-                    compile.send(buffer);
+                    job.send(buffer);
                     pos += read;
                     if (++fileIdx < item.response.index.length) {
                         work();
@@ -129,7 +122,7 @@ function getFromCache(compile)
         if (fd)
             fs.closeSync(fd);
         if (pointOfNoReturn) {
-            compile.close();
+            job.close();
             return true; // hehe
         }
         return false;
@@ -461,14 +454,34 @@ server.on("job", job => {
         stderr: "",
         start: function() {
             let job = this.job;
-            if (getFromCache(job)) {
-                console.log("Got it from cache", job.sourceFile);
-                job.objectcache = true;
+            if (getFromCache(job, err => {
+                if (err) {
+                    console.error("cache failed, let the client handle doing it itself");
+                    job.close();
+                } else {
+                    // console.log("GOT STUFF", job);
+                    let info = {
+                        type: "cacheHit",
+                        client: {
+                            hostname: job.hostname,
+                            ip: job.ip,
+                            name: job.name,
+                            user: job.user
+                        },
+                        sourceFile: job.sourceFile,
+                        id: job.id
+                    };
+                    // console.log("sending cachehit", info);
+                    client.send(info);
+
+                    console.log("Job finished from cache", this.id, job.sourceFile, "for", job.ip, job.name);
+                }
                 this.done = true;
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished from cache", this.id, job.sourceFile, "for", job.ip, job.name);
                 if (idx != -1)
                     jobQueue.splice(idx, 1);
+                startPending();
+            })) {
                 return;
             }
             client.send("jobStarted", {
