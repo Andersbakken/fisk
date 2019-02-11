@@ -451,6 +451,7 @@ server.on("job", job => {
         job: job,
         op: undefined,
         done: false,
+        aborted: false,
         heartbeatTimer: undefined,
         buffers: [],
         stdout: "",
@@ -515,6 +516,8 @@ server.on("job", job => {
             this.op.on("stderr", data => { this.stderr += data; });
             this.op.on("finished", event => {
                 this.done = true;
+                if (this.aborted)
+                    return;
                 let idx = jobQueue.indexOf(j);
                 console.log("Job finished", this.id, job.sourceFile, "for", job.ip, job.name);
                 if (idx != -1) {
@@ -586,6 +589,7 @@ server.on("job", job => {
         job.removeAllListeners();
         let idx = jobQueue.indexOf(j);
         if (idx != -1) {
+            j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
             client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
