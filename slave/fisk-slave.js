@@ -462,6 +462,10 @@ server.on("job", job => {
         start: function() {
             let job = this.job;
             if (getFromCache(job, err => {
+                if (this.heartbeatTimer) {
+                    clearTimeout(this.heartbeatTimer);
+                    this.heartbeatTimer = undefined;
+                }
                 if (err) {
                     console.error("cache failed, let the client handle doing it itself");
                     job.close();
@@ -592,6 +596,11 @@ server.on("job", job => {
     job.on("close", () => {
         job.removeAllListeners();
         let idx = jobQueue.indexOf(j);
+        if (job.heartbeatTimer) {
+            clearTimeout(job.heartbeatTimer);
+            job.heartbeatTimer = undefined;
+        }
+
         if (idx != -1) {
             j.aborted = true;
             jobQueue.splice(idx, 1);
