@@ -75,10 +75,11 @@ function getFromCache(job, cb)
         job.objectcache = true;
         pointOfNoReturn = true;
         fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
-        // console.log("here", item.response.md5, item.response);
+        // console.log("here", item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;
         const work = () => {
+            // console.log("work", job.md5);
             function finish(err)
             {
                 fs.closeSync(fd);
@@ -97,8 +98,9 @@ function getFromCache(job, cb)
                 return;
             }
             const buffer = Buffer.allocUnsafe(file.bytes);
-            // console.log("reading from", pos);
+            // console.log("reading from", file, path.join(objectCache.dir, item.response.md5), pos);
             fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
+                // console.log("GOT READ RESPONSE", file, fileIdx, err, read);
                 if (err || read != file.bytes) {
                     if (!err) {
                         err = `Short read ${read}/${file.bytes}`;
@@ -106,6 +108,7 @@ function getFromCache(job, cb)
                     console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
                     finish(err);
                 } else {
+                    // console.log("got good response from file", file);
                     // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
                     job.send(buffer);
                     pos += read;
