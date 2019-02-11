@@ -526,7 +526,7 @@ function addLogFile(log, cb) {
 }
 
 server.on("slave", slave => {
-    if (compareVersions(schedulerNpmVersion, slave.npmVersion) > 1) {
+    if (compareVersions(schedulerNpmVersion, slave.npmVersion) >= 1) {
         console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been at least: ${schedulerNpmVersion}`);
         slave.send({ type: "quit" });
         return;
