@@ -22,10 +22,15 @@ if (process.getuid() !== 0) {
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+    if (client)
+        client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
+
 });
 
 process.on('uncaughtException', err => {
     console.error("Uncaught exception", err);
+    if (client)
+        client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
 });
 
 let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
