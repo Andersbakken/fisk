@@ -235,7 +235,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 return nullptr;
             }
             ret->flags |= HasDashO;
-            ret->objectFileIndex = i;
+            ret->objectFileIndex = i + 1;
             md5(2);
             ++i;
             continue;
