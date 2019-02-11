@@ -20,7 +20,9 @@ export class CompilersComponent {
                 console.log(data.environments);
                 for (const k in data.environments) {
                     const e = data.environments[k];
-                    if (typeof e === "object" && "hash" in e) {
+                    if (typeof e === "object" && "system" in e) {
+                        if (!("hash" in e))
+                            e.hash = k;
                         const info = { name: undefined, major: undefined, minor: undefined, patch: undefined, version: "" };
                         const infos = (e.info || "").split("\n");
                         const crx = /^(clang) version ([0-9]+)\.([0-9+])\.([0-9]+) /;
@@ -71,6 +73,8 @@ export class CompilersComponent {
         });
         dialogRef.afterClosed().subscribe(result => {
             //console.log("dialog closed", result);
+            if (!result)
+                return;
             for (let k in result.checked) {
                 if (result.checked[k]) {
                     const args = result.args[k] && result.args[k].split(' ');
