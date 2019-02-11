@@ -33,7 +33,6 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
             ERROR("Couldn't open log file %s for writing", file.c_str());
         } else {
             sLogFileName = std::move(file);
-            std::atexit([]() { fclose(sLogFile); });
         }
     } else if (!file.empty()) {
         sLogFileName = std::move(file);
@@ -42,6 +41,14 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
         minLogLevel = Debug;
     } else {
         minLogLevel = level;
+    }
+}
+
+void Log::shutdown()
+{
+    if (sLogFile) {
+        fclose(sLogFile);
+        sLogFile = nullptr;
     }
 }
 
@@ -74,7 +81,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     const unsigned long long elapsed = Client::mono() - Client::started;
     if (level >= sLevel) {
         if (Config::logTimePrefix)
-            fprintf(f, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
+            fprintf(f, "%llu: %llu.%03llu: ", sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), f);
     }
     int fd = -1;
@@ -88,11 +95,12 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
 
     if (sLogFile) {
         if (Config::logTimePrefix)
-            fprintf(sLogFile, "%llu: %llu.%03llu: ", sPid, elapsed / 1000, elapsed % 1000);
+            fprintf(sLogFile, "%llu: %llu.%03llu: ", sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
-        fwrite("\n", 1, 1, f);
+        if (level >= sLevel)
+            fwrite("\n", 1, 1, f);
         if (sLogFile)
             fwrite("\n", 1, 1, sLogFile);
     }

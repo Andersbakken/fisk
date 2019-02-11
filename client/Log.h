@@ -24,6 +24,7 @@ enum LogFileMode {
     Append
 };
 void init(Level level, std::string &&logFile, LogFileMode mode);
+void shutdown();
 extern Level minLogLevel;
 Level stringToLevel(const char *str, bool *ok);
 

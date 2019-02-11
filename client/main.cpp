@@ -47,6 +47,7 @@ int main(int argc, char **argv)
             Log::log(Log::Warn, str);
         }
         delete data.watchdog;
+        Log::shutdown();
     });
 
     if (!Config::init(argc, argv)) {
