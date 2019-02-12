@@ -344,19 +344,26 @@ void WebSocket::onWrite()
 {
     if (mState == ConnectingTCP) {
         int err;
-        socklen_t size = sizeof(err);
-        int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &size);
+        do {
+            socklen_t size = sizeof(err);
+            int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &size);
 
-        if (e == -1) {
+            if (e == -1) {
+                mState = Error;
+                ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
+                return;
+            }
+        } while (err == EINTR);
+
+        if (err == EINPROGRESS) {
+            DEBUG("Still connecting to host %s:%d", mHost.c_str(), mPort);
+            return;
+        } else if (err && err != EISCONN) {
+            ERROR("Failed to connect to host %s:%d (%d %s)", mHost.c_str(), mPort, err, strerror(err));
             mState = Error;
-            ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
             return;
         }
-        if (err) {
-            ERROR("Failed to connect to host %s:%d", mHost.c_str(), mPort);
-            mState = Error;
-            return;
-        }
+
         DEBUG("Asynchronously connected to host %s:%d", mHost.c_str(), mPort);
         mState = ConnectedTCP;
         if (!requestUpgrade())
