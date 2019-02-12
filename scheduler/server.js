@@ -370,7 +370,8 @@ class Server extends EventEmitter {
             this._handleMonitor(req, client);
             break;
         default:
-            error(`Invalid pathname ${url.pathname}`);
+            console.error(`Invalid pathname ${url.pathname} from: ${ip}`);
+            ws.close();
             return;
         }
     }
