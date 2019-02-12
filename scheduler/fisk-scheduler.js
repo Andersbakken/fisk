@@ -33,6 +33,8 @@ process.on('uncaughtException', err => {
     });
 });
 
+const monitorsLog = option("monitor-log");
+
 server.on("error", error => {
     throw new error;
 });
@@ -114,14 +116,17 @@ function jobStartedOrScheduled(type, job)
             },
             sourceFile: job.sourceFile,
             slave: {
-                hostname: job.slave.hostname,
                 ip: job.slave.ip,
                 name: job.slave.name,
                 port: job.slave.port
             },
             id: job.id
         };
-        // console.log("send to monitors", info);
+        if (job.slave.hostname)
+            info.slave.hostname = job.slave.hostname;
+
+        if (monitorsLog)
+            console.log("send to monitors", info);
         monitors.forEach(monitor => monitor.send(info));
     }
 }
@@ -141,7 +146,6 @@ function cacheHit(slave, job)
             },
             sourceFile: job.sourceFile,
             slave: {
-                hostname: slave.hostname,
                 ip: slave.ip,
                 name: slave.name,
                 port: slave.port
@@ -153,7 +157,10 @@ function cacheHit(slave, job)
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        // console.log("send to monitors", info);
+        if (slave.hostname)
+            info.slave.hostname = job.slave.hostname;
+        if (monitorsLog)
+            console.log("send to monitors", info);
         // console.log("sending info", info);
         monitors.forEach(monitor => monitor.send(info));
     }
@@ -179,7 +186,8 @@ function jobFinished(slave, job)
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        // console.log("send to monitors", info);
+        if (monitorsLog)
+            console.log("send to monitors", info);
         monitors.forEach(monitor => monitor.send(info));
     }
 }
@@ -217,7 +225,8 @@ function insertSlave(slave) {
     capacity += slave.slots;
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveAdded");
-        // console.log("send to monitors", info);
+        if (monitorsLog)
+            console.log("send to monitors", info);
         monitors.forEach(monitor => {
             monitor.send(info);
         });
@@ -249,7 +258,8 @@ function removeSlave(slave) {
     delete slaves[slaveKey(slave)];
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveRemoved");
-        // console.log("send to monitors", info);
+        if (monitorsLog)
+            console.log("send to monitors", info);
         monitors.forEach(monitor => {
             monitor.send(info);
         });
@@ -851,7 +861,8 @@ function randomBytes(bytes)
 
 
 server.on("monitor", client => {
-    console.log("Got monitor");
+    if (monitorsLog)
+        console.log("Got monitor", client.ip, client.hostname);
     monitors.push(client);
     function remove()
     {
@@ -862,15 +873,20 @@ server.on("monitor", client => {
         client.removeAllListeners();
     }
     forEachSlave(slave => {
-        client.send(slaveToMonitorInfo(slave, "slaveAdded"));
+        const info = slaveToMonitorInfo(slave, "slaveAdded");
+        if (monitorsLog)
+            console.log("sending to monitor", info);
+        client.send(info);
     });
     let info = statsMessage();
-    // console.log("sending info", info);
+    if (monitorsLog)
+        console.log("sending info to monitor", info);
 
     client.send(info);
     let user;
     client.on("message", messageText => {
-        // console.log("GOT MESSAGE", messageText);
+        if (monitorsLog)
+            console.log("Got message from monitor", client.ip, client.hostname, messageText);
         let message;
         try {
             message = JSON.parse(messageText);
