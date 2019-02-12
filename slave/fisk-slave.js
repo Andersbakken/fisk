@@ -553,14 +553,25 @@ server.on("job", job => {
                 // job.close();
                 const end = Date.now();
                 // console.log("GOT ID", j);
-                client.send("jobFinished", {
-                    id: j.id,
-                    cppSize: event.cppSize,
-                    compileDuration: event.compileDuration,
-                    compileSpeed: (event.cppSize / event.compileDuration),
-                    uploadDuration: uploadDuration,
-                    uploadSpeed: (event.cppSize / uploadDuration)
-                });
+                if (event.success) {
+                    client.send("jobFinished", {
+                        id: j.id,
+                        cppSize: event.cppSize,
+                        compileDuration: event.compileDuration,
+                        compileSpeed: (event.cppSize / event.compileDuration),
+                        uploadDuration: uploadDuration,
+                        uploadSpeed: (event.cppSize / uploadDuration)
+                    });
+                } else {
+                    client.send("jobAborted", {
+                        id: j.id,
+                        cppSize: event.cppSize,
+                        compileDuration: event.compileDuration,
+                        compileSpeed: (event.cppSize / event.compileDuration),
+                        uploadDuration: uploadDuration,
+                        uploadSpeed: (event.cppSize / uploadDuration)
+                    });
+                }
                 startPending();
             });
         },
