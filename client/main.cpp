@@ -102,13 +102,13 @@ int main(int argc, char **argv)
 
     std::string clientName = Config::name;
 
-    Log::Level level = Log::Error;
+    Log::Level level = Log::Fatal;
     const std::string logLevel = Config::logLevel;
     if (!logLevel.empty()) {
         bool ok;
         level = Log::stringToLevel(logLevel.c_str(), &ok);
         if (!ok) {
-            fprintf(stderr, "Invalid log level: %s (\"Verbose\", \"Debug\", \"Warn\", \"Error\" or \"Silent\")\n", logLevel.c_str());
+            fprintf(stderr, "Invalid log level: %s (\"Verbose\", \"Debug\", \"Warn\", \"Error\" \"Fatal\" or \"Silent\")\n", logLevel.c_str());
             return 106;
         }
     }
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
         }
     }
     if (!Client::findCompiler(preresolved)) {
-        ERROR("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
+        FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
         return 107;
     }
     DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
@@ -326,7 +326,7 @@ int main(int argc, char **argv)
         for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
             if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max() && sem_unlink(Client::Slot::typeToString(type))) {
                 if (errno != ENOENT) {
-                    ERROR("Failed to unlink semaphore %s: %d %s",
+                    FATAL("Failed to unlink semaphore %s: %d %s",
                           Client::Slot::typeToString(type), errno, strerror(errno));
                 } else {
                     DEBUG("Semaphore %s didn't exist", Client::Slot::typeToString(type));

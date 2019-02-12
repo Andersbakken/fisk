@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/file.h>
 
-static Log::Level sLevel = Log::Error;
+static Log::Level sLevel = Log::Fatal;
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
 static const unsigned long long sPid = getpid();
@@ -62,6 +62,8 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
         return Warn;
     } else if (!strcasecmp("Error", str)) {
         return Error;
+    } else if (!strcasecmp("Fatal", str)) {
+        return Fatal;
     } else if (!strcasecmp("Silent", str)) {
         return Silent;
     }
@@ -148,5 +150,13 @@ void Log::error(const char *fmt, ...)
     va_list args;
     va_start(args, fmt);
     log(Error, fmt, args);
+    va_end(args);
+}
+
+void Log::fatal(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    log(Fatal, fmt, args);
     va_end(args);
 }

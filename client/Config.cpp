@@ -107,7 +107,7 @@ Separator s10("Logging:");
 Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr than)", false);
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
-Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\" or \"silent\")", "error");
+Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\", \"fatal\" or \"silent\")", "fatal");
 
 Getter<bool> logTimePrefix("log-time-prefix", "Add a time prefix to logs", false);
 Getter<bool> debug("debug", "Set log level to \"debug\"", false);

@@ -15,6 +15,7 @@ enum Level {
     Debug,
     Warn,
     Error,
+    Fatal,
     Silent
 };
 Level logLevel();
@@ -39,14 +40,22 @@ void verbose(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)
 void debug(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void warn(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void error(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+void fatal(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
-#define VERBOSE(...) if (Log::minLogLevel <= Log::Verbose)  \
+#define VERBOSE(...)                            \
+    if (Log::minLogLevel <= Log::Verbose)       \
         Log::verbose(__VA_ARGS__)
-#define DEBUG(...) if (Log::minLogLevel <= Log::Debug)  \
+#define DEBUG(...)                              \
+    if (Log::minLogLevel <= Log::Debug)         \
         Log::debug(__VA_ARGS__)
-#define WARN(...) if (Log::minLogLevel <= Log::Warn)    \
+#define WARN(...)                               \
+    if (Log::minLogLevel <= Log::Warn)          \
         Log::warn(__VA_ARGS__)
-#define ERROR(...) if (Log::minLogLevel <= Log::Error)  \
+#define ERROR(...)                              \
+    if (Log::minLogLevel <= Log::Error)         \
+        Log::error(__VA_ARGS__)
+#define FATAL(...)                              \
+    if (Log::minLogLevel <= Log::Error)         \
         Log::error(__VA_ARGS__)
 
 class Stream
