@@ -225,6 +225,20 @@ export class PieChartComponent {
                     ctx.fillStyle = c.fg;
                     ctx.fillText(c.client.modifiedName, legendX, legendY);
 
+                    let add = 0;
+                    // cache hits for client
+                    let cw = legendSpace * ((c.cacheJobs || 0) / ((c.cacheJobs || 0) + c.jobs));
+                    let jw = legendSpace * (c.jobs / ((c.cacheJobs || 0) + c.jobs));
+                    ctx.fillStyle = "#3d3";
+                    ctx.beginPath();
+                    ctx.rect(legendX, legendY - 20 + 31, cw, 4);
+                    ctx.fill();
+                    ctx.fillStyle = "#33d";
+                    ctx.beginPath();
+                    ctx.rect(legendX + cw, legendY - 20 + 31, jw, 4);
+                    ctx.fill();
+                    add = 8;
+
                     // legend usage
                     let usage = "";
                     if (c.cacheJobs) {
@@ -244,7 +258,7 @@ export class PieChartComponent {
                     ctx.fillText(usage, legendX + legendSpace - metrics.width - 10, legendY);
 
                     cur += Math.PI * 2 * (c.animatedJobs / maxJobs);
-                    legendY += 30;
+                    legendY += 30 + add;
                 });
 
                 ctx.fillStyle = "#fff";
