@@ -44,9 +44,9 @@ class Client extends EventEmitter {
 
     error(message) {
         try {
-            this.ws.send(`{"error": "${msg}"}`);
+            this.ws.send(`{"error": "${message}"}`);
             this.ws.close();
-            this.emit("error", msg);
+            this.emit("error", message);
         } catch (err) {
         }
     }
