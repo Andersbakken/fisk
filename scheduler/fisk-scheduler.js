@@ -572,11 +572,11 @@ server.on("slave", slave => {
     });
 
     slave.on("objectCacheAdded", msg => {
-        objectCache.insert(msg.md5, slave);
+        objectCache.insert(msg, slave);
     });
 
     slave.on("objectCacheRemoved", msg => {
-        objectCache.remove(msg.md5, slave);
+        objectCache.remove(msg, slave);
     });
 
     slave.on("close", () => {

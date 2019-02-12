@@ -195,7 +195,8 @@ class ObjectCache extends EventEmitter
                         throw new Error(`Wrong file size for ${path.join(this.dir, response.md5)}, should have been ${cacheItem.fileSize} but ended up being ${stat.size}`);
                     }
                     this.cache[response.md5] = cacheItem;
-                    this.emit("added", response.md5);
+                    console.log(response);
+                    this.emit("added", { md5: response.md5, sourceFile: response.sourceFile });
 
                     this.size += cacheItem.fileSize;
                     if (this.size > this.maxSize)
@@ -245,8 +246,9 @@ class ObjectCache extends EventEmitter
     {
         try {
             this.size -= this.cache[md5].fileSize;
+            const info = this.cache[md5];
             delete this.cache[md5];
-            this.emit("removed", md5);
+            this.emit("removed", { md5: md5, sourceFile: info.response.sourceFile });
             fs.unlinkSync(path.join(this.dir, md5));
         } catch (err) {
             console.error("Can't remove file", path.join(this.dir, md5), err.toString());

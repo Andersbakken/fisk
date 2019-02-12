@@ -50,30 +50,30 @@ class ObjectCacheManager extends EventEmitter
         return this.byMd5.get(md5);
     }
 
-    insert(md5, node)
+    insert(msg, node)
     {
         let md5s = this.byNode.get(node);
-        console.log("adding", md5, "for", node.ip + ":" + node.port, md5s ? md5s.length : -1);
+        console.log("adding", msg.sourceFile, msg.md5, "for", node.ip + ":" + node.port, md5s ? md5s.length : -1);
         if (md5s) {
-            md5s.push(md5);
-            addToMd5Map(this.byMd5, md5, node);
+            md5s.push(msg.md5);
+            addToMd5Map(this.byMd5, msg.md5, node);
         } else {
             console.error("insert: We don't seem to have this node", node.ip + ":" + node.port);
         }
     }
 
-    remove(md5, node)
+    remove(msg, node)
     {
         let md5s = this.byNode.get(node);
-        console.log("removing", md5, "for", node.ip + ":" + node.port, md5s ? md5s.length : -1);
+        console.log("removing", msg.sourceFile, msg.md5, "for", node.ip + ":" + node.port, md5s ? md5s.length : -1);
         if (md5s) {
-            let idx = md5s.indexOf(md5);
+            let idx = md5s.indexOf(msg.md5);
             if (idx != -1) {
                 md5s.splice(idx, 1);
             } else {
-                console.error("We don't have", md5, "on", node.ip + ":" + node.port);
+                console.error("We don't have", msg.md5, "on", node.ip + ":" + node.port);
             }
-            removeFromMd5Map(this.byMd5, md5, node);
+            removeFromMd5Map(this.byMd5, msg.md5, node);
         } else {
             console.error("remove: We don't seem to have this node", node.ip + ":" + node.port);
         }

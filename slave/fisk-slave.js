@@ -144,12 +144,12 @@ client.on("objectCache", enabled => {
         const objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
 
         objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
-        objectCache.on("added", md5 => {
-            client.send({ type: "objectCacheAdded", md5: md5 });
+        objectCache.on("added", data => {
+            client.send({ type: "objectCacheAdded", md5: data.md5, sourceFile: data.sourceFile });
         });
 
-        objectCache.on("removed", md5 => {
-            client.send({ type: "objectCacheRemoved", md5: md5 });
+        objectCache.on("removed", data => {
+            client.send({ type: "objectCacheRemoved", md5: data.md5, sourceFile: data.sourceFile });
         });
     } else {
         objectCache = undefined;
@@ -544,6 +544,7 @@ server.on("job", job => {
                 };
                 job.send(response);
                 if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
+                    response.sourceFile = job.sourceFile;
                     objectCache.add(response, contents);
                 }
 
