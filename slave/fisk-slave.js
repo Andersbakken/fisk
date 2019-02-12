@@ -421,7 +421,7 @@ let jobQueue = [];
 
 server.on('headers', (headers, request) => {
     // console.log("request is", request.headers);
-    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(request.headers["x-fisk-md5"]) != "none"));
+    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(request.headers["x-fisk-md5"]) == "exists"));
     headers.push(`x-fisk-wait: ${wait}`);
 });
 
