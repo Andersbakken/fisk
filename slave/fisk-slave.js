@@ -481,9 +481,9 @@ server.on("job", job => {
                     // console.log("sending cachehit", info);
                     client.send(info);
 
-                    console.log("Job finished from cache", this.id, job.sourceFile, "for", job.ip, job.name);
+                    console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
                 }
-                this.done = true;
+                j.done = true;
                 let idx = jobQueue.indexOf(j);
                 if (idx != -1)
                     jobQueue.splice(idx, 1);
@@ -509,21 +509,21 @@ server.on("job", job => {
                 }
             });
 
-            console.log("Starting job", this.id, job.sourceFile, "for", job.ip, job.name, job.wait);
-            this.op = vm.startCompile(job.commandLine, job.argv0, job.id);
-            this.buffers.forEach(data => this.op.feed(data.data, data.last));
+            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, job.wait);
+            j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
+            j.buffers.forEach(data => j.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
             }
-            delete this.buffers;
-            this.op.on("stdout", data => { this.stdout += data; }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
-            this.op.on("stderr", data => { this.stderr += data; });
-            this.op.on("finished", event => {
-                this.done = true;
-                if (this.aborted)
+            delete j.buffers;
+            j.op.on("stdout", data => { j.stdout += data; }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
+            j.op.on("stderr", data => { j.stderr += data; });
+            j.op.on("finished", event => {
+                j.done = true;
+                if (j.aborted)
                     return;
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished", this.id, job.sourceFile, "for", job.ip, job.name);
+                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name);
                 if (idx != -1) {
                     jobQueue.splice(idx, 1);
                 } else {
@@ -539,8 +539,8 @@ server.on("job", job => {
                     success: event.success,
                     exitCode: event.exitCode,
                     md5: job.md5,
-                    stderr: this.stderr,
-                    stdout: this.stdout
+                    stderr: j.stderr,
+                    stdout: j.stdout
                 };
                 job.send(response);
                 if (objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
@@ -565,14 +565,15 @@ server.on("job", job => {
             });
         },
         cancel: function() {
-            if (!this.done && this.op) {
-                this.op.cancel();
+            if (!j.done && j.op) {
+                j.done = true;
+                j.op.cancel();
             }
         }
     };
 
     job.heartbeatTimer = setInterval(() => {
-        if (job.done) {
+        if (job.done || job.aborted) {
             clearTimeout(job.heartbeatTimer);
         } else {
             // console.log("sending heartbeat");
@@ -583,12 +584,13 @@ server.on("job", job => {
     job.on("error", (err) => {
         job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
         console.error("got error from job", job.webSocketError);
+        j.done = true;
     });
     job.on("close", () => {
         job.removeAllListeners();
+        job.done = true;
         let idx = jobQueue.indexOf(j);
         if (idx != -1) {
-            j.done = true;
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
