@@ -44,6 +44,10 @@ public:
                 FATAL("Version mismatch detected, client version: %s minimum client version required: %s",
                       npm_version, msg["minimum_version"].string_value().c_str());
                 _exit(108);
+            } else if (type == "version_verified") {
+                ERROR("Version verified, client version: %s minimum client version required: %s",
+                      npm_version, msg["minimum_version"].string_value().c_str());
+                done = true;
             } else {
                 ERROR("Unexpected message type: %s", type.c_str());
             }
@@ -53,7 +57,6 @@ public:
     }
 
     bool done { false };
-    bool responseDone { false };
     bool needsEnvironment { false };
     int jobId { 0 };
     uint16_t slavePort { 0 };

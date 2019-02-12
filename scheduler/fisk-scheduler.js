@@ -690,6 +690,14 @@ function requestEnvironment(compile)
     return true;
 }
 
+server.on("clientVerify", clientVerify => {
+    if (compareVersions(clientMinimumVersion, clientVerify.npmVersion) >= 1) {
+        clientVerify.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
+    } else {
+        clientVerify.send("version_verified", { minimum_version: `${clientMinimumVersion}` });
+    }
+});
+
 let semaphoreMaintenanceTimers = {};
 server.on("compile", compile => {
     compile.on("log", event => {

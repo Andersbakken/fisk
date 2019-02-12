@@ -207,6 +207,7 @@ extern Getter<size_t> compileSlots;
 extern Getter<size_t> desiredCompileSlots;
 extern Getter<size_t> cppSlots;
 extern Getter<bool> watchdog;
+extern Getter<bool> verify;
 extern Getter<std::string> nodePath;
 extern Getter<std::string> hostname;
 extern Getter<std::string> name;

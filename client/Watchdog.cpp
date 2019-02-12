@@ -11,6 +11,8 @@ Watchdog::Watchdog()
 
 void Watchdog::transition(Stage stage)
 {
+    if (mState != Running)
+        return;
     if (mStage == 0) {
         if (Config::objectCache) {
             stages = { Initial, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };

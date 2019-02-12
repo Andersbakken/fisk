@@ -60,7 +60,8 @@ Client.Type = {
     Slave: 0,
     Compile: 1,
     UploadEnvironment: 2,
-    Monitor: 3
+    Monitor: 3,
+    ClientVerify: 4
 };
 
 class Server extends EventEmitter {
@@ -341,6 +342,17 @@ class Server extends EventEmitter {
         client.ws.on('error', err => client.emit('error', err));
     }
 
+    _handleClientVerify(req, client) {
+        client.assign({npmVersion: req.headers["x-fisk-npm-version"] });
+        this.emit("clientVerify", client);
+        client.ws.on('close', (code, reason) => {
+            client.ws.removeAllListeners();
+            client.emit('close', { code: code, reason: reason });
+        });
+
+        client.ws.on('error', err => client.emit('error', err));
+    }
+
     _handleConnection(ws, req) {
         let client = undefined;
         let ip = req.connection.remoteAddress;
@@ -368,6 +380,10 @@ class Server extends EventEmitter {
         case "/monitor":
             client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });
             this._handleMonitor(req, client);
+            break;
+        case "/client_verify":
+            client = new Client({ type: Client.Type.ClientVerify, ws: ws, ip: ip });
+            this._handleClientVerify(req, client);
             break;
         default:
             console.error(`Invalid pathname ${url.pathname} from: ${ip}`);

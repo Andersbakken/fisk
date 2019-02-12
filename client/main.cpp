@@ -19,6 +19,8 @@
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
 extern "C" const char *npm_version;
+static std::string schedulerUrl();
+static int clientVerify();
 int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
@@ -148,6 +150,14 @@ int main(int argc, char **argv)
         std::signal(signal, signalHandler);
     }
 
+    struct sigaction act;
+    memset(&act, 0, sizeof(struct sigaction));
+    act.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &act, 0);
+
+    if (Config::verify) {
+        return clientVerify();
+    }
     if (preresolved.empty()) {
         std::string fn;
         Client::parsePath(argv[0], &fn, 0);
@@ -206,13 +216,6 @@ int main(int argc, char **argv)
         }
     }
 
-    SchedulerWebSocket schedulerWebsocket;
-
-    struct sigaction act;
-    memset(&act, 0, sizeof(struct sigaction));
-    act.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &act, 0);
-
     data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
     if (!data.preprocessed) {
         ERROR("Failed to preprocess");
@@ -249,19 +252,7 @@ int main(int argc, char **argv)
         if (!hostname.empty())
             headers["x-fisk-client-hostname"] = std::move(hostname);
     }
-    std::string url = Config::scheduler;
-    if (url.find("://") == std::string::npos)
-        url.insert(0, "ws://");
-
-    size_t colon = url.find(':', 6);
-    if (colon != std::string::npos) {
-        ++colon;
-        while (std::isdigit(url[colon])) {
-            ++colon;
-        }
-    }
-    if (colon != url.size())
-        url.append(":8097");
+    const std::string url = schedulerUrl();
 
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
@@ -295,6 +286,7 @@ int main(int argc, char **argv)
         headers["x-fisk-md5"] = std::move(md5);
     }
 
+    SchedulerWebSocket schedulerWebsocket;
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
         data.watchdog->stop();
@@ -308,13 +300,13 @@ int main(int argc, char **argv)
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket.done && !schedulerWebsocket.responseDone
+        while (!schedulerWebsocket.done
                && schedulerWebsocket.state() >= SchedulerWebSocket::None
                && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
         }
         DEBUG("Finished schedulerWebsocket");
-        if (!schedulerWebsocket.done && !schedulerWebsocket.responseDone) {
+        if (!schedulerWebsocket.done) {
             DEBUG("Have to run locally because no server 2");
             data.watchdog->stop();
             Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error 2");
@@ -346,17 +338,6 @@ int main(int argc, char **argv)
         }
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "needs environment");
         return 0;
-    }
-
-    if (schedulerWebsocket.responseDone) {
-        if (!data.preprocessed->stdErr.empty()) {
-            fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
-        }
-        // data.watchdog->transition(Watchdog::Finished); // this would assert
-        data.watchdog->stop();
-        schedulerWebsocket.close("responsed");
-        Client::writeStatistics();
-        return data.exitCode;
     }
 
     if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())
@@ -493,4 +474,66 @@ int main(int argc, char **argv)
 
     Client::writeStatistics();
     return data.exitCode;
+}
+
+static std::string schedulerUrl()
+{
+    std::string url = Config::scheduler;
+    if (url.find("://") == std::string::npos)
+        url.insert(0, "ws://");
+
+    size_t colon = url.find(':', 6);
+    if (colon != std::string::npos) {
+        ++colon;
+        while (std::isdigit(url[colon])) {
+            ++colon;
+        }
+    }
+    if (colon != url.size())
+        url.append(":8097");
+    return url;
+}
+
+static int clientVerify()
+{
+    Client::data().watchdog->stop();
+    std::map<std::string, std::string> headers;
+    {
+        char buf[1024];
+        if (!getlogin_r(buf, sizeof(buf))) {
+            headers["x-fisk-user"] = buf;
+        } else if (const char *user = getenv("USER")) {
+            headers["x-fisk-user"] = user;
+        } else if (const char *user = getenv("USERNAME")) {
+            headers["x-fisk-user"] = user;
+        }
+    }
+
+    headers["x-fisk-client-name"] = Config::name;
+    headers["x-fisk-config-version"] = std::to_string(Config::Version);
+    headers["x-fisk-npm-version"] = npm_version;
+    SchedulerWebSocket schedulerWebsocket;
+    if (!schedulerWebsocket.connect(schedulerUrl() + "/client_verify", headers)) {
+        FATAL("Failed to connect to scheduler %s", schedulerWebsocket.url().c_str());
+        return 109;
+    }
+
+    {
+        Select select;
+        select.add(&schedulerWebsocket);
+
+        DEBUG("Starting schedulerWebsocket");
+        while (!schedulerWebsocket.done
+               && schedulerWebsocket.state() >= SchedulerWebSocket::None
+               && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
+            select.exec();
+        }
+        DEBUG("Finished schedulerWebsocket");
+        if (!schedulerWebsocket.done) {
+            FATAL("Failed to connect to scheduler 2 %s", schedulerWebsocket.url().c_str());
+            return 109;
+        }
+    }
+
+    return 0;
 }
