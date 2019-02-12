@@ -543,7 +543,7 @@ server.on("job", job => {
                     stdout: j.stdout
                 };
                 job.send(response);
-                if (objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
+                if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
                     objectCache.add(response, contents);
                 }
 
