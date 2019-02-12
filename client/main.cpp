@@ -29,11 +29,12 @@ int main(int argc, char **argv)
     // usleep(500 * 1000);
     // return 0;
     std::atexit([]() {
-        const Client::Data &data = Client::data();
+        Client::Data &data = Client::data();
         for (sem_t *semaphore : data.semaphores) {
             sem_post(semaphore);
             sem_close(semaphore);
         }
+        data.semaphores.clear();
         if (Log::minLogLevel <= Log::Warn) {
             std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
                                              Client::milliseconds_since_epoch,
@@ -133,6 +134,7 @@ int main(int argc, char **argv)
         for (sem_t *semaphore : Client::data().semaphores) {
             sem_post(semaphore);
         }
+        Client::data().semaphores.clear();
         if (signal != SIGINT) {
             fprintf(stderr, "fiskc: Caught signal %d\n", signal);
             void *buffer[64];
