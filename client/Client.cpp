@@ -383,54 +383,16 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
         ptr->stdOut.reserve(1024 * 1024);
         std::string commandLine = compiler;
         const size_t count = args->commandLine.size();
-        auto append = [&commandLine](const std::string &arg) {
-            // std::string copy;
-            // size_t slashes = 0;
-            // for (size_t i=0; i<arg.size(); ++i) {
-            //     const char ch = arg.at(i);
-            //     if (ch == '\\') {
-            //         ++slashes;
-            //         continue;
-            //     }
-            //     if (ch == '\'') {
-            //         if (slashes % 2 == 0) {
-            //             if (copy.empty()) {
-            //                 copy.assign(arg.c_str(), i);
-            //             } else {
-
-            //             }
-            //         }
-            //     }
-            //     slashes = 0;
-            // }
-            const size_t idx = arg.find('\'');
-            if (idx != std::string::npos) {
-                // ### gotta escape quotes
-            }
-            commandLine += arg;
-
-        };
-        std::string depFile;
-        std::string outputFile;
-        bool hasDepFile = false;
         for (size_t i=1; i<count; ++i) {
             const std::string arg = args->commandLine.at(i);
             if (arg == "-o" && args->commandLine.size() > i + 1) {
-                outputFile = args->commandLine.at(++i);
+                ++i;
                 continue;
             }
 
             commandLine += " '";
-            append(args->commandLine.at(i));
+            commandLine += args->commandLine.at(i);
             commandLine += '\'';
-
-            if (arg == "-MMD" || arg == "-MD" || arg == "-MM" || arg == "-M") {
-                hasDepFile = true;
-            } else if (arg == "-MF" && i + 1 < count) {
-                commandLine += " '";
-                append(args->commandLine.at(++i));
-                commandLine += '\'';
-            }
         }
         commandLine += " '-E'";
         if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
@@ -442,14 +404,6 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
             commandLine += " '-C'";
         }
 
-        if (hasDepFile) {
-            if (depFile.empty()) {
-                if (outputFile.empty())
-                    outputFile = args->output();
-                depFile = outputFile + ".d";
-            }
-            DEBUG("Depfile is %s", depFile.c_str());
-        }
         DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
         std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
         ptr->slotDuration = Client::mono() - started;
@@ -502,8 +456,6 @@ std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &comp
         ptr->cppSize = ptr->stdOut.size();
         ptr->duration = Client::mono() - started;
         ptr->mCond.notify_one();
-        if (hasDepFile)
-            ptr->depFile = std::move(depFile);
     });
     return ret;
 }
