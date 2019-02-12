@@ -18,8 +18,6 @@ class Compile extends EventEmitter {
         let output;
         let depfile;
         let hasDashO = false;
-        let hasMF = false;
-        let hasM = false;
         let hasDashX = false;
         let sourceFile;
         for (let i=0; i<args.length; ++i) {
@@ -31,18 +29,16 @@ class Compile extends EventEmitter {
                 args[i] = "output.o";
                 break; }
             case '-MF': {
-                hasMF = true;
-                depfile = args[++i];
-                args[i] = "output.d";
+                args.splice(i--, 2);
                 break; }
             case '-MMD':
             case '-MD':
             case '-MM':
             case '-M':
-                hasM = true;
+                args.splice(i--, 1);
                 continue;
             case '-MT':
-                ++i;
+                args.splice(i--, 2);
                 continue;
             case '-cxx-isystem':
             case '-isysroot':
@@ -181,12 +177,6 @@ class Compile extends EventEmitter {
             output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
         }
 
-        if (hasM && !hasMF) {
-            args.push("-MF", "output.d");
-            let suffix = path.extname(sourceFile);
-            depfile = sourceFile.substr(0, sourceFile.length - suffix) + ".d";
-        }
-
         // debug = true;
         if (debug)
             console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
@@ -224,8 +214,6 @@ class Compile extends EventEmitter {
                             } else if (stat.isFile()) {
                                 if (file == "output.o") {
                                     files.push({ path: output, mapped: path.join(prefix, file) });
-                                } else if (file == "output.d") {
-                                    files.push({ path: depfile, mapped: path.join(prefix, file) });
                                 } else if (file == "output.gcno") {
                                     // console.log("mapping", output, prefix, file);
                                     files.push({ path: output.substr(0, output.length - 1) + "gcno", mapped: path.join(prefix, file) });
