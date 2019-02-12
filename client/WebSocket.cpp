@@ -290,7 +290,7 @@ void WebSocket::acceptUpgrade()
     }
     assert(mContext);
     mState = ConnectedWebSocket;
-    onConected();
+    onConnected();
 }
 
 bool WebSocket::send(MessageType type, const void *msg, size_t len)

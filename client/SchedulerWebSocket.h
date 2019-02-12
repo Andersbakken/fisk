@@ -4,22 +4,19 @@
 #include "WebSocket.h"
 #include "Client.h"
 #include "Watchdog.h"
-#include "JobReceiver.h"
 #include <string>
 
 extern "C" const char *npm_version;
 
-class SchedulerWebSocket : public WebSocket, public JobReceiver
+class SchedulerWebSocket : public WebSocket
 {
 public:
-    virtual void onConected() override
+    virtual void onConnected() override
     {
         Client::data().watchdog->transition(Watchdog::ConnectedToScheduler);
     }
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
-        if (handleMessage(type, data, len, &responseDone))
-            return;
         if (type == WebSocket::Text) {
             std::string err;
             json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);

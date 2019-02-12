@@ -52,7 +52,7 @@ public:
     }
 protected:
     virtual void onMessage(MessageType mode, const void *data, size_t len) = 0;
-    virtual void onConected() = 0;
+    virtual void onConnected() = 0;
 
     // Socket
     virtual unsigned int mode() const override;
