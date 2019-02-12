@@ -55,6 +55,7 @@ let capacity = 0;
 let jobsFailed = 0;
 let jobsStarted = 0;
 let jobsScheduled = 0;
+let jobsFinished = 0;
 let jobId = 0;
 const db = new Database(path.join(common.cacheDir(), "db.json"));
 let objectCache;
@@ -83,10 +84,11 @@ function statsMessage()
 {
     let info = peakData();
     info.type = "stats";
-    const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
+    const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
     info.jobs = jobs;
     info.jobsFailed = jobsFailed;
     info.jobsScheduled = jobsScheduled;
+    info.jobsFinished = jobsFinished;
     info.jobsStarted = jobsStarted;
     info.cacheHits = objectCache ? objectCache.hits : 0;
     return info;
@@ -151,9 +153,10 @@ function cacheHit(slave, job)
                 port: slave.port
             },
             id: job.id,
-            jobs: (objectCache ? objectCache.hits : 0) + jobsFailed + jobsScheduled,
+            jobs: (objectCache ? objectCache.hits : 0) + jobsFailed + jobsFinished,
             jobsFailed: jobsFailed,
             jobsStarted: jobsStarted,
+            jobsFinished: jobsFinished,
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
@@ -168,12 +171,13 @@ function cacheHit(slave, job)
 
 function jobFinished(slave, job)
 {
+    ++jobsFinished;
     ++slave.jobsPerformed;
     slave.totalCompileSpeed += job.compileSpeed;
     slave.totalUploadSpeed += job.uploadSpeed;
     // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
     if (monitors.length) {
-        const jobs = jobsFailed + jobsScheduled + (objectCache ? objectCache.hits : 0);
+        const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
         const info = {
             type: "jobFinished",
             id: job.id,
@@ -183,6 +187,7 @@ function jobFinished(slave, job)
             jobs: jobs,
             jobsStarted: jobsStarted,
             jobsFailed: jobsFailed,
+            jobsFinished: jobsFinished,
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
@@ -245,6 +250,7 @@ if (option('object-cache')) {
         jobsFailed = 0;
         jobsStarted = 0;
         jobsScheduled = 0;
+        jobsFinished = 0;
         const msg = { type: "clearObjectCache" };
         forEachSlave(slave => slave.send(msg));
         let info = statsMessage();
@@ -430,7 +436,8 @@ server.on("listen", app => {
             jobsFailed: percentage(jobsFailed),
             jobsStarted: jobsStarted,
             jobs: jobs,
-            jobsScheduled: percentage(jobsScheduled),
+            jobsScheduled: jobsScheduled,
+            jobsFinished: percentage(jobsFinished),
             cacheHits: percentage(objectCache ? objectCache.hits : 0),
             uptimeMS: now - serverStartTime,
             uptime: humanizeDuration(now - serverStartTime),
