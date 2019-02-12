@@ -16,6 +16,7 @@ class Compile extends EventEmitter {
         const isClang = compiler.indexOf('clang') != -1;
 
         let output;
+        let outputFileName;
         let depfile;
         let hasDashO = false;
         let hasDashX = false;
@@ -26,8 +27,9 @@ class Compile extends EventEmitter {
             case '-o': {
                 hasDashO = true;
                 output = args[++i];
-                args[i] = "output.o";
-                break; }
+                outputFileName = path.basename(output);
+                args[i] = outputFileName;
+           break; }
             case '-MF': {
                 args.splice(i--, 2);
                 break; }
@@ -172,9 +174,9 @@ class Compile extends EventEmitter {
         }
 
         if (!hasDashO) {
-            args.push("-o", "output.o");
             let suffix = path.extname(sourceFile);
-            output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
+            outputFileName = output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
+            args.push("-o", outputFileName);
         }
 
         // debug = true;
@@ -212,12 +214,12 @@ class Compile extends EventEmitter {
                             if (stat.isDirectory()) {
                                 addDir(path.join(dir, file), prefix ? prefix + file + '/' : file + '/');
                             } else if (stat.isFile()) {
-                                if (file == "output.o") {
+                                if (file == outputFileName) {
                                     files.push({ path: output, mapped: path.join(prefix, file) });
-                                } else if (file == "output.gcno") {
+                                } else if (path.extname(file) == ".gcno") {
                                     // console.log("mapping", output, prefix, file);
                                     files.push({ path: output.substr(0, output.length - 1) + "gcno", mapped: path.join(prefix, file) });
-                                } else if (file == "output.gcda") {
+                                } else if (path.extname(file) == ".gcda") {
                                     files.push({ path: output.substr(0, output.length - 1) + "gcda", mapped: path.join(prefix, file) });
                                 } else {
                                     files.push({ path: path.join(prefix, file) });
