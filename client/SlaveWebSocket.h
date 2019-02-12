@@ -66,6 +66,11 @@ public:
             if (!stdErr.empty())
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
 
+            const auto objectCache = msg["objectCache"];
+            if (objectCache.is_bool() && !objectCache.bool_value()) {
+                Client::data().objectCache = true;
+            }
+
             if (!index.empty()) {
                 files.resize(index.size());
                 for (size_t i=0; i<index.size(); ++i) {

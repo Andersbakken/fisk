@@ -42,6 +42,7 @@ struct Data
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave
     std::string hash;
+    bool objectCache { false };
     int exitCode { 0 };
     std::set<sem_t *> semaphores;
     size_t totalWritten { 0 };

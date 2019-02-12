@@ -541,6 +541,7 @@ void Client::writeStatistics()
         stats["local"] = CompilerArgs::localReasonToString(sData.localReason);
         stats["command_line"] = data.originalArgs;
     }
+    stats["object_cache"] = data.objectCache;
     if (data.preprocessed) {
         stats["cpp_size"] = static_cast<int>(data.preprocessed->cppSize);
         stats["cpp_time"] = static_cast<int>(data.preprocessed->duration);
