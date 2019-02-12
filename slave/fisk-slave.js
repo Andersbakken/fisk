@@ -462,10 +462,6 @@ server.on("job", job => {
         start: function() {
             let job = this.job;
             if (getFromCache(job, err => {
-                if (this.heartbeatTimer) {
-                    clearTimeout(this.heartbeatTimer);
-                    this.heartbeatTimer = undefined;
-                }
                 if (err) {
                     console.error("cache failed, let the client handle doing it itself");
                     job.close();
@@ -554,11 +550,6 @@ server.on("job", job => {
                 for (let i=0; i<contents.length; ++i) {
                     job.send(contents[i].contents);
                 }
-                if (this.heartbeatTimer) {
-                    clearTimeout(this.heartbeatTimer);
-                    this.heartbeatTimer = undefined;
-                }
-
                 // job.close();
                 const end = Date.now();
                 // console.log("GOT ID", j);
@@ -577,16 +568,16 @@ server.on("job", job => {
             if (!this.done && this.op) {
                 this.op.cancel();
             }
-            if (this.heartbeatTimer) {
-                clearTimeout(this.heartbeatTimer);
-                this.heartbeatTimer = undefined;
-            }
         }
     };
 
     job.heartbeatTimer = setInterval(() => {
-        // console.log("sending heartbeat");
-        job.send("heartbeat", {});
+        if (job.done) {
+            clearTimeout(job.heartbeatTimer);
+        } else {
+            // console.log("sending heartbeat");
+            job.send("heartbeat", {});
+        }
     }, 5000);
 
     job.on("error", (err) => {
@@ -596,12 +587,8 @@ server.on("job", job => {
     job.on("close", () => {
         job.removeAllListeners();
         let idx = jobQueue.indexOf(j);
-        if (job.heartbeatTimer) {
-            clearTimeout(job.heartbeatTimer);
-            job.heartbeatTimer = undefined;
-        }
-
         if (idx != -1) {
+            j.done = true;
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
