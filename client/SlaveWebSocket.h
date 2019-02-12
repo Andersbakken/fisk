@@ -18,7 +18,7 @@ public:
     {
         DEBUG("GOT MESSAGE %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
 
-        if (messageType == WebSocket::Text) {
+        if (messageType == WebSocket::Binary) {
             handleResponseBinary(data, len);
             ERROR("Unexpected binary message");
             Client::data().watchdog->stop();
