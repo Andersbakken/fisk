@@ -20,9 +20,6 @@ public:
 
         if (messageType == WebSocket::Binary) {
             handleResponseBinary(data, len);
-            ERROR("Unexpected binary message");
-            Client::data().watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 4");
             return;
         }
 
@@ -96,9 +93,10 @@ public:
             } else {
                 done = true;
             }
+            return;
         }
 
-        ERROR("Unexpected message type %s. Wanted \"response\"", msg["type"].string_value().c_str());
+        ERROR("Unexpected message type %s.", msg["type"].string_value().c_str());
         Client::data().watchdog->stop();
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 5");
     }
