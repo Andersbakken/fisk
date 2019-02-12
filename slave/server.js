@@ -29,6 +29,7 @@ class Job extends EventEmitter {
                 this.ws.send(JSON.stringify(tosend));
             }
         } catch (err) {
+            console.error("got send error", type, err);
         }
     }
 
