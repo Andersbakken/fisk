@@ -55,7 +55,7 @@ class Load extends EventEmitter {
         this._interval = undefined;
     }
 
-    running() {
+    get running() {
         return this._interval !== undefined;
     }
 

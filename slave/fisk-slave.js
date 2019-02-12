@@ -392,20 +392,21 @@ client.on("connect", () => {
         clearInterval(connectInterval);
         connectInterval = undefined;
     }
-    load.start(option("loadInterval", 1000));
+    if (!load.running)
+        load.start(option("loadInterval", 1000));
     if (objectCache)
         client.send({ type: "objectCache", md5s: objectCache.keys() });
 });
 
 client.on("error", err => {
     console.error("client error", err);
-    if (load.running())
+    if (load.running)
         load.stop();
 });
 
 client.on("close", () => {
     console.log("client closed");
-    if (load.running())
+    if (load.running)
         load.stop();
     if (!connectInterval) {
         connectInterval = setInterval(() => {
