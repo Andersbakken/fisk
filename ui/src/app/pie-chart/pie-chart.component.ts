@@ -87,7 +87,7 @@ export class PieChartComponent {
                 return;
             canvas.addEventListener("click", event => {
                 const ncanvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
-                const br = ncanvas.getBoundingClientRect();
+                const br = ncanvas.getBoundingClientRect() as DOMRect;
                 const x = event.pageX - br.x
                 const y = event.pageY - br.y
 
