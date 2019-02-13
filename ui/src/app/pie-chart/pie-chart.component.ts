@@ -440,9 +440,11 @@ export class PieChartComponent {
         } else {
             const c = this.clientJobs[idx];
             c.jobs += inc;
-            c.totalJobs += inc;
+            if (inc > 0)
+                c.totalJobs += inc;
             c.cacheJobs += cacheinc;
-            c.totalCacheJobs += cacheinc;
+            if (cacheinc > 0)
+                c.totalCacheJobs += cacheinc;
             if (!c.jobs && !c.cacheJobs) {
                 this.clientJobs.splice(idx, 1);
             }
