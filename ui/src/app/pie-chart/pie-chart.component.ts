@@ -257,8 +257,8 @@ export class PieChartComponent {
 
                     let add = 0;
                     // cache hits for client
-                    let cw = legendSpace * ((c.cacheJobs || 0) / ((c.cacheJobs || 0) + c.jobs));
-                    let jw = legendSpace * (c.jobs / ((c.cacheJobs || 0) + c.jobs));
+                    let cw = legendSpace * ((c.totalCacheJobs || 0) / ((c.totalCacheJobs || 0) + c.totalJobs));
+                    let jw = legendSpace * (c.totalJobs / ((c.totalCacheJobs || 0) + c.totalJobs));
                     ctx.fillStyle = "#3d3";
                     ctx.beginPath();
                     ctx.rect(legendX, legendY - 20 + 31, cw, 4);
@@ -432,7 +432,7 @@ export class PieChartComponent {
                 if (!client.modifiedName)
                     client.modifiedName = client.name;
             }
-            this.clientJobs.push({ client: client, jobs: inc, cacheJobs: cacheinc });
+            this.clientJobs.push({ client: client, jobs: inc, cacheJobs: cacheinc, totalJobs: inc, totalCacheJobs: cacheinc });
 
             this.clientJobs.sort((a, b) => {
                 return a.client.modifiedName.localeCompare(b.client.modifiedName);
@@ -440,7 +440,9 @@ export class PieChartComponent {
         } else {
             const c = this.clientJobs[idx];
             c.jobs += inc;
+            c.totalJobs += inc;
             c.cacheJobs += cacheinc;
+            c.totalCacheJobs += cacheinc;
             if (!c.jobs && !c.cacheJobs) {
                 this.clientJobs.splice(idx, 1);
             }
