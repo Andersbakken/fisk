@@ -85,6 +85,29 @@ export class PieChartComponent {
             const canvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
             if (!canvas)
                 return;
+            canvas.addEventListener("click", event => {
+                const ncanvas = <HTMLCanvasElement> document.getElementById("canvas-chart");
+                const br = ncanvas.getBoundingClientRect();
+                const x = event.pageX - br.x
+                const y = event.pageY - br.y
+
+                const contains = (x, y, rect) => {
+                    if (x >= rect.x && x <= rect.x + rect.width) {
+                        if (y >= rect.y && y <= rect.y + rect.height)
+                            return true;
+                    }
+                    return false;
+                };
+
+                this.clientJobs.forEach(c => {
+                    if (contains(x, y, c.client.rect)) {
+                        // clicked
+                        //console.log("clicked", c.client.url);
+                        if (c.client.url)
+                            window.open(c.client.url, "_blank");
+                    }
+                });
+            })
 
             this.inited = true;
 
@@ -220,6 +243,13 @@ export class PieChartComponent {
                     ctx.beginPath();
                     ctx.rect(legendX, legendY - 20, legendSpace, 30);
                     ctx.fill();
+
+                    if (!("rect" in c.client)) {
+                        c.client.rect = { x: legendX, y: legendY - 20, width: legendSpace, height: 30 };
+                    } else {
+                        c.client.rect.x = legendX;
+                        c.client.rect.y = legendY - 20;
+                    }
 
                     // legend name text
                     ctx.fillStyle = c.fg;
@@ -390,7 +420,17 @@ export class PieChartComponent {
             } else if (client.name.length > 0 && client.name[0] === '-') {
                 client.modifiedName = "dev:" + (client.user || "nobody") + client.name;
             } else {
-                client.modifiedName = client.name;
+                // try to json parse
+                try {
+                    const o = JSON.parse(client.name);
+                    if (typeof o === "object" && "name" in o) {
+                        client.modifiedName = o.name;
+                        client.url = o.href;
+                    }
+                } catch (e) {
+                }
+                if (!client.modifiedName)
+                    client.modifiedName = client.name;
             }
             this.clientJobs.push({ client: client, jobs: inc, cacheJobs: cacheinc });
 
