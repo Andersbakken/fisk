@@ -44,19 +44,22 @@ class CompileJob extends EventEmitter
 
 class VM extends EventEmitter
 {
-    constructor(root, hash, user, keepCompiles) {
+    constructor(root, hash, options) {
         super();
         this.root = root;
         this.hash = hash;
         this.compiles = {};
         this.destroying = false;
-        this.keepCompiles = keepCompiles;
+        this.keepCompiles = options.keepCompiles || false;
 
         fs.remove(path.join(root, 'compiles'));
 
         let args = [ `--root=${root}`, `--hash=${hash}` ];
-        if (user)
-            args.push(`--user=${user}`);
+        if (options.user)
+            args.push(`--user=${options.user}`);
+        if (options.debug)
+            args.push("--debug");
+
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         let gotReady = false;
         this.child.on('message', msg => {

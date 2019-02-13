@@ -225,7 +225,12 @@ function loadEnvironments()
                             } catch (err) {
                             }
                             if (env && env.hash) {
-                                let vm = new VM(dir, env.hash, option("vm-user"), option("keep-compiles"));
+                                let opts = {
+                                    user: option("vm-user"),
+                                    keepCompiles: option("keep-compiles"),
+                                    debug: option("debug")
+                                };
+                                let vm = new VM(dir, env.hash, opts);
                                 ++pending;
                                 environments[env.hash] = vm;
                                 let errorHandler = () => {
