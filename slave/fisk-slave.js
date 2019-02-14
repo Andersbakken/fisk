@@ -33,6 +33,8 @@ process.on('uncaughtException', err => {
         client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
 });
 
+const debug = option("debug");
+
 let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
 if (ports.length) {
     var name = option("name") || option("hostname") || os.hostname();
@@ -554,6 +556,9 @@ server.on("job", job => {
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
+                if (debug) {
+                    console.log("Sending response", job.ip, job.hostname, response);
+                }
                 job.send(response);
                 if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
                     response.sourceFile = job.sourceFile;
