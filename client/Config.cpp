@@ -126,10 +126,15 @@ bool Config::init(int &argc, char **&argv)
     auto load = [](const std::string &path, std::vector<json11::Json> &j) {
         std::string contents;
         bool opened;
-        if (!Client::readFile(path, contents, &opened))
-            return !opened;
-
         std::string err;
+        if (!Client::readFile(path, contents, &opened, &err)) {
+            if (opened) {
+                fprintf(stderr, "%s\n", err.c_str());
+                return false;
+            }
+            return true;
+        }
+
         json11::Json parsed = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
             fprintf(stderr, "Failed to parse json from %s: %s\n", path.c_str(), err.c_str());
@@ -336,7 +341,7 @@ bool Config::init(int &argc, char **&argv)
         flock(fd, LOCK_EX); // what if it fails?
         const uint32_t version = htonl(Version);
         if (write(fd, &version, sizeof(version)) != sizeof(version)) {
-            ERROR("Failed to log");
+            fprintf(stderr, "Failed to write to versionfile %d %s\n", errno, strerror(errno));
         }
         flock(fd, LOCK_UN);
         ::close(fd);

@@ -248,43 +248,44 @@ inline FileType fileType(const std::string &path, struct stat *st = 0)
 }
 
 template <typename T>
-inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr)
+inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, std::string *error = nullptr)
 {
+#ifdef READFILE_ERR
+#error Do not define READFILE_ERR
+#endif
+#define READFILE_ERR(...)                           \
+    do {                                            \
+        if (error) {                                \
+            *error = Client::format(__VA_ARGS__);   \
+        } else {                                    \
+            ERROR(__VA_ARGS__);                     \
+        }                                           \
+        fclose(f);                                  \
+        return false;                               \
+    } while (false)
+
     FILE *f = fopen(fileName.c_str(), "r");
     if (opened)
         *opened = f;
-    if (!f) {
-        ERROR("Failed to open %s for reading (%d %s)", fileName.c_str(), errno, strerror(errno));
-        return false;
-    }
+    if (!f)
+        READFILE_ERR("Failed to open %s for reading (%d %s)", fileName.c_str(), errno, strerror(errno));
 
-    if (fseek(f, 0, SEEK_END)) {
-        ERROR("Failed to fseek to end of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
-        fclose(f);
-        return false;
-    }
+    if (fseek(f, 0, SEEK_END))
+        READFILE_ERR("Failed to fseek to end of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
 
     const long size = ftell(f);
-    if (fseek(f, 0, SEEK_SET)) {
-        ERROR("Failed to fseek to beginning of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
-        fclose(f);
-        return false;
-    }
+    if (fseek(f, 0, SEEK_SET))
+        READFILE_ERR("Failed to fseek to beginning of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
 
-    if (size < 0) {
-        ERROR("Failed to ftell %s (%d %s)", fileName.c_str(), errno, strerror(errno));
-        fclose(f);
-        return false;
-    }
+    if (size < 0)
+        READFILE_ERR("Failed to ftell %s (%d %s)", fileName.c_str(), errno, strerror(errno));
 
     t.resize(size);
     int read;
     EINTRWRAP(read, fread(&t[0], sizeof(char), t.size(), f));
     fclose(f);
-    if (read != size) {
-        ERROR("Failed to read from %s (%d %s)", fileName.c_str(), errno, strerror(errno));
-        return false;
-    }
+    if (read != size)
+        READFILE_ERR("Failed to read from %s (%d %s)", fileName.c_str(), errno, strerror(errno));
 
     return true;
 }
