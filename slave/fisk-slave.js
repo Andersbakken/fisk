@@ -20,6 +20,8 @@ if (process.getuid() !== 0) {
     process.exit(1);
 }
 
+const debug = option("debug");
+
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
     if (client)
@@ -356,7 +358,13 @@ client.on("getEnvironments", message => {
                         console.log(`Unlink ${file} ${env}`);
                         return fs.unlink(file);
                     }).then(() => {
-                        let vm = new VM(dir, env);
+                        let opts = {
+                            user: option("vm-user"),
+                            keepCompiles: option("keep-compiles"),
+                            debug: option("debug")
+                        };
+                        
+                        let vm = new VM(dir, env, opts);
                         return new Promise((resolve, reject) => {
                             let done = false;
                             vm.on('error', err => {
@@ -515,8 +523,8 @@ server.on("job", job => {
                 }
             });
 
-            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, job.wait);
-            j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
+            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, job.wait, job.files);
+            j.op = vm.startCompile(job.commandLine, job.argv0, job.files, job.id);
             j.buffers.forEach(data => j.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
@@ -548,6 +556,8 @@ server.on("job", job => {
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
+                if (debug) 
+                    console.log("sending response to client", job.ip, job.hostname, response);
                 job.send(response);
                 if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
                     response.sourceFile = job.sourceFile;
@@ -625,7 +635,7 @@ server.on("job", job => {
             j.buffers.push(data);
             console.log("buffering...", j.buffers.length);
         } else {
-            j.op.feed(data.data, data.last);
+            j.op.feed(data.data);
         }
     });
 

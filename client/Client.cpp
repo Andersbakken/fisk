@@ -373,50 +373,50 @@ bool Client::recursiveRmdir(const std::string &dir)
     return ::rmdir(dir.c_str()) == 0;
 }
 
-std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
+std::unique_ptr<Client::Preprocessed> Client::preprocess(std::vector<std::string> &&commandLine)
 {
     const unsigned long long started = Client::mono();
     Preprocessed *ptr = new Preprocessed;
     std::unique_ptr<Client::Preprocessed> ret(ptr);
-    ret->mThread = std::thread([ptr, args, compiler, started] {
+    ret->mThread = std::thread([ptr, commandLine { std::move(commandLine)}, started] {
         std::string out, err;
         ptr->stdOut.reserve(1024 * 1024);
-        std::string commandLine = compiler;
-        const size_t count = args->commandLine.size();
+        std::string commandLineString = sData.compiler;
+        const size_t count = commandLine.size();
         for (size_t i=1; i<count; ++i) {
-            const std::string arg = args->commandLine.at(i);
-            if (arg == "-o" && args->commandLine.size() > i + 1) {
+            const std::string arg = commandLine.at(i);
+            if (arg == "-o" && commandLine.size() > i + 1) {
                 ++i;
                 continue;
             }
 
-            commandLine += " '";
-            commandLine += args->commandLine.at(i);
-            commandLine += '\'';
+            commandLineString += " '";
+            commandLineString += commandLine.at(i);
+            commandLineString += '\'';
         }
-        commandLine += " '-E'";
+        commandLineString += " '-E'";
         if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
-            commandLine += " '-frewrite-includes'";
+            commandLineString += " '-frewrite-includes'";
         } else {
-            commandLine += " '-fdirectives-only'";
+            commandLineString += " '-fdirectives-only'";
         }
         if (!Config::discardComments) {
-            commandLine += " '-C'";
+            commandLineString += " '-C'";
         }
 
-        DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
+        DEBUG("Acquiring preprocess slot: %s", commandLineString.c_str());
         std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
         ptr->slotDuration = Client::mono() - started;
-        DEBUG("Running preprocess: %s", commandLine.c_str());
-        if (args->flags & (CompilerArgs::CPreprocessed
+        DEBUG("Running preprocess: %s", commandLineString.c_str());
+        if (sData.compilerArgs->flags & (CompilerArgs::CPreprocessed
                            |CompilerArgs::ObjectiveCPreprocessed
                            |CompilerArgs::ObjectiveCPlusPlusPreprocessed
                            |CompilerArgs::CPlusPlusPreprocessed)) {
             DEBUG("Already preprocessed. No need to do it");
-            ptr->exitStatus = readFile(args->sourceFile(), ptr->stdOut) ? 0 : 1;
+            ptr->exitStatus = readFile(sData.compilerArgs->sourceFile(), ptr->stdOut) ? 0 : 1;
         } else {
-            DEBUG("Executing:\n%s", commandLine.c_str());
-            TinyProcessLib::Process proc(commandLine, std::string(),
+            DEBUG("Executing:\n%s", commandLineString.c_str());
+            TinyProcessLib::Process proc(commandLineString, std::string(),
                                          [ptr](const char *bytes, size_t n) {
                                              VERBOSE("Preprocess appending %zu bytes to stdout", n);
                                              ptr->stdOut.append(bytes, n);

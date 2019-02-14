@@ -51,7 +51,9 @@ struct CompilerArgs
         ObjectiveCPlusPlusPreprocessed = 0x0800000,
         AssemblerWithCpp = 0x01000000,
         Assembler = 0x02000000,
-        LanguageMask = CPlusPlus|C|CPreprocessed|CPlusPlusPreprocessed|ObjectiveC|ObjectiveCPreprocessed|ObjectiveCPlusPlus|ObjectiveCPlusPlusPreprocessed|AssemblerWithCpp|Assembler
+        CPlusPlusHeader = 0x04000000,
+        CHeader = 0x08000000,
+        LanguageMask = CPlusPlus|C|CPreprocessed|CPlusPlusPreprocessed|ObjectiveC|ObjectiveCPreprocessed|ObjectiveCPlusPlus|ObjectiveCPlusPlusPreprocessed|AssemblerWithCpp|Assembler|CPlusPlusHeader|CHeader
     };
     static Flag preprocessedFlag(Flag);
     static const char *languageName(Flag flag, bool preprocessed = false);
@@ -73,7 +75,9 @@ struct CompilerArgs
         Local_Link
     };
     static const char *localReasonToString(LocalReason reason);
-    static std::shared_ptr<CompilerArgs> create(const std::vector<std::string> &args, LocalReason *reason);
+    static std::shared_ptr<CompilerArgs> create(std::vector<std::string> args, LocalReason *reason);
+
+    std::vector<std::pair<std::string, std::string> > extraFiles;
 
     std::string sourceFile() const
     {

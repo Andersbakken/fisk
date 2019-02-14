@@ -17,6 +17,7 @@
 #include "Log.h"
 #include "Client.h"
 #include <string.h>
+#include <unistd.h>
 
 struct OptionArg {
     const char *name;
@@ -148,11 +149,10 @@ static inline size_t hasArg(const std::string &arg, bool &md5)
     return 0;
 }
 
-std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string> &args, LocalReason *localReason)
+std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> args, LocalReason *localReason)
 {
     const bool objectCache = Config::objectCache;
     std::shared_ptr<CompilerArgs> ret(new CompilerArgs);
-    ret->commandLine = args;
     ret->flags = None;
     ret->objectFileIndex = -1;
     bool hasDashC = false;
@@ -390,10 +390,19 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         }
 
         if (arg == "-include" || arg == "-include-pch") {
-            // we may have to handle this differently, gcc apparently falls back
-            // to not using the pch file if it can't be found. Icecream code is
-            // extremely confusing.
             md5(2);
+            if (i + 1 < args.size()) {
+                std::string includeFile = args.at(i + 1);
+                std::string gchFile = includeFile + ".gch";
+                if (!access(includeFile.c_str(), R_OK) && !access(gchFile.c_str(), R_OK)) {
+                    std::string mappedHeader = std::to_string(ret->extraFiles.size() + 1) + ".h";
+                    std::string mappedGch = std::to_string(ret->extraFiles.size() + 1) + ".h.gch";
+                    args[i + 1] = mappedHeader;
+                    ret->extraFiles.push_back(std::make_pair(std::move(includeFile), std::move(mappedHeader)));
+                    ret->extraFiles.push_back(std::make_pair(std::move(gchFile), std::move(mappedGch)));
+                }
+            }
+
             ++i;
             continue;
         }
@@ -460,6 +469,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                         { "S", Assembler },
                         { "sx", Assembler },
                         { "s", AssemblerWithCpp },
+                        { "h", CHeader },
+                        { "hh", CPlusPlusHeader },
+                        { "H", CPlusPlusHeader },
+                        { "hxx", CPlusPlusHeader },
+                        { "hpp", CPlusPlusHeader },
                         { 0, None }
                     };
                     for (size_t ii=0; suffixes[ii].suffix; ++ii) {
@@ -476,13 +490,15 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         md5();
     }
 
+    ret->commandLine = std::move(args);
+
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
         DEBUG("No src file, building local");
         *localReason = Local_NoSources;
         return nullptr;
     }
 
-    if (!hasDashC) {
+    if (!hasDashC && !(ret->flags & (CHeader|CPlusPlusHeader))) {
         *localReason = Local_Link;
         DEBUG("link job, building local");
         return nullptr;
@@ -548,6 +564,8 @@ const char *CompilerArgs::languageName(Flag flag, bool preprocessed)
     switch (flag) {
     case CPlusPlus: return "c++";
     case C: return "c";
+    case CPlusPlusHeader: return "c++-header";
+    case CHeader: return "c-header";
     case CPreprocessed: return "cpp-output";
     case CPlusPlusPreprocessed: return "c++-cpp-output";
     case ObjectiveC: return "objective-c";

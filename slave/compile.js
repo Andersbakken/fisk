@@ -5,11 +5,11 @@ const path = require('path');
 const EventEmitter = require('events');
 
 class Compile extends EventEmitter {
-    constructor(args, argv0, dir, debug) {
+    constructor(args, argv0, root, debug) {
         super();
 
-        if (!args || !args.length || !dir || !argv0) {
-            console.error(argv0, args, dir);
+        if (!args || !args.length || !root || !argv0) {
+            console.error(argv0, args, root);
             throw new Error("Bad args");
         }
         let compiler = args.shift();
@@ -21,6 +21,7 @@ class Compile extends EventEmitter {
         let hasDashO = false;
         let hasDashX = false;
         let sourceFile;
+        let pchFiles = [];
         for (let i=0; i<args.length; ++i) {
             // console.log(i, args[i]);
             switch (args[i]) {
@@ -85,13 +86,16 @@ class Compile extends EventEmitter {
             case '-gcc-toolchain':
             case '-imacros':
             case '-imultilib':
-            case '-include':
             case '-iprefix':
             case '-ivfsoverlay':
             case '-iwithprefix':
             case '-iwithprefixbefore':
             case '-target':
                 ++i;
+                break;
+            case '-include': // probably include-pch too
+                pchFiles.push(args[++i]);
+                pchFiles.push(args[i] + ".gch");
                 break;
             default:
                 if (/^-mlinker-version=/.exec(args[i]) || /^-stdlib=/.exec(args[i])) {
@@ -105,7 +109,6 @@ class Compile extends EventEmitter {
                         throw new Error("More than one source file");
                     }
                     sourceFile = args[i];
-                    args[i] = path.join(dir, 'sourcefile');
                 }
                 break;
             }
@@ -115,55 +118,60 @@ class Compile extends EventEmitter {
         }
 
         if (!hasDashX) {
-            if (compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1) {
+            let plusPlus = compiler.indexOf('g++') != -1 || compiler.indexOf('c++') != -1;
+            switch (path.extname(sourceFile)) {
+            case '.C':
+            case '.cc':
+            case '.cpp':
+            case '.CPP':
+            case '.c++':
+            case '.cp':
+            case '.cxx':
                 args.unshift(isClang ? 'c++' : 'c++-cpp-output');
-            } else {
-                switch (path.extname(sourceFile)) {
-                case '.C':
-                case '.cc':
-                case '.cpp':
-                case '.CPP':
-                case '.c++':
-                case '.cp':
-                case '.cxx':
+                break;
+            case '.ii':
+                args.unshift('c++-cpp-output');
+                break;
+            case '.hh':
+            case '.hpp':
+            case '.H':
+                args.unshift('c++-header');
+                break;
+            case '.h':
+                args.unshift(plusPlus ? 'c++-header' : 'c-header');
+                break;
+            case '.c':
+                if (plusPlus) {
                     args.unshift(isClang ? 'c++' : 'c++-cpp-output');
-                    break;
-                case '.ii':
-                    args.unshift('c++-cpp-output');
-                    break;
-                case '.hh':
-                case '.hpp':
-                case '.H':
-                    args.unshift('c++-header');
-                    break;
-                case '.h':
-                    args.unshift('c-header');
-                    break;
-                case '.c':
+                } else {
                     args.unshift(isClang ? 'c' : 'cpp-output');
-                    break;
-                case '.i':
-                    args.unshift('cpp-output');
-                    break;
-                case '.m':
-                case '.mi':
-                    args.unshift(isClang ? 'objective-c' : 'objective-c-cpp-output');
-                    break;
-                case '.s':
-                    args.unshift('assembler');
-                    break;
-                case '.sx':
-                case '.S':
-                    args.unshift('assembler-with-cpp');
-                    break;
-                case '.mm':
-                case '.M':
-                case '.mii':
-                    args.unshift(isClang ? 'objective-c++' : 'objective-c++-cpp-output');
-                    break;
-                default:
-                    throw new Error(`Can't determine source language for file: ${sourceFile}`);
                 }
+                break;
+            case '.i':
+                args.unshift('cpp-output');
+                break;
+            case '.m':
+            case '.mi':
+                if (plusPlus) {
+                    args.unshift(isClang ? 'objective-c++' : 'objective-c++-cpp-output');
+                } else {
+                    args.unshift(isClang ? 'objective-c' : 'objective-c-cpp-output');
+                }
+                break;
+            case '.s':
+                args.unshift('assembler');
+                break;
+            case '.sx':
+            case '.S':
+                args.unshift('assembler-with-cpp');
+                break;
+            case '.mm':
+            case '.M':
+            case '.mii':
+                args.unshift(isClang ? 'objective-c++' : 'objective-c++-cpp-output');
+                break;
+            default:
+                throw new Error(`Can't determine source language for file: ${sourceFile}`);
             }
             args.unshift('-x');
         }
@@ -185,7 +193,7 @@ class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
-        let proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
+        let proc = child_process.spawn(compiler, args, { cwd: root, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
@@ -207,8 +215,11 @@ class Compile extends EventEmitter {
             function addDir(dir, prefix) {
                 try {
                     fs.readdirSync(dir).forEach(file => {
-                        if (file === 'sourcefile')
-                            return;
+                        if (dir == root) {
+                            if (file == sourceFile || pchFiles.indexOf(file) != -1) {
+                                return;
+                            }
+                        }
                         try {
                             let stat = fs.statSync(path.join(dir, file));
                             if (stat.isDirectory()) {
@@ -235,7 +246,7 @@ class Compile extends EventEmitter {
                     return;
                 }
             }
-            addDir(dir, dir);
+            addDir(root, root);
             this.emit('exit', { exitCode: exitCode, files: files, sourceFile: sourceFile });
         });
     }

@@ -5,8 +5,11 @@ const path = require('path');
 
 class CompileJob extends EventEmitter
 {
-    constructor(commandLine, argv0, id, vm) {
+    constructor(commandLine, argv0, files, id, vm) {
         super();
+        this.files = files;
+        this.firstFile = true;
+        this.written = 0;
         this.vm = vm;
         this.commandLine = commandLine;
         this.argv0 = argv0;
@@ -14,7 +17,7 @@ class CompileJob extends EventEmitter
         this.dir = path.join(vm.root, 'compiles', "" + this.id);
         this.vmDir = path.join('/', 'compiles', "" + this.id);
         fs.mkdirpSync(this.dir);
-        this.fd = fs.openSync(path.join(this.dir, 'sourcefile'), "w");
+        this.fd = fs.openSync(path.join(this.dir, files[0].fileName), "w");
         this.cppSize = 0;
         this.startCompile = undefined;
     }
@@ -26,13 +29,25 @@ class CompileJob extends EventEmitter
         }
     }
 
-    feed(data, last) {
+    feed(data) {
         fs.writeSync(this.fd, data);
-        this.cppSize += data.length;
-        if (last) {
-            this.startCompile = Date.now();
+        this.written += data.length;
+        if (this.firstFile)
+            this.cppSize += data.length;
+        if (this.written == this.files[0].bytes) {
             fs.close(this.fd);
-            this.fd = undefined;
+            this.files.splice(0, 1);
+            this.written = 0;
+            this.firstFile = false;
+            if (this.files.length) {
+                this.fd = fs.openSync(path.join(this.dir, this.files[0].fileName), "w");
+            } else {
+                this.fd = undefined;
+            }
+        }
+
+        if (!this.files.length) {
+            this.startCompile = Date.now();
             this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir}, this.sendCallback);
         }
     }
@@ -139,8 +154,8 @@ class VM extends EventEmitter
         });
     }
 
-    startCompile(commandLine, argv0, id) {
-        let compile = new CompileJob(commandLine, argv0, id, this);
+    startCompile(commandLine, argv0, files, id) {
+        let compile = new CompileJob(commandLine, argv0, files, id, this);
         this.compiles[compile.id] = compile;
         // console.log("startCompile " + compile.id);
         return compile;

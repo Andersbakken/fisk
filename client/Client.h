@@ -136,9 +136,9 @@ private:
     std::thread mThread;
     bool mDone { false };
     bool mJoined { false };
-    friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
+    friend std::unique_ptr<Preprocessed> preprocess(std::vector<std::string> &&commandLine);
 };
-std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
+std::unique_ptr<Preprocessed> preprocess(std::vector<std::string> &&commandLine);
 
 template <size_t StaticBufSize = 4096>
 static std::string vformat(const char *format, va_list args)

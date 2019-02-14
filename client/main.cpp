@@ -198,25 +198,25 @@ int main(int argc, char **argv)
             args[i] = data.argv[i];
         }
         data.compilerArgs = CompilerArgs::create(args, &data.localReason);
-    }
-    if (!data.compilerArgs) {
-        DEBUG("Have to run locally");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile),
-                         Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
-        return 0; // unreachable
-    }
+        if (!data.compilerArgs) {
+            DEBUG("Have to run locally");
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile),
+                             Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
+            return 0; // unreachable
+        }
 
-    if (!Client::isAtty()) {
-        for (auto it = data.compilerArgs->commandLine.begin(); it != data.compilerArgs->commandLine.end(); ++it) {
-            if (*it == "-fcolor-diagnostics") {
-                *it = "-fno-color-diagnostics";
-            } else if (*it == "-fdiagnostics-color=always" || *it == "-fdiagnostics-color=auto") {
-                *it = "-fdiagnostics-color=never";
+        if (!Client::isAtty()) {
+            for (auto it = data.compilerArgs->commandLine.begin(); it != data.compilerArgs->commandLine.end(); ++it) {
+                if (*it == "-fcolor-diagnostics") {
+                    *it = "-fno-color-diagnostics";
+                } else if (*it == "-fdiagnostics-color=always" || *it == "-fdiagnostics-color=auto") {
+                    *it = "-fdiagnostics-color=never";
+                }
             }
         }
-    }
 
-    data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
+        data.preprocessed = Client::preprocess(std::move(args));
+    }
     if (!data.preprocessed) {
         ERROR("Failed to preprocess");
         data.watchdog->stop();
@@ -238,7 +238,9 @@ int main(int argc, char **argv)
     }
 
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
-    Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
+    std::string sourceFileName;
+    Client::parsePath(data.compilerArgs->sourceFile(), &sourceFileName, 0);
+    headers["x-fisk-sourcefile"] = sourceFileName;
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
@@ -402,15 +404,41 @@ int main(int argc, char **argv)
     }
 
 
-    std::vector<std::string> args = data.compilerArgs->commandLine;
-    args[0] = data.slaveCompiler;
+    std::vector<std::string> commandLine = data.compilerArgs->commandLine;
+    commandLine[0] = data.slaveCompiler;
 
     const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
+    json11::Json::array files;
+    files.push_back(json11::Json::object {
+            { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) },
+            { "fileName", sourceFileName }
+        });
+
+    std::vector<std::vector<unsigned char> > extraFiles;
+    for (const std::pair<std::string, std::string> &file : data.compilerArgs->extraFiles) {
+        std::vector<unsigned char> contents;
+        bool opened;
+        if (!Client::readFile(file.first.c_str(), contents, &opened)) {
+            if (!opened) {
+                extraFiles.clear();
+                files.resize(1);
+                break;
+            }
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "includefile error");
+            return 0; // unreachable
+        }
+        files.push_back(json11::Json::object {
+                { "bytes", static_cast<int>(contents.size()) },
+                { "fileName", file.second }
+            });
+        extraFiles.push_back(std::move(contents));
+    }
+
     json11::Json::object msg {
-        { "commandLine", args },
+        { "commandLine", commandLine },
         { "argv0", data.compiler },
         { "wait", wait },
-        { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }
+        { "files", files }
     };
 
     const std::string json = json11::Json(msg).dump();
@@ -445,6 +473,13 @@ int main(int argc, char **argv)
 
     while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
         select.exec();
+    for (const std::vector<unsigned char> &extra : extraFiles) {
+        slaveWebSocket.send(WebSocket::Binary, &extra[0], extra.size());
+        while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+            select.exec();
+        if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket)
+            break;
+    }
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
         data.watchdog->stop();
