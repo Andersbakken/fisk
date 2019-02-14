@@ -356,7 +356,13 @@ client.on("getEnvironments", message => {
                         console.log(`Unlink ${file} ${env}`);
                         return fs.unlink(file);
                     }).then(() => {
-                        let vm = new VM(dir, env);
+                        let opts = {
+                            user: option("vm-user"),
+                            keepCompiles: option("keep-compiles"),
+                            debug: option("debug")
+                        };
+
+                        let vm = new VM(dir, env, opts);
                         return new Promise((resolve, reject) => {
                             let done = false;
                             vm.on('error', err => {
