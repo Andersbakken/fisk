@@ -263,8 +263,8 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
         if (f) {                                    \
             int r;                                  \
             EINTRWRAP(r, fclose(f));                \
-            return false;                           \
         }                                           \
+        return false;                               \
     } while (false)
 
     FILE *f;
