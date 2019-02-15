@@ -419,6 +419,13 @@ int main(int argc, char **argv)
 
     std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.slaveCompiler;
+    if (!schedulerWebsocket.extraArguments.empty()) {
+        args.reserve(args.size() + schedulerWebsocket.extraArguments.size());
+        for (std::string &arg : schedulerWebsocket.extraArguments) {
+            args.push_back(std::move(arg));
+        }
+        schedulerWebsocket.extraArguments.clear(); // since we moved it out
+    }
 
     const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
     json11::Json::object msg {

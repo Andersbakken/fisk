@@ -34,6 +34,11 @@ public:
                 slaveIp = msg["ip"].string_value();
                 slaveHostname = msg["hostname"].string_value();
                 environment = msg["environment"].string_value();
+                std::vector<json11::Json> extraArgs = msg["extraArgs"].array_items();
+                extraArguments.reserve(extraArgs.size());
+                for (const json11::Json &arg : extraArgs) {
+                    extraArguments.push_back(arg.string_value());
+                }
                 slavePort = msg["port"].int_value();
                 jobId = msg["id"].int_value();
                 Client::data().maintainSemaphores = msg["maintain_semaphores"].bool_value();
@@ -61,6 +66,7 @@ public:
     int jobId { 0 };
     uint16_t slavePort { 0 };
     std::string slaveIp, slaveHostname, environment;
+    std::vector<std::string> extraArguments;
 };
 
 
