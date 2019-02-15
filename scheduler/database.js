@@ -42,7 +42,7 @@ class Database {
                 for (let i=0; i<keyValuePairs.length; i+=2)
                     records[keyValuePairs[i]] = keyValuePairs[i + 1];
 
-                fs.writeFile(this.path + ".tmp", JSON.stringify(records), err => {
+                fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", err => {
                     if (err) {
                         reject(err);
                     } else {
