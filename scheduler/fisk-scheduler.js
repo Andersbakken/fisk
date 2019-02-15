@@ -944,10 +944,16 @@ server.on("monitor", client => {
             client.send({ type: "listEnvironments", environments: environmentsInfo() });
             break;
         case 'linkEnvironments':
-            Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist);
+            Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist).then(() => {
+                const info = { type: "listEnvironments", environments: environmentsInfo() };
+                monitors.forEach(monitor => monitor.send(info));
+            });
             break;
         case 'unlinkEnvironments':
-            Environments.unlink(message.srcHash, message.targetHash);
+            Environments.unlink(message.srcHash, message.targetHash).then(() => {
+                const info = { type: "listEnvironments", environments: environmentsInfo() };
+                monitors.forEach(monitor => monitor.send(info));
+            });
             break;
         case 'listUsers': {
             if (!user) {
