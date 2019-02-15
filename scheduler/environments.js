@@ -312,7 +312,7 @@ const environments = {
     },
 
     link(srcHash, targetHash, args, blacklist) {
-        let data = environments._link[srcHash];
+        let data = environments._links[srcHash];
         if (!data)
             data = environments._links[srcHash] = new Links();
         data.set(targetHash, args, blacklist);
