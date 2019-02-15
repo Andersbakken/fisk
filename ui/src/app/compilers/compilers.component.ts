@@ -11,6 +11,7 @@ import { TabChangedService } from '../tab-changed.service';
 export class CompilersComponent {
     public environments: any;
     private compatibilities: any;
+    private links: any;
 
     constructor(private fisk: FiskService, private tabChanged: TabChangedService,
                 private dialog: MatDialog) {
@@ -18,6 +19,7 @@ export class CompilersComponent {
             if (data.type === "listEnvironments") {
                 let envs = [];
                 console.log(data.environments);
+                this.links = data.environments.links;
                 for (const k in data.environments) {
                     const e = data.environments[k];
                     if (typeof e === "object" && "system" in e) {
@@ -69,7 +71,7 @@ export class CompilersComponent {
     onClicked(env) {
         //console.log(env);
         const dialogRef = this.dialog.open(CompilersComponentDialog, {
-            data: { current: env, environments: this.environments }
+            data: { current: env, environments: this.environments, links: this.links[env.hash] }
         });
         dialogRef.afterClosed().subscribe(result => {
             //console.log("dialog closed", result);
@@ -101,6 +103,11 @@ export class CompilersComponentDialog {
             if (data.current != data.environments[i]) {
                 this.others.push(data.environments[i]);
                 this.checked[data.environments[i].hash] = false;
+            }
+        }
+        if (data.links) {
+            for (let k in data.links) {
+                this.checked[k] = true;
             }
         }
     }
