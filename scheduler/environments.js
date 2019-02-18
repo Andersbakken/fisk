@@ -311,6 +311,15 @@ const environments = {
         return compatible;
     },
 
+    extraArgs(srcHash, targetHash) {
+        let data = environments._links[srcHash];
+        console.log(srcHash, targetHash, data);
+        if (data) {
+            return data.arguments(targetHash);
+        }
+        return [];
+    },
+
     link(srcHash, targetHash, args, blacklist) {
         let data = environments._links[srcHash];
         if (!data)

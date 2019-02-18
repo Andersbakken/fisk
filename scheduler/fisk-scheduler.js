@@ -790,8 +790,10 @@ server.on("compile", compile => {
     }
 
     if (slave) {
-        if (env != compile.environment)
+        if (env != compile.environment) {
             data.environment = env;
+            data.extraArgs = Environments.extraArgs(compile.environment, env);
+        }
         ++activeJobs;
         let utilization = (activeJobs / capacity);
         let peakInfo = false;
