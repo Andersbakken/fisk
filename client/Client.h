@@ -141,7 +141,7 @@ private:
 std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 
 template <size_t StaticBufSize = 4096>
-static std::string vformat(const char *format, va_list args)
+inline static std::string vformat(const char *format, va_list args)
 {
     va_list copy;
     va_copy(copy, args);
@@ -171,6 +171,11 @@ inline std::string format(const char *fmt, ...)
     std::string ret = vformat<StaticBufSize>(fmt, args);
     va_end(args);
     return ret;
+}
+
+inline bool endsWith(const std::string &haystack, const std::string &needle)
+{
+    return needle.size() <= haystack.size() && !strcmp(haystack.c_str() + (haystack.length() - needle.length()), needle.c_str());
 }
 
 inline std::string sha1(const std::string &str)

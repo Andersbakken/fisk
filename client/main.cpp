@@ -162,10 +162,17 @@ int main(int argc, char **argv)
         std::string fn;
         Client::parsePath(argv[0], &fn, 0);
         if (fn == "fiskc") {
+            bool c = false;
+            for (int i=1; i<argc; ++i) {
+                if (Client::endsWith(".c", argv[i])) {
+                    c = true;
+                    break;
+                }
+            }
 #ifdef __APPLE__
-            preresolved = "clang";
+            preresolved = c ? "clang" : "clang++";
 #else
-            preresolved = "gcc";
+            preresolved = c ? "gcc" : "g++";
 #endif
         }
     }
