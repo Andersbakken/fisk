@@ -109,7 +109,7 @@ export class CompilersComponentDialog {
             for (let k in data.links) {
                 let info = data.links[k];
                 if (info.arguments) {
-                    this.args[k] = info.arguments;
+                    this.args[k] = info.arguments.join(" ");
                 }
                 this.checked[k] = true;
             }
