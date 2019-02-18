@@ -523,7 +523,7 @@ server.on("job", job => {
                 }
             });
 
-            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, job.wait);
+            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, "wait", job.wait);
             j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
             j.buffers.forEach(data => j.op.feed(data.data, data.last));
             if (job.wait) {
