@@ -306,16 +306,16 @@ export class PieChartComponent {
                     ctx.fillStyle = "#3d3";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.cacheHits / statsTotal), statsHeight);
                     pos += (this.view.width - 10) * (this.stats.cacheHits / statsTotal);
-                    ctx.fillText(this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText(this.stats.cacheHits).width + 10;
+                    ctx.fillText("Hits " + this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText("Hits " + this.stats.cacheHits).width + 30;
                     ctx.fillStyle = "#33d";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsStarted / statsTotal), statsHeight);
                     pos += (this.view.width - 10) * (this.stats.jobsStarted / statsTotal);
-                    ctx.fillText(this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText(this.stats.jobsStarted).width + 10;
+                    ctx.fillText("Compiles " + this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText("Compiles " + this.stats.jobsStarted).width + 30;
                     ctx.fillStyle = "#d33";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsFailed / statsTotal), statsHeight);
-                    ctx.fillText(this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
+                    ctx.fillText("Misses " + this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
                 }
 
                 window.requestAnimationFrame(animate);
