@@ -37,7 +37,10 @@ export class WebSocketService {
         try {
             this.socket = new WebSocket(`ws://${host}:${port}/monitor`);
         } catch (e) {
-            console.error("websocket error", e.message);
+            this.socket = undefined;
+            for (let i = 0; i < this.errorListeners.length; ++i) {
+                this.errorListeners[i](e);
+            }
             return;
         }
 
@@ -74,7 +77,12 @@ export class WebSocketService {
             this.removeListeners();
             this.reset();
         });
-        this.addListener('error', (err) => {
+        this.addListener('error', err => {
+            if (this.socket) {
+                this.socket.close();
+            }
+            this.removeListeners();
+            this.reset();
             for (let i = 0; i < this.errorListeners.length; ++i) {
                 this.errorListeners[i](err);
             }
@@ -102,11 +110,11 @@ export class WebSocketService {
     }
 
     close(code?: number, reason?: string) {
-        if (this.isopen) {
+        if (this.socket) {
             this.socket.close(code, reason);
-            this.removeListeners();
-            this.reset();
         }
+        this.removeListeners();
+        this.reset();
     }
 
     private reset() {

@@ -6,27 +6,40 @@ import { Injectable } from '@angular/core';
 
 export class BackoffService {
     private backoffs: { [key: string]: number } = {};
+    private serials: { [key: string]: number } = {};
 
     constructor() { }
 
     backoff(id: string, next: { (next: number): number; }, run: { (): Promise<any>; }) {
         if (id in this.backoffs)
             return false;
+        if (id in this.serials) {
+            ++this.serials[id];
+        } else {
+            this.serials[id] = 0;
+        }
+
+        const serial = this.serials[id];
         this.backoffs[id] = -1;
         const go = (when) => {
             console.log("reconnecting", when);
             run().then((ok: boolean) => {
-                if (!ok) {
-                    const n = next(when);
-                    this.backoffs[id] = setTimeout(() => { go(n); }, n);
-                } else {
-                    delete this.backoffs[id];
+                if (serial === this.serials[id]) {
+                    if (ok) {
+                        delete this.backoffs[id];
+                    } else {
+                        const n = next(when);
+                        this.backoffs[id] = setTimeout(() => { go(n); }, n);
+                    }
                 }
             }).catch(() => {
-                delete this.backoffs[id];
+                if (serial === this.serials[id]) {
+                    delete this.backoffs[id];
+                }
             });
         };
         go(0);
+        return true;
     }
 
     stop(id: string) {
