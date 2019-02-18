@@ -63,9 +63,11 @@ export class PieChartComponent {
             //console.log(window.innerWidth, window.innerHeight);
             const canvas = document.getElementById("canvas-chart");
 
-            const rect: any = canvas.getBoundingClientRect();
-            this.view.width = window.innerWidth - (rect.x * 2);
-            this.view.height = window.innerHeight - rect.y - 50;
+            if (canvas) {
+                const rect: any = canvas.getBoundingClientRect();
+                this.view.width = window.innerWidth - (rect.x * 2);
+                this.view.height = window.innerHeight - rect.y - 50;
+            }
         });
 
         this.config.onChange((key: string) => {
