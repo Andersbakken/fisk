@@ -162,10 +162,13 @@ int main(int argc, char **argv)
         std::string fn;
         Client::parsePath(argv[0], &fn, 0);
         if (fn == "fiskc") {
-            bool c = false;
+            bool c = true;
             for (int i=1; i<argc; ++i) {
-                if (Client::endsWith(".c", argv[i])) {
-                    c = true;
+                if (Client::endsWith(".cpp", argv[i], Client::CaseInsensitive)
+                    || Client::endsWith(".cxx", argv[i], Client::CaseInsensitive)
+                    || Client::endsWith(".cc", argv[i], Client::CaseInsensitive)
+                    || Client::endsWith(".C", argv[i])) {
+                    c = false;
                     break;
                 }
             }

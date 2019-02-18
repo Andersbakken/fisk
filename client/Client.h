@@ -173,9 +173,19 @@ inline std::string format(const char *fmt, ...)
     return ret;
 }
 
-inline bool endsWith(const std::string &haystack, const std::string &needle)
+enum CaseSensitivity {
+    CaseInsensitive,
+    CaseSensitive
+};
+inline bool endsWith(const std::string &haystack, const std::string &needle, CaseSensitivity cs = CaseSensitive)
 {
-    return needle.size() <= haystack.size() && !strcmp(haystack.c_str() + (haystack.length() - needle.length()), needle.c_str());
+    if (needle.size() > haystack.size())
+        return false;
+    if (cs == CaseSensitive) {
+        return !strcmp(haystack.c_str() + (haystack.length() - needle.length()), needle.c_str());
+    } else {
+        return !strcasecmp(haystack.c_str() + (haystack.length() - needle.length()), needle.c_str());
+    }
 }
 
 inline std::string sha1(const std::string &str)
