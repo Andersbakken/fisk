@@ -28,6 +28,7 @@ export class WebSocketService {
             const item = this.allListeners[i];
             this.socket.removeEventListener(item[0], item[1]);
         }
+        this.allListeners = [];
     }
 
     open(host: string, port: number) {
