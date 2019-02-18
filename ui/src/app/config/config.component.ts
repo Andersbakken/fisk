@@ -18,6 +18,7 @@ export class ConfigComponent {
     noAnimate: boolean;
     minHeight: string = "";
     inited: boolean = false;
+    timers: { [key: string]: number } = {};
 
     constructor(private config: ConfigService, private tabChanged: TabChangedService) {
         this.scheduler = config.get("scheduler", location.hostname);
@@ -83,7 +84,10 @@ export class ConfigComponent {
             break;
         }
         if (ok) {
-            this.config.set(key, data);
+            if (key in this.timers) {
+                clearTimeout(this.timers[key]);
+            }
+            this.timers[key] = setTimeout(() => { delete this.timers[key]; this.config.set(key, data); }, 500);
         }
     }
 

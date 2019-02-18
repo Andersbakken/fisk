@@ -32,10 +32,11 @@ export class BackoffService {
                         this.backoffs[id] = setTimeout(() => { go(n); }, n);
                     }
                 }
-            }).catch(() => {
+            }).catch(err => {
                 if (serial === this.serials[id]) {
                     delete this.backoffs[id];
                 }
+                console.error(err);
             });
         };
         go(0);

@@ -47,26 +47,16 @@ export class FiskService {
     }
 
     open(host: string, port: number) {
+        console.log("reoping");
         this.ws.on("message", (data: any) => {
             this.emit(this.dataListeners, data);
         });
         this.ws.on("close", () => {
             // let's retry with an exponential backoff
-            if (this.backoff.running("fisk")) {
-                this.resolvePending(false);
-                return;
-            }
-            const when = (next: number): number => {
-                if (!next)
-                    return 1000;
-                return Math.min(30000, next * 2);
-            };
-            this.backoff.backoff("fisk", when, (): Promise<any> => {
-                return new Promise<any>((resolve, reject) => {
-                    this.pendingConnect.push({ resolve: resolve, reject: reject });
-                    this.open(host, port);
-                });
-            });
+            this.reconnect(host, port);
+        });
+        this.ws.on("error", () => {
+            this.reconnect(host, port);
         });
         this.ws.on("open", () => {
             this.emit(this.openListeners);
@@ -98,6 +88,24 @@ export class FiskService {
 
     send(message: any) {
         this.ws.send(message);
+    }
+
+    private reconnect(host: string, port: number) {
+        if (this.backoff.running("fisk")) {
+            this.resolvePending(false);
+            return;
+        }
+        const when = (next: number): number => {
+            if (!next)
+                return 1000;
+            return Math.min(30000, next * 2);
+        };
+        this.backoff.backoff("fisk", when, (): Promise<any> => {
+            return new Promise<any>((resolve, reject) => {
+                this.pendingConnect.push({ resolve: resolve, reject: reject });
+                this.open(host, port);
+            });
+        });
     }
 
     private resolvePending(ok: boolean) {

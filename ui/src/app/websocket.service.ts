@@ -72,20 +72,27 @@ export class WebSocketService {
             }
         });
         this.addListener('close', () => {
-            for (let i = 0; i < this.closeListeners.length; ++i) {
-                this.closeListeners[i]();
-            }
+            const closeListeners = this.closeListeners;
+
             this.removeListeners();
             this.reset();
+
+            for (let i = 0; i < closeListeners.length; ++i) {
+                closeListeners[i]();
+            }
         });
         this.addListener('error', err => {
             if (this.socket) {
                 this.socket.close();
             }
+
+            const errorListeners = this.errorListeners;
+
             this.removeListeners();
             this.reset();
-            for (let i = 0; i < this.errorListeners.length; ++i) {
-                this.errorListeners[i](err);
+
+            for (let i = 0; i < errorListeners.length; ++i) {
+                errorListeners[i](err);
             }
         });
     }
