@@ -2,6 +2,7 @@
 
 const option = require("@jhanssen/options")("fisk/slave", require('minimist')(process.argv.slice(2)));
 const request = require("request");
+const ws = require('ws');
 const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
@@ -602,7 +603,7 @@ server.on("job", job => {
     };
 
     job.heartbeatTimer = setInterval(() => {
-        if (job.done || job.aborted) {
+        if (job.done || job.aborted || job.readyState !== ws.OPEN) {
             clearTimeout(job.heartbeatTimer);
         } else {
             // console.log("sending heartbeat");

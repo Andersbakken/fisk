@@ -33,6 +33,10 @@ class Job extends EventEmitter {
         }
     }
 
+    get readyState() {
+        return this.ws.readyState;
+    }
+
     close() {
         this.ws.close();
     }
