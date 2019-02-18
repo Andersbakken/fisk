@@ -86,6 +86,9 @@ process.on('message', msg => {
     case 'compile':
         try {
             // console.log("compiling for );
+            if (argv.debug) {
+                console.log("Creating new compile", msg.commandLine, msg.argv0, msg.dir);
+            }
             let compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug);
             // console.log("running thing", msg.commandLine);
             compile.on('stdout', data => send({ type: 'compileStdOut', id: msg.id, data: data }));
