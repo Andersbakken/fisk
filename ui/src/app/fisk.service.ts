@@ -10,6 +10,7 @@ export class FiskService {
     private pendingConnect: Array<any> = [];
     private dataListeners: { (data: any): void; } [] = [];
     private openListeners: { (): void; } [] = [];
+    private schedulerListeners: { (): void; } [] = [];
     private _host: string;
     private _port: number;
 
@@ -39,6 +40,7 @@ export class FiskService {
                 if (this._host !== undefined) {
                     this.open(this._host, this._port);
                 }
+                this.emit(this.schedulerListeners, key);
                 break;
             }
         });
@@ -87,6 +89,9 @@ export class FiskService {
             break;
         case "open":
             this.openListeners.push(on);
+            break;
+        case "scheduler":
+            this.schedulerListeners.push(on);
             break;
         }
     }

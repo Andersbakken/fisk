@@ -55,6 +55,9 @@ export class PieChartComponent {
             this._reset();
             this.message.showMessage("connected to " + this.fisk.host + ":" + this.fisk.port);
         });
+        this.fisk.on("scheduler", () => {
+            this._reset();
+        });
 
         window.addEventListener("resize", () => {
             //console.log(window.innerWidth, window.innerHeight);
