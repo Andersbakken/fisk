@@ -1,8 +1,8 @@
 <mat-card class="scroll">
   <div *ngFor="let e of others" class="env">
     <mat-checkbox matInput [(ngModel)]="checked[e.hash]"></mat-checkbox> {{e.hash}} {{e.compiler.name}} {{e.compiler.version}} ({{e.target}})<br>
-    <mat-form-field>
-      <input matInput placeholder="Arguments" [(ngModel)]="args[e.hash]">
+    <mat-form-field class="fullwidth">
+      <input matInput placeholder="Arguments" [(ngModel)]="args[e.hash]" class="fullwidth">
     </mat-form-field>
   </div>
   <div mat-dialog-actions>

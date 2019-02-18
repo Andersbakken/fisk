@@ -3,6 +3,10 @@
     font-family: monospace;
 }
 
+.fullwidth {
+    min-width: 100%;
+}
+
 .scroll {
     overflow: auto;
     max-height: 70vh !important;
