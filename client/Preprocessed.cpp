@@ -5,7 +5,6 @@
 
 Preprocessed::Preprocessed()
 {
-    pipe(mPipe);
 }
 
 Preprocessed::~Preprocessed()

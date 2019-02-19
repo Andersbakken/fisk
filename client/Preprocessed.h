@@ -33,7 +33,6 @@ private:
     std::thread mThread;
     bool mDone { false };
     bool mJoined { false };
-    int mPipe[2];
 };
 
 #endif /* PREPROCESSED_H */
