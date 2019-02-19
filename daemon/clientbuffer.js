@@ -9,7 +9,7 @@ class ClientBuffer
     write(buffer)
     {
         this.buffers.push(buffer);
-        console.log("write", buffer.length, this.buffers.length, this.available);
+        // console.log("write", buffer.length, this.buffers.length, this.available);
     }
 
     read(len)
@@ -19,7 +19,7 @@ class ClientBuffer
         if (len > this.available)
             throw new Error("We don't have this many bytes available " + len + ">" + this.available);
 
-        console.log("read", len, this.available);
+        // console.log("read", len, this.available);
         let ret;
 
         if (this.buffers[0].length - this.offset >= len) { // buffers[0] is enough
