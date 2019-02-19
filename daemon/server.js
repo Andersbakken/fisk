@@ -37,7 +37,7 @@ class Server extends EventEmitter
         return new Promise((resolve, reject) => {
             let connected = false;
             this.server = net.createServer(this._onConnection.bind(this)).listen(this.file, () => {
-                fs.chmodSync(this.file, 0777);
+                fs.chmodSync(this.file, "a+rwx");
                 connected = true;
                 resolve();
             });
