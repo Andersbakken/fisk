@@ -313,7 +313,6 @@ const environments = {
 
     extraArgs(srcHash, targetHash) {
         let data = environments._links[srcHash];
-        console.log(srcHash, targetHash, data);
         if (data) {
             return data.arguments(targetHash);
         }
