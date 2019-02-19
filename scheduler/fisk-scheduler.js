@@ -750,7 +750,7 @@ server.on("compile", compile => {
                     foundInCache = true;
                 }
             });
-            if (slave && !(compile.environment in slave.environment)) {
+            if (slave && !(compile.environment in slave.environments)) {
                 for (let i=0; i<usableEnvs.length; ++i) {
                     // console.log("checking slave", s.name, s.environments);
                     if (usableEnvs[i] in slave.environments) {
