@@ -741,6 +741,8 @@ server.on("compile", compile => {
         let cacheNodes = objectCache.get(compile.md5);
         if (cacheNodes) {
             cacheNodes.forEach(s => {
+                if (compile.slave && slave != compile.slave)
+                    return;
                 const slaveScore = score(s);
                 if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
                     bestScore = slaveScore;
@@ -748,6 +750,15 @@ server.on("compile", compile => {
                     foundInCache = true;
                 }
             });
+            if (slave && !(compile.environment in slave.environment)) {
+                for (let i=0; i<usableEnvs.length; ++i) {
+                    // console.log("checking slave", s.name, s.environments);
+                    if (usableEnvs[i] in slave.environments) {
+                        env = usableEnvs[i];
+                        break;
+                    }
+                }
+            }
         }
     }
     if (!slave) {
