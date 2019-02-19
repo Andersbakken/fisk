@@ -161,7 +161,7 @@ function cacheHit(slave, job)
             cacheHits: objectCache ? objectCache.hits : 0
         };
         if (slave.hostname)
-            info.slave.hostname = job.slave.hostname;
+            info.slave.hostname = slave.hostname;
         if (monitorsLog)
             console.log("send to monitors", info);
         // console.log("sending info", info);
