@@ -22,6 +22,7 @@ add_executable(fiskc
     Client.cpp
     CompilerArgs.cpp
     Config.cpp
+    DaemonSocket.cpp
     Log.cpp
     Select.cpp
     Watchdog.cpp

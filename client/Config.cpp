@@ -53,6 +53,7 @@ Getter<bool> help("help", "Display this help", false);
 Getter<bool> version("version", "Display fisk version and exit", false);
 Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
+Getter<std::string> socketFile("socket-file", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
 Separator s2;
 Separator s3("Options:");

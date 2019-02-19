@@ -73,6 +73,7 @@ public:
             str << '"';
         return str.str();
     }
+    T get() const { return mGetter(mValue); }
 private:
     static bool applyValue(const std::string &input, std::string &dest)
     {
@@ -179,6 +180,7 @@ private:
 };
 
 extern Getter<std::string> scheduler;
+extern Getter<std::string> socketFile;
 extern Getter<unsigned long long> schedulerConnectTimeout;
 extern Getter<unsigned long long> acquiredSlaveTimeout;
 extern Getter<unsigned long long> slaveConnectTimeout;

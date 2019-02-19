@@ -14,7 +14,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
-
+#include "DaemonSocket.h"
 
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
@@ -229,6 +229,32 @@ int main(int argc, char **argv)
                 *it = "-fdiagnostics-color=never";
             }
         }
+    }
+
+    DaemonSocket daemonSocket;
+    if (!daemonSocket.connect()) {
+        ERROR("Failed to connect to daemon");
+        data.watchdog->stop();
+        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "daemon failure");
+        return 0; // unreachable
+    }
+    {
+        Select select;
+        select.add(&daemonSocket);
+        while (daemonSocket.state() == DaemonSocket::Connecting) {
+            select.exec();
+        }
+        if (daemonSocket.state() != DaemonSocket::Connected) {
+            ERROR("Failed to connect to daemon 2");
+            data.watchdog->stop();
+            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "daemon failure 2");
+            return 0; // unreachable
+        }
+        daemonSocket.send("{\"type\":\"acquireCPPSlot\"}");
+        while (daemonSocket.hasPendingSendData() && daemonSocket.state() == DaemonSocket::Connected) {
+            select.exec();
+        }
+        return 0;
     }
 
     data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
