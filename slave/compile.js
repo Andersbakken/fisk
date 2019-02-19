@@ -200,7 +200,7 @@ class Compile extends EventEmitter {
             this.emit('error', err);
         });
 
-        proc.on('exit', (exitCode) => {
+        proc.on('exit', exitCode => {
             // try {
             var that = this;
             let files = [];
@@ -231,11 +231,14 @@ class Compile extends EventEmitter {
                         }
                     });
                 } catch (err) {
-                    that.emit('exit', { exitCode: 101, files: [], error: err, sourceFile: sourceFile });
+                    that.emit('exit', { exitCode: 110, files: [], error: err, sourceFile: sourceFile });
                     return;
                 }
             }
-            addDir(dir, dir);
+            if (exitCode === 0)
+                addDir(dir, dir);
+            if (exitCode === null)
+                exitCode = 111;
             this.emit('exit', { exitCode: exitCode, files: files, sourceFile: sourceFile });
         });
     }
