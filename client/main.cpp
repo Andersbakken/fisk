@@ -238,7 +238,7 @@ int main(int argc, char **argv)
         Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "daemon failure");
         return 0; // unreachable
     }
-    {
+    if (!Config::socketFile.get().empty()) {
         Select select;
         select.add(&daemonSocket);
         while (daemonSocket.state() == DaemonSocket::Connecting) {

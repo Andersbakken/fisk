@@ -120,6 +120,13 @@ class Server extends EventEmitter
     }
     _onConnection(conn)
     {
+        let send = message => {
+            let msg = Buffer.from(JSON.stringify(message), "utf8");
+            let header = Buffer.allocUnsafe(4);
+            header.writeUInt32BE(msg.length);
+            conn.write(header);
+            conn.write(msg);
+        };
         conn.connectionId = ++this._connectionId;
         this._connections[conn.connectionId] = conn;
         conn.on('end', () => {
