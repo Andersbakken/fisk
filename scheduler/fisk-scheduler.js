@@ -736,6 +736,7 @@ server.on("compile", compile => {
     let extraArgs;
     let blacklistedArgs;
     // console.log("got usableEnvs", usableEnvs);
+    // ### should have a function match(s) that checks for env, score and compile.slave etc
     let foundInCache = false;
     if (objectCache) {
         let cacheNodes = objectCache.get(compile.md5);
