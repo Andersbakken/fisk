@@ -10,15 +10,17 @@ const Slots = require('./slots');
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
-    if (client)
-        client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
+    process.exit();
+    // if (client)
+    //     client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
 
 });
 
 process.on('uncaughtException', err => {
     console.error("Uncaught exception", err);
-    if (client)
-        client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
+    process.exit();
+    // if (client)
+    //     client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
 });
 
 const server = new Server(option, common);
