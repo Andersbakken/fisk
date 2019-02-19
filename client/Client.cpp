@@ -55,10 +55,10 @@ enum CheckResult {
     Continue
 };
 
-void filterCOLLECT(std::string &output)
+static void filter(const std::string &needle, std::string &output)
 {
     size_t i=0;
-    while ((i = output.find("COLLECT_", i)) != std::string::npos) {
+    while ((i = output.find(needle, i)) != std::string::npos) {
         if (!i || output[i - 1] == '\n') {
             size_t endLine = output.find("\n", i);
             if (endLine == std::string::npos) {
@@ -70,6 +70,12 @@ void filterCOLLECT(std::string &output)
             ++i;
         }
     }
+}
+
+static void filter(std::string &output)
+{
+    filter("COLLECT_", output);
+    filter("InstalledDir: ", output);
 }
 
 static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
@@ -540,7 +546,7 @@ std::string Client::environmentHash(const std::string &compiler)
         }
 
         out += err;
-        filterCOLLECT(out);
+        filter(out);
         return Client::toHex(Client::sha1(out));
     };
     const std::string cache = Config::envCache();
@@ -770,7 +776,7 @@ std::string Client::prepareEnvironmentForUpload()
             return std::string();
         }
         stdOut += stdErr;
-        filterCOLLECT(stdOut);
+        filter(stdOut);
         int w;
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {
