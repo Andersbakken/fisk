@@ -30,7 +30,8 @@ public:
         if (!err.empty()) {
             ERROR("Failed to parse json from slave: %s", err.c_str());
             Client::data().watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave json parse error");
+            error = "slave json parse error";
+            done = true;
             return;
         }
 
@@ -53,7 +54,8 @@ public:
             if (success.is_bool() && !success.bool_value()) {
                 ERROR("Slave had some issue. Build locally");
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave run failure");
+                error = "slave run failure";
+                done = true;
                 return;
             }
 
@@ -81,7 +83,8 @@ public:
                     if (ff.path.empty()) {
                         ERROR("No file for idx: %zu", i);
                         Client::data().watchdog->stop();
-                        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error");
+                        error = "slave protocol error";
+                        done = true;
                         return;
                     }
                 }
@@ -89,7 +92,8 @@ public:
                 if (!f) {
                     ERROR("Can't open file: %s", files[0].path.c_str());
                     Client::data().watchdog->stop();
-                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave file open error");
+                    error = "slave file open error";
+                    done = true;
                     return;
                 }
                 assert(f);
@@ -103,7 +107,8 @@ public:
 
         ERROR("Unexpected message type %s.", msg["type"].string_value().c_str());
         Client::data().watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 5");
+        error = "slave protocol error 5";
+        done = true;
     }
 
     void handleResponseBinary(const void *data, size_t len)
@@ -112,7 +117,9 @@ public:
         if (files.empty()) {
             ERROR("Unexpected binary data (%zu bytes)", len);
             Client::data().watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 2");
+            error = "slave protocol error 2";
+            done = true;
+            return;
         }
         fill(reinterpret_cast<const unsigned char *>(data), len);
         if (files.empty()) {
@@ -133,7 +140,8 @@ public:
                 if (fwrite(data + offset, 1, b, f) != b) {
                     ERROR("Failed to write to file %s (%d %s)", front->path.c_str(), errno, strerror(errno));
                     Client::data().watchdog->stop();
-                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave file write error");
+                    error = "slave file write error";
+                    done = true;
                     return;
                 }
                 offset += b;
@@ -149,7 +157,8 @@ public:
                 f = fopen(front->path.c_str(), "w");
                 if (!f) {
                     Client::data().watchdog->stop();
-                    Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave file open error 2");
+                    error = "slave file open error 2";
+                    done = true;
                     return;
                 }
 
@@ -160,7 +169,8 @@ public:
         if (offset < bytes) {
             ERROR("Extraneous bytes. Abandon ship (%zu/%zu)", offset, bytes);
             Client::data().watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 3");
+            error = "slave protocol error 3";
+            done = true;
         }
     }
 
@@ -173,6 +183,7 @@ public:
     size_t totalWritten { 0 };
     FILE *f { 0 };
     bool done { false };
+    std::string error;
 };
 
 

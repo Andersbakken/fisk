@@ -7,19 +7,17 @@ Watchdog::Watchdog()
     : mState(Config::watchdog ? Running : Stopped)
 {
     mTransitionTime = Watchdog::timings[Initial] = Client::mono();
+    if (Config::objectCache) {
+        stages = { Initial, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
+    } else {
+        stages = { Initial, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
+    }
 }
 
 void Watchdog::transition(Stage stage)
 {
     if (mState != Running)
         return;
-    if (mStage == 0) {
-        if (Config::objectCache) {
-            stages = { Initial, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
-        } else {
-            stages = { Initial, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
-        }
-    }
     Watchdog::timings[mStage + 1] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
     DEBUG("Watchdog transition from %s to %s (stage took %llu)",
@@ -79,7 +77,8 @@ void Watchdog::onTimeout()
 {
     if (mState == Running && Client::mono() >= mTimeoutTime) {
         ERROR("%d %d Watchdog timed out waiting for %s", mState, (int)Config::watchdog, stageName(static_cast<Stage>(stages[mState + 1])));
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
+        // Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
+        mState = TimedOut;
     }
 }
 

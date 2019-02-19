@@ -42,6 +42,7 @@ public:
     void transition(Stage stage);
     void heartbeat();
     void stop();
+    bool timedOut() const { return mState == TimedOut; }
 protected:
     virtual int fd() const override { return -1; }
     virtual unsigned int mode() const override { return None; }
@@ -54,7 +55,8 @@ private:
     enum State {
         Running,
         Stopped,
-        Suspended
+        Suspended,
+        TimedOut
     } mState { Running };
     unsigned long long mTransitionTime { Client::mono() };
     unsigned long long mTimeoutTime { 0 };

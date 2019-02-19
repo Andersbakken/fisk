@@ -53,6 +53,7 @@ Getter<bool> help("help", "Display this help", false);
 Getter<bool> version("version", "Display fisk version and exit", false);
 Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
+Getter<std::string> socketFile("socket-file", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
 Separator s2;
 Separator s3("Options:");
@@ -113,11 +114,6 @@ Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\",
 Getter<bool> logTimePrefix("log-time-prefix", "Add a time prefix to logs", false);
 Getter<bool> debug("debug", "Set log level to \"debug\"", false);
 Getter<bool> verbose("verbose", "Set log level to \"verbose\"", false);
-Separator s11;
-Separator s12("Semaphores:");
-Getter<bool> dumpSemaphores("dump-semaphores", "Dump info about fiskc's semaphores", false);
-Getter<bool> cleanSemaphores("clean-semaphores", "Clean fiskc's semaphores", false);
-
 };
 
 bool Config::init(int &argc, char **&argv)

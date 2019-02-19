@@ -2,6 +2,8 @@
 
 #include <unistd.h>
 #include "SchedulerWebSocket.h"
+#include "DaemonSocket.h"
+#include "Preprocessed.h"
 #include "Select.h"
 #include "Config.h"
 #include <unistd.h>
@@ -277,26 +279,6 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-Client::Slot::Slot(Type type, sem_t *semaphore)
-    : mType(type), mSemaphore(semaphore)
-{
-    if (semaphore) {
-        sData.semaphores.insert(semaphore);
-        DEBUG("Acquired %s semaphore on %s", typeToString(type), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-    } else {
-        DEBUG("Acquired %s slot without semaphore for %s", typeToString(type), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-    }
-}
-
-Client::Slot::~Slot()
-{
-    if (mSemaphore) {
-        DEBUG("Dropping %s semaphore on %s", typeToString(mType), sData.compilerArgs ? sData.compilerArgs->sourceFile().c_str() : "");
-        sem_post(mSemaphore);
-        sData.semaphores.erase(mSemaphore);
-    }
-}
-
 bool Client::setFlag(int fd, int flag)
 {
     int flags, r;
@@ -373,141 +355,6 @@ bool Client::recursiveRmdir(const std::string &dir)
     return ::rmdir(dir.c_str()) == 0;
 }
 
-std::unique_ptr<Client::Preprocessed> Client::preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args)
-{
-    const unsigned long long started = Client::mono();
-    Preprocessed *ptr = new Preprocessed;
-    std::unique_ptr<Client::Preprocessed> ret(ptr);
-    ret->mThread = std::thread([ptr, args, compiler, started] {
-        std::string out, err;
-        ptr->stdOut.reserve(1024 * 1024);
-        std::string commandLine = compiler;
-        const size_t count = args->commandLine.size();
-        for (size_t i=1; i<count; ++i) {
-            const std::string arg = args->commandLine.at(i);
-            if (arg == "-o" && args->commandLine.size() > i + 1) {
-                ++i;
-                continue;
-            }
-
-            commandLine += " '";
-            commandLine += args->commandLine.at(i);
-            commandLine += '\'';
-        }
-        commandLine += " '-E'";
-        if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
-            commandLine += " '-frewrite-includes'";
-        } else {
-            commandLine += " '-fdirectives-only'";
-        }
-        if (!Config::discardComments) {
-            commandLine += " '-C'";
-        }
-
-        DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
-        std::shared_ptr<Client::Slot> slot = Client::acquireSlot(Client::Slot::Cpp);
-        ptr->slotDuration = Client::mono() - started;
-        DEBUG("Running preprocess: %s", commandLine.c_str());
-        if (args->flags & (CompilerArgs::CPreprocessed
-                           |CompilerArgs::ObjectiveCPreprocessed
-                           |CompilerArgs::ObjectiveCPlusPlusPreprocessed
-                           |CompilerArgs::CPlusPlusPreprocessed)) {
-            DEBUG("Already preprocessed. No need to do it");
-            ptr->exitStatus = readFile(args->sourceFile(), ptr->stdOut) ? 0 : 1;
-        } else {
-            DEBUG("Executing:\n%s", commandLine.c_str());
-            TinyProcessLib::Process proc(commandLine, std::string(),
-                                         [ptr](const char *bytes, size_t n) {
-                                             VERBOSE("Preprocess appending %zu bytes to stdout", n);
-                                             ptr->stdOut.append(bytes, n);
-                                         }, [ptr](const char *bytes, size_t n) {
-                                             VERBOSE("Preprocess appending %zu bytes to stderr", n);
-                                             ptr->stdErr.append(bytes, n);
-                                         });
-            VERBOSE("Preprocess calling get_status");
-            ptr->exitStatus = proc.get_exit_status();
-            DEBUG("Preprocess got status %d", ptr->exitStatus);
-            if (Config::objectCache) {
-                const char *ch = ptr->stdOut.c_str();
-                const char *last = ch;
-                while (*ch) {
-                    // VERBOSE("GETTING CHAR [%c]", *ch);
-                    if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
-                        if (ch > last) {
-                            VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
-                            MD5_Update(&Client::data().md5, last, ch - last);
-                        }
-                        while (*ch && *ch != '\n')
-                            ++ch;
-                        last = ch;
-                    } else {
-                        ++ch;
-                    }
-                }
-                if (last < ch) {
-                    VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
-                    MD5_Update(&Client::data().md5, last, ch - last);
-                }
-            }
-        }
-        slot.reset();
-        std::unique_lock<std::mutex> lock(ptr->mMutex);
-        ptr->mDone = true;
-        ptr->cppSize = ptr->stdOut.size();
-        ptr->duration = Client::mono() - started;
-        ptr->mCond.notify_one();
-    });
-    return ret;
-}
-
-Client::Preprocessed::~Preprocessed()
-{
-    wait();
-}
-
-void Client::Preprocessed::wait()
-{
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-        if (mJoined)
-            return;
-        while (!mDone) {
-            mCond.wait(lock);
-        }
-        mJoined = true;
-    }
-    mThread.join();
-}
-
-std::unique_ptr<Client::Slot> Client::acquireSlot(Client::Slot::Type type)
-{
-    const size_t slots = Slot::slots(type);
-    if (!slots)
-        return std::unique_ptr<Client::Slot>();
-
-    sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, slots);
-    if (!sem) {
-        ERROR("Failed to open semaphore %s for %zu slots: %d %s",
-              Client::Slot::typeToString(type), slots, errno, strerror(errno));
-        return std::unique_ptr<Client::Slot>(new Client::Slot(type, nullptr));
-    }
-    int ret;
-    EINTRWRAP(ret, sem_wait(sem));
-
-    if (Log::minLogLevel <= Log::Debug) {
-#ifdef __linux__
-        int val = -1;
-        sem_getvalue(sem, &val);
-        Log::debug("Opened semaphore %s for %zu slots (value %d)", Client::Slot::typeToString(type), slots, val);
-#else
-        Log::debug("Opened semaphore %s for %zu slots", Client::Slot::typeToString(type), slots);
-#endif
-    }
-
-    assert(!ret);
-    return std::unique_ptr<Client::Slot>(new Client::Slot(type, sem));
-}
-
 void Client::writeStatistics()
 {
     if (sData.localReason == CompilerArgs::Local_Preprocess)
@@ -570,25 +417,6 @@ void Client::writeStatistics()
     EINTRWRAP(ret, fclose(f));
 }
 
-std::unique_ptr<Client::Slot> Client::tryAcquireSlot(Client::Slot::Type type)
-{
-    const size_t slots = Slot::slots(type);
-    if (!slots)
-        return std::unique_ptr<Client::Slot>();
-
-    sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, slots);
-    if (!sem) {
-        ERROR("Failed to open semaphore %s for %zu slots: %d %s",
-              Client::Slot::typeToString(type), slots, errno, strerror(errno));
-        return std::unique_ptr<Client::Slot>(new Client::Slot(type, nullptr));
-    }
-    int ret = sem_trywait(sem);
-    if (!ret) {
-        return std::unique_ptr<Client::Slot>(new Client::Slot(type, sem));
-    }
-    return std::unique_ptr<Client::Slot>();
-}
-
 static std::string argsAsString()
 {
     std::string ret = sData.compiler;
@@ -599,7 +427,7 @@ static std::string argsAsString()
     return ret;
 }
 
-void Client::runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason)
+void Client::runLocal(const std::string &reason)
 {
     enum { Increment = 75000 };
     auto run = [&reason]() {
@@ -637,7 +465,6 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason)
     }
     if (pid == -1) { // errpr
         ERROR("Failed to fork: %d %s", errno, strerror(errno));
-        slot.reset();
         run();
         exit(101);
     } else if (pid == 0) { // child
@@ -646,7 +473,6 @@ void Client::runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason)
     } else { // paren
         int ret, status;
         EINTRWRAP(ret, waitpid(pid, &status, 0));
-        slot.reset();
         writeStatistics();
         if (WIFEXITED(status))
             _exit(WEXITSTATUS(status));

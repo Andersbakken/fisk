@@ -15,7 +15,6 @@
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 
-#include <semaphore.h>
 #include <set>
 #include <string.h>
 #include <string>
@@ -27,24 +26,21 @@
 #define EINTRWRAP(VAR, BLOCK) do { VAR = BLOCK; } while (VAR == -1 && errno == EINTR)
 
 class Watchdog;
+class DaemonSocket;
 class SchedulerWebSocket;
-namespace Client {
 class Preprocessed;
+namespace Client {
 struct Data
 {
-    ~Data() {}
-
     int argc { 0 };
     char **argv { 0 };
     std::vector<std::string> originalArgs;
-    bool maintainSemaphores { false };
     std::string compiler; // this is the next one on the path and the one we will exec if we run locally
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string slaveCompiler; // this is the one that actually will exist on the slave
     std::string hash;
     bool objectCache { false };
     int exitCode { 0 };
-    std::set<sem_t *> semaphores;
     size_t totalWritten { 0 };
 
     std::unique_ptr<Preprocessed> preprocessed;
@@ -73,72 +69,13 @@ inline void parsePath(const std::string &path, std::string *basename, std::strin
 {
     return parsePath(path.c_str(), basename, dirname);
 }
-class Slot
-{
-public:
-    enum Type {
-        DesiredCompile,
-        Compile,
-        Cpp
-    };
-
-    Slot(Type type, sem_t *sem);
-    ~Slot();
-    static constexpr const char *typeToString(Type type)
-    {
-        return (type == Compile ? "/fisk.compile" : (type == DesiredCompile ? "/fisk.desiredCompile" : "/fisk.cpp"));
-    }
-    static size_t slots(Type type)
-    {
-        switch (type) {
-        case Compile:
-            return Config::compileSlots;
-        case Cpp:
-            return Config::cppSlots;
-        case DesiredCompile:
-            return Config::desiredCompileSlots;
-        }
-        assert(0);
-        return 0;
-    }
-private:
-    Slot(const Slot &) = delete;
-    Slot &operator=(const Slot &) = delete;
-
-    const Type mType;
-    sem_t *mSemaphore;
-};
-
-std::unique_ptr<Slot> tryAcquireSlot(Slot::Type type);
-std::unique_ptr<Slot> acquireSlot(Slot::Type type);
 void writeStatistics();
-[[noreturn]] void runLocal(std::unique_ptr<Slot> &&slot, const std::string &reason);
+[[noreturn]] void runLocal(const std::string &reason);
 unsigned long long mono();
 bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 bool recursiveRmdir(const std::string &path);
 std::string realpath(const std::string &path);
-
-class Preprocessed
-{
-public:
-    ~Preprocessed();
-    void wait();
-
-    std::string stdOut, stdErr;
-    size_t cppSize { 0 };
-    int exitStatus { -1 };
-    unsigned long long duration { 0 };
-    unsigned long long slotDuration { 0 };
-private:
-    std::mutex mMutex;
-    std::condition_variable mCond;
-    std::thread mThread;
-    bool mDone { false };
-    bool mJoined { false };
-    friend std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
-};
-std::unique_ptr<Preprocessed> preprocess(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args);
 
 template <size_t StaticBufSize = 4096>
 inline static std::string vformat(const char *format, va_list args)

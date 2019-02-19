@@ -23,7 +23,8 @@ public:
             if (!err.empty()) {
                 ERROR("Failed to parse json from scheduler: %s", err.c_str());
                 Client::data().watchdog->stop();
-                Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler json parse error");
+                error = "scheduler json parse error";
+                done = true;
                 return;
             }
             const std::string type = msg["type"].string_value();
@@ -41,7 +42,6 @@ public:
                 }
                 slavePort = msg["port"].int_value();
                 jobId = msg["id"].int_value();
-                Client::data().maintainSemaphores = msg["maintain_semaphores"].bool_value();
                 DEBUG("type %d", msg["port"].type());
                 DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);
                 done = true;
@@ -62,6 +62,7 @@ public:
     }
 
     bool done { false };
+    std::string error;
     bool needsEnvironment { false };
     int jobId { 0 };
     uint16_t slavePort { 0 };

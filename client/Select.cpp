@@ -43,7 +43,7 @@ int Select::exec(int timeoutMs) const
         return -1;
     }
 
-    const unsigned long long after = ret ? 0 : Client::mono();
+    const unsigned long long after = Client::mono();
     VERBOSE("Woke up from select timeout %dms after %llums with %d sockets fired",
             timeoutMs, after - before, ret);
 

@@ -4,6 +4,7 @@
 #include "SlaveWebSocket.h"
 #include "SchedulerWebSocket.h"
 #include "Log.h"
+#include "Preprocessed.h"
 #include "Select.h"
 #include <execinfo.h>
 #include "Watchdog.h"
@@ -14,7 +15,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
-
+#include "DaemonSocket.h"
 
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
@@ -32,11 +33,6 @@ int main(int argc, char **argv)
     // return 0;
     std::atexit([]() {
         Client::Data &data = Client::data();
-        for (sem_t *semaphore : data.semaphores) {
-            sem_post(semaphore);
-            sem_close(semaphore);
-        }
-        data.semaphores.clear();
         if (Log::minLogLevel <= Log::Warn) {
             std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
                                              Client::milliseconds_since_epoch,
@@ -67,40 +63,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (Config::dumpSemaphores) {
-#ifdef __APPLE__
-        fprintf(stderr, "sem_getvalue(2) is not functional on mac so this option doesn't work\n");
-#else
-        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
-            if (Client::Slot::slots(type) == std::numeric_limits<size_t>::max()) {
-                continue;
-            }
-            sem_t *sem = sem_open(Client::Slot::typeToString(type), O_CREAT, 0666, Client::Slot::slots(type));
-            if (!sem) {
-                fprintf(stderr, "Failed to open semaphore %s slots: %zu: %d %s\n",
-                        Client::Slot::typeToString(type), Client::Slot::slots(type),
-                        errno, strerror(errno));
-                continue;
-            }
-            int val = -1;
-            sem_getvalue(sem, &val);
-            printf("%s %d/%zu\n", Client::Slot::typeToString(type), val, Client::Slot::slots(type));
-            sem_close(sem);
-        }
-#endif
-        return 0;
-    }
-    if (Config::cleanSemaphores) {
-        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
-            if (sem_unlink(Client::Slot::typeToString(type))) {
-                if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max()) {
-                    fprintf(stderr, "Failed to unlink semaphore %s: %d %s\n",
-                            Client::Slot::typeToString(type), errno, strerror(errno));
-                }
-            }
-        }
-        return 0;
-    }
 
     std::string clientName = Config::name;
 
@@ -114,10 +76,10 @@ int main(int argc, char **argv)
             return 106;
         }
     }
-    if (Config::debug) {
-        level = Log::Debug;
-    } else if (Config::verbose) {
+    if (Config::verbose) {
         level = Log::Verbose;
+    } else if (Config::debug) {
+        level = Log::Debug;
     }
     std::string preresolved = Config::compiler;
 
@@ -133,10 +95,6 @@ int main(int argc, char **argv)
     data.argv = argv;
     data.argc = argc;
     auto signalHandler = [](int signal) {
-        for (sem_t *semaphore : Client::data().semaphores) {
-            sem_post(semaphore);
-        }
-        Client::data().semaphores.clear();
         if (signal != SIGINT) {
             fprintf(stderr, "fiskc: Caught signal %d\n", signal);
             void *buffer[64];
@@ -193,16 +151,45 @@ int main(int argc, char **argv)
           data.compiler.c_str(), data.resolvedCompiler.c_str(),
           data.slaveCompiler.c_str());
 
+    DaemonSocket daemonSocket;
+    if (!daemonSocket.connect()) {
+        ERROR("Failed to connect to daemon");
+        data.watchdog->stop();
+        Client::runLocal("daemon connect failure");
+        return 0; // unreachable
+    }
+
+    Select select;
+    select.add(&daemonSocket);
+    select.add(data.watchdog);
+    while (daemonSocket.state() == DaemonSocket::Connecting) {
+        select.exec();
+    }
+    if (daemonSocket.state() != DaemonSocket::Connected) {
+        Client::runLocal("daemon connect failure 2");
+        return 0;
+    }
+
+    auto runLocal = [&daemonSocket, &data, &select](const std::string &reason) {
+        data.watchdog->stop();
+        daemonSocket.acquireCompileSlot();
+        daemonSocket.waitForCompileSlot(select);
+        Client::runLocal(reason);
+    };
+
+
+#if 0
     if (!Config::noDesire) {
         if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-            Client::runLocal(std::move(slot), "nodesire");
+            runLocal("nodesire");
             return 0;
         }
     }
+#endif
 
     if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "disabled");
+        runLocal("disabled");
         return 0; // unreachable
     }
 
@@ -216,8 +203,7 @@ int main(int argc, char **argv)
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile),
-                         Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
+        runLocal(Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
         return 0; // unreachable
     }
 
@@ -231,14 +217,30 @@ int main(int argc, char **argv)
         }
     }
 
-    data.preprocessed = Client::preprocess(data.compiler, data.compilerArgs);
-    if (!data.preprocessed) {
-        ERROR("Failed to preprocess");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess failure");
-        return 0; // unreachable
-    }
+    // if (!Config::socketFile.get().empty()) {
+    //     Select select;
+    //     select.add(&daemonSocket);
+    //     while (daemonSocket.state() == DaemonSocket::Connecting) {
+    //         select.exec();
+    //     }
+    //     if (daemonSocket.state() != DaemonSocket::Connected) {
+    //         ERROR("Failed to connect to daemon 2");
+    //         data.watchdog->stop();
+    //         daemonSocket.acquireCompileSlot();
+    //         daemonSocket.waitForCompileSlot(select);
+    //         Client::runLocal("daemon failure 2");
+    //         return 0; // unreachable
+    //     }
+    //     daemonSocket.send("{\"type\":\"acquireCppSlot\"}");
+    //     while (daemonSocket.hasPendingSendData() && daemonSocket.state() == DaemonSocket::Connected) {
+    //         select.exec();
+    //     }
+    //     return 0;
+    // }
 
+    daemonSocket.acquireCppSlot();
+    data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, select, daemonSocket);
+    assert(data.preprocessed);
     data.hash = Client::environmentHash(data.resolvedCompiler);
     std::map<std::string, std::string> headers;
     {
@@ -271,7 +273,10 @@ int main(int argc, char **argv)
 
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
-        data.preprocessed->wait();
+        while (!data.preprocessed->done() && daemonSocket.state() == DaemonSocket::Connected) {
+            select.exec();
+        }
+        daemonSocket.releaseCppSlot();
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -279,15 +284,13 @@ int main(int argc, char **argv)
 
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 2");
+            runLocal("preprocess error 2");
             return 0; // unreachable
         }
 
         if (data.preprocessed->stdOut.empty()) {
             ERROR("Empty preprocessed output. Running locally");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 3");
+            runLocal("preprocess error 3");
             return 0; // unreachable
         }
 
@@ -304,44 +307,28 @@ int main(int argc, char **argv)
     SchedulerWebSocket schedulerWebsocket;
     if (!schedulerWebsocket.connect(url + "/compile", headers)) {
         DEBUG("Have to run locally because no server");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error");
+        runLocal("scheduler connect error");
         return 0; // unreachable
     }
 
-    {
-        Select select;
-        select.add(data.watchdog);
-        select.add(&schedulerWebsocket);
-
-        DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket.done
-               && schedulerWebsocket.state() >= SchedulerWebSocket::None
-               && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
-            select.exec();
-        }
-        DEBUG("Finished schedulerWebsocket");
-        if (!schedulerWebsocket.done) {
-            DEBUG("Have to run locally because no server 2");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "scheduler connect error 2");
-            return 0; // unreachable
-        }
+    select.add(&schedulerWebsocket);
+    DEBUG("Starting schedulerWebsocket");
+    while (!schedulerWebsocket.done
+           && schedulerWebsocket.state() >= SchedulerWebSocket::None
+           && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
+        select.exec();
+    }
+    if (!schedulerWebsocket.error.empty()) {
+        DEBUG("Have to run locally because no server: %s", schedulerWebsocket.error.c_str());
+        runLocal(schedulerWebsocket.error);
+        return 0; // unreachable
     }
 
-    if (data.maintainSemaphores) {
-        for (Client::Slot::Type type : { Client::Slot::Compile, Client::Slot::Cpp, Client::Slot::DesiredCompile }) {
-            if (Client::Slot::slots(type) != std::numeric_limits<size_t>::max() && sem_unlink(Client::Slot::typeToString(type))) {
-                if (errno != ENOENT) {
-                    FATAL("Failed to unlink semaphore %s: %d %s",
-                          Client::Slot::typeToString(type), errno, strerror(errno));
-                } else {
-                    DEBUG("Semaphore %s didn't exist", Client::Slot::typeToString(type));
-                }
-            } else {
-                DEBUG("Destroyed semaphore %s", Client::Slot::typeToString(type));
-            }
-        }
+    DEBUG("Finished schedulerWebsocket");
+    if (!schedulerWebsocket.done) {
+        DEBUG("Have to run locally because no server 2");
+        runLocal("scheduler connect error 2");
+        return 0; // unreachable
     }
 
     if (schedulerWebsocket.needsEnvironment) {
@@ -351,24 +338,21 @@ int main(int argc, char **argv)
         if (!tarball.empty()) {
             Client::uploadEnvironment(&schedulerWebsocket, tarball);
         }
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "needs environment");
+        runLocal("needs environment");
         return 0;
     }
 
     if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())
         || !schedulerWebsocket.slavePort) {
         DEBUG("Have to run locally because no slave");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "no slave");
+        runLocal("no slave");
         return 0; // unreachable
     }
 
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredSlave);
     SlaveWebSocket slaveWebSocket;
-    Select select;
     select.add(&slaveWebSocket);
-    select.add(data.watchdog);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
     headers["x-fisk-slave-ip"] = schedulerWebsocket.slaveIp;
     if (!schedulerWebsocket.environment.empty()) {
@@ -379,8 +363,7 @@ int main(int argc, char **argv)
                                                schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
                                                schedulerWebsocket.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure");
+        runLocal("slave connection failure");
         return 0; // unreachable
     }
 
@@ -388,14 +371,14 @@ int main(int argc, char **argv)
         select.exec();
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because no slave connection 2");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connection failure 2");
+        runLocal("slave connection failure 2");
         return 0;
     }
     data.watchdog->transition(Watchdog::ConnectedToSlave);
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
         data.preprocessed->wait();
+        daemonSocket.releaseCppSlot();
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -403,15 +386,13 @@ int main(int argc, char **argv)
 
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 4");
+            Client::runLocal("preprocess error 4");
             return 0; // unreachable
         }
 
         if (data.preprocessed->stdOut.empty()) {
             ERROR("Empty preprocessed output. Running locally");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "preprocess error 5");
+            runLocal("preprocess error 5");
             return 0; // unreachable
         }
     }
@@ -456,8 +437,7 @@ int main(int argc, char **argv)
         }
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
-            data.watchdog->stop();
-            Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave protocol error 6");
+            runLocal("slave protocol error 6");
             return 0; // unreachable
         }
     }
@@ -469,8 +449,7 @@ int main(int argc, char **argv)
         select.exec();
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 3");
+        runLocal("slave connect error 3");
         return 0; // unreachable
     }
 
@@ -482,8 +461,7 @@ int main(int argc, char **argv)
         select.exec();
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
-        data.watchdog->stop();
-        Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "slave connect error 4");
+        runLocal("slave connect error 4");
         return 0; // unreachable
     }
 
