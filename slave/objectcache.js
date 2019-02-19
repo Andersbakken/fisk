@@ -195,7 +195,7 @@ class ObjectCache extends EventEmitter
                         throw new Error(`Wrong file size for ${path.join(this.dir, response.md5)}, should have been ${cacheItem.fileSize} but ended up being ${stat.size}`);
                     }
                     this.cache[response.md5] = cacheItem;
-                    console.log(response);
+                    // console.log(response);
                     this.emit("added", { md5: response.md5, sourceFile: response.sourceFile });
 
                     this.size += cacheItem.fileSize;
