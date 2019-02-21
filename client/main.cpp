@@ -162,17 +162,27 @@ int main(int argc, char **argv)
     Select select;
     select.add(&daemonSocket);
     select.add(data.watchdog);
-    while (daemonSocket.state() == DaemonSocket::Connecting) {
+    while (daemonSocket.state() == DaemonSocket::Connecting && !data.watchdog->timedOut()) {
         select.exec();
     }
+
+    if (data.watchdog->timedOut()) {
+        ERROR("Have to run locally because we timed out connecting to daemon");
+        data.watchdog->stop();
+        Client::runLocal("daemon connect failure");
+        return 0; // unreachable
+    }
+
     if (daemonSocket.state() != DaemonSocket::Connected) {
         Client::runLocal("daemon connect failure 2");
         return 0;
     }
 
+    data.watchdog->transition(Watchdog::ConnectedToDaemon);
+
     auto runLocal = [&daemonSocket, &data, &select](const std::string &reason) {
         data.watchdog->stop();
-        daemonSocket.acquireCompileSlot();
+        daemonSocket.send(DaemonSocket::AcquireCompileSlot);
         daemonSocket.waitForCompileSlot(select);
         Client::runLocal(reason);
     };
@@ -217,28 +227,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // if (!Config::socketFile.get().empty()) {
-    //     Select select;
-    //     select.add(&daemonSocket);
-    //     while (daemonSocket.state() == DaemonSocket::Connecting) {
-    //         select.exec();
-    //     }
-    //     if (daemonSocket.state() != DaemonSocket::Connected) {
-    //         ERROR("Failed to connect to daemon 2");
-    //         data.watchdog->stop();
-    //         daemonSocket.acquireCompileSlot();
-    //         daemonSocket.waitForCompileSlot(select);
-    //         Client::runLocal("daemon failure 2");
-    //         return 0; // unreachable
-    //     }
-    //     daemonSocket.send("{\"type\":\"acquireCppSlot\"}");
-    //     while (daemonSocket.hasPendingSendData() && daemonSocket.state() == DaemonSocket::Connected) {
-    //         select.exec();
-    //     }
-    //     return 0;
-    // }
-
-    daemonSocket.acquireCppSlot();
+    daemonSocket.send(DaemonSocket::AcquireCppSlot);
     data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, select, daemonSocket);
     assert(data.preprocessed);
     data.hash = Client::environmentHash(data.resolvedCompiler);
@@ -273,10 +262,17 @@ int main(int argc, char **argv)
 
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
-        while (!data.preprocessed->done() && daemonSocket.state() == DaemonSocket::Connected) {
+        while (!data.preprocessed->done()
+               && daemonSocket.state() == DaemonSocket::Connected
+               && !data.watchdog->timedOut()) {
             select.exec();
         }
-        daemonSocket.releaseCppSlot();
+        if (data.watchdog->timedOut()) {
+            DEBUG("Have to run locally because we timed out waiting for preprocessing");
+            runLocal("watchdog preprocessing");
+            return 0; // unreachable
+        }
+        daemonSocket.send(DaemonSocket::ReleaseCppSlot);
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -314,10 +310,18 @@ int main(int argc, char **argv)
     select.add(&schedulerWebsocket);
     DEBUG("Starting schedulerWebsocket");
     while (!schedulerWebsocket.done
+           && !data.watchdog->timedOut()
            && schedulerWebsocket.state() >= SchedulerWebSocket::None
            && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
         select.exec();
     }
+
+    if (data.watchdog->timedOut()) {
+        DEBUG("Have to run locally because we timed out trying to connect ro the scheduler");
+        runLocal("watchdog scheduler connect");
+        return 0; // unreachable
+    }
+
     if (!schedulerWebsocket.error.empty()) {
         DEBUG("Have to run locally because no server: %s", schedulerWebsocket.error.c_str());
         runLocal(schedulerWebsocket.error);
@@ -367,8 +371,18 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    while (slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket && slaveWebSocket.state() > WebSocket::None)
+    while (!data.watchdog->timedOut()
+           && slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket
+           && slaveWebSocket.state() > WebSocket::None) {
         select.exec();
+    }
+
+    if (data.watchdog->timedOut()) {
+        DEBUG("Have to run locally because we timed out tryint to connect to slave");
+        runLocal("watchdog slave connect");
+        return 0; // unreachable
+    }
+
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because no slave connection 2");
         runLocal("slave connection failure 2");
@@ -378,7 +392,7 @@ int main(int argc, char **argv)
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
         data.preprocessed->wait();
-        daemonSocket.releaseCppSlot();
+        daemonSocket.send(DaemonSocket::ReleaseCppSlot);
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -421,8 +435,11 @@ int main(int argc, char **argv)
     slaveWebSocket.wait = wait;
     slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
-        while (!slaveWebSocket.done && (slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+        while (!slaveWebSocket.done
+               && !data.watchdog->timedOut()
+               && (slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
+        }
         if (slaveWebSocket.done) {
             if (!data.preprocessed->stdErr.empty()) {
                 fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
@@ -435,6 +452,11 @@ int main(int argc, char **argv)
             Client::writeStatistics();
             return data.exitCode;
         }
+        if (data.watchdog->timedOut()) {
+            DEBUG("Have to run locally because we timed out waiting for slave");
+            runLocal("watchdog");
+            return 0; // unreachable
+        }
         if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the slave");
             runLocal("slave protocol error 6");
@@ -445,8 +467,18 @@ int main(int argc, char **argv)
     assert(!slaveWebSocket.wait);
     slaveWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
 
-    while (slaveWebSocket.hasPendingSendData() && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+    while (data.watchdog->timedOut()
+           && slaveWebSocket.hasPendingSendData()
+           && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
         select.exec();
+    }
+
+    if (data.watchdog->timedOut()) {
+        DEBUG("Have to run locally because we timed out waiting for slave");
+        runLocal("watchdog upload");
+        return 0; // unreachable
+    }
+
     if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the slave");
         runLocal("slave connect error 3");
@@ -455,10 +487,18 @@ int main(int argc, char **argv)
 
     data.watchdog->transition(Watchdog::UploadedJob);
 
-    // usleep(1000 * 500);
-    // return 0;
-    while (!slaveWebSocket.done && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket)
+    while (!data.watchdog->timedOut()
+           && !slaveWebSocket.done
+           && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
         select.exec();
+    }
+
+    if (data.watchdog->timedOut()) {
+        DEBUG("Have to run locally because we timed out waiting for slave somehoe");
+        runLocal("watchdog slave");
+        return 0; // unreachable
+    }
+
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
         runLocal("slave connect error 4");

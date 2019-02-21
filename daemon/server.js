@@ -10,14 +10,18 @@ class Server extends EventEmitter
     constructor(option, common)
     {
         super();
+        this.debug = option("debug");
         this.file = option("socket", path.join(common.cacheDir(option), "socket"));
         this.server = undefined;
+        this.option = option;
         this._connections = {};
         this._connectionId = 0;
     }
 
     close()
     {
+        if (this.debug)
+            console.log("Server::close");
         if (this.server)
             this.server.close();
         try {
@@ -59,11 +63,16 @@ class Server extends EventEmitter
     }
     _onConnection(conn)
     {
-        let compile = new Compile(conn, ++this._connectionId);
+        let compile = new Compile(conn, ++this._connectionId, this.option);
+        if (this.debug)
+            console.log("Server::_onConnection", compile.id);
         if (this._connectionId == Math.pow(2, 31) - 1)
             this._connectionId = 0;
         this._connections[compile.id] = conn;
         compile.on('end', () => {
+            if (this.debug)
+                console.log("Compile::end");
+
             delete this._connections[compile.id];
         });
         this.emit('compile', compile);

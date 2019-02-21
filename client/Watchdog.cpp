@@ -8,9 +8,9 @@ Watchdog::Watchdog()
 {
     mTransitionTime = Watchdog::timings[Initial] = Client::mono();
     if (Config::objectCache) {
-        stages = { Initial, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
+        stages = { Initial, ConnectedToDaemon, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
     } else {
-        stages = { Initial, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
+        stages = { Initial, ConnectedToDaemon, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
     }
 }
 
@@ -36,31 +36,34 @@ void Watchdog::stop()
 
 int Watchdog::timeout()
 {
-    if (mState != Running)
+    if (mState != Running || stages[mStage] == Finished)
         return -1;
     const unsigned long long now = Client::mono();
     mTimeoutTime = mTransitionTime;
-    switch (mStage) {
+    switch (stages[mStage + 1]) {
     case Initial:
-        mTimeoutTime += Config::schedulerConnectTimeout;
+        assert(0);
+    case ConnectedToDaemon:
+        mTimeoutTime += Config::daemonConnectTimeout;
         break;
     case ConnectedToScheduler:
-        mTimeoutTime += Config::acquiredSlaveTimeout;
-        break;
-    case AcquiredSlave:
-        mTimeoutTime += Config::slaveConnectTimeout;
-        break;
-    case ConnectedToSlave:
-        mTimeoutTime += Config::preprocessTimeout;
+        mTimeoutTime += Config::schedulerConnectTimeout;
         break;
     case PreprocessFinished:
-        mTimeoutTime += Config::uploadJobTimeout;
+        mTimeoutTime += Config::preprocessTimeout;
+        break;
+    case AcquiredSlave:
+        mTimeoutTime += Config::acquiredSlaveTimeout;
+        break;
+    case ConnectedToSlave:
+        mTimeoutTime += Config::slaveConnectTimeout;
         break;
     case UploadedJob:
-        mTimeoutTime += Config::responseTimeout;
+        mTimeoutTime += Config::uploadJobTimeout;
         break;
     case Finished:
-        return -1;
+        mTimeoutTime += Config::responseTimeout;
+        break;
     }
     if (now >= mTimeoutTime) {
         DEBUG("Already timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));

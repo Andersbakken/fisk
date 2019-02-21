@@ -11,7 +11,6 @@ class DaemonSocket : public Socket
 public:
     DaemonSocket();
     bool connect();
-    void send(const std::string &json);
 
     enum State {
         Error = -2,
@@ -22,15 +21,23 @@ public:
     };
     State state() const { return mState; }
     bool hasPendingSendData() const { return !mSendBuffer.empty(); }
-    void acquireCppSlot();
+    enum Command {
+        AcquireCppSlot = 1,
+        AcquireCompileSlot = 2,
+        ReleaseCppSlot = 3,
+        ReleaseCompileSlot = 4,
+        JSON = 5
+    };
+
+    void send(const std::string &json);
+    void send(Command cmd);
     bool hasCppSlot() const;
     bool waitForCppSlot();
-    void releaseCppSlot();
 
-    void acquireCompileSlot();
     bool hasCompileSlot() const { return mHasCompileSlot; }
     bool waitForCompileSlot(Select &select);
     std::string error() const { return mError; }
+    void processJSON(const std::string &/*json*/) {}
 protected:
     // Socket
     virtual unsigned int mode() const override;
@@ -42,7 +49,12 @@ protected:
 private:
     void write();
     void close(std::string &&err = std::string());
-    void processMessage(const std::string &message);
+    enum Response {
+        CppSlotAcquired = 10,
+        CompileSlotAcquired = 11,
+        JSONResponse = 12
+    };
+    size_t processMessage(const char *msg, size_t len);
 
     int mFD { -1 };
     State mState { None };

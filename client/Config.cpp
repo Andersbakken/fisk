@@ -66,6 +66,7 @@ Getter<unsigned long long> delay("delay", "Delay this many milliseconds before s
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
 Separator s4("Timeouts:");
+Getter<unsigned long long> daemonConnectTimeout("daemon-connect-timeout", "Set acquired slave watchdog timeout", 2000);
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 7500);
 Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 7500);
 Getter<unsigned long long> slaveConnectTimeout("slave-connect-timeout", "Set slave connect watchdog timeout", 7500);

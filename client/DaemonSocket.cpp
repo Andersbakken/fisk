@@ -1,7 +1,6 @@
 #include "DaemonSocket.h"
 #include "Config.h"
 #include "Client.h"
-#include <json11.hpp>
 #include "Watchdog.h"
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -65,12 +64,17 @@ bool DaemonSocket::connect()
 unsigned int DaemonSocket::mode() const
 {
     if (mState == Connecting) {
+        VERBOSE("DaemonSocket connecting, returning write");
         return Write;
     }
 
     int ret = Read;
-    if (!mSendBuffer.empty())
+    if (!mSendBuffer.empty()) {
         ret |= Write;
+        VERBOSE("DaemonSocket connecting, read|write %zu bytes pending", mSendBuffer.size());
+    } else {
+        VERBOSE("DaemonSocket connecting, read only");
+    }
     return ret;
 }
 
@@ -100,7 +104,8 @@ void DaemonSocket::onWrite()
 
         DEBUG("Asynchronously connected to socket %s", Config::socketFile.get().c_str());
         mState = Connected;
-        return;
+        if (mSendBuffer.size() - mSendBufferOffset == 0)
+            return;
     }
     write();
 }
@@ -132,22 +137,24 @@ void DaemonSocket::onRead()
         mRecvBuffer.append(buf, r);
     }
 
-    while (mRecvBuffer.size() > 4 && mState == Connected) {
-        uint32_t messageLength;
-        memcpy(&messageLength, mRecvBuffer.c_str(), sizeof(messageLength));
-        messageLength = ntohl(messageLength);
-        if (mRecvBuffer.size() - sizeof(messageLength) >= messageLength) { // got message
-            const std::string message = mRecvBuffer.substr(sizeof(messageLength), messageLength);
-            mRecvBuffer.erase(0, messageLength + sizeof(messageLength));
-            processMessage(message);
-        } else {
+    const char *ch = mRecvBuffer.c_str();
+    size_t len = mRecvBuffer.length();
+    while (len) {
+        size_t consumed = processMessage(ch, len);
+        assert(len >= consumed);
+        if (!consumed)
             break;
-        }
+        ch += consumed;
+        len -= consumed;
+    }
+    if (len < mRecvBuffer.size()) {
+        mRecvBuffer.erase(mRecvBuffer.begin(), mRecvBuffer.begin() + mRecvBuffer.size() - len);
     }
 }
 
 void DaemonSocket::write()
 {
+    VERBOSE("DaemonSocket::write(%zu, %zu)", mSendBuffer.size(), mSendBufferOffset);
     assert(mSendBuffer.size() - mSendBufferOffset > 0);
 
     do {
@@ -172,8 +179,16 @@ void DaemonSocket::write()
     } while (mSendBuffer.size() > mSendBufferOffset);
 }
 
+void DaemonSocket::send(Command cmd)
+{
+    const char ch = static_cast<char>(cmd);
+    mSendBuffer.append(&ch, 1);
+    DEBUG("Sending command %d", cmd);
+}
+
 void DaemonSocket::send(const std::string &json)
 {
+    send(JSON);
     union {
         uint32_t bytes;
         char buf[sizeof(uint32_t)];
@@ -182,12 +197,6 @@ void DaemonSocket::send(const std::string &json)
     mSendBuffer.append(buf, sizeof(buf));
     mSendBuffer.append(json.c_str(), json.size());
     DEBUG("DaemonSocket send message: %s", json.c_str());
-    // send here?
-}
-
-void DaemonSocket::acquireCppSlot()
-{
-    send("{\"type\":\"acquireCppSlot\"}");
 }
 
 bool DaemonSocket::hasCppSlot() const
@@ -205,47 +214,12 @@ bool DaemonSocket::waitForCppSlot()
     return mHasCppSlot;
 }
 
-void DaemonSocket::releaseCppSlot()
-{
-    send("{\"type\":\"releaseCppSlot\"}");
-}
-
-void DaemonSocket::acquireCompileSlot()
-{
-    send("{\"type\":\"acquireCompileSlot\"}");
-}
-
 bool DaemonSocket::waitForCompileSlot(Select &select)
 {
     while (!mHasCompileSlot && mState == Connected) {
         select.exec();
     }
     return mHasCompileSlot;
-}
-
-void DaemonSocket::processMessage(const std::string &message)
-{
-    DEBUG("DaemonSocket got message: %s", message.c_str());
-    std::string err;
-    json11::Json msg = json11::Json::parse(message, err, json11::JsonParse::COMMENTS);
-    if (!err.empty()) {
-        ERROR("Failed to parse json from scheduler: %s", err.c_str());
-        Client::data().watchdog->stop();
-        close("daemon json parse error");
-        return;
-    }
-
-    const std::string type = msg["type"].string_value();
-    if (type == "cppSlotAcquired") {
-        std::unique_lock<std::mutex> lock(mMutex);
-        mHasCppSlot = true;
-        mCond.notify_one();
-    } else if (type == "compileSlotAcquired") {
-        mHasCompileSlot = true;
-    } else {
-        ERROR("Unknown type from daemon: %s\n%s", type.c_str(), message.c_str());
-        close("Bad json");
-    }
 }
 
 void DaemonSocket::close(std::string &&err)
@@ -260,4 +234,48 @@ void DaemonSocket::close(std::string &&err)
     } else {
         mState = Closed;
     }
+}
+
+size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
+{
+    DEBUG("Processing %zu bytes", len);
+    size_t ret = 0;
+    while (ret < len) {
+        size_t used = 0;
+        switch (msg[ret]) {
+        case CppSlotAcquired: {
+            DEBUG("CppSlotAcquired");
+            std::unique_lock<std::mutex> lock(mMutex);
+            mHasCppSlot = true;
+            mCond.notify_one();
+            used = 1;
+            break; }
+        case CompileSlotAcquired:
+            DEBUG("CompileSlotAcquired");
+            mHasCompileSlot = true;
+            used = 1;
+            break;
+        case JSONResponse:
+            DEBUG("JSONResponse");
+            if (ret + 4 < len) {
+                uint32_t msgLen;
+                memcpy(&msgLen, msg + ret + 1, 4);
+                msgLen = ntohl(len);
+                if (ret + 4 + msgLen < len) {
+                    std::string json(msg + ret + 5, msgLen);
+                    used += 1 + 4 + msgLen;
+                    processJSON(json);
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        if (used) {
+            ret += used;
+        } else {
+            break;
+        }
+    }
+    return ret;
 }

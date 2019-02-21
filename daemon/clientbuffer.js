@@ -12,6 +12,13 @@ class ClientBuffer
         // console.log("write", buffer.length, this.buffers.length, this.available);
     }
 
+    peek()
+    {
+        if (!this.available)
+            throw new Error("No data available");
+        return this.buffers[0][0];
+    }
+
     read(len)
     {
         if (!len)

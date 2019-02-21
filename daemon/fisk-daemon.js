@@ -7,6 +7,9 @@ const assert = require('assert');
 const common = require('../common')(option);
 const Server = require('./server');
 const Slots = require('./slots');
+const Constants = require('./constants');
+
+const debug = option('debug');
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
@@ -25,7 +28,7 @@ process.on('uncaughtException', err => {
 
 const server = new Server(option, common);
 server.listen().then(() => {
-    console.log("listening");
+    console.log("listening on", server.file);
 });
 
 // server.on("message
@@ -40,14 +43,21 @@ const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)
 server.on('compile', compile => {
     let hasCppSlot = false;
     compile.on('acquireCppSlot', () => {
+        if (debug)
+            console.log("acquireCppSlot");
+
         assert(!hasCppSlot);
         hasCppSlot = true;
         cppSlots.acquire(compile.id, () => {
-            compile.send({ type: "cppSlotAcquired" });
+            // compile.send({ type: "cppSlotAcquired" });
+            compile.send(Constants.CppSlotAcquired);
         });
     });
 
     compile.on('releaseCppSlot', () => {
+        if (debug)
+            console.log("releaseCppSlot");
+
         assert(hasCppSlot);
         if (hasCppSlot) {
             hasCppSlot = false;
@@ -57,14 +67,21 @@ server.on('compile', compile => {
 
     let hasCompileSlot = false;
     compile.on('acquireCompileSlot', () => {
+        if (debug)
+            console.log("acquireCompileSlot");
+
         assert(!hasCompileSlot);
         hasCompileSlot = true;
         compileSlots.acquire(compile.id, () => {
-            compile.send({ type: "compileSlotAcquired" });
+            // compile.send({ type: "compileSlotAcquired" });
+            compile.send(Constants.CompileSlotAcquired);
         });
     });
 
     compile.on('releaseCompileSlot', () => {
+        if (debug)
+            console.log("releaseCompileSlot");
+
         assert(hasCompileSlot);
         if (hasCompileSlot) {
             hasCompileSlot = false;

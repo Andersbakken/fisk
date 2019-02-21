@@ -1,11 +1,13 @@
 const EventEmitter = require('events');
 const ClientBuffer = require('./clientbuffer');
+const Constants = require('./constants');
 
 class Compile extends EventEmitter
 {
-    constructor(conn, id)
+    constructor(conn, id, option)
     {
         super();
+        this.debug = option("debug");
         this.id = id;
         this.connection = conn;
         this.buffer = new ClientBuffer;
@@ -20,12 +22,20 @@ class Compile extends EventEmitter
 
     send(message)
     {
+        if (this.debug)
+            console.log("Compile::send", message);
+
         try {
-            let msg = Buffer.from(JSON.stringify(message), "utf8");
-            let header = Buffer.allocUnsafe(4);
-            header.writeUInt32BE(msg.length);
-            this.connection.write(header);
-            this.connection.write(msg);
+            if (typeof message === 'number') {
+                this.connection.write(Buffer.from([message]));
+            } else {
+                let msg = Buffer.from(JSON.stringify(message), "utf8");
+                let header = Buffer.allocUnsafe(5);
+                header.writeUInt8(Constants.JSONResponse);
+                header.writeUInt32BE(msg.length);
+                this.connection.write(header);
+                this.connection.write(msg);
+            }
         } catch (err) {
             console.error("Got error sending message", err);
         }
@@ -33,16 +43,51 @@ class Compile extends EventEmitter
 
     _onData(data)
     {
+
         // console.log("got data", data.length);
         this.buffer.write(data);
-        while (true) {
+        let available = this.buffer.available;
+        if (this.debug)
+            console.log("Compile::_onData", data, "available", available, this.messageLength);
+
+        let emit = type => {
+            if (this.debug)
+                console.log("Compile::_onData::emit", type, available);
+
+            this.buffer.read(1);
+            --available;
+            this.emit(type, {});
+        };
+
+        while (available) {
             if (!this.messageLength) {
-                if (this.buffer.available < 4)
+                if (this.debug)
+                    console.log("peeking", this.buffer.peek());
+
+                switch (this.buffer.peek()) {
+                case Constants.AcquireCppSlot:
+                    emit('acquireCppSlot');
+                    continue;
+                case Constants.AcquireCompileSlot:
+                    emit('acquireCompileSlot');
+                    continue;
+                case Constants.ReleaseCppSlot:
+                    emit('releaseCppSlot');
+                    continue;
+                case Constants.ReleaseCompileSlot:
+                    emit('releaseCompileSlot');
+                    continue;
+                case Constants.JSON:
+                    if (available < 5)
+                        break;
+                    this.buffer.read(1);
+                    this.messageLength = this.buffer.read(4).readUInt32BE();
+                    available -= 5;
                     break;
-                this.messageLength = this.buffer.read(4).readUInt32BE();
+                }
             }
 
-            if (this.messageLength > this.buffer.available) {
+            if (this.messageLength > available) {
                 // console.log("Still waiting on data", this.messageLength, this.buffer.available);
                 break;
             }

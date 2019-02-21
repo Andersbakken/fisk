@@ -15,6 +15,7 @@ public:
     Watchdog();
     enum Stage {
         Initial,
+        ConnectedToDaemon,
         PreprocessFinished,
         ConnectedToScheduler,
         AcquiredSlave,
@@ -29,6 +30,7 @@ public:
     {
         switch (stage) {
         case Initial: return "Initial";
+        case ConnectedToDaemon: return "ConnectedToDaemon";
         case ConnectedToScheduler: return "ConnectedToScheduler";
         case AcquiredSlave: return "AcquiredSlave";
         case ConnectedToSlave: return "ConnectedToSlave";
