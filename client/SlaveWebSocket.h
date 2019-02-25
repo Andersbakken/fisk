@@ -89,6 +89,7 @@ public:
                     }
                 }
                 f = fopen(files[0].path.c_str(), "w");
+                DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
                 if (!f) {
                     ERROR("Can't open file: %s", files[0].path.c_str());
                     Client::data().watchdog->stop();
@@ -155,6 +156,7 @@ public:
                     break;
                 front = &files.front();
                 f = fopen(front->path.c_str(), "w");
+                DEBUG("Opened file [%s] -> [%s] -> %p", front->path.c_str(), Client::realpath(front->path).c_str(), f);
                 if (!f) {
                     Client::data().watchdog->stop();
                     error = "slave file open error 2";
