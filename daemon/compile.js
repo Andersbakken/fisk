@@ -54,7 +54,10 @@ class Compile extends EventEmitter
             if (this.debug)
                 console.log("Compile::_onData::emit", type, available);
 
-            this.buffer.read(1);
+            let read = this.buffer.read(1);
+            if (this.debug) {
+                console.log("Discarded", read);
+            }
             --available;
             this.emit(type, {});
         };
