@@ -37,8 +37,8 @@ server.on("error", (err) => {
     console.error("server error", err);
 });
 
-const cppSlots = new Slots(option.int("cpp-slots", Math.max(os.cpus().length * 2, 1)), "cpp");
-const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)), "compile");
+const cppSlots = new Slots(option.int("cpp-slots", Math.max(os.cpus().length * 2, 1)), "cpp", debug);
+const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)), "compile", debug);
 
 server.on('compile', compile => {
     let hasCppSlot = false;
