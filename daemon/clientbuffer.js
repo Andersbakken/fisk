@@ -16,7 +16,7 @@ class ClientBuffer
     {
         if (!this.available)
             throw new Error("No data available");
-        return this.buffers[0][0];
+        return this.buffers[0][this.offset];
     }
 
     read(len)

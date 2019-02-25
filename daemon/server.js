@@ -43,7 +43,6 @@ class Server extends EventEmitter
             this.server = net.createServer(this._onConnection.bind(this)).listen(this.file, () => {
                 fs.chmodSync(this.file, '777');
                 connected = true;
-                console.log("listening on", this.file);
                 resolve();
             });
             this.server.on('error', err => {
