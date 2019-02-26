@@ -33,8 +33,9 @@ static inline size_t random(void *data, size_t len)
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
     }
+    const size_t r = ret;
     EINTRWRAP(ret, fclose(f));
-    return ret;
+    return r;
 }
 
 WebSocket::WebSocket()
