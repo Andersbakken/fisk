@@ -27,11 +27,11 @@ public:
                 done = true;
                 return;
             }
-            const std::string type = msg["type"].string_value();
-            if (type == "needsEnvironment") {
+            const std::string t = msg["type"].string_value();
+            if (t == "needsEnvironment") {
                 needsEnvironment = true;
                 done = true;
-            } else if (type == "slave") {
+            } else if (t == "slave") {
                 slaveIp = msg["ip"].string_value();
                 slaveHostname = msg["hostname"].string_value();
                 environment = msg["environment"].string_value();
@@ -45,16 +45,16 @@ public:
                 DEBUG("type %d", msg["port"].type());
                 DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);
                 done = true;
-            } else if (type == "version_mismatch") {
+            } else if (t == "version_mismatch") {
                 FATAL("Version mismatch detected, client version: %s minimum client version required: %s",
                       npm_version, msg["minimum_version"].string_value().c_str());
                 _exit(108);
-            } else if (type == "version_verified") {
+            } else if (t == "version_verified") {
                 ERROR("Version verified, client version: %s minimum client version required: %s",
                       npm_version, msg["minimum_version"].string_value().c_str());
                 done = true;
             } else {
-                ERROR("Unexpected message type: %s", type.c_str());
+                ERROR("Unexpected message type: %s", t.c_str());
             }
             // } else {
             //     printf("Got binary message: %zu bytes\n", len);

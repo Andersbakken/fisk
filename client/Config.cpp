@@ -96,10 +96,10 @@ Separator s8("Identity:");
 Getter<std::string> hostname("hostname", "Set hostname", std::string(), [](const std::string &value) {
         if (!value.empty())
             return value;
-        std::string name(256, ' ');
-        ::gethostname(&name[0], name.size());
-        name.resize(strlen(name.c_str()));
-        return name;
+        std::string n(256, ' ');
+        ::gethostname(&n[0], n.size());
+        n.resize(strlen(n.c_str()));
+        return n;
     });
 Getter<std::string> name("name", "Set name (used for visualization)", std::string(), [](const std::string &value) {
         if (!value.empty())
@@ -164,8 +164,8 @@ bool Config::init(int &argc, char **&argv)
 
     std::vector<std::string> &originalArgs = Client::data().originalArgs;
     originalArgs.resize(argc);
-    for (int i=0; i<argc; ++i) {
-        originalArgs[i] = argv[i];
+    for (int j=0; j<argc; ++j) {
+        originalArgs[j] = argv[j];
     }
 
     if (argc > 1 && !access(argv[1], X_OK)) {
@@ -268,8 +268,8 @@ bool Config::init(int &argc, char **&argv)
     }
 
     if (environ) {
-        for (size_t i=0; environ[i]; ++i) {
-            char *env = environ[i];
+        for (size_t j=0; environ[j]; ++j) {
+            char *env = environ[j];
             if (strncmp(env, "FISK_", 5))
                 continue;
 

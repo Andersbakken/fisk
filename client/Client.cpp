@@ -184,10 +184,10 @@ bool Client::findCompiler(const std::string &preresolved)
         sData.resolvedCompiler = exec;
     } else {
         resolveSymlink(exec, [](const std::string &p) -> CheckResult {
-            std::string base;
-            parsePath(p, &base, 0);
+            std::string b;
+            parsePath(p, &b, 0);
             // Log::debug("GOT BASE %s", base.c_str());
-            if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
+            if (b.find("g++") != std::string::npos || b.find("gcc") != std::string::npos) {
                 sData.resolvedCompiler = p;
                 return Stop;
             }
@@ -557,7 +557,6 @@ std::string Client::environmentHash(const std::string &compiler)
     json11::Json::object json;
     int fd;
     if ((fd = open(cache.c_str(), O_CLOEXEC|O_RDONLY)) != -1) {
-        struct stat st;
         if (flock(fd, LOCK_SH)) {
             ERROR("Failed to flock shared %s (%d %s)", cache.c_str(), errno, strerror(errno));
             ::close(fd);
@@ -664,10 +663,10 @@ std::string Client::findExecutablePath(const char *argv0)
     const int w = snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid());
     std::string p(buf, w);
     if (fileType(p) == Symlink) {
-        char buf[PATH_MAX];
-        const ssize_t len = readlink(p.c_str(), buf, sizeof(buf));
+        char b[PATH_MAX];
+        const ssize_t len = readlink(p.c_str(), b, sizeof(b));
         if (len > 0) {
-            p.assign(buf, len);
+            p.assign(b, len);
             if (fileType(p) == File) {
                 return p;
             }
@@ -675,11 +674,11 @@ std::string Client::findExecutablePath(const char *argv0)
     }
 #elif defined(__APPLE__)
     {
-        char buf[PATH_MAX + 1];
+        char b[PATH_MAX + 1];
         uint32_t size = PATH_MAX;
-        if (_NSGetExecutablePath(buf, &size) == 0) {
-            buf[PATH_MAX] = '\0';
-            return Client::realpath(buf);
+        if (_NSGetExecutablePath(b, &size) == 0) {
+            b[PATH_MAX] = '\0';
+            return Client::realpath(b);
         }
     }
 #else
@@ -782,15 +781,15 @@ std::string Client::prepareEnvironmentForUpload()
         stdOut += stdErr;
         filter(stdOut);
         int w;
+        int ret;
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
-            int ret;
             EINTRWRAP(ret, fclose(f));
             Client::recursiveMkdir(dir);
             return std::string();
         }
-        int ret;
+        // int ret;
         EINTRWRAP(ret, fclose(f));
     }
 

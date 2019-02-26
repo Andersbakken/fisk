@@ -238,8 +238,8 @@ int main(int argc, char **argv)
             headers["x-fisk-user"] = buf;
         } else if (const char *user = getenv("USER")) {
             headers["x-fisk-user"] = user;
-        } else if (const char *user = getenv("USERNAME")) {
-            headers["x-fisk-user"] = user;
+        } else if (const char *username = getenv("USERNAME")) {
+            headers["x-fisk-user"] = username;
         }
     }
 
@@ -544,8 +544,8 @@ static int clientVerify()
             headers["x-fisk-user"] = buf;
         } else if (const char *user = getenv("USER")) {
             headers["x-fisk-user"] = user;
-        } else if (const char *user = getenv("USERNAME")) {
-            headers["x-fisk-user"] = user;
+        } else if (const char *username = getenv("USERNAME")) {
+            headers["x-fisk-user"] = username;
         }
     }
 

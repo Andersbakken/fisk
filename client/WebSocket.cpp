@@ -169,8 +169,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
 
         if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
             ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            int ret;
-            EINTRWRAP(ret, ::close(mFD));
+            int cret;
+            EINTRWRAP(cret, ::close(mFD));
             mFD = -1;
             continue;
         }
@@ -183,8 +183,8 @@ bool WebSocket::connect(std::string &&url, const std::map<std::string, std::stri
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
-            int ret;
-            EINTRWRAP(ret, ::close(mFD));
+            int cret;
+            EINTRWRAP(cret, ::close(mFD));
             ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
                   inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
                   mPort, errno, strerror(errno));
