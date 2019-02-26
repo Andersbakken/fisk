@@ -340,6 +340,7 @@ int main(int argc, char **argv)
         const std::string tarball = Client::prepareEnvironmentForUpload();
         // printf("GOT TARBALL %s\n", tarball.c_str());
         if (!tarball.empty()) {
+            select.remove(&schedulerWebsocket);
             Client::uploadEnvironment(&schedulerWebsocket, tarball);
         }
         runLocal("needs environment");
