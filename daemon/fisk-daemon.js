@@ -15,48 +15,54 @@ process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
     process.exit();
     // if (client)
-    //     client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
+    //     client.send('log', { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
 
 });
 
 process.on('uncaughtException', err => {
-    console.error("Uncaught exception", err);
+    console.error('Uncaught exception', err);
     process.exit();
     // if (client)
-    //     client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
+    //     client.send('log', { message: `Uncaught exception ${err.toString()} ${err.stack}` });
 });
 
 const server = new Server(option, common);
 server.listen().then(() => {
-    console.log("listening on", server.file);
+    console.log('listening on', server.file);
 });
 
 // server.on("message
 
-server.on("error", (err) => {
-    console.error("server error", err);
+server.on('error', (err) => {
+    console.error('server error', err);
 });
 
-const cppSlots = new Slots(option.int("cpp-slots", Math.max(os.cpus().length * 2, 1)), "cpp", debug);
-const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)), "compile", debug);
+const cppSlots = new Slots(option.int('cpp-slots', Math.max(os.cpus().length * 2, 1)), 'cpp', debug);
+const compileSlots = new Slots(option.int('slots', Math.max(os.cpus().length, 1)), 'compile', debug);
 
 server.on('compile', compile => {
     let hasCppSlot = false;
     compile.on('acquireCppSlot', () => {
         if (debug)
-            console.log("acquireCppSlot");
+            console.log('acquireCppSlot');
 
         assert(!hasCppSlot);
         hasCppSlot = true;
         cppSlots.acquire(compile.id, () => {
-            // compile.send({ type: "cppSlotAcquired" });
+            // compile.send({ type: 'cppSlotAcquired' });
             compile.send(Constants.CppSlotAcquired);
         });
     });
 
+    compile.on('error', err => {
+        if (debug) {
+            console.error('Got error from fiskc', err);
+        }
+    });
+
     compile.on('releaseCppSlot', () => {
         if (debug)
-            console.log("releaseCppSlot");
+            console.log('releaseCppSlot');
 
         assert(hasCppSlot);
         if (hasCppSlot) {
@@ -68,19 +74,19 @@ server.on('compile', compile => {
     let hasCompileSlot = false;
     compile.on('acquireCompileSlot', () => {
         if (debug)
-            console.log("acquireCompileSlot");
+            console.log('acquireCompileSlot');
 
         assert(!hasCompileSlot);
         hasCompileSlot = true;
         compileSlots.acquire(compile.id, () => {
-            // compile.send({ type: "compileSlotAcquired" });
+            // compile.send({ type: 'compileSlotAcquired' });
             compile.send(Constants.CompileSlotAcquired);
         });
     });
 
     compile.on('releaseCompileSlot', () => {
         if (debug)
-            console.log("releaseCompileSlot");
+            console.log('releaseCompileSlot');
 
         assert(hasCompileSlot);
         if (hasCompileSlot) {
@@ -110,27 +116,27 @@ process.on('SIGINT', sig => {
   const client = new Client(option, common.Version);
 
 let connectInterval;
-client.on("quit", message => {
+client.on('quit', message => {
     process.exit(message.code);
 });
 
-client.on("connect", () => {
-    console.log("connected");
+client.on('connect', () => {
+    console.log('connected');
     if (connectInterval) {
         clearInterval(connectInterval);
         connectInterval = undefined;
     }
 });
 
-client.on("error", err => {
-    console.error("client error", err);
+client.on('error', err => {
+    console.error('client error', err);
 });
 
-client.on("close", () => {
-    console.log("client closed");
+client.on('close', () => {
+    console.log('client closed');
     if (!connectInterval) {
         connectInterval = setInterval(() => {
-            console.log("Reconnecting...");
+            console.log('Reconnecting...');
             client.connect();
         }, 1000);
     }
