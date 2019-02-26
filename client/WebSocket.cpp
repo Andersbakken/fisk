@@ -33,7 +33,7 @@ static inline size_t random(void *data, size_t len)
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
     }
-    fclose(f);
+    EINTRWRAP(ret, fclose(f));
     return ret;
 }
 

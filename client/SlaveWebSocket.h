@@ -149,7 +149,8 @@ public:
                 front->remaining -= b;
             }
             if (!front->remaining) {
-                fclose(f);
+                int ret;
+                EINTRWRAP(ret, fclose(f));
                 f = 0;
                 files.erase(files.begin());
                 if (files.empty())

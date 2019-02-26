@@ -702,7 +702,8 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
     struct stat st;
     if (stat(tarball.c_str(), &st)) {
         ERROR("Failed to stat %s: %d %s", tarball.c_str(), errno, strerror(errno));
-        fclose(f);
+        int ret;
+        EINTRWRAP(ret, fclose(f));
         Client::recursiveRmdir(dir);
         return false;
     }
@@ -723,7 +724,8 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             const size_t chunkSize = std::min<size_t>(st.st_size - sent, sizeof(buf));
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
-                fclose(f);
+                int ret;
+                EINTRWRAP(ret, fclose(f));
                 Client::recursiveRmdir(dir);
                 return false;
             }
@@ -734,7 +736,8 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             sent += chunkSize;
         } while (sent < static_cast<size_t>(st.st_size) && schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket);
     }
-    fclose(f);
+    int ret;
+    EINTRWRAP(ret, fclose(f));
     Client::recursiveRmdir(dir);
     return schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket;
 }
@@ -771,7 +774,8 @@ std::string Client::prepareEnvironmentForUpload()
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s", sData.resolvedCompiler.c_str(), stdErr.c_str());
-            fclose(f);
+            int ret;
+            EINTRWRAP(ret, fclose(f));
             Client::recursiveMkdir(dir);
             return std::string();
         }
@@ -781,11 +785,13 @@ std::string Client::prepareEnvironmentForUpload()
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
-            fclose(f);
+            int ret;
+            EINTRWRAP(ret, fclose(f));
             Client::recursiveMkdir(dir);
             return std::string();
         }
-        fclose(f);
+        int ret;
+        EINTRWRAP(ret, fclose(f));
     }
 
 
