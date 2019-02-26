@@ -57,6 +57,7 @@ Getter<std::string> socketFile("socket-file", "Set fiskc's socket file", "/var/f
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
 Separator s2;
 Separator s3("Options:");
+Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
 Getter<bool> objectCache("object-cache", "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be configured with --object-cache and the slaves to have --object-cache-size", true);

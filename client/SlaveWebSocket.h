@@ -153,8 +153,13 @@ public:
                 EINTRWRAP(ret, fclose(f));
                 f = 0;
                 files.erase(files.begin());
-                if (files.empty())
+                if (files.empty()) {
+                    if (Config::syncFileSystem) {
+                        DEBUG("Syncing file system");
+                        sync();
+                    }
                     break;
+                }
                 front = &files.front();
                 f = fopen(front->path.c_str(), "w");
                 DEBUG("Opened file [%s] -> [%s] -> %p", front->path.c_str(), Client::realpath(front->path).c_str(), f);

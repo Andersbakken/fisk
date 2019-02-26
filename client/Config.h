@@ -195,6 +195,7 @@ extern Getter<bool> objectCache;
 extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<bool> help;
+extern Getter<bool> syncFileSystem;
 extern Getter<bool> version;
 extern Getter<std::string> statisticsLog;
 inline std::string envCache()
