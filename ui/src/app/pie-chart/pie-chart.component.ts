@@ -302,22 +302,26 @@ export class PieChartComponent {
                 if (this.stats) {
                     statsTotal = this.stats.cacheHits + this.stats.jobsFailed + this.stats.jobsStarted;
                 }
+
                 if (statsTotal > 0) {
                     let pos = 5;
                     let tpos = 5;
                     ctx.fillStyle = "#3d3";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.cacheHits / statsTotal), statsHeight);
                     pos += (this.view.width - 10) * (this.stats.cacheHits / statsTotal);
-                    ctx.fillText("Hits " + this.stats.cacheHits, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText("Hits " + this.stats.cacheHits).width + 30;
+                    let str = "Hits " + Number(this.stats.cacheHits).toLocaleString() + " " + ((this.stats.cacheHits / statsTotal) * 100).toFixed(1) + "%";
+                    ctx.fillText(str, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(str).width + 30;
                     ctx.fillStyle = "#33d";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsStarted / statsTotal), statsHeight);
                     pos += (this.view.width - 10) * (this.stats.jobsStarted / statsTotal);
-                    ctx.fillText("Compiles " + this.stats.jobsStarted, tpos, this.view.height - statsHeight - 10);
-                    tpos += ctx.measureText("Compiles " + this.stats.jobsStarted).width + 30;
+                    str = "Compiles " + Number(this.stats.jobsStarted).toLocaleString() + " " + ((this.stats.jobsStarted / statsTotal) * 100).toFixed(1) + "%";
+                    ctx.fillText(str, tpos, this.view.height - statsHeight - 10);
+                    tpos += ctx.measureText(str).width + 30;
                     ctx.fillStyle = "#d33";
                     ctx.fillRect(pos, this.view.height - statsHeight - 5, (this.view.width - 10) * (this.stats.jobsFailed / statsTotal), statsHeight);
-                    ctx.fillText("Misses " + this.stats.jobsFailed, tpos, this.view.height - statsHeight - 10);
+                    str = "Failures " + Number(this.stats.jobsFailed).toLocaleString() + " " + ((this.stats.jobsFailed / statsTotal) * 100).toFixed(1) + "%";
+                    ctx.fillText(str, tpos, this.view.height - statsHeight - 10);
                 }
 
                 window.requestAnimationFrame(animate);
