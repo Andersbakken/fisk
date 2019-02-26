@@ -76,6 +76,8 @@ static void filter(std::string &output)
 {
     filter("COLLECT_", output);
     filter("InstalledDir: ", output);
+    filter("Found candidate GCC installation: ", output);
+    filter("Selected GCC installation: ", output);
 }
 
 static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
