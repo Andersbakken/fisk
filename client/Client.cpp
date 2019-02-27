@@ -549,6 +549,7 @@ std::string Client::environmentHash(const std::string &compiler)
 
         out += err;
         filter(out);
+        VERBOSE("Signature created from %s", out.c_str());
         return Client::toHex(Client::sha1(out));
     };
     const std::string cache = Config::envCache();
