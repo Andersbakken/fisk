@@ -344,7 +344,11 @@ client.on("getEnvironments", message => {
         request.get(url)
             .on('error', err => {
                 console.log("Got error from request", err);
-                stream.close();
+                if (stream.destroy instanceof Function) {
+                    stream.destroy();
+                } else {
+                    stream.end();
+                }
                 try {
                     fs.removeSync(dir);
                 } catch (err) {
@@ -355,50 +359,52 @@ client.on("getEnvironments", message => {
                 }
                 return;
             }).on('end', event => {
-                stream.close();
-                console.log("Got end", env);
-                exec("tar xf '" + file + "'", { cwd: dir }).
-                    then(() => {
-                        console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
-                        return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
-                    }).then(() => {
-                        console.log("Write json file");
-                        return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
-                    }).then(() => {
-                        console.log(`Unlink ${file} ${env}`);
-                        return fs.unlink(file);
-                    }).then(() => {
-                        let opts = {
-                            user: option("vm-user"),
-                            keepCompiles: option("keep-compiles"),
-                            debug: option("debug")
-                        };
+                stream.end();
+                stream.on("finish", () => {
+                    console.log("Got end", env);
+                    exec("tar xf '" + file + "'", { cwd: dir }).
+                        then(() => {
+                            console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
+                            return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
+                        }).then(() => {
+                            console.log("Write json file");
+                            return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
+                        }).then(() => {
+                            console.log(`Unlink ${file} ${env}`);
+                            return fs.unlink(file);
+                        }).then(() => {
+                            let opts = {
+                                user: option("vm-user"),
+                                keepCompiles: option("keep-compiles"),
+                                debug: option("debug")
+                            };
 
-                        let vm = new VM(dir, env, opts);
-                        return new Promise((resolve, reject) => {
-                            let done = false;
-                            vm.on('error', err => {
-                                if (!done) {
-                                    reject(err);
-                                }
+                            let vm = new VM(dir, env, opts);
+                            return new Promise((resolve, reject) => {
+                                let done = false;
+                                vm.on('error', err => {
+                                    if (!done) {
+                                        reject(err);
+                                    }
+                                });
+                                vm.on('ready', () => {
+                                    done = true;
+                                    resolve(vm);
+                                });
                             });
-                            vm.on('ready', () => {
-                                done = true;
-                                resolve(vm);
-                            });
+                        }).then(vm => {
+                            environments[env] = vm;
+                            setTimeout(work, 0);
+                        }).catch((err) => {
+                            console.error("Got failure setting up environment", err);
+                            try {
+                                fs.removeSync(dir);
+                            } catch (rmdirErr) {
+                                console.error("Failed to remove directory", dir, rmdirErr);
+                            }
+                            setTimeout(work, 0);
                         });
-                    }).then(vm => {
-                        environments[env] = vm;
-                        setTimeout(work, 0);
-                    }).catch((err) => {
-                        console.error("Got failure setting up environment", err);
-                        try {
-                            fs.removeSync(dir);
-                        } catch (rmdirErr) {
-                            console.error("Failed to remove directory", dir, rmdirErr);
-                        }
-                        setTimeout(work, 0);
-                    });
+                });
             }).pipe(stream);
     }
     work();
