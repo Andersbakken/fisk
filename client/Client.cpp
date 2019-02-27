@@ -526,6 +526,7 @@ unsigned long long Client::mono()
     return 0;
 }
 
+enum { EnvironmentCacheVersion = 2 };
 std::string Client::environmentHash(const std::string &compiler)
 {
     struct stat st;
@@ -583,18 +584,24 @@ std::string Client::environmentHash(const std::string &compiler)
                         ERROR("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
                     }
                     if (obj.is_object()) {
-                        json11::Json value = obj[key];
-                        if (value.is_string()) {
-                            DEBUG("Cache hit for compiler %s", key.c_str());
-                            return value.string_value();
-                        }
-                        json = obj.object_items();
-                        auto it = json.begin();
-                        while (it != json.end()) {
-                            if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
-                                json.erase(it++);
-                            } else {
-                                ++it;
+                        json11::Json version = obj["version"];
+                        if (version.int_value() != EnvironmentCacheVersion) {
+                            json = json11::Json::object();
+                            json["version"] = json11::Json(EnvironmentCacheVersion);
+                        } else {
+                            json11::Json value = obj[key];
+                            if (value.is_string()) {
+                                DEBUG("Cache hit for compiler %s", key.c_str());
+                                return value.string_value();
+                            }
+                            json = obj.object_items();
+                            auto it = json.begin();
+                            while (it != json.end()) {
+                                if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
+                                    json.erase(it++);
+                                } else {
+                                    ++it;
+                                }
                             }
                         }
                     }
