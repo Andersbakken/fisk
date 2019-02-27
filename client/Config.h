@@ -41,8 +41,8 @@ private:
 class Separator : public GetterBase
 {
 public:
-    Separator(const char *help = 0)
-        : GetterBase(0, help ? help : "")
+    Separator(const char *hlp = 0)
+        : GetterBase(0, hlp ? hlp : "")
     {}
     virtual bool apply(const std::string &) { return false; }
     virtual bool apply(const json11::Json &) { return false; }
@@ -55,8 +55,8 @@ template <typename T>
 class Getter : public GetterBase
 {
 public:
-    Getter(const char *arg, const char *help, const T &defaultValue = T(), const std::function<T(const T &)> &getter = identity<T>)
-        : GetterBase(arg, help), mValue(defaultValue), mGetter(getter)
+    Getter(const char *arg, const char *hlp, const T &defaultValue = T(), const std::function<T(const T &)> &getter = identity<T>)
+        : GetterBase(arg, hlp), mValue(defaultValue), mGetter(getter)
     {}
     operator T() const { return mGetter(mValue); }
     virtual bool apply(const std::string &input) override { return applyValue(input, mValue); }

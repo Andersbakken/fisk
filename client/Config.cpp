@@ -25,8 +25,8 @@ static json11::Json value(const std::vector<json11::Json> &jsons, const std::str
 namespace Config {
 static std::map<std::string, GetterBase *> sGetters;
 static std::vector<GetterBase *> sOrderedGetters;
-GetterBase::GetterBase(const char *arg, const char *help)
-    : mHelp(help)
+GetterBase::GetterBase(const char *arg, const char *hlp)
+    : mHelp(hlp)
 {
     if (arg) {
         mJsonKey.assign(arg);
