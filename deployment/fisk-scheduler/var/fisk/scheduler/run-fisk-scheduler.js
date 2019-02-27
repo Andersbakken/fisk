@@ -4,8 +4,9 @@ const child_process = require('child_process');
 const fs = require("fs-extra");
 const http = require("http");
 const path = require('path');
-const minimist = require('minimist');
-const option = require('@jhanssen/options')('fisk/scheduler', minimist(process.argv.slice(2)));
+const option = require('@jhanssen/options')({ prefix: 'fisk/scheduler',
+                                              applicationPath: false,
+                                              additionalFiles: [ "/etc/xdg/fisk/scheduler.conf.override" ] });
 
 const port = option.int("port", 8097);
 const root = option("root", "/var/fisk");

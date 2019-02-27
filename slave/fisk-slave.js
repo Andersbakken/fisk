@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")("fisk/slave", require('minimist')(process.argv.slice(2)));
+const option = require('@jhanssen/options')({ prefix: 'fisk/slave',
+                                              applicationPath: false,
+                                              additionalFiles: [ "/etc/xdg/fisk/slave.conf.override" ] });
+
 const request = require("request");
 const ws = require('ws');
 const common = require("../common")(option);

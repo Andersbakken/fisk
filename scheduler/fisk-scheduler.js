@@ -2,7 +2,9 @@
 
 const path = require('path');
 const os = require('os');
-const option = require('@jhanssen/options')('fisk/scheduler', require('minimist')(process.argv.slice(2)));
+const option = require('@jhanssen/options')({ prefix: 'fisk/scheduler',
+                                              applicationPath: false,
+                                              additionalFiles: [ "/etc/xdg/fisk/scheduler.conf.override" ] });
 const posix = require('posix');
 const Server = require('./server');
 const common = require('../common')(option);

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-const option = require('@jhanssen/options')('fisk/daemon', require('minimist')(process.argv.slice(2)));
+const option = require('@jhanssen/options')({ prefix: 'fisk/daemon',
+                                              applicationPath: false,
+                                              additionalFiles: [ "/etc/xdg/fisk/daemon.conf.override" ] });
 const ws = require('ws');
 const os = require('os');
 const assert = require('assert');
