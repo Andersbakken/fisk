@@ -322,11 +322,11 @@ bool Config::init(int &argc, char **&argv)
     int fd = open(versionFile.c_str(), O_RDONLY|O_CLOEXEC);
     if (fd != -1) {
         flock(fd, LOCK_SH); // what if it fails?
-        uint32_t version;
-        if (read(fd, &version, sizeof(version)) == sizeof(version)) {
+        uint32_t ver;
+        if (read(fd, &ver, sizeof(ver)) == sizeof(ver)) {
             flock(fd, LOCK_UN); // what if it fails?
             ::close(fd);
-            if (version == htonl(Version)) {
+            if (ver == htonl(Version)) {
                 return true;
             }
         }
@@ -337,8 +337,8 @@ bool Config::init(int &argc, char **&argv)
     fd = open(versionFile.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
     if (fd != -1) {
         flock(fd, LOCK_EX); // what if it fails?
-        const uint32_t version = htonl(Version);
-        if (write(fd, &version, sizeof(version)) != sizeof(version)) {
+        const uint32_t ver = htonl(Version);
+        if (write(fd, &ver, sizeof(ver)) != sizeof(ver)) {
             fprintf(stderr, "Failed to write to versionfile %d %s\n", errno, strerror(errno));
         }
         flock(fd, LOCK_UN);
