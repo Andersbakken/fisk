@@ -55,8 +55,8 @@ void fatal(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)))
     if (Log::minLogLevel <= Log::Error)         \
         Log::error(__VA_ARGS__)
 #define FATAL(...)                              \
-    if (Log::minLogLevel <= Log::Error)         \
-        Log::error(__VA_ARGS__)
+    if (Log::minLogLevel <= Log::Fatal)         \
+        Log::fatal(__VA_ARGS__)
 
 class Stream
 {
