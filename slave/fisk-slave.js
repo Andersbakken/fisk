@@ -312,10 +312,16 @@ client.on("getEnvironments", message => {
     function work()
     {
         if (!message.environments.length) {
-            setTimeout(() => {
-                client.send("environments", { environments: Object.keys(environments) });
-                console.log("Informing scheduler about our environments:", Object.keys(environments));
-            }, option.int("inform-delay", 30000));
+            let restart = option("restart-on-new-environments");
+            if (!restart) {
+                setTimeout(() => {
+                        client.send("environments", { environments: Object.keys(environments) });
+                        console.log("Informing scheduler about our environments:", Object.keys(environments));
+                }, option.int("inform-delay", 5000));
+            } else {
+                console.log("Restarting after we got our new environments");
+                process.exit();
+            }
             return;
         }
         let env = message.environments.splice(0, 1)[0];
