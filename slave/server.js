@@ -67,10 +67,11 @@ class Server extends EventEmitter {
         let client = undefined;
         let bytes = undefined;
         let ip = req.connection.remoteAddress;
+        let clientEmitted = false;
         const error = msg => {
             ws.send(`{"error": "${msg}"}`);
             ws.close();
-            if (client) {
+            if (client && clientEmitted) {
                 client.emit("error", msg);
             } else {
                 this.emit("error", { ip: ip, message: msg });
@@ -143,6 +144,7 @@ class Server extends EventEmitter {
                 client.connectTime = connectTime;
                 client.wait = json.wait;
                 this.emit("job", client);
+                clientEmitted = true;
                 break;
             case "object":
                 if (msg instanceof Buffer) {
@@ -169,16 +171,15 @@ class Server extends EventEmitter {
             }
         });
         ws.on("close", () => {
-            // console.log("GOT WS CLOSE");
-            if (bytes && !client.objectcache)
-                client.emit("error", "Got close while reading a binary message");
-            if (client)
+            if (client && clientEmitted) {
+                // console.error("GOT WS CLOSE", bytes, client.objectcache);
                 client.emit("close");
+            }
             ws.removeAllListeners();
         });
         ws.on("error", (error) => {
-            // console.log("GOT WS ERROR");
-            if (client)
+            console.log("GOT WS ERROR", error);
+            if (client && clientEmitted)
                 client.emit("error", error);
         });
     }

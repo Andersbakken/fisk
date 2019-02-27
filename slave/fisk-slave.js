@@ -611,7 +611,7 @@ server.on("job", job => {
         }
     }, 5000);
 
-    job.on("error", (err) => {
+    job.on("error", err => {
         job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
         console.error("got error from job", job.webSocketError);
         j.done = true;
