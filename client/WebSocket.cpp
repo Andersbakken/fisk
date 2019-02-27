@@ -98,10 +98,10 @@ WebSocket::~WebSocket()
     }
 }
 
-bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &headers)
+bool WebSocket::connect(std::string &&url, const std::map<std::string, std::string> &hdrs)
 {
     mUrl = std::move(url);
-    mHeaders = std::move(headers);
+    mHeaders = std::move(hdrs);
     mParsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
     if (!mParsedUrl.IsValid()) {
         ERROR("Bad url %s", mUrl.c_str());
