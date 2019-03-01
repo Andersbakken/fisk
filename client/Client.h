@@ -76,6 +76,7 @@ bool setFlag(int fd, int flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 bool recursiveRmdir(const std::string &path);
 std::string realpath(const std::string &path);
+std::string cwd();
 
 template <size_t StaticBufSize = 4096>
 inline static std::string vformat(const char *format, va_list args)

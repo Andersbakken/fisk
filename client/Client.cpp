@@ -650,6 +650,13 @@ std::string Client::realpath(const std::string &path)
     return std::string();
 }
 
+std::string Client::cwd()
+{
+    char buf[PATH_MAX];
+    const char *ret = getcwd(buf, sizeof(buf));
+    return ret ? std::string(ret) : std::string();
+}
+
 std::string Client::base64(const std::string &src)
 {
     BIO *b64 = BIO_new(BIO_f_base64());
