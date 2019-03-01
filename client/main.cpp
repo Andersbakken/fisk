@@ -85,6 +85,17 @@ int main(int argc, char **argv)
 
     Log::init(level, Config::logFile, Config::logFileAppend ? Log::Append : Log::Overwrite);
 
+    if (Log::minLogLevel <= Log::Debug) {
+        Log::debug("CWD: %s", Client::cwd().c_str());
+        std::string ret;
+        for (int i=0; i<argc; ++i) {
+            ret += " \"";
+            ret += argv[i];
+            ret += '"';
+        }
+        Log::debug("CMDLINE:%s", ret.c_str());
+    }
+
     if (unsigned long long delay = Config::delay) {
         DEBUG("Sleeping for %llu ms", delay);
         usleep(delay * 1000);
