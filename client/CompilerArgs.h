@@ -81,22 +81,7 @@ struct CompilerArgs
         return commandLine.at(sourceFileIndex);
     }
 
-    std::string output() const
-    {
-        if (flags & HasDashO) {
-            assert(objectFileIndex != std::string::npos);
-            return commandLine.at(objectFileIndex);
-        } else {
-            std::string source = sourceFile();
-            const size_t lastDot = source.rfind('.');
-            const size_t lastSlash = source.rfind('/');
-            if (lastDot != std::string::npos && (lastDot > lastSlash || lastSlash == std::string::npos)) {
-                source.resize(lastDot + 1); // ### is this right?
-            }
-            source.push_back('o');
-            return source;
-        }
-    }
+    std::string output() const;
 };
 
 inline CompilerArgs::Flag CompilerArgs::preprocessedFlag(Flag flag)

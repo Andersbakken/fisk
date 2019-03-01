@@ -581,3 +581,21 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     abort();
     return 0;
 }
+
+std::string CompilerArgs::output() const
+{
+    if (flags & HasDashO) {
+        assert(objectFileIndex != std::string::npos);
+        return commandLine.at(objectFileIndex);
+    } else {
+        std::string source = sourceFile();
+        std::string output;
+        Client::parsePath(source, &output, nullptr);
+        const size_t lastDot = output.rfind('.');
+        if (lastDot != std::string::npos) {
+            output.resize(lastDot);
+        }
+        output += ".o";
+        return output;
+    }
+}
