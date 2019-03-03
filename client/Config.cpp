@@ -201,7 +201,12 @@ bool Config::init(int &argc, char **&argv)
             key = argv[i] + 7;
         }
         auto it = sGetters.find(key);
-        if (it == sGetters.end()) {
+        bool no = false;
+        if (it == sGetters.end() && !strncmp(key.c_str(), "no-", 3)) {
+            it = sGetters.find(key.substr(3));
+            no = true;
+        }
+        if (it == sGetters.end() || (no && !it->second->isBoolean())) {
             fprintf(stderr, "Unknown argument %s\n", argv[i]);
             // for (auto foo : sGetters) {
             //     fprintf(stderr, "Balls: %s\n", foo.first.c_str());
@@ -225,12 +230,16 @@ bool Config::init(int &argc, char **&argv)
                 consumeArg(0);
             }
             it->second->mDone = true;
+            if (no)
+                it->second->flip();
             continue;
         }
         if (eq) {
             if (it->second->apply(std::string(eq + 1))) {
                 it->second->mDone = true;
                 consumeArg(0);
+                if (no)
+                    it->second->flip();
                 continue;
             } else {
                 usage(stderr);
@@ -289,8 +298,14 @@ bool Config::init(int &argc, char **&argv)
                     *ch = std::tolower(*ch);
                 }
             }
+            bool no = false;
             auto it = sGetters.find(key);
-            if (it == sGetters.end()) { // not found, treat as error?
+            if (it == sGetters.end() && !strncmp(key.c_str(), "no-", 3)) {
+                it = sGetters.find(key.substr(3));
+                no = true;
+            }
+
+            if (it == sGetters.end() || (no && !it->second->isBoolean())) {
                 continue;
             }
             if (it->second->mDone) // set from command line, no need to worry about environment
@@ -301,6 +316,8 @@ bool Config::init(int &argc, char **&argv)
                 fprintf(stderr, "Can't parse environment variable %s\n", env);
                 return false;
             }
+            if (no)
+                it->second->flip();
             it->second->mDone = true;
         }
     }
@@ -308,12 +325,25 @@ bool Config::init(int &argc, char **&argv)
     for (const std::pair<std::string, GetterBase *> &getter : sGetters) {
         if (getter.second->mDone)
             continue;
-        const json11::Json val = value(jsons, getter.second->jsonKey());
-        if (!val.is_null() && !getter.second->apply(val)) {
+        std::string key = getter.second->jsonKey();
+        json11::Json val = value(jsons, key);
+        bool no = false;
+        if (val.is_null() && getter.second->isBoolean()) {
+            key = "no_" + key;
+            val = value(jsons, key);
+            no = true;
+        }
+        if (val.is_null())
+            continue;
+
+        if (!getter.second->apply(val)) {
             usage(stderr);
             fprintf(stderr, "Can't parse %s for %s\n", val.dump().c_str(), getter.second->jsonKey().c_str());
             return false;
         }
+        if (no)
+            getter.second->flip();
+
         getter.second->mDone = true;
     }
 

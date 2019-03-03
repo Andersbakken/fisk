@@ -28,6 +28,8 @@ public:
     std::string commandLine() const { return mCommandLine; }
     virtual bool apply(const std::string &value) = 0;
     virtual bool apply(const json11::Json &input) = 0;
+    virtual void flip() = 0;
+    bool isBoolean() const { return !requiresArgument(); }
     virtual bool requiresArgument() const = 0;
     virtual std::string toString() const = 0;
     const char *help() const { return mHelp; }
@@ -46,6 +48,7 @@ public:
     {}
     virtual bool apply(const std::string &) { return false; }
     virtual bool apply(const json11::Json &) { return false; }
+    virtual void flip() { abort(); }
     virtual bool requiresArgument() const { return false; }
     virtual std::string toString() const { return std::string(); }
 };
@@ -74,7 +77,15 @@ public:
         return str.str();
     }
     T get() const { return mGetter(mValue); }
+    virtual void flip() override
+    {
+        assert(isBoolean());
+        flip(mValue);
+    }
 private:
+    template <typename TT>
+    static void flip(TT &) { abort(); }
+    static void flip(bool &value) { value = !value; }
     static bool applyValue(const std::string &input, std::string &dest)
     {
         if (input.empty())
