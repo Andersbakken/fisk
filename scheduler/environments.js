@@ -13,16 +13,15 @@ function untarFile(archive, file, encoding)
                     return;
                 }
                 fs.readFile(path.join(tmpdir, file), encoding || "utf8", (err, data) => {
+                    try {
+                        fs.removeSync(tmpdir);
+                    } catch (e) {
+                        console.error("Got an error removing the temp dir", tmpdir);
+                    }
                     if (err) {
                         reject(err);
                     } else {
-                        fs.remove(tmpdir, (err) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                resolve(data);
-                            }
-                        });
+                        resolve(data);
                     }
                 });
             });

@@ -326,7 +326,7 @@ function purgeEnvironmentsToMaxSize()
                 }
                 purged = true;
                 Environments.remove(env.hash);
-                console.log("Should purge env", env.hash);
+                console.log("Should purge env", env.hash, maxSize, env.size);
             });
             resolve(purged);
         } catch (err) {
