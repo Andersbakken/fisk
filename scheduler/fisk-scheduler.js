@@ -778,8 +778,8 @@ server.on("compile", compile => {
                         bestScore = slaveScore;
                         slave = s;
                         env = usableEnvs[i];
+                        break;
                     }
-                    break;
                 }
             }
         });
