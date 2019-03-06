@@ -18,6 +18,10 @@ class Compile extends EventEmitter
             // console.log("connection ended", id);
             this.emit('end');
         });
+        this.connection.on('error', err => {
+            // console.log("connection error", id, err);
+            this.emit('error', err);
+        });
     }
 
     send(message)
