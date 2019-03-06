@@ -341,6 +341,51 @@ client.on("getEnvironments", message => {
 
         let file = path.join(dir, "env.tar.gz");
         let stream = fs.createWriteStream(file);
+        stream.on("finish", () => {
+            console.log("Got finish", env);
+            exec("tar xf '" + file + "'", { cwd: dir }).
+                then(() => {
+                    console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
+                    return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
+                }).then(() => {
+                    console.log("Write json file");
+                    return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
+                }).then(() => {
+                    console.log(`Unlink ${file} ${env}`);
+                    return fs.unlink(file);
+                }).then(() => {
+                    let opts = {
+                        user: option("vm-user"),
+                        keepCompiles: option("keep-compiles"),
+                        debug: option("debug")
+                    };
+
+                    let vm = new VM(dir, env, opts);
+                    return new Promise((resolve, reject) => {
+                        let done = false;
+                        vm.on('error', err => {
+                            if (!done) {
+                                reject(err);
+                            }
+                        });
+                        vm.on('ready', () => {
+                            done = true;
+                            resolve(vm);
+                        });
+                    });
+                }).then(vm => {
+                    environments[env] = vm;
+                    setTimeout(work, 0);
+                }).catch((err) => {
+                    console.error("Got failure setting up environment", err);
+                    try {
+                        fs.removeSync(dir);
+                    } catch (rmdirErr) {
+                        console.error("Failed to remove directory", dir, rmdirErr);
+                    }
+                    setTimeout(work, 0);
+                });
+        });
         request.get(url)
             .on('error', err => {
                 console.log("Got error from request", err);
@@ -360,51 +405,7 @@ client.on("getEnvironments", message => {
                 return;
             }).on('end', event => {
                 stream.end();
-                stream.on("finish", () => {
-                    console.log("Got end", env);
-                    exec("tar xf '" + file + "'", { cwd: dir }).
-                        then(() => {
-                            console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
-                            return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
-                        }).then(() => {
-                            console.log("Write json file");
-                            return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
-                        }).then(() => {
-                            console.log(`Unlink ${file} ${env}`);
-                            return fs.unlink(file);
-                        }).then(() => {
-                            let opts = {
-                                user: option("vm-user"),
-                                keepCompiles: option("keep-compiles"),
-                                debug: option("debug")
-                            };
-
-                            let vm = new VM(dir, env, opts);
-                            return new Promise((resolve, reject) => {
-                                let done = false;
-                                vm.on('error', err => {
-                                    if (!done) {
-                                        reject(err);
-                                    }
-                                });
-                                vm.on('ready', () => {
-                                    done = true;
-                                    resolve(vm);
-                                });
-                            });
-                        }).then(vm => {
-                            environments[env] = vm;
-                            setTimeout(work, 0);
-                        }).catch((err) => {
-                            console.error("Got failure setting up environment", err);
-                            try {
-                                fs.removeSync(dir);
-                            } catch (rmdirErr) {
-                                console.error("Failed to remove directory", dir, rmdirErr);
-                            }
-                            setTimeout(work, 0);
-                        });
-                });
+                console.log("got end", env);
             }).pipe(stream);
     }
     work();
