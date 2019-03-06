@@ -761,6 +761,8 @@ server.on("compile", compile => {
                         break;
                     }
                 }
+                if (!env)
+                    slave = undefined;
             }
         }
     }
