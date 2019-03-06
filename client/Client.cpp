@@ -708,11 +708,8 @@ std::string Client::findExecutablePath(const char *argv0)
 bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)
 {
     FILE *f = fopen(tarball.c_str(), "r");
-    std::string dir;
-    Client::parsePath(tarball, 0, &dir);
     if (!f) {
         ERROR("Failed to open %s for reading: %d %s", tarball.c_str(), errno, strerror(errno));
-        Client::recursiveRmdir(dir);
         return false;
     }
     struct stat st;
@@ -720,7 +717,6 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         ERROR("Failed to stat %s: %d %s", tarball.c_str(), errno, strerror(errno));
         int ret;
         EINTRWRAP(ret, fclose(f));
-        Client::recursiveRmdir(dir);
         return false;
     }
     {
@@ -742,7 +738,6 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
                 int ret;
                 EINTRWRAP(ret, fclose(f));
-                Client::recursiveRmdir(dir);
                 return false;
             }
             schedulerWebSocket->send(WebSocket::Binary, buf, chunkSize);
@@ -754,13 +749,12 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
     }
     int ret;
     EINTRWRAP(ret, fclose(f));
-    Client::recursiveRmdir(dir);
     return schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket;
 }
 
 extern "C" const unsigned char create_fisk_env[];
 extern "C" const unsigned create_fisk_env_size;
-std::string Client::prepareEnvironmentForUpload()
+std::string Client::prepareEnvironmentForUpload(std::string *directory)
 {
     char dir[PATH_MAX];
     strcpy(dir, "/tmp/fisk-env-XXXXXX");
@@ -768,6 +762,7 @@ std::string Client::prepareEnvironmentForUpload()
         ERROR("Failed to mkdtemp %d %s", errno, strerror(errno));
         return std::string();
     }
+    *directory = dir;
 
     // printf("GOT DIR %s\n", dir);
 
@@ -775,7 +770,6 @@ std::string Client::prepareEnvironmentForUpload()
     FILE *f = fopen(info.c_str(), "w");
     if (!f) {
         ERROR("Failed to create info file: %s %d %s", info.c_str(), errno, strerror(errno));
-        Client::recursiveMkdir(dir);
         return std::string();
     }
 
@@ -792,7 +786,6 @@ std::string Client::prepareEnvironmentForUpload()
             ERROR("Failed to run %s -v\n%s", sData.resolvedCompiler.c_str(), stdErr.c_str());
             int ret;
             EINTRWRAP(ret, fclose(f));
-            Client::recursiveMkdir(dir);
             return std::string();
         }
         stdOut += stdErr;
@@ -803,7 +796,6 @@ std::string Client::prepareEnvironmentForUpload()
         if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
             EINTRWRAP(ret, fclose(f));
-            Client::recursiveMkdir(dir);
             return std::string();
         }
         // int ret;
@@ -837,7 +829,6 @@ std::string Client::prepareEnvironmentForUpload()
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run create-fisk-env: %s", stdErr.c_str());
-            Client::recursiveMkdir(dir);
             return std::string();
         }
         if (stdOut.size() > 1 && stdOut[stdOut.size() - 1] == '\n')
@@ -845,7 +836,6 @@ std::string Client::prepareEnvironmentForUpload()
         const size_t idx = stdOut.rfind("\ncreating ");
         if (idx == std::string::npos) {
             ERROR("Failed to parse stdout of create-fisk-env:\n%s", stdOut.c_str());
-            Client::recursiveMkdir(dir);
             return std::string();
         }
         std::string tarball = Client::format("%s/%s", dir, stdOut.substr(idx + 10).c_str());

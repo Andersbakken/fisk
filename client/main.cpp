@@ -348,12 +348,14 @@ int main(int argc, char **argv)
 
     if (schedulerWebsocket.needsEnvironment) {
         data.watchdog->stop();
-        const std::string tarball = Client::prepareEnvironmentForUpload();
+        std::string dir;
+        const std::string tarball = Client::prepareEnvironmentForUpload(&dir);
         // printf("GOT TARBALL %s\n", tarball.c_str());
         if (!tarball.empty()) {
             select.remove(&schedulerWebsocket);
             Client::uploadEnvironment(&schedulerWebsocket, tarball);
         }
+        Client::recursiveRmdir(dir);
         runLocal("needs environment");
         return 0;
     }
