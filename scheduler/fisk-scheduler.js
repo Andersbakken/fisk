@@ -389,7 +389,7 @@ function environmentsInfo()
 
 server.on("listen", app => {
     app.get("/environments", (req, res, next) => {
-        res.send(JSON.stringify(environmentsInfo(), null, 4));
+        res.send(JSON.stringify(environmentsInfo(), null, 4) + "\n");
     });
 
     app.get("/slaves", (req, res, next) => {
@@ -416,7 +416,7 @@ server.on("listen", app => {
                 environments: Object.keys(s.environments)
             });
         }
-        res.send(JSON.stringify(ret, null, 4));
+        res.send(JSON.stringify(ret, null, 4) + "\n");
     });
 
     app.get("/info", (req, res, next) => {
@@ -445,7 +445,7 @@ server.on("listen", app => {
             uptime: humanizeDuration(now - serverStartTime),
             serverStartTime: new Date(serverStartTime).toString()
         };
-        res.send(JSON.stringify(obj, null, 4));
+        res.send(JSON.stringify(obj, null, 4) + "\n");
     });
 
     app.get("/objectcache", (req, res, next) => {

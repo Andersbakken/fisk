@@ -76,13 +76,14 @@ class Server extends EventEmitter {
     listen() {
         return new Promise((resolve, reject) => {
             this.app = express();
-            this.app.use(express.static(`${__dirname}/../ui/dist/ui`));
             this.emit("listen", this.app);
 
-            this.app.all('/*', function(req, res, next) {
-                // Just send the index.html for other files to support HTML5Mode
-                res.sendFile('/index.html', { root: path.join(__dirname, "..", "ui", "dist", "ui") });
-            });
+            let ui = this.option("ui");
+            if (ui) {
+                this.app.all('/*', function(req, res, next) {
+                    res.redirect(ui);
+                });
+            }
 
             this.server = http.createServer(this.app);
             this.ws = new WebSocket.Server({ noServer: true });
