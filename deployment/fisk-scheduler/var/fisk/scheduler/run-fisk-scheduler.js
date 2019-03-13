@@ -129,15 +129,6 @@ function updateFisk()
             }
         }).then(() => {
             return npm("install --unsafe-perm @andersbakken/fisk", { cwd: path.join(root, "stage") });
-        }).then(() => {
-            if (option("ui") === false)
-                return;
-            return npm("install --unsafe-perm", { cwd: path.join(root, "/stage/node_modules/@andersbakken/fisk/ui") });
-        }).then(() => {
-            if (option("ui") === false)
-                return;
-            return npm("run dist", { cwd: path.join(root, "/stage/node_modules/@andersbakken/fisk/ui") });
-        }).then(() => {
             resolve(true);
         }).catch(error => {
             if (typeof error !== 'boolean') {
