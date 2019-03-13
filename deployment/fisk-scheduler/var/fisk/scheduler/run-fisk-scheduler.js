@@ -129,6 +129,7 @@ function updateFisk()
             }
         }).then(() => {
             return npm("install --unsafe-perm @andersbakken/fisk", { cwd: path.join(root, "stage") });
+        }).then(() => {
             resolve(true);
         }).catch(error => {
             if (typeof error !== 'boolean') {
