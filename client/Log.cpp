@@ -57,7 +57,9 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
 {
     if (ok)
         *ok = true;
-    if (!strcasecmp("Debug", str)) {
+    if (!strcasecmp("Verbose", str)) {
+        return Verbose;
+    } else if (!strcasecmp("Debug", str)) {
         return Debug;
     } else if (!strcasecmp("Warn", str)) {
         return Warn;
