@@ -904,6 +904,9 @@ function sendInfoToClient(client)
         console.log("sending info to monitor", info);
 
     client.send(info);
+
+    let scheduler = { version: schedulerNpmVersion, type: "schedulerInfo" };
+    client.send(scheduler);
 }
 
 server.on("monitor", client => {
