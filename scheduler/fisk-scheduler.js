@@ -891,7 +891,20 @@ function randomBytes(bytes)
     });
 }
 
+function sendInfoToClient(client)
+{
+    forEachSlave(slave => {
+        const info = slaveToMonitorInfo(slave, "slaveAdded");
+        if (monitorsLog)
+            console.log("sending to monitor", info);
+        client.send(info);
+    });
+    let info = statsMessage();
+    if (monitorsLog)
+        console.log("sending info to monitor", info);
 
+    client.send(info);
+}
 
 server.on("monitor", client => {
     if (monitorsLog)
@@ -905,17 +918,7 @@ server.on("monitor", client => {
         }
         client.removeAllListeners();
     }
-    forEachSlave(slave => {
-        const info = slaveToMonitorInfo(slave, "slaveAdded");
-        if (monitorsLog)
-            console.log("sending to monitor", info);
-        client.send(info);
-    });
-    let info = statsMessage();
-    if (monitorsLog)
-        console.log("sending info to monitor", info);
-
-    client.send(info);
+    sendInfoToClient(client);
     let user;
     client.on("message", messageText => {
         if (monitorsLog)
@@ -930,6 +933,9 @@ server.on("monitor", client => {
             return;
         }
         switch (message.type) {
+        case 'resendInfo':
+            sendInfoToClient(client);
+            break;
         case 'logFiles':
             // console.log("logFiles:", message);
             fs.readdir(logFileDir, (err, files) => {
