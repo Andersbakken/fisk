@@ -918,7 +918,6 @@ server.on("monitor", client => {
         }
         client.removeAllListeners();
     }
-    sendInfoToClient(client);
     let user;
     client.on("message", messageText => {
         if (monitorsLog)
@@ -933,7 +932,7 @@ server.on("monitor", client => {
             return;
         }
         switch (message.type) {
-        case 'resendInfo':
+        case 'sendInfo':
             sendInfoToClient(client);
             break;
         case 'logFiles':
