@@ -27,7 +27,7 @@ static inline size_t random(void *data, size_t len)
         return 0;
     }
 
-    int ret;
+    ssize_t ret;
     EINTRWRAP(ret, read(fileno(f), data, len));
     if (ret != static_cast<int>(len)) {
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
@@ -43,7 +43,7 @@ WebSocket::WebSocket()
     memset(&mCallbacks, 0, sizeof(mCallbacks));
     mCallbacks.recv_callback = [](wslay_event_context *ctx,
                                   uint8_t *buf, size_t len,
-                                  int flags, void *user_data) -> ssize_t {
+                                  int /*flags*/, void *user_data) -> ssize_t {
         WebSocket *ws = static_cast<WebSocket *>(user_data);
         if (ws->mRecvBuffer.empty()) {
             wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
@@ -55,9 +55,9 @@ WebSocket::WebSocket()
         return ret;
     };
 
-    mCallbacks.send_callback = [](wslay_event_context *ctx,
+    mCallbacks.send_callback = [](wslay_event_context */*ctx*/,
                                   const uint8_t *data, size_t len,
-                                  int flags, void *user_data) -> ssize_t {
+                                  int /*flags*/, void *user_data) -> ssize_t {
         WebSocket *ws = static_cast<WebSocket *>(user_data);
         ws->mSendBuffer.resize(ws->mSendBuffer.size() + len);
         memcpy(&ws->mSendBuffer[ws->mSendBuffer.size() - len], data, len);
@@ -123,10 +123,11 @@ bool WebSocket::connect(std::string &&uniformResourceLocator, const std::map<std
     if (!mPort)
         mPort = 80;
 
-    addrinfo *res = 0;
+    addrinfo *res = nullptr;
     addrinfo stackRes;
     in_addr literal;
-    sockaddr_in literalSockAddr = { 0 };
+    sockaddr_in literalSockAddr;
+    memset(&literalSockAddr, 0, sizeof(literalSockAddr));
     int ret;
     if (inet_aton(mHost.c_str(), &literal)) {
         DEBUG("Got literal ip address: %s", mHost.c_str());
@@ -159,7 +160,7 @@ bool WebSocket::connect(std::string &&uniformResourceLocator, const std::map<std
 
     for (addrinfo *addr = res; addr; addr = addr->ai_next) {
         mFD = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        DEBUG("Opening socket for for %s -> %d", mHost.c_str(), ret);
+        DEBUG("Opening socket for for %s -> %d", mHost.c_str(), mFD);
 
         if (mFD == -1)
             continue;

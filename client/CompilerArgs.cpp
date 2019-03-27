@@ -127,7 +127,7 @@ static const OptionArg argOptions[] = {
     { "-weak_library", 1, true },
     { "-weak_reference_mismatches", 1, true },
     { "-x", 1, true },
-    { "-z", 1 }
+    { "-z", 1, true }
 };
 
 // { "-Xarch_<arg1> <arg2>", 1, true },
@@ -137,7 +137,7 @@ static const OptionArg argOptions[] = {
 
 static inline size_t hasArg(const std::string &arg, bool &md5)
 {
-    const OptionArg a { arg.c_str(), 1 };
+    const OptionArg a { arg.c_str(), 1, false };
     const size_t idx = std::lower_bound(argOptions, argOptions + (sizeof(argOptions) / sizeof(argOptions[0])), a) - argOptions;
     if (idx < sizeof(argOptions) / sizeof(argOptions[0])) {
         if (!strcmp(arg.c_str(), argOptions[idx].name)) {
@@ -460,7 +460,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                         { "S", Assembler },
                         { "sx", Assembler },
                         { "s", AssemblerWithCpp },
-                        { 0, None }
+                        { nullptr, None }
                     };
                     for (size_t ii=0; suffixes[ii].suffix; ++ii) {
                         if (!strcmp(ext, suffixes[ii].suffix)) {
@@ -511,7 +511,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
     if (hasProfiling && !hasProfileDir) {
         std::string dir;
-        Client::parsePath(ret->output(), 0, &dir);
+        Client::parsePath(ret->output(), nullptr, &dir);
         dir = Client::realpath(dir);
         if (objectCache) {
             MD5_Update(&Client::data().md5, "-fprofile-dir=", 14);
@@ -578,8 +578,8 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     case Local_NoSources: return "NoSources";
     case Local_Link: return "Link";
     }
-    abort();
-    return 0;
+    assert(0);
+    return nullptr;
 }
 
 std::string CompilerArgs::output() const

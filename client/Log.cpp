@@ -8,7 +8,7 @@ static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
 static const unsigned long long sPid = getpid();
 static std::mutex sMutex;
-std::string sLogFileName;
+static std::string sLogFileName;
 
 namespace Log {
 Level minLogLevel = Log::Silent;

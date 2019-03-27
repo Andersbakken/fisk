@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
     if (unsigned long long delay = Config::delay) {
         DEBUG("Sleeping for %llu ms", delay);
-        usleep(delay * 1000);
+        usleep(static_cast<unsigned>(delay * 1000));
     }
 
     Client::Data &data = Client::data();
@@ -122,14 +122,14 @@ int main(int argc, char **argv)
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
     act.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &act, 0);
+    sigaction(SIGPIPE, &act, nullptr);
 
     if (Config::verify) {
         return clientVerify();
     }
     if (preresolved.empty()) {
         std::string fn;
-        Client::parsePath(argv[0], &fn, 0);
+        Client::parsePath(argv[0], &fn, nullptr);
         if (fn == "fiskc") {
             bool c = true;
             for (int i=1; i<argc; ++i) {
@@ -252,7 +252,7 @@ int main(int argc, char **argv)
     }
 
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
-    Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], 0);
+    Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], nullptr);
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;

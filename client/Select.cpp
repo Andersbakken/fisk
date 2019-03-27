@@ -1,5 +1,9 @@
 #include "Select.h"
 
+Socket::~Socket()
+{
+}
+
 int Select::exec(int timeoutMs) const
 {
     fd_set r, w;
@@ -31,12 +35,12 @@ int Select::exec(int timeoutMs) const
     int ret;
     do {
         struct timeval t = {};
-        struct timeval *timeout = timeoutMs == -1 ? 0 : &t;
+        struct timeval *timeout = timeoutMs == -1 ? nullptr : &t;
         if (timeout) {
             timeout->tv_sec = timeoutMs / 1000;
             timeout->tv_usec = (timeoutMs % 1000) * 1000;
         }
-        ret = select(max + 1, &r, &w, 0, timeout);
+        ret = select(max + 1, &r, &w, nullptr, timeout);
     } while (ret == EINTR);
     if (ret == -1) {
         ERROR("Select failed %d %s", errno, strerror(errno));
@@ -51,7 +55,7 @@ int Select::exec(int timeoutMs) const
     if (FD_ISSET(mPipe[0], &r)) {
         --ret;
         char ch;
-        int readRet;
+        ssize_t readRet;
         do {
             readRet = ::read(mPipe[0], &ch, 1);
         } while (readRet == -1 && errno == EINTR);
@@ -82,9 +86,10 @@ void Select::wakeup()
 {
     if (mPipe[1] != -1) {
         DEBUG("Waking up with pipe");
-        int err;
+        ssize_t err;
         EINTRWRAP(err, write(mPipe[1], "w", 1));
     } else {
         DEBUG("Pipe not there");
     }
 }
+

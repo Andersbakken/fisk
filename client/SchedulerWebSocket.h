@@ -11,10 +11,7 @@ extern "C" const char *npm_version;
 class SchedulerWebSocket : public WebSocket
 {
 public:
-    virtual void onConnected() override
-    {
-        Client::data().watchdog->transition(Watchdog::ConnectedToScheduler);
-    }
+    virtual void onConnected() override;
     virtual void onMessage(MessageType type, const void *data, size_t len) override
     {
         if (type == WebSocket::Text) {
@@ -40,7 +37,7 @@ public:
                 for (const json11::Json &arg : extraArgs) {
                     extraArguments.push_back(arg.string_value());
                 }
-                slavePort = msg["port"].int_value();
+                slavePort = static_cast<uint16_t>(msg["port"].int_value());
                 jobId = msg["id"].int_value();
                 DEBUG("type %d", msg["port"].type());
                 DEBUG("Got here %s:%d", slaveIp.c_str(), slavePort);

@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
-include_directories(${CMAKE_CURRENT_LIST_DIR})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wformat -Wall -Wshadow")
+if (APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wformat -Wall -Wshadow -Weverything -Wno-c++98-compat -Wno-switch-enum -Wno-c++98-compat-pedantic -Wno-padded -Wno-format-nonliteral -Wno-float-equal -Wno-reserved-id-macro -Wno-sign-conversion -Wno-global-constructors -Wno-exit-time-destructors -Wno-format-pedantic -Wno-old-style-cast")
+else ()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+endif ()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 set_source_files_properties(Client.cpp PROPERTIES COMPILE_FLAGS -Wno-unused-value)
 set(OPENSSL_USE_STATIC_LIBS TRUE)
@@ -22,18 +25,20 @@ add_custom_command(OUTPUT npm-version.c
 message(STATUS "Found openssl includes ${OPENSSL_INCLUDE_DIR}")
 include_directories(${OPENSSL_INCLUDE_DIR})
 add_executable(fiskc
+    ${CMAKE_BINARY_DIR}/client/create-fisk-env.c
+    ${CMAKE_BINARY_DIR}/client/npm-version.c
     Client.cpp
     CompilerArgs.cpp
     Config.cpp
     DaemonSocket.cpp
     Log.cpp
     Preprocessed.cpp
+    SchedulerWebSocket.cpp
     Select.cpp
+    SlaveWebSocket.cpp
     Watchdog.cpp
     WebSocket.cpp
-    main.cpp
-    ${CMAKE_BINARY_DIR}/client/create-fisk-env.c
-    ${CMAKE_BINARY_DIR}/client/npm-version.c)
+    main.cpp)
 add_dependencies(fiskc create-create-fisk-env create-npm-version)
 target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library dl)
 

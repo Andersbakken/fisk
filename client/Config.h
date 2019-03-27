@@ -43,14 +43,15 @@ private:
 class Separator : public GetterBase
 {
 public:
-    Separator(const char *hlp = 0)
-        : GetterBase(0, hlp ? hlp : "")
+    Separator(const char *hlp = nullptr)
+        : GetterBase(nullptr, hlp ? hlp : "")
     {}
-    virtual bool apply(const std::string &) { return false; }
-    virtual bool apply(const json11::Json &) { return false; }
-    virtual void flip() { abort(); }
-    virtual bool requiresArgument() const { return false; }
-    virtual std::string toString() const { return std::string(); }
+    virtual ~Separator() override;
+    virtual bool apply(const std::string &) override { return false; }
+    virtual bool apply(const json11::Json &) override { return false; }
+    virtual void flip() override { abort(); }
+    virtual bool requiresArgument() const override { return false; }
+    virtual std::string toString() const override { return std::string(); }
 };
 
 template <typename T> T identity(const T &t) { return t; }

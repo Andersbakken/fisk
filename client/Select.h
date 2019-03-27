@@ -14,7 +14,7 @@
 class Select;
 struct Socket
 {
-    virtual ~Socket() {}
+    virtual ~Socket();
     enum Mode {
         None = 0x0,
         Read = 0x1,

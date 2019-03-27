@@ -35,7 +35,7 @@ GetterBase::GetterBase(const char *arg, const char *hlp)
             if (*ch == '-') {
                 *ch = '_';
             } else {
-                *ch = std::toupper(*ch);
+                *ch = static_cast<char>(std::toupper(*ch));
             }
         }
         mCommandLine = "--fisk-" + mJsonKey;
@@ -51,12 +51,12 @@ GetterBase::~GetterBase()
 
 Getter<bool> help("help", "Display this help", false);
 Getter<bool> version("version", "Display fisk version and exit", false);
-Separator s1;
+static Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
 Getter<std::string> socketFile("socket-file", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
-Separator s2;
-Separator s3("Options:");
+static Separator s2;
+static Separator s3("Options:");
 Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
@@ -66,7 +66,7 @@ Getter<bool> verify("verify", "Only verify that the npm version is correct", fal
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
-Separator s4("Timeouts:");
+static Separator s4("Timeouts:");
 Getter<unsigned long long> daemonConnectTimeout("daemon-connect-timeout", "Set acquired slave watchdog timeout", 2000);
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 7500);
 Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 7500);
@@ -85,14 +85,14 @@ Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir", getenv("HOME"
                              });
 Getter<std::string> statisticsLog("statistics-log", "Dump statistics into this file");
 
-Separator s5;
-Separator s6("CPU allowances:");
+static Separator s5;
+static Separator s6("CPU allowances:");
 Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(), [](const size_t &value) { return std::max<size_t>(1, value); });
 Getter<size_t> desiredCompileSlots("desired-slots", "Number of desired compile slots", 0);
 Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2, [](const size_t &value) { return std::max<size_t>(1, value); });
 
-Separator s7;
-Separator s8("Identity:");
+static Separator s7;
+static Separator s8("Identity:");
 Getter<std::string> hostname("hostname", "Set hostname", std::string(), [](const std::string &value) {
         if (!value.empty())
             return value;
@@ -106,8 +106,8 @@ Getter<std::string> name("name", "Set name (used for visualization)", std::strin
             return value;
         return static_cast<std::string>(hostname);
     });
-Separator s9;
-Separator s10("Logging:");
+static  Separator s9;
+static Separator s10("Logging:");
 Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr than)", false);
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
@@ -156,7 +156,7 @@ bool Config::init(int &argc, char **&argv)
     auto consumeArg = [&i, &argv, &argc](int extra) {
         memmove(&argv[i], &argv[i + extra + 1], sizeof(argv[0]) * (argc - i + 1));
         argc -= (extra + 1);
-        argv[argc] = 0;
+        argv[argc] = nullptr;
     };
 
     bool gotHelp = false;
@@ -295,7 +295,7 @@ bool Config::init(int &argc, char **&argv)
                 if (*ch == '_') {
                     *ch = '-';
                 } else {
-                    *ch = std::tolower(*ch);
+                    *ch = static_cast<char>(std::tolower(*ch));
                 }
             }
             bool no = false;
@@ -385,7 +385,7 @@ void Config::usage(FILE *f)
             "--------\n");
     int max = 0;
     for (const std::pair<std::string, GetterBase *> &getter : sGetters) {
-        max = std::max<int>(max, 2 + 7 + getter.first.size() + 1 + 8 + 3 + 3);
+        max = std::max<int>(max, static_cast<int>(2 + 7 + getter.first.size() + 1 + 8 + 3 + 3));
     }
     fprintf(f, "  --help%*s%s (false)\n", max - 12, "", "Display this help (if argv0 is fiskc)");
     for (const GetterBase *getter : sOrderedGetters) {
@@ -394,7 +394,7 @@ void Config::usage(FILE *f)
             continue;
         }
         fprintf(f, "  %s", getter->commandLine().c_str());
-        int used = 2 + getter->commandLine().size();
+        int used = static_cast<int>(2 + getter->commandLine().size());
         if (getter->requiresArgument()) {
             fprintf(f, "=[value]");
             used += 8;
@@ -413,7 +413,11 @@ void Config::usage(FILE *f)
         }
 
         fprintf(f, "  %s", getter->environmentVariable().c_str());
-        int used = 6 + getter->environmentVariable().size();
+        int used = static_cast<int>(6 + getter->environmentVariable().size());
         fprintf(f, "%*s%s (%s)\n", max - used, "", getter->help(), getter->toString().c_str());
     }
+}
+
+Config::Separator::~Separator()
+{
 }

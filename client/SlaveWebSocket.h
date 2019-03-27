@@ -10,10 +10,7 @@ class SlaveWebSocket : public WebSocket
 {
 public:
     bool wait { false };
-    virtual void onConnected() override
-    {
-    }
-
+    virtual void onConnected() override;
     virtual void onMessage(MessageType messageType, const void *data, size_t len) override
     {
         DEBUG("GOT MESSAGE %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
@@ -99,7 +96,7 @@ public:
                 }
                 assert(f);
                 if (files[0].remaining)
-                    fill(0, 0);
+                    fill(nullptr, 0);
             } else {
                 done = true;
             }
@@ -151,7 +148,7 @@ public:
             if (!front->remaining) {
                 int ret;
                 EINTRWRAP(ret, fclose(f));
-                f = 0;
+                f = nullptr;
                 files.erase(files.begin());
                 if (files.empty()) {
                     if (Config::syncFileSystem) {
@@ -189,7 +186,7 @@ public:
 
     std::vector<File> files;
     size_t totalWritten { 0 };
-    FILE *f { 0 };
+    FILE *f { nullptr };
     bool done { false };
     std::string error;
 };

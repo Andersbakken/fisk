@@ -27,11 +27,11 @@
 #endif
 
 #ifdef __APPLE__
-const char *systemName = "Darwin x86_64";
+static const char *systemName = "Darwin x86_64";
 #elif defined(__linux__) && defined(__i686)
-const char *systemName = "Linux i686"
+static const char *systemName = "Linux i686"
 #elif defined(__linux__) && defined(__x86_64)
-const char *systemName = "Linux x86_64";
+static const char *systemName = "Linux x86_64";
 #else
 #error unsupported platform
 #endif
@@ -96,7 +96,7 @@ static std::string resolveSymlink(const std::string &link, const std::function<C
         }
         if (buf[0] != '/') {
             std::string dirname;
-            Client::parsePath(l, 0, &dirname);
+            Client::parsePath(l, nullptr, &dirname);
             if (!dirname.empty() && dirname[dirname.size() - 1] != '/')
                 dirname += '/';
             l = dirname + std::string(buf, ret);
@@ -118,7 +118,7 @@ std::string Client::findInPath(const std::string &fn)
     if (!path)
         return std::string();
 
-    const char *begin = path, *end = 0;
+    const char *begin = path, *end = nullptr;
     std::string exec;
     do {
         end = strchr(begin, ':');
@@ -135,7 +135,7 @@ std::string Client::findInPath(const std::string &fn)
             if (!access(exec.c_str(), X_OK)) {
                 std::string resolved = Client::realpath(exec);
                 std::string basename;
-                Client::parsePath(resolved, 0, &basename);
+                Client::parsePath(resolved, nullptr, &basename);
                 if (basename != "fiskc") {
                     if (fileType(exec) == Symlink) {
                         char link[PATH_MAX + 1];
@@ -147,7 +147,7 @@ std::string Client::findInPath(const std::string &fn)
                         }
                         link[len] = '\0';
                         std::string linkedFile;
-                        parsePath(link, &linkedFile, 0);
+                        parsePath(link, &linkedFile, nullptr);
                         if (linkedFile == "icecc" || linkedFile == "fiskc") {
                             exec.clear();
                             continue;
@@ -169,7 +169,7 @@ bool Client::findCompiler(const std::string &preresolved)
     std::string exec;
     if (preresolved.empty()) {
         std::string fn;
-        parsePath(sData.argv[0], &fn, 0);
+        parsePath(sData.argv[0], &fn, nullptr);
         exec = findInPath(fn);
     } else if (preresolved[0] != '/') {
         exec = findInPath(preresolved);
@@ -181,13 +181,13 @@ bool Client::findCompiler(const std::string &preresolved)
         return false;
 
     std::string base;
-    parsePath(exec, &base, 0);
+    parsePath(exec, &base, nullptr);
     if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
         sData.resolvedCompiler = exec;
     } else {
         resolveSymlink(exec, [](const std::string &p) -> CheckResult {
             std::string b;
-            parsePath(p, &b, 0);
+            parsePath(p, &b, nullptr);
             // Log::debug("GOT BASE %s", base.c_str());
             if (b.find("g++") != std::string::npos || b.find("gcc") != std::string::npos) {
                 sData.resolvedCompiler = p;
@@ -383,11 +383,11 @@ void Client::writeStatistics()
         if (!stat(sourceFile.c_str(), &st)) {
             stats["source_size"] = static_cast<int>(st.st_size);
         }
-        int written = data.totalWritten;
+        int written = static_cast<int>(data.totalWritten);
         if (!written) {
             const std::string output = data.compilerArgs->output();
             if (!stat(output.c_str(), &st)) {
-                written = st.st_size;
+                written = static_cast<int>(st.st_size);
             }
         }
         if (written)
@@ -411,7 +411,7 @@ void Client::writeStatistics()
     int fd = fileno(f);
 
     errno = 0;
-    int ret;
+    ssize_t ret;
     EINTRWRAP(ret, flock(fd, LOCK_EX));
     if (ret) {
         ERROR("Failed to lock %s for writing %d %s", file.c_str(), errno, strerror(errno));
@@ -444,7 +444,7 @@ void Client::runLocal(const std::string &reason)
         for (int i=1; i<sData.argc; ++i) {
             argvCopy[i] = sData.argv[i];
         }
-        argvCopy[sData.argc] = 0;
+        argvCopy[sData.argc] = nullptr;
         size_t micros = 0;
         while (true) {
             WARN("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
@@ -466,7 +466,7 @@ void Client::runLocal(const std::string &reason)
                 micros += Increment;
             ERROR("Fork failed (%s) again errno: %d %s. Trying again... in %zums",
                   sData.compiler.c_str(), errno, strerror(errno), micros / 1000);
-            usleep(micros);
+            usleep(static_cast<unsigned int >(micros));
         } else {
             break;
         }
@@ -488,7 +488,7 @@ void Client::runLocal(const std::string &reason)
     }
 }
 
-bool gettime(timeval *time)
+static bool gettime(timeval *time)
 {
 #if defined(__APPLE__)
     static mach_timebase_info_data_t info;
@@ -615,7 +615,7 @@ std::string Client::environmentHash(const std::string &compiler)
     if (!ret.empty()) {
         json[key] = ret;
         std::string dirname;
-        parsePath(cache.c_str(), 0, &dirname);
+        parsePath(cache.c_str(), nullptr, &dirname);
         recursiveMkdir(dirname);
         if ((fd = open(cache.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH)) != -1) {
             std::string str = json11::Json(json).dump();
@@ -663,7 +663,7 @@ std::string Client::base64(const std::string &src)
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
     BIO *sink = BIO_new(BIO_s_mem());
     BIO_push(b64, sink);
-    BIO_write(b64, &src[0], src.size());
+    BIO_write(b64, &src[0], static_cast<int>(src.size()));
     BIO_flush(b64);
     const char *encoded;
     const long len = BIO_get_mem_data(sink, &encoded);
@@ -690,6 +690,7 @@ std::string Client::findExecutablePath(const char *argv0)
         }
     }
 #elif defined(__APPLE__)
+    static_cast<void>(argv0);
     {
         char b[PATH_MAX + 1];
         uint32_t size = PATH_MAX;
@@ -790,58 +791,54 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         }
         stdOut += stdErr;
         filter(stdOut);
-        int w;
         int ret;
+        ssize_t w;
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
             EINTRWRAP(ret, fclose(f));
             return std::string();
         }
-        // int ret;
         EINTRWRAP(ret, fclose(f));
     }
 
 
-    {
-        std::string stdOut, stdErr;
-        TinyProcessLib::Process proc("bash", dir,
-                                     [&stdOut](const char *bytes, size_t n) {
-                                         stdOut.append(bytes, n);
-                                         // printf("%s", std::string(bytes, n).c_str());
-                                         if (Log::minLogLevel <= Log::Debug)
-                                             Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
-                                     }, [&stdErr](const char *bytes, size_t n) {
-                                         stdErr.append(bytes, n);
-                                         // fprintf(stderr, "%s", std::string(bytes, n).c_str());
-                                         if (Log::minLogLevel <= Log::Debug)
-                                             Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
-                                     }, true);
+    std::string stdOut, stdErr;
+    TinyProcessLib::Process proc("bash", dir,
+                                 [&stdOut](const char *bytes, size_t n) {
+                                     stdOut.append(bytes, n);
+                                     // printf("%s", std::string(bytes, n).c_str());
+                                     if (Log::minLogLevel <= Log::Debug)
+                                         Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+                                 }, [&stdErr](const char *bytes, size_t n) {
+                                     stdErr.append(bytes, n);
+                                     // fprintf(stderr, "%s", std::string(bytes, n).c_str());
+                                     if (Log::minLogLevel <= Log::Debug)
+                                         Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+                                 }, true);
 
-        proc.write(Client::format("export ARG1=%s\n"
-                                  "export ARG2=--addfile\n"
-                                  "export ARG3=%s:/etc/compiler_info\n",
-                                  sData.resolvedCompiler.c_str(),
-                                  info.c_str()));
-        proc.write(reinterpret_cast<const char *>(create_fisk_env), create_fisk_env_size);
-        DEBUG("Running create-fisk-env %s --addfile %s:/etc/compiler_info", sData.resolvedCompiler.c_str(), info.c_str());
-        proc.close_stdin();
-        const int exit_status = proc.get_exit_status();
-        if (exit_status) {
-            ERROR("Failed to run create-fisk-env: %s", stdErr.c_str());
-            return std::string();
-        }
-        if (stdOut.size() > 1 && stdOut[stdOut.size() - 1] == '\n')
-            stdOut.resize(stdOut.size() - 1);
-        const size_t idx = stdOut.rfind("\ncreating ");
-        if (idx == std::string::npos) {
-            ERROR("Failed to parse stdout of create-fisk-env:\n%s", stdOut.c_str());
-            return std::string();
-        }
-        std::string tarball = Client::format("%s/%s", dir, stdOut.substr(idx + 10).c_str());
-        return tarball;
+    proc.write(Client::format("export ARG1=%s\n"
+                              "export ARG2=--addfile\n"
+                              "export ARG3=%s:/etc/compiler_info\n",
+                              sData.resolvedCompiler.c_str(),
+                              info.c_str()));
+    proc.write(reinterpret_cast<const char *>(create_fisk_env), create_fisk_env_size);
+    DEBUG("Running create-fisk-env %s --addfile %s:/etc/compiler_info", sData.resolvedCompiler.c_str(), info.c_str());
+    proc.close_stdin();
+    const int exit_status = proc.get_exit_status();
+    if (exit_status) {
+        ERROR("Failed to run create-fisk-env: %s", stdErr.c_str());
+        return std::string();
     }
-    return std::string();
+    if (stdOut.size() > 1 && stdOut[stdOut.size() - 1] == '\n')
+        stdOut.resize(stdOut.size() - 1);
+    const size_t idx = stdOut.rfind("\ncreating ");
+    if (idx == std::string::npos) {
+        ERROR("Failed to parse stdout of create-fisk-env:\n%s", stdOut.c_str());
+        return std::string();
+    }
+    std::string tarball = Client::format("%s/%s", dir, stdOut.substr(idx + 10).c_str());
+    return tarball;
 }
 
 bool Client::isAtty()

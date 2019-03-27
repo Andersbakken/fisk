@@ -97,8 +97,8 @@ private:
                 log(level, str);
             }
         }
-        const Level level;
         std::ostringstream stream;
+        const Level level;
     };
     std::unique_ptr<Data> mData;
 };

@@ -33,7 +33,7 @@ namespace Client {
 struct Data
 {
     int argc { 0 };
-    char **argv { 0 };
+    char **argv { nullptr };
     std::vector<std::string> originalArgs;
     std::string compiler; // this is the next one on the path and the one we will exec if we run locally
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
@@ -45,7 +45,7 @@ struct Data
 
     std::unique_ptr<Preprocessed> preprocessed;
     std::shared_ptr<CompilerArgs> compilerArgs;
-    Watchdog *watchdog { 0 };
+    Watchdog *watchdog { nullptr };
     CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
 
     std::string commandLineAsString() const;
@@ -180,7 +180,7 @@ enum FileType {
     Invalid
 };
 
-inline FileType fileType(const std::string &path, struct stat *st = 0)
+inline FileType fileType(const std::string &path, struct stat *st = nullptr)
 {
     struct stat dummy;
     struct stat &stat = st ? *st : dummy;
@@ -239,7 +239,7 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
             READFILE_ERR("Failed to fseek to end of %s (%d %s)", fileName.c_str(), errno, strerror(errno));
     }
 
-    int size;
+    long size;
     EINTRWRAP(size, ftell(f));
     if (size < 0) {
         READFILE_ERR("Failed to ftell %s (%d %s)", fileName.c_str(), errno, strerror(errno));
@@ -254,7 +254,7 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
     }
 
     t.resize(size);
-    int read;
+    ssize_t read;
     EINTRWRAP(read, fread(&t[0], sizeof(char), t.size(), f));
     if (read != size)
         READFILE_ERR("Failed to read from %s (%d %s)", fileName.c_str(), errno, strerror(errno));

@@ -13,7 +13,7 @@ class WebSocket : public Socket
 {
 public:
     WebSocket();
-    ~WebSocket();
+    ~WebSocket() override;
 
     enum MessageType {
         Text,
