@@ -40,6 +40,7 @@ static inline size_t random(void *data, size_t len)
 
 WebSocket::WebSocket()
 {
+    memset(&mCallbacks, 0, sizeof(mCallbacks));
     mCallbacks.recv_callback = [](wslay_event_context *ctx,
                                   uint8_t *buf, size_t len,
                                   int flags, void *user_data) -> ssize_t {

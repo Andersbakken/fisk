@@ -70,8 +70,8 @@ private:
     LUrlParser::clParseURL mParsedUrl;
     std::map<std::string, std::string> mHeaders;
     int mFD { -1 };
-    wslay_event_callbacks mCallbacks { 0 };
-    wslay_event_context *mContext { 0 };
+    wslay_event_callbacks mCallbacks;
+    wslay_event_context *mContext { nullptr };
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
     std::vector<std::string> mHandshakeResponseHeaders;

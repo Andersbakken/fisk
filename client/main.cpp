@@ -167,7 +167,6 @@ int main(int argc, char **argv)
         ERROR("Failed to connect to daemon");
         data.watchdog->stop();
         Client::runLocal("daemon connect failure");
-        return 0; // unreachable
     }
 
     Select select;
@@ -181,12 +180,10 @@ int main(int argc, char **argv)
         ERROR("Have to run locally because we timed out connecting to daemon");
         data.watchdog->stop();
         Client::runLocal("daemon connect failure");
-        return 0; // unreachable
     }
 
     if (daemonSocket.state() != DaemonSocket::Connected) {
         Client::runLocal("daemon connect failure 2");
-        return 0;
     }
 
     data.watchdog->transition(Watchdog::ConnectedToDaemon);
@@ -414,7 +411,7 @@ int main(int argc, char **argv)
 
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
-            Client::runLocal("preprocess error 4");
+            runLocal("preprocess error 4");
             return 0; // unreachable
         }
 
