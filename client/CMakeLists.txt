@@ -17,6 +17,7 @@ add_custom_command(OUTPUT npm-version.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake
                    COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/../package.json" -DOUTPUT="${CMAKE_BINARY_DIR}/client/npm-version.c" -DVARIABLE=npm_version -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
 
+message(STATUS "Found openssl includes ${OPENSSL_INCLUDE_DIR}")
 include_directories(${OPENSSL_INCLUDE_DIR})
 add_executable(fiskc
     Client.cpp
