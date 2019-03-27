@@ -4,7 +4,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wformat -Wall -Wshadow")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 set_source_files_properties(Client.cpp PROPERTIES COMPILE_FLAGS -Wno-unused-value)
 set(OPENSSL_USE_STATIC_LIBS TRUE)
-find_package(OpenSSL REQUIRED)
+if (NOT OPENSSL_INCLUDE_DIR OR NOT OPENSSL_CRYPTO_LIBRARY)
+    find_package(OpenSSL REQUIRED)
+endif ()
 add_custom_target(create-create-fisk-env ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake COMMENT "Generating create-fisk-env.c")
 add_custom_command(OUTPUT create-fisk-env.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env
