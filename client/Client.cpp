@@ -28,7 +28,7 @@
 
 #ifdef __APPLE__
 static const char *systemName = "Darwin x86_64";
-#elif defined(__linux__) && defined(__i686)
+#elif defined(__linux__) && (defined(__i686) || defined(__i386))
 static const char *systemName = "Linux i686"
 #elif defined(__linux__) && defined(__x86_64)
 static const char *systemName = "Linux x86_64";
@@ -671,39 +671,6 @@ std::string Client::base64(const std::string &src)
     BIO_free(b64);
     BIO_free(sink);
     return ret;
-}
-
-std::string Client::findExecutablePath(const char *argv0)
-{
-#if defined(__linux__)
-    char buf[32];
-    const int w = snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid());
-    std::string p(buf, w);
-    if (fileType(p) == Symlink) {
-        char b[PATH_MAX];
-        const ssize_t len = readlink(p.c_str(), b, sizeof(b));
-        if (len > 0) {
-            p.assign(b, len);
-            if (fileType(p) == File) {
-                return p;
-            }
-        }
-    }
-#elif defined(__APPLE__)
-    static_cast<void>(argv0);
-    {
-        char b[PATH_MAX + 1];
-        uint32_t size = PATH_MAX;
-        if (_NSGetExecutablePath(b, &size) == 0) {
-            b[PATH_MAX] = '\0';
-            return Client::realpath(b);
-        }
-    }
-#else
-#error Unknown platform
-#endif
-
-    return std::string();
 }
 
 bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)

@@ -268,7 +268,6 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
 }
 
 std::string environmentHash(const std::string &compiler);
-std::string findExecutablePath(const char *argv0);
 bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();
