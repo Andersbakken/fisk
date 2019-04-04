@@ -45,6 +45,7 @@ public:
     void heartbeat();
     void stop();
     bool timedOut() const { return mState == TimedOut; }
+    Stage currentStage() const;
 protected:
     virtual int fd() const override { return -1; }
     virtual unsigned int mode() const override { return None; }

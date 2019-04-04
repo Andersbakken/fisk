@@ -1,6 +1,7 @@
 #include "WebSocket.h"
 #include "Log.h"
 #include "Client.h"
+#include "Watchdog.h"
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -390,7 +391,10 @@ void WebSocket::onRead()
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
         } else if (errno != EINTR) {
-            ERROR("Got read error: %d %s", errno, strerror(errno));
+            ERROR("Got read error: %d %s for websocket %s at stage %s",
+                  errno, strerror(errno), mUrl.c_str(),
+                  Watchdog::stageName(Client::data().watchdog->currentStage()));
+
             mState = Error;
             break;
         }
@@ -429,7 +433,9 @@ void WebSocket::send()
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
         } else if (errno != EINTR) {
-            ERROR("Got write error: %d %s", errno, strerror(errno));
+            ERROR("Got write error: %d %s for websocket %s at stage: %ss",
+                  errno, strerror(errno), mUrl.c_str(),
+                  Watchdog::stageName(Client::data().watchdog->currentStage()));
             mState = Error;
             break;
         }

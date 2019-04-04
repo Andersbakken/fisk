@@ -28,6 +28,12 @@ void Watchdog::transition(Stage stage)
     mTransitionTime = Client::mono();
 }
 
+Watchdog::Stage Watchdog::currentStage() const
+{
+    std::unique_lock<std::mutex> lock(Client::mutex());
+    return stages[mStage];
+}
+
 void Watchdog::stop()
 {
     if (mState == Running)
