@@ -6,7 +6,7 @@ const http = require("http");
 const path = require('path');
 const option = require('@jhanssen/options')({ prefix: 'fisk/scheduler',
                                               applicationPath: false,
-                                              additionalFiles: [ "/etc/xdg/fisk/scheduler.conf.override" ] });
+                                              additionalFiles: [ "scheduler.conf.override" ] });
 
 const port = option.int("port", 8097);
 const root = option("root", "/var/fisk");

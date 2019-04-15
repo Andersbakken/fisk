@@ -2,7 +2,7 @@
 
 const option = require('@jhanssen/options')({ prefix: 'fisk/daemon',
                                               applicationPath: false,
-                                              additionalFiles: [ "/etc/xdg/fisk/daemon.conf.override" ] });
+                                              additionalFiles: [ "fisk/daemon.conf.override" ] });
 const ws = require('ws');
 const os = require('os');
 const assert = require('assert');
