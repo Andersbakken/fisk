@@ -194,6 +194,7 @@ private:
 extern Getter<std::string> scheduler;
 extern Getter<std::string> socketFile;
 extern Getter<unsigned long long> daemonConnectTimeout;
+extern Getter<unsigned long long> slotAcquisitionTimeout;
 extern Getter<unsigned long long> schedulerConnectTimeout;
 extern Getter<unsigned long long> acquiredSlaveTimeout;
 extern Getter<unsigned long long> slaveConnectTimeout;

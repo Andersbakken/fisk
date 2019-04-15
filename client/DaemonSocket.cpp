@@ -216,7 +216,8 @@ bool DaemonSocket::waitForCppSlot()
 
 bool DaemonSocket::waitForCompileSlot(Select &select)
 {
-    while (!mHasCompileSlot && mState == Connected) {
+    const unsigned long long start = Client::mono();
+    while (!mHasCompileSlot && mState == Connected && Client::mono() - start < Config::slotAcquisitionTimeout) {
         select.exec();
     }
     return mHasCompileSlot;
