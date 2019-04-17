@@ -37,7 +37,7 @@ public:
     bool hasCompileSlot() const { return mHasCompileSlot; }
     bool waitForCompileSlot(Select &select);
     std::string error() const { return mError; }
-    void processJSON(const std::string &/*json*/) {}
+    void processJSON(const std::string &json);
 protected:
     // Socket
     virtual unsigned int mode() const override;

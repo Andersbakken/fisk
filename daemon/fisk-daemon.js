@@ -43,14 +43,21 @@ const cppSlots = new Slots(option.int('cpp-slots', Math.max(os.cpus().length * 2
 const compileSlots = new Slots(option.int('slots', Math.max(os.cpus().length, 1)), 'compile', debug);
 
 server.on('compile', compile => {
-    let hasCppSlot = false;
+    compile.on("dumpSlots", () => {
+        let ret = { cpp: cppSlots.dump(), compile: compileSlots.dump() };
+        if (debug)
+            console.log("sending dump", ret);
+
+        compile.send(ret);
+    });
+    let requestedCppSlot = false;
     compile.on('acquireCppSlot', () => {
         if (debug)
             console.log('acquireCppSlot');
 
-        assert(!hasCppSlot);
-        hasCppSlot = true;
-        cppSlots.acquire(compile.id, () => {
+        assert(!requestedCppSlot);
+        requestedCppSlot = true;
+        cppSlots.acquire(compile.id, {pid: compile.pid}, () => {
             // compile.send({ type: 'cppSlotAcquired' });
             compile.send(Constants.CppSlotAcquired);
         });
@@ -66,21 +73,21 @@ server.on('compile', compile => {
         if (debug)
             console.log('releaseCppSlot');
 
-        assert(hasCppSlot);
-        if (hasCppSlot) {
-            hasCppSlot = false;
+        assert(requestedCppSlot);
+        if (requestedCppSlot) {
+            requestedCppSlot = false;
             cppSlots.release(compile.id);
         }
     });
 
-    let hasCompileSlot = false;
+    let requestedCompileSlot = false;
     compile.on('acquireCompileSlot', () => {
         if (debug)
             console.log('acquireCompileSlot');
 
-        assert(!hasCompileSlot);
-        hasCompileSlot = true;
-        compileSlots.acquire(compile.id, () => {
+        assert(!requestedCompileSlot);
+        requestedCompileSlot = true;
+        compileSlots.acquire(compile.id, {pid: compile.pid}, () => {
             // compile.send({ type: 'compileSlotAcquired' });
             compile.send(Constants.CompileSlotAcquired);
         });
@@ -90,17 +97,19 @@ server.on('compile', compile => {
         if (debug)
             console.log('releaseCompileSlot');
 
-        assert(hasCompileSlot);
-        if (hasCompileSlot) {
-            hasCompileSlot = false;
+        assert(requestedCompileSlot);
+        if (requestedCompileSlot) {
+            requestedCompileSlot = false;
             compileSlots.release(compile.id);
         }
     });
 
     compile.on('end', () => {
-        if (hasCppSlot)
+        if (debug)
+            console.log("got end from", compile.id, compile.pid);
+        if (requestedCppSlot)
             cppSlots.release(compile.id);
-        if (hasCompileSlot)
+        if (requestedCompileSlot)
             compileSlots.release(compile.id);
     });
 });

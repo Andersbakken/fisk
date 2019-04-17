@@ -18,7 +18,7 @@ bool DaemonSocket::connect()
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    const std::string path = Config::socketFile;
+    const std::string path = Config::socket;
     if (path.size() + 1 > sizeof(addr.sun_path)) {
         ERROR("Socket path is too long %zu > %zu", path.size(), sizeof(addr.sun_path) - 1);
         mState = Error;
@@ -41,6 +41,11 @@ bool DaemonSocket::connect()
         mState = Error;
         return false;
     }
+
+    const pid_t pid = getpid();
+    static_assert(sizeof(pid) == 4, "pid_t must be 4 bytes");
+    const uint32_t networkOrder = htonl(pid);
+    mSendBuffer.append(reinterpret_cast<const char *>(&networkOrder), sizeof(networkOrder));
 
     int ret;
     EINTRWRAP(ret, ::connect(mFD, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)));
@@ -94,15 +99,15 @@ void DaemonSocket::onWrite()
         } while (err == EINTR);
 
         if (err == EINPROGRESS) {
-            DEBUG("Still connecting to socket %s", Config::socketFile.get().c_str());
+            DEBUG("Still connecting to socket %s", Config::socket.get().c_str());
             return;
         } else if (err && err != EISCONN) {
-            ERROR("Failed to connect to socket %s (%d %s)", Config::socketFile.get().c_str(), err, strerror(err));
+            ERROR("Failed to connect to socket %s (%d %s)", Config::socket.get().c_str(), err, strerror(err));
             mState = Error;
             return;
         }
 
-        DEBUG("Asynchronously connected to socket %s", Config::socketFile.get().c_str());
+        DEBUG("Asynchronously connected to socket %s", Config::socket.get().c_str());
         mState = Connected;
         if (mSendBuffer.size() - mSendBufferOffset == 0)
             return;
@@ -117,19 +122,19 @@ void DaemonSocket::onRead()
         ssize_t r;
         errno = 0;
         EINTRWRAP(r, ::read(mFD, buf, sizeof(buf)));
-        VERBOSE("Read from socket %s -> %ld (%d %s)", Config::socketFile.get().c_str(),
+        VERBOSE("Read from socket %s -> %ld (%d %s)", Config::socket.get().c_str(),
                 r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
 
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
                 break;
-            ERROR("Read error from socket %s %d %s", Config::socketFile.get().c_str(), errno, strerror(errno));
+            ERROR("Read error from socket %s %d %s", Config::socket.get().c_str(), errno, strerror(errno));
             mState = Error;
             break;
         }
 
         if (!r) {
-            DEBUG("Socket connection closed %s", Config::socketFile.get().c_str());
+            DEBUG("Socket connection closed %s", Config::socket.get().c_str());
             close();
             break;
         }
@@ -160,13 +165,13 @@ void DaemonSocket::write()
     do {
         ssize_t r;
         EINTRWRAP(r, ::write(mFD, mSendBuffer.c_str() + mSendBufferOffset, mSendBuffer.size() - mSendBufferOffset));
-        VERBOSE("Write to socket %s -> %zd (%d %s)", Config::socketFile.get().c_str(),
+        VERBOSE("Write to socket %s -> %zd (%d %s)", Config::socket.get().c_str(),
                 r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
                 break;
 
-            ERROR("Write error from socket %s %d %s", Config::socketFile.get().c_str(), errno, strerror(errno));
+            ERROR("Write error from socket %s %d %s", Config::socket.get().c_str(), errno, strerror(errno));
             mState = Error;
             break;
         }
@@ -243,6 +248,7 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
     size_t ret = 0;
     while (ret < len) {
         size_t used = 0;
+        // DEBUG("CHECKING MESSAGE TYPE %d", msg[ret]);
         switch (msg[ret]) {
         case CppSlotAcquired: {
             DEBUG("CppSlotAcquired");
@@ -257,11 +263,12 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
             used = 1;
             break;
         case JSONResponse:
-            DEBUG("JSONResponse");
+            DEBUG("JSONResponse len %zu", len - ret);
             if (ret + 4 < len) {
                 uint32_t msgLen;
                 memcpy(&msgLen, msg + ret + 1, 4);
-                msgLen = ntohl(len);
+                msgLen = ntohl(msgLen);
+                DEBUG("Read message ret %zu msgLen %u len %zu", ret, msgLen, len);
                 if (ret + 4 + msgLen < len) {
                     std::string json(msg + ret + 5, msgLen);
                     used += 1 + 4 + msgLen;
@@ -279,4 +286,11 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
         }
     }
     return ret;
+}
+
+void DaemonSocket::processJSON(const std::string &json)
+{
+    fwrite(json.c_str(), 1, json.size(), stdout);
+    fflush(stdout);
+    close();
 }

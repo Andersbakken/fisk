@@ -12,6 +12,7 @@ class Compile extends EventEmitter
         this.connection = conn;
         this.buffer = new ClientBuffer;
         this.messageLength =  0;
+        this.pid = undefined;
 
         this.connection.on('data', this._onData.bind(this));
         this.connection.on('end', () => {
@@ -35,8 +36,11 @@ class Compile extends EventEmitter
             } else {
                 let msg = Buffer.from(JSON.stringify(message), "utf8");
                 let header = Buffer.allocUnsafe(5);
-                header.writeUInt8(Constants.JSONResponse);
-                header.writeUInt32BE(msg.length);
+                header.writeUInt8(Constants.JSONResponse, 0);
+                header.writeUInt32BE(msg.length, 1);
+                if (this.debug) {
+                    console.log("Compile::send header", header, Constants.JSONResponse);
+                }
                 this.connection.write(header);
                 this.connection.write(msg);
             }
@@ -52,7 +56,19 @@ class Compile extends EventEmitter
         this.buffer.write(data);
         let available = this.buffer.available;
         if (this.debug)
-            console.log("Compile::_onData", data, "available", available, this.messageLength);
+            console.log("Compile::_onData", "id", this.id, "pid", this.pid,
+                        data, "available", available, this.messageLength);
+
+        if (!this.pid) {
+            if (available < 4)
+                return;
+
+            let pidBuffer = this.buffer.read(4);
+            available -= 4;
+            this.pid = pidBuffer.readUInt32BE();
+            if (this.debug)
+                console.log("Compile::_onData got pid", "id", this.id, "pid", this.pid);
+        }
 
         let emit = type => {
             if (this.debug)
@@ -63,7 +79,7 @@ class Compile extends EventEmitter
                 console.log("Discarded", read);
             }
             --available;
-            this.emit(type, {});
+            this.emit(type);
         };
 
         while (available) {
@@ -100,10 +116,13 @@ class Compile extends EventEmitter
             }
 
             let raw = this.buffer.read(this.messageLength);
+            available -= this.messageLength;
             this.messageLength = 0;
 
             try {
                 let msg = JSON.parse(raw.toString('utf8'));
+                if (this.debug)
+                    console.log("Got json message", msg);
                 // console.log("Got message", msg);
                 this.emit(msg.type, msg);
             } catch (err) {

@@ -15,6 +15,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
+#include <sys/prctl.h>
 #include "DaemonSocket.h"
 
 static unsigned long long preprocessedDuration = 0;
@@ -106,7 +107,7 @@ int main(int argc, char **argv)
     data.argv = argv;
     data.argc = argc;
     auto signalHandler = [](int signal) {
-        if (signal != SIGINT) {
+        if (signal != SIGINT && signal != SIGTERM) {
             fprintf(stderr, "fiskc: Caught signal %d\n", signal);
             void *buffer[64];
             const int count = backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));
@@ -115,9 +116,15 @@ int main(int argc, char **argv)
         }
         _exit(-signal);
     };
-    for (int signal : { SIGINT, SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
+    for (int signal : { SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV, SIGALRM, SIGTERM }) {
         std::signal(signal, signalHandler);
     }
+#ifdef __linux__
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+    if (getppid() == 1) { // parent already dead
+        return -SIGTERM;
+    }
+#endif
 
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
@@ -153,14 +160,16 @@ int main(int argc, char **argv)
 #endif
         }
     }
-    if (!Client::findCompiler(preresolved)) {
-        FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
-        return 107;
+    if (!Config::dumpSlots) {
+        if (!Client::findCompiler(preresolved)) {
+            FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
+            return 107;
+        }
+        DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
+              data.argv[0], preresolved.c_str(),
+              data.compiler.c_str(), data.resolvedCompiler.c_str(),
+              data.slaveCompiler.c_str());
     }
-    DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
-          data.argv[0], preresolved.c_str(),
-          data.compiler.c_str(), data.resolvedCompiler.c_str(),
-          data.slaveCompiler.c_str());
 
     DaemonSocket daemonSocket;
     if (!daemonSocket.connect()) {
@@ -177,16 +186,34 @@ int main(int argc, char **argv)
     }
 
     if (data.watchdog->timedOut()) {
-        ERROR("Have to run locally because we timed out connecting to daemon");
-        data.watchdog->stop();
-        Client::runLocal("daemon connect failure");
+        if (Config::dumpSlots) {
+            ERROR("Can't connect to daemon because of watchdog");
+            return 1;
+        } else {
+            ERROR("Have to run locally because we timed out connecting to daemon");
+            data.watchdog->stop();
+            Client::runLocal("daemon connect failure");
+        }
     }
 
     if (daemonSocket.state() != DaemonSocket::Connected) {
-        Client::runLocal("daemon connect failure 2");
+        if (Config::dumpSlots) {
+            ERROR("Can't connect to daemon because of connect failure");
+            return 1;
+        } else {
+            Client::runLocal("daemon connect failure 2");
+        }
     }
 
     data.watchdog->transition(Watchdog::ConnectedToDaemon);
+
+    if (Config::dumpSlots) {
+        daemonSocket.send("{ \"type\": \"dumpSlots\" }");
+        while (daemonSocket.state() == DaemonSocket::Connected && !data.watchdog->timedOut()) {
+            select.exec();
+        }
+        return daemonSocket.state() == DaemonSocket::Closed ? 0 : 1;
+    }
 
     auto runLocal = [&daemonSocket, &data, &select](const std::string &reason) {
         data.watchdog->stop();
