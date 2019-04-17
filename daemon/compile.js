@@ -109,7 +109,7 @@ class Compile extends EventEmitter
                     break;
                 default:
                     console.error("Bad data", this.buffer.peek(), "available", available);
-                    throw new Error("Got unexpected type " + this.buffer.peek();
+                    throw new Error("Got unexpected type " + this.buffer.peek());
                 }
             }
 
