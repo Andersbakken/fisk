@@ -107,10 +107,13 @@ class Compile extends EventEmitter
                     this.messageLength = this.buffer.read(4).readUInt32BE();
                     available -= 5;
                     break;
+                default:
+                    console.error("Bad data", this.buffer.peek(), "available", available);
+                    throw new Error("Got unexpected type " + this.buffer.peek();
                 }
             }
 
-            if (this.messageLength > available) {
+            if (!this.messageLength || this.messageLength > available) {
                 // console.log("Still waiting on data", this.messageLength, this.buffer.available);
                 break;
             }
