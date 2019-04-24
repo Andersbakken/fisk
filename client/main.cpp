@@ -15,7 +15,9 @@
 #include <cstring>
 #include <unistd.h>
 #include <csignal>
+#ifdef __linux__
 #include <sys/prctl.h>
+#endif
 #include "DaemonSocket.h"
 
 static unsigned long long preprocessedDuration = 0;
