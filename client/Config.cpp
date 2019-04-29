@@ -324,7 +324,7 @@ bool Config::init(int &argc, char **&argv)
         }
     }
 
-    for (const std::pair<std::string, GetterBase *> &getter : sGetters) {
+    for (const auto &getter : sGetters) {
         if (getter.second->mDone)
             continue;
         std::string key = getter.second->jsonKey();
@@ -386,7 +386,7 @@ void Config::usage(FILE *f)
             "Options:\n"
             "--------\n");
     int max = 0;
-    for (const std::pair<std::string, GetterBase *> &getter : sGetters) {
+    for (const auto &getter : sGetters) {
         max = std::max<int>(max, static_cast<int>(2 + 7 + getter.first.size() + 1 + 8 + 3 + 3));
     }
     fprintf(f, "  --help%*s%s (false)\n", max - 12, "", "Display this help (if argv0 is fiskc)");

@@ -225,7 +225,7 @@ bool WebSocket::requestUpgrade()
         DEBUG("Writing HTTP handshake");
         std::string extraHeaders;
         extraHeaders.reserve(1024);
-        for (const std::pair<std::string, std::string> &header : mHeaders) {
+        for (const auto &header : mHeaders) {
             extraHeaders += Client::format("%s: %s\r\n", header.first.c_str(), header.second.c_str());
         }
         const size_t reqHeaderSize = snprintf(reqHeader, sizeof(reqHeader),
