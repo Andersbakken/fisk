@@ -63,12 +63,6 @@ server.on('compile', compile => {
         });
     });
 
-    compile.on('error', err => {
-        if (debug) {
-            console.error('Got error from fiskc', err);
-        }
-    });
-
     compile.on('releaseCppSlot', () => {
         if (debug)
             console.log('releaseCppSlot');
@@ -104,13 +98,30 @@ server.on('compile', compile => {
         }
     });
 
+    compile.on('error', err => {
+        if (debug)
+            console.error('Got error from fiskc', compile.id, compile.pid, err);
+        if (requestedCppSlot) {
+            requestedCppSlot = false;
+            cppSlots.release(compile.id);
+        }
+        if (requestedCompileSlot) {
+            requestedCompileSlot = false;
+            compileSlots.release(compile.id);
+        }
+    });
+
     compile.on('end', () => {
         if (debug)
             console.log("got end from", compile.id, compile.pid);
-        if (requestedCppSlot)
+        if (requestedCppSlot) {
+            requestedCppSlot = false;
             cppSlots.release(compile.id);
-        if (requestedCompileSlot)
+        }
+        if (requestedCompileSlot) {
+            requestedCompileSlot = false;
             compileSlots.release(compile.id);
+        }
     });
 });
 
