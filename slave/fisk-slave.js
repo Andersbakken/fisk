@@ -486,13 +486,18 @@ server.on("job", job => {
         op: undefined,
         done: false,
         aborted: false,
+        started: false,
         heartbeatTimer: undefined,
         buffers: [],
         stdout: "",
         stderr: "",
         start: function() {
             let job = this.job;
+            if (j.aborted)
+                return;
             if (getFromCache(job, err => {
+                if (j.aborted)
+                    return;
                 if (err) {
                     console.error("cache failed, let the client handle doing it itself");
                     job.close();
@@ -523,6 +528,7 @@ server.on("job", job => {
                 j.objectCache = true;
                 return;
             }
+            j.started = true;
             client.send("jobStarted", {
                 id: job.id,
                 sourceFile: job.sourceFile,
@@ -640,7 +646,8 @@ server.on("job", job => {
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
-            client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
+            if (j.started)
+                client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
             startPending();
         }
     });
