@@ -53,7 +53,7 @@ if (pwd) {
 }
 
 process.on("error", error => {
-    console.error(`Got process error ${error}. Going down`);
+    console.error(`Got process error ${error} ${JSON.stringify(argv)}. Going down`);
     process.exit();
 });
 
