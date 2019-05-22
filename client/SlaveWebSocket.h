@@ -48,7 +48,7 @@ public:
 
         if (type == "response") {
             const auto success = msg["success"];
-            if (success.is_bool() && !success.bool_value()) {
+            if (!success.is_bool() || !success.bool_value()) {
                 ERROR("Slave had some issue. Build locally");
                 Client::data().watchdog->stop();
                 error = "slave run failure";
