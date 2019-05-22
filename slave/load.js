@@ -10,6 +10,9 @@ function cpuAverage() {
     let totalIdle = 0, totalTick = 0;
     const cpus = os.cpus();
 
+    if (!(cpus instanceof Array))
+        return undefined;
+
     //Loop through CPU cores
     for(let i = 0, len = cpus.length; i < len; i++) {
 
@@ -36,17 +39,19 @@ function measure() {
     //Grab second Measure
     const endMeasure = cpuAverage();
 
-    //Calculate the difference in idle and total time between the measures
-    const idleDifference = endMeasure.idle - startMeasure.idle;
-    const totalDifference = endMeasure.total - startMeasure.total;
+    let percentageCPU;
+    if (endMeasure && startMeasure) {
+        //Calculate the difference in idle and total time between the measures
+        const idleDifference = endMeasure.idle - startMeasure.idle;
+        const totalDifference = endMeasure.total - startMeasure.total;
+        //Calculate the average percentage CPU usage
+        percentageCPU = 100 - ~~(100 * idleDifference / totalDifference);
+    }
 
     //Next measure will diff against this measure
     startMeasure = endMeasure;
 
-    //Calculate the average percentage CPU usage
-    const percentageCPU = 100 - ~~(100 * idleDifference / totalDifference);
-
-    return percentageCPU / 100;
+    return percentageCPU ? percentageCPU / 100 : undefined;
 };
 
 class Load extends EventEmitter {
@@ -63,7 +68,9 @@ class Load extends EventEmitter {
         if (this._interval !== undefined)
             throw new Error("Interval already running");
         this._interval = setInterval(() => {
-            this.emit("data", measure());
+            let m = measure();
+            if (m)
+                this.emit("data", m);
         }, interval);
     }
 
