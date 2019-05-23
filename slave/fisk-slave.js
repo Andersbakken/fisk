@@ -568,16 +568,8 @@ server.on("job", job => {
                     return;
                 }
 
-                let contents;
-                if (j.stderr.indexOf(/error trying to exec.*execvp/) != -1) {
-                    event.success = false;
-                    contents = [];
-                    if (client)
-                        client.send("log", { message: `Bad error: stderr: ${j.stderr} ip: ${job.ip} name: ${job.name} sourceFile: ${job.sourceFile}` });
-                } else {
-                    // this can't be async, the directory is removed after the event is fired
-                    contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
-                }
+                // this can't be async, the directory is removed after the event is fired
+                let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
                 let response = {
                     type: "response",
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
