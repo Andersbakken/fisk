@@ -280,11 +280,11 @@ bool Config::init(int &argc, char **&argv)
 
     if (environ) {
         for (size_t j=0; environ[j]; ++j) {
-            char *env = environ[j];
+            const char *env = environ[j];
             if (strncmp(env, "FISK_", 5))
                 continue;
 
-            char *eq = strchr(env, '=');
+            const char *eq = strchr(env, '=');
             std::string key, value;
             if (!eq) {
                 key = env + 5;

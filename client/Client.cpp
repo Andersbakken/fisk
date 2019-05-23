@@ -478,7 +478,7 @@ void Client::runLocal(const std::string &reason)
     } else if (pid == 0) { // child
         run();
         exit(102);
-    } else { // paren
+    } else { // parent
         int ret, status;
         EINTRWRAP(ret, waitpid(pid, &status, 0));
         writeStatistics();
