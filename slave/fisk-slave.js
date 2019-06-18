@@ -2,7 +2,7 @@
 
 const option = require('@jhanssen/options')({ prefix: 'fisk/slave',
                                               applicationPath: false,
-                                              additionalFiles: [ "slave.conf.override" ] });
+                                              additionalFiles: [ "fisk/slave.conf.override" ] });
 
 const request = require("request");
 const ws = require('ws');
