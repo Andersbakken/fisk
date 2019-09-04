@@ -11,6 +11,7 @@ const Server = require("./server");
 const Client = require("./client");
 const Compile = require("./compile");
 const bytes = require('bytes');
+const parse_duration = require('parse-duration');
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
@@ -38,6 +39,35 @@ process.on('uncaughtException', err => {
 });
 
 const debug = option("debug");
+
+let restartOnInactivity = option("restart-on-inactivity");
+if (typeof restartOnInactivity === 'string')
+    restartOnInactivity = parse_duration(restartOnInactivity);
+
+let shutdownTimer;
+function restartShutdownTimer()
+{
+    if (restartOnInactivity > 0) {
+        if (shutdownTimer)
+            clearTimeout(shutdownTimer);
+        function shutdownNow()
+        {
+            console.log("shutting down now due to inactivity");
+            // child_process.exec("shutdown -h now");
+        }
+        if (restartOnInactivity <= 10000) {
+            shutdownTimer = setTimeout(shutdownNow, restartOnInactivity);
+        } else {
+            shutdownTimer = setTimeout(() => {
+                console.log("shutting down in 10 seconds due to inactivity");
+                shutdownTimer = setTimeout(shutdownNow, 10000);
+            }, restartOnInactivity - 10000);
+        }
+    }
+}
+
+if (restartOnInactivity)
+    restartShutdownTimer();
 
 let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
 if (ports.length) {
@@ -417,6 +447,7 @@ client.on("requestEnvironments", message => {
 });
 
 client.on("connect", () => {
+    restartShutdownTimer();
     console.log("connected");
     if (connectInterval) {
         clearInterval(connectInterval);
@@ -470,6 +501,7 @@ function startPending()
 }
 
 server.on("job", job => {
+    restartShutdownTimer();
     let vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);

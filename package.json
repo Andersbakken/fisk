@@ -25,10 +25,12 @@
     "lowdb": "^1.0.0",
     "minimist": "^1.2.0",
     "mktemp": "^0.4.0",
+    "parse-duration": "^0.1.1",
     "posix": "Andersbakken/node-posix#node12fix",
     "prettysize": "^2.0.0",
     "random-words": "^1.1.0",
     "request": "^2.88.0",
+    "wake_on_lan": "^1.0.0",
     "ws": "^5.1.1"
   }
 }
