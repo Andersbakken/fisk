@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@jhanssen/options": "^1.0.12",
+    "@jhanssen/options": "^1.0.18",
     "fs-extra": "^7.0.1",
     "minimist": "^1.2.0"
   }

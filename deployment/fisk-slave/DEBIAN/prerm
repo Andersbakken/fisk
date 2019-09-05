@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mount | grep --quiet /mnt/fisk_objectcache_ram_drive && umount /mnt/fisk_objectcache_ram_drive
+rm -rf /mnt/fisk_objectcache_ram_drive
 rm -rf /var/fisk/slave/data
 sudo service fisk-slave stop
 npm  --unsafe-perm uninstall -g @andersbakken/fisk

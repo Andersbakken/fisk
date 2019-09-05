@@ -1,0 +1,11 @@
+cd /var/fisk/daemon
+sudo -H npm install --unsafe-perm @andersbakken/fisk
+mv /usr/local/bin/fiskc.linux /usr/local/bin/fiskc
+rm /usr/local/bin/fiskc.osx
+if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
+   sudo systemctl enable fisk-daemon.service
+   sudo service fisk-daemon start
+fi
+
+mkdir -p /var/fisk/client/compilers
+chmod 777 /var/fisk/client/compilers

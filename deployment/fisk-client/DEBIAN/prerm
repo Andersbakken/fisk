@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
+    sudo service fisk-daemon stop
+    sudo systemctl disable fisk-slave.service
+fi
+if [ "$1" != "upgrade" ]; then
+    rm -rf /var/fisk/client/compilers
+fi
+rm -rf /usr/local/bin/fiskc
+rm -rf /var/fisk/daemon/node_modules
+rm -rf /var/fisk/daemon/data
+rm -f /var/fisk/daemon/package-lock.json
+rm -f /var/fisk/daemon/socket
+rm -rf /var/fisk/daemon/version

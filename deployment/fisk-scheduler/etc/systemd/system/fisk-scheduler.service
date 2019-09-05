@@ -4,8 +4,9 @@ Wants=network.target
 
 [Service]
 User=root
-ExecStart=/usr/bin/env node /var/fisk/scheduler/run-fisk-scheduler.js --max_old_space_size=8192
+ExecStart=/var/fisk/scheduler/run-fisk-scheduler.js
 Restart=always
+LimitNOFILE=16384
 
 [Install]
 WantedBy=multi-user.target

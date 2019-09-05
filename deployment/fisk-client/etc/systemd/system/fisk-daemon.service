@@ -1,0 +1,13 @@
+[Unit]
+Description=Fisk daemon, the distributed compile system
+Wants=network.target
+
+[Service]
+User=root
+Restart=always
+ExecStart=/var/fisk/daemon/run-fisk-daemon.sh
+
+[Install]
+WantedBy=multi-user.target
+
+
