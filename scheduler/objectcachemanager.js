@@ -81,7 +81,7 @@ class ObjectCacheManager extends EventEmitter
 
     addNode(node, md5s)
     {
-        console.log("adding object cache node", node.ip + ":" + node.port, node.name, node.hostname, md5s.length);
+        console.log("adding node", node.ip + ":" + node.port, md5s.length);
         if (this.byNode.get(node)) {
             console.log("We already have", node.ip + ":" + node.port);
             return;

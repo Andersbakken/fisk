@@ -18,17 +18,6 @@ const Peak = require('./peak');
 const ObjectCacheManager = require('./objectcachemanager');
 const compareVersions = require('compare-versions');
 const humanizeDuration = require('humanize-duration');
-const wol = require('wake_on_lan');
-let wolSlaves = {};
-(option("wake-on-lan-slaves") || []).forEach(slave => {
-    if (!slave.name || !slave.mac) {
-        console.error("Bad wol, missing name or mac address");
-    } else if (slave.name in wolSlaves) {
-        console.error(`Duplicate name for wol-slave ${JSON.stringify(slave)}`);
-    } else {
-        wolSlaves[slave.name] = { mac: slave.mac, connected: false, address: slave.address || "255.255.255.255" };
-    }
-});
 
 const clientMinimumVersion = "3.1.39";
 const serverStartTime = Date.now();
@@ -61,41 +50,6 @@ try {
 }
 
 const slaves = {};
-let lastWol = 0;
-function sendWols()
-{
-    const now = Date.now();
-    // console.log("sendWols", now, lastWol, now - lastWol);
-    if (now - lastWol < 60000)
-        return;
-
-    lastWol = now;
-    let byName;
-    for (let name in wolSlaves) {
-        const wolSlave = wolSlaves[name];
-        if (wolSlave.connected)
-            continue;
-        if (!byName) {
-            byName = {};
-            for (let key in slaves) {
-                const slave = slaves[key];
-                if (slave.name)
-                    byName[slave.name] = slave;
-            }
-        }
-        if (!(name in byName)) {
-            wol.wake(wolSlave.mac, error => {
-                console.log("sending wol", JSON.stringify(wolSlave));
-                if (error) {
-                    console.error(`Failed to wol slave: ${JSON.stringify(wolSlave)}: ${error}`);
-                }
-            });
-        } else {
-            console.log(wolSlave, "is already connected");
-        }
-    }
-}
-
 const monitors = [];
 let slaveCount = 0;
 let activeJobs = 0;
@@ -274,9 +228,6 @@ function slaveToMonitorInfo(slave, type)
 
 function insertSlave(slave) {
     slaves[slaveKey(slave)] = slave;
-    if (slave.name && slave.name in wolSlaves) {
-        wolSlaves[slave.name].connected = true;
-    }
     ++slaveCount;
     capacity += slave.slots;
     if (monitors.length) {
@@ -313,11 +264,6 @@ function removeSlave(slave) {
     --slaveCount;
     capacity -= slave.slots;
     delete slaves[slaveKey(slave)];
-    if (slave.name && slave.name in wolSlaves) {
-        lastWol = 0; // lets recussitate him right away!
-        wolSlaves[slave.name].connected = false;
-    }
-
     if (monitors.length) {
         const info = slaveToMonitorInfo(slave, "slaveRemoved");
         if (monitorsLog)
@@ -327,6 +273,10 @@ function removeSlave(slave) {
         });
     }
 
+}
+
+function findSlave(ip, port) {
+    return slaves(slaveKey(ip, port));
 }
 
 function purgeEnvironmentsToMaxSize()
@@ -493,8 +443,7 @@ server.on("listen", app => {
             cacheHits: percentage(objectCache ? objectCache.hits : 0),
             uptimeMS: now - serverStartTime,
             uptime: humanizeDuration(now - serverStartTime),
-            serverStartTime: new Date(serverStartTime).toString(),
-            wolSlaves: wolSlaves
+            serverStartTime: new Date(serverStartTime).toString()
         };
         res.send(JSON.stringify(obj, null, 4) + "\n");
     });
@@ -592,16 +541,13 @@ function formatDate(date)
 }
 
 function addLogFile(log, cb) {
-    try {
-        fs.writeFileSync(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents, cb);
-    } catch (err) {
-    }
+    fs.writeFile(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents, cb);
 }
 
 server.on("slave", slave => {
     if (compareVersions(schedulerNpmVersion, slave.npmVersion) >= 1) {
         console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been at least: ${schedulerNpmVersion}`);
-        slave.send({ type: "version_mismatch", required_version: schedulerNpmVersion, code: 1 });
+        slave.send({ type: "quit" });
         return;
     }
     slave.activeClients = 0;
@@ -756,7 +702,6 @@ server.on("clientVerify", clientVerify => {
 
 let semaphoreMaintenanceTimers = {};
 server.on("compile", compile => {
-    sendWols();
     compile.on("log", event => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
