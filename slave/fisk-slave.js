@@ -315,7 +315,7 @@ client.on("version_mismatch", message => {
     const versionFile = option("npm-version-file");
     if (versionFile) {
         try {
-            fs.writeFileSync(versionFile, message.required_version);
+            fs.writeFileSync(versionFile, "@" + message.required_version);
         } catch (err) {
             console.error("Failed to write version file", versionFile, err);
         }
