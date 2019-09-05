@@ -307,7 +307,20 @@ client.on("quit", message => {
             console.error("Failed to remove environments", environmentsRoot);
         }
     }
-    process.exit(message.code);
+    process.exit(message.code || 0);
+});
+
+client.on("version_mismatch", message => {
+    console.log(`We have the wrong version. We have ${client.npmVersion} but we need ${message.required_version}`);
+    const versionFile = option("npm-version-file");
+    if (versionFile) {
+        try {
+            fs.writeFileSync(versionFile, message.required_version);
+        } catch (err) {
+            console.error("Failed to write version file", versionFile, err);
+        }
+    }
+    process.exit(message.code || 0);
 });
 
 client.on("clearObjectCache", () => {

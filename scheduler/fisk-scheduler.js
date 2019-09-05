@@ -601,7 +601,7 @@ function addLogFile(log, cb) {
 server.on("slave", slave => {
     if (compareVersions(schedulerNpmVersion, slave.npmVersion) >= 1) {
         console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been at least: ${schedulerNpmVersion}`);
-        slave.send({ type: "quit" });
+        slave.send({ type: "version_mismatch", required_version: schedulerNpmVersion, code: 1 });
         return;
     }
     slave.activeClients = 0;
