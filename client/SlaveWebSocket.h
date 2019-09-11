@@ -13,7 +13,7 @@ public:
     virtual void onConnected() override;
     virtual void onMessage(MessageType messageType, const void *data, size_t len) override
     {
-        DEBUG("GOT MESSAGE %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
+        DEBUG("Got message %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
 
         if (messageType == WebSocket::Binary) {
             handleResponseBinary(data, len);

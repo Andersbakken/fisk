@@ -63,7 +63,7 @@ class VM extends EventEmitter
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         let gotReady = false;
         this.child.on('message', msg => {
-            // console.log("GOT MESSAGE", msg);
+            // console.log("Got message", msg);
             switch (msg.type) {
             case 'ready':
                 gotReady = true;

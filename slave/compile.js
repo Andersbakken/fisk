@@ -181,7 +181,7 @@ class Compile extends EventEmitter {
 
         // debug = true;
         if (debug)
-            console.log("CALLING", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
+            console.log("Calling", argv0, compiler, args.map(x => '"' + x + '"').join(" "));
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }

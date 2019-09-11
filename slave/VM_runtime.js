@@ -1,4 +1,6 @@
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const posix = require('posix');
 const Compile = require('./compile');
 
@@ -57,6 +59,53 @@ process.on("error", error => {
     process.exit();
 });
 
+let libDirs = [];
+const mac = os.type() === "Darwin";
+
+function isLibrary(file)
+{
+    if (file == "ld.so.conf || file == ld.so.cache")
+        return false;
+    const suffix = path.extname(file);
+    if (mac)
+        return suffix == ".dylib";
+
+    // console.log("got file", suffix, file);
+    if (suffix == ".so") {
+        return true;
+    }
+    return file.indexOf(".so.") != -1;
+}
+
+function findLibraries(dir)
+{
+    const files = fs.readdirSync(dir);
+    // console.log("findLibraries", dir, files.length);
+    let found = false;
+    files.forEach(file => {
+        let stat;
+        try {
+            stat = fs.statSync(path.join(dir, file));
+        } catch (err) {
+            console.error("Got error", err);
+            return;
+        }
+
+
+        if (stat.isDirectory()) {
+            findLibraries(path.join(dir, file));
+        } else if (!found && stat.isFile() && isLibrary(file)) {
+            found = true;
+            libDirs.push(dir);
+        }
+    });
+}
+
+findLibraries("/");
+console.log("Got lib directories", argv.root, libDirs);
+if (libDirs.length) {
+    process.env[os.type() == "Linux" ? "LD_LIBRARY_PATH" : "DYLD_LIBRARY_PATH"] = libDirs.join(":");
+}
 setTimeout(() => { // hack
     try {
         send({type: "ready"});

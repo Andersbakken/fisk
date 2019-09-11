@@ -313,7 +313,7 @@ class Server extends EventEmitter {
                     client.error("Unable to parse string message as JSON");
                     return;
                 }
-                // console.log("GOT MESSAGE", json);
+                // console.log("Got message", json);
                 if ("type" in json) {
                     client.emit(json.type, json);
                 } else {
