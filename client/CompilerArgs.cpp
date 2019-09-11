@@ -192,6 +192,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             return nullptr;
         }
 
+        if (arg == "-fno-integrated-as") {
+            DEBUG("-fno-integrated-as, running local");
+            *localReason = Local_NoIntegratedAs;
+            return nullptr;
+        }
+
         if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
             DEBUG("%s, running local", arg.c_str());
             *localReason = Local_Preprocess;
@@ -577,6 +583,7 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     case Local_StdinInput: return "StdinInput";
     case Local_NoSources: return "NoSources";
     case Local_Link: return "Link";
+    case Local_NoIntegratedAs: return "NoIntegratedAs";
     }
     assert(0);
     return nullptr;

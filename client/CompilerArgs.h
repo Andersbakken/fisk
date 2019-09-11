@@ -70,7 +70,8 @@ struct CompilerArgs
         Local_MultiSource,
         Local_StdinInput,
         Local_NoSources,
-        Local_Link
+        Local_Link,
+        Local_NoIntegratedAs
     };
     static const char *localReasonToString(LocalReason reason);
     static std::shared_ptr<CompilerArgs> create(const std::vector<std::string> &args, LocalReason *reason);
