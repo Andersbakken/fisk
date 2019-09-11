@@ -185,7 +185,8 @@ class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
-        let proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
+        const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
+        const proc = child_process.spawn(compiler, args, { cwd: dir, maxBuffer: 1024 * 1024 * 16 });
         this.proc = proc;
         proc.stdout.setEncoding('utf8');
         proc.stderr.setEncoding('utf8');
