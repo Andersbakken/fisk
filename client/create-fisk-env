@@ -35,11 +35,11 @@ usage ()
 
 is_contained ()
 {
-  case " $target_files " in
-    *" $1 "* ) return 0 ;;
-    *"=$1 "* ) return 0;;
-    * ) return 1 ;;
-  esac
+    case " $target_files " in
+        *" $1 "* ) return 0 ;;
+        *"=$1 "* ) return 0;;
+        * ) return 1 ;;
+    esac
 }
 
 # returns abs path to filedir
@@ -78,77 +78,77 @@ resolve_path()
 # This could use realpath, but that's reportedly not that widely available.
 convert_path_cdup ()
 {
-  local filename="$1"
-  local directory=$(dirname $filename)
-  local fixed_directory=$(cd "$directory" >/dev/null && pwd)
-  echo ${fixed_directory}/$(basename $filename)
+    local filename="$1"
+    local directory=$(dirname $filename)
+    local fixed_directory=$(cd "$directory" >/dev/null && pwd)
+    echo ${fixed_directory}/$(basename $filename)
 }
 
 add_file ()
 {
-  local name="$1"
-  local path="$1";
-  if test -n "$2"; then
-    name="$2"
-  fi
-  test -z "$name" && return
-  path=$(resolve_path $path)
-  name=$(convert_path_cdup $name)
-  if test -n "$stripprefix"; then
-    name=$(echo $name | sed "s#$stripprefix#/usr#" )
-  fi
-  toadd="$name=$path"
-  if test "$name" = "$path"; then
-    toadd=$path
-  fi
-  is_contained "$toadd" && return
-  echo "adding file $toadd"
-  target_files="$target_files $toadd"
-  if test -x "$path"; then
-    # Only call ldd when it makes sense
-    if file -L "$path" | grep 'ELF' > /dev/null 2>&1; then
-    if ! file -L "$path" | grep 'static' > /dev/null 2>&1; then
-       # ldd now outputs ld as /lib/ld-linux.so.xx on current nptl based glibc
-        # this regexp parse the outputs like:
-        # ldd /usr/bin/gcc
-        #         linux-gate.so.1 =>  (0xffffe000)
-        #         libc.so.6 => /lib/tls/libc.so.6 (0xb7e81000)
-        #         /lib/ld-linux.so.2 (0xb7fe8000)
-        # covering both situations ( with => and without )
-           for lib in $(ldd "$path" | sed -n 's,^[^/]*\(/[^ ]*\).*,\1,p'); do
-          test -f "$lib" || continue
-          # Check wether the same library also exists in the parent directory,
-          # and prefer that on the assumption that it is a more generic one.
-          local baselib=$(echo "$lib" | sed 's,\(/[^/]*\)/.*\(/[^/]*\)$,\1\2,')
-          test -f "$baselib" && lib=$baselib
-              add_file "$lib"
-           done
-        fi
-    elif test "$is_darwin" = 1; then
-          # this regexp parse the outputs like:
-          # $ otool -L /usr/llvm-gcc-4.2/libexec/gcc/i686-apple-darwin11/4.2.1/cc1
-          #         @executable_path/libllvmgcc.dylib
-          #         /usr/lib/libiconv.2.dylib
-          #         /usr/lib/libSystem.B.dylib
-          #         /usr/lib/libstdc++.6.dylib
-          for lib in $(otool -L "$path" | sed -n 's,^[^/@]*\([/@][^ ]*\).*,\1,p'); do
-            local libinstall=""
-            if test "${lib%%/*}" = "@executable_path"; then
-              # Installs libs like @executable_path/libllvmgcc.dylib
-              # that contains @executable_path in its path in $(dirname ${name})
-              # (the same install path of the executable program)
-              libinstall="${name%/*}${lib#@executable_path}"
-              lib="${path%/*}${lib#@executable_path}"
-            fi
-        test -f "$lib" || continue
-        # Check wether the same library also exists in the parent directory,
-        # and prefer that on the assumption that it is a more generic one.
-        local baselib=$(echo "$lib" | sed 's,\(/[^/]*\)/.*\(/[^/]*\)$,\1\2,')
-        test -f "$baselib" && lib=$baselib
-            add_file "$lib" "$libinstall"
-         done
+    local name="$1"
+    local path="$1";
+    if test -n "$2"; then
+        name="$2"
     fi
-  fi
+    test -z "$name" && return
+    path=$(resolve_path $path)
+    name=$(convert_path_cdup $name)
+    if test -n "$stripprefix"; then
+        name=$(echo $name | sed "s#$stripprefix#/usr#" )
+    fi
+    toadd="$name=$path"
+    if test "$name" = "$path"; then
+        toadd=$path
+    fi
+    is_contained "$toadd" && return
+    echo "adding file $toadd"
+    target_files="$target_files $toadd"
+    if test -x "$path"; then
+        # Only call ldd when it makes sense
+        if file -L "$path" | grep 'ELF' > /dev/null 2>&1; then
+            if ! file -L "$path" | grep 'static' > /dev/null 2>&1; then
+                # ldd now outputs ld as /lib/ld-linux.so.xx on current nptl based glibc
+                # this regexp parse the outputs like:
+                # ldd /usr/bin/gcc
+                #         linux-gate.so.1 =>  (0xffffe000)
+                #         libc.so.6 => /lib/tls/libc.so.6 (0xb7e81000)
+                #         /lib/ld-linux.so.2 (0xb7fe8000)
+                # covering both situations ( with => and without )
+                for lib in $(ldd "$path" | sed -n 's,^[^/]*\(/[^ ]*\).*,\1,p'); do
+                    test -f "$lib" || continue
+                    # Check whether the same library also exists in the parent directory,
+                    # and prefer that on the assumption that it is a more generic one.
+                    local baselib=$(echo "$lib" | sed 's,\(/[^/]*\)/.*\(/[^/]*\)$,\1\2,')
+                    test -f "$baselib" && lib=$baselib
+                    add_file "$lib"
+                done
+            fi
+        elif test "$is_darwin" = 1; then
+            # this regexp parse the outputs like:
+            # $ otool -L /usr/llvm-gcc-4.2/libexec/gcc/i686-apple-darwin11/4.2.1/cc1
+            #         @executable_path/libllvmgcc.dylib
+            #         /usr/lib/libiconv.2.dylib
+            #         /usr/lib/libSystem.B.dylib
+            #         /usr/lib/libstdc++.6.dylib
+            for lib in $(otool -L "$path" | sed -n 's,^[^/@]*\([/@][^ ]*\).*,\1,p'); do
+                local libinstall=""
+                if test "${lib%%/*}" = "@executable_path"; then
+                    # Installs libs like @executable_path/libllvmgcc.dylib
+                    # that contains @executable_path in its path in $(dirname ${name})
+                    # (the same install path of the executable program)
+                    libinstall="${name%/*}${lib#@executable_path}"
+                    lib="${path%/*}${lib#@executable_path}"
+                fi
+                test -f "$lib" || continue
+                # Check wether the same library also exists in the parent directory,
+                # and prefer that on the assumption that it is a more generic one.
+                local baselib=$(echo "$lib" | sed 's,\(/[^/]*\)/.*\(/[^/]*\)$,\1\2,')
+                test -f "$baselib" && lib=$baselib
+                add_file "$lib" "$libinstall"
+            done
+        fi
+    fi
 }
 
 # Search and add file to the tarball file.
@@ -189,7 +189,7 @@ search_addfile()
 
 # backward compat
 if test "$1" = "--respect-path"; then
-  shift
+    shift
 fi
 
 if test "$1" = "--gcc"; then
@@ -372,7 +372,7 @@ if test -n "$clang"; then
     fi
     clangincludes=$(dirname $(abs_path $clangincludes))
     for file in $(find $clangincludes -type f); do
-      add_file "$file"
+        add_file "$file"
     done
 fi
 
@@ -400,14 +400,14 @@ fi
 # for ldconfig -r to work, ld.so.conf must not contain relative paths
 # in include directives. Make them absolute.
 if test -f /etc/ld.so.conf; then
-  tmp_ld_so_conf=$(mktemp /tmp/icecc_ld_so_confXXXXXX)
-  while read directive path; do
-    if [ "$directive" = "include" -a "${path:0:1}" != "/" ]; then
-      path="/etc/$path"
-    fi
-    echo "$directive $path"
-  done </etc/ld.so.conf >$tmp_ld_so_conf
-  add_file $tmp_ld_so_conf /etc/ld.so.conf
+    tmp_ld_so_conf=$(mktemp /tmp/icecc_ld_so_confXXXXXX)
+    while read directive path; do
+        if [ "$directive" = "include" -a "${path:0:1}" != "/" ]; then
+            path="/etc/$path"
+        fi
+        echo "$directive $path"
+    done </etc/ld.so.conf >$tmp_ld_so_conf
+    add_file $tmp_ld_so_conf /etc/ld.so.conf
 fi
 
 # special case for weird multilib setups
@@ -417,49 +417,49 @@ done
 
 new_target_files=
 for i in $target_files; do
- case $i in
-   *=/*)
-    target=$(echo $i | cut -d= -f1)
-    path=$(echo $i | cut -d= -f2)
-    ;;
-   *)
-    path=$i
-    target=$i
-    ;;
-  esac
-  mkdir -p $tempdir/$(dirname $target)
-  cp -p $path $tempdir/$target
-  target=$(echo $target | cut -b2-)
-  new_target_files="$new_target_files $target"
+    case $i in
+        *=/*)
+            target=$(echo $i | cut -d= -f1)
+            path=$(echo $i | cut -d= -f2)
+            ;;
+        *)
+            path=$i
+            target=$i
+            ;;
+    esac
+    mkdir -p $tempdir/$(dirname $target)
+    cp -p $path $tempdir/$target
+    target=$(echo $target | cut -b2-)
+    new_target_files="$new_target_files $target"
 done
 
 if test -x /sbin/ldconfig -a "$is_linux" = 1; then
-   mkdir -p $tempdir/let/cache/ldconfig
-   /sbin/ldconfig -r $tempdir
-   new_target_files="$new_target_files etc/ld.so.cache"
+    mkdir -p $tempdir/let/cache/ldconfig
+    /sbin/ldconfig -r $tempdir
+    new_target_files="$new_target_files etc/ld.so.cache"
 fi
 
 md5sum=NONE
 for file in /usr/bin/md5sum /bin/md5 /usr/bin/md5 /sbin/md5; do
-   if test -x $file; then
-    md5sum=$file
+    if test -x $file; then
+        md5sum=$file
         break
-   fi
+    fi
 done
 
 # now sort the files in order to make the md5sums independent
 # of ordering
 target_files=$(for i in $new_target_files; do echo $i; done | sort)
 md5=$(for i in $target_files; do $md5sum $tempdir/$i; done | sed -e 's/ .*$//' | $md5sum | sed -e 's/ .*$//') || {
-  echo "Couldn't compute MD5 sum."
-  exit 2
+    echo "Couldn't compute MD5 sum."
+    exit 2
 }
 echo "creating $md5.tar.gz"
 mydir=$(pwd)
 cd $tempdir
 tar -czh --numeric-owner -f "$mydir/$md5".tar.gz $target_files || {
-  echo "Couldn't create archive"
-  exit 3
+    echo "Couldn't create archive"
+    exit 3
 }
 cd ..
 rm -rf $tempdir
