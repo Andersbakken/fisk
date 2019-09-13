@@ -64,9 +64,9 @@ public:
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
             const std::string stdErr = msg["stderr"].string_value();
             if (!stdErr.empty()) {
-                fprintf(stderr, "error: Fisk %s ran on slave %s\n",
-                        data.compilerArgs->sourceFile().c_str(),
-                        url().c_str());
+                fprintf(stderr, "error: Fisk slave %s used for compiling %s\n",
+                        url().c_str(),
+                        data.compilerArgs->sourceFile().c_str());
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
             }
 
