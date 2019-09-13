@@ -165,11 +165,13 @@ std::string Client::findInPath(const std::string &fn)
 
 bool Client::findCompiler(const std::string &preresolved)
 {
+    Client::Data &data = Client::data();
+
     // printf("PATH %s\n", path);
     std::string exec;
     if (preresolved.empty()) {
         std::string fn;
-        parsePath(sData.argv[0], &fn, nullptr);
+        parsePath(data.argv[0], &fn, nullptr);
         exec = findInPath(fn);
     } else if (preresolved[0] != '/') {
         exec = findInPath(preresolved);
@@ -183,23 +185,23 @@ bool Client::findCompiler(const std::string &preresolved)
     std::string base;
     parsePath(exec, &base, nullptr);
     if (base.find("g++") != std::string::npos || base.find("gcc") != std::string::npos) {
-        sData.resolvedCompiler = exec;
+        data.resolvedCompiler = exec;
     } else {
-        resolveSymlink(exec, [](const std::string &p) -> CheckResult {
+        resolveSymlink(exec, [&data](const std::string &p) -> CheckResult {
             std::string b;
             parsePath(p, &b, nullptr);
             // Log::debug("GOT BASE %s", base.c_str());
             if (b.find("g++") != std::string::npos || b.find("gcc") != std::string::npos) {
-                sData.resolvedCompiler = p;
+                data.resolvedCompiler = p;
                 return Stop;
             }
             return Continue;
         });
     }
-    if (sData.resolvedCompiler.empty())
-        sData.resolvedCompiler = exec;
+    if (data.resolvedCompiler.empty())
+        data.resolvedCompiler = exec;
     {
-        auto findSlaveCompiler = [](const std::string &path) {
+        auto findSlaveCompiler = [&data](const std::string &path) {
             size_t slash = path.rfind('/');
             if (slash == std::string::npos)
                 slash = 0;
@@ -207,19 +209,19 @@ bool Client::findCompiler(const std::string &preresolved)
             while (*ch) {
                 if (*ch == 'g') {
                     if (!strncmp(ch + 1, "++", 2)) {
-                        sData.slaveCompiler =  "/usr/bin/g++";
+                        data.slaveCompiler =  "/usr/bin/g++";
                         return true;
                     } else if (!strncmp(ch + 1, "cc", 2)) {
-                        sData.slaveCompiler =  "/usr/bin/gcc";
+                        data.slaveCompiler =  "/usr/bin/gcc";
                         return true;
                     }
                 } else if (*ch == 'c') {
                     if (!strncmp(ch + 1, "lang", 4)) {
                         if (!strncmp(ch + 5, "++", 2)) {
-                            sData.slaveCompiler =  "/usr/bin/clang++";
+                            data.slaveCompiler =  "/usr/bin/clang++";
                             return true;
                         } else {
-                            sData.slaveCompiler =  "/usr/bin/clang";
+                            data.slaveCompiler =  "/usr/bin/clang";
                             return true;
                         }
                     }
@@ -229,9 +231,9 @@ bool Client::findCompiler(const std::string &preresolved)
             return false;
         };
         if (!findSlaveCompiler(exec)
-            && !findSlaveCompiler(sData.resolvedCompiler)
+            && !findSlaveCompiler(data.resolvedCompiler)
             && !findSlaveCompiler(Client::realpath(exec))
-            && !findSlaveCompiler(Client::realpath(sData.resolvedCompiler))) {
+            && !findSlaveCompiler(Client::realpath(data.resolvedCompiler))) {
             if (exec.find("++") != std::string::npos) {
                 findSlaveCompiler("g++");
             } else {
@@ -240,36 +242,36 @@ bool Client::findCompiler(const std::string &preresolved)
         }
     }
     {
-        const size_t slash = sData.resolvedCompiler.rfind('/');
+        const size_t slash = data.resolvedCompiler.rfind('/');
         if (slash != std::string::npos) {
-            for (size_t i=slash + 2; i<sData.resolvedCompiler.size(); ++i) {
-                if (sData.resolvedCompiler[i] == '+' && sData.resolvedCompiler[i - 1] == '+') {
-                    if (sData.resolvedCompiler[i - 2] == 'c') {
-                        sData.resolvedCompiler[i - 1] = 'c';
-                        sData.resolvedCompiler.erase(i);
-                    } else if (sData.resolvedCompiler[i - 2] == 'g') {
-                        if (i > 6 && !strncmp(sData.resolvedCompiler.c_str() + i - 6, "clang", 5)) {
-                            sData.resolvedCompiler.erase(sData.resolvedCompiler.begin() + i - 1, sData.resolvedCompiler.begin() + i + 1);
+            for (size_t i=slash + 2; i<data.resolvedCompiler.size(); ++i) {
+                if (data.resolvedCompiler[i] == '+' && data.resolvedCompiler[i - 1] == '+') {
+                    if (data.resolvedCompiler[i - 2] == 'c') {
+                        data.resolvedCompiler[i - 1] = 'c';
+                        data.resolvedCompiler.erase(i);
+                    } else if (data.resolvedCompiler[i - 2] == 'g') {
+                        if (i > 6 && !strncmp(data.resolvedCompiler.c_str() + i - 6, "clang", 5)) {
+                            data.resolvedCompiler.erase(data.resolvedCompiler.begin() + i - 1, data.resolvedCompiler.begin() + i + 1);
                         } else {
-                            sData.resolvedCompiler[i - 1] = 'c';
-                            sData.resolvedCompiler[i] = 'c';
+                            data.resolvedCompiler[i - 1] = 'c';
+                            data.resolvedCompiler[i] = 'c';
                         }
                     }
                 }
             }
         }
     }
-    // printf("RESULT %s %s %s\n", sData.resolvedCompiler.c_str(), sData.slaveCompiler.c_str(), exec.c_str());
+    // printf("RESULT %s %s %s\n", data.resolvedCompiler.c_str(), data.slaveCompiler.c_str(), exec.c_str());
 
     if (exec.size() >= 5 && !strcmp(exec.c_str() + exec.size() - 5, "fiskc")) { // resolved to ourselves
-        // printf("WE'RE HERE %s %s %s\n", exec.c_str(), sData.slaveCompiler.c_str(), sData.resolvedCompiler.c_str());
-        sData.slaveCompiler.clear();
-        sData.resolvedCompiler.clear();
+        // printf("WE'RE HERE %s %s %s\n", exec.c_str(), data.slaveCompiler.c_str(), data.resolvedCompiler.c_str());
+        data.slaveCompiler.clear();
+        data.resolvedCompiler.clear();
         return false;
     }
-    sData.compiler = std::move(exec);
+    data.compiler = std::move(exec);
     struct stat st;
-    return !stat(sData.compiler.c_str(), &st) && (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode));
+    return !stat(data.compiler.c_str(), &st) && (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode));
 }
 
 void Client::parsePath(const char *path, std::string *basename, std::string *dirname)
@@ -365,13 +367,13 @@ bool Client::recursiveRmdir(const std::string &dir)
 
 void Client::writeStatistics()
 {
-    if (sData.localReason == CompilerArgs::Local_Preprocess)
+    const Client::Data &data = Client::data();
+    if (data.localReason == CompilerArgs::Local_Preprocess)
         return;
     const std::string file = Config::statisticsLog;
     if (file.empty())
         return;
 
-    const Client::Data &data = Client::data();
     json11::Json::object stats {
         { "start", static_cast<double>(Client::milliseconds_since_epoch / 1000.0) },
         { "end", static_cast<double>((Client::milliseconds_since_epoch + (Client::mono() - Client::started)) / 1000.0) }
@@ -393,7 +395,7 @@ void Client::writeStatistics()
         if (written)
             stats["output_size"] = written;
     } else {
-        stats["local"] = CompilerArgs::localReasonToString(sData.localReason);
+        stats["local"] = CompilerArgs::localReasonToString(data.localReason);
         stats["command_line"] = data.originalArgs;
     }
     stats["object_cache"] = data.objectCache;
@@ -427,34 +429,37 @@ void Client::writeStatistics()
 
 static std::string argsAsString()
 {
-    std::string ret = sData.compiler;
-    for (int i=1; i<sData.argc; ++i) {
+    const Client::Data &data = Client::data();
+    std::string ret = data.compiler;
+    for (int i=1; i<data.argc; ++i) {
         ret += ' ';
-        ret += sData.argv[i];
+        ret += data.argv[i];
     }
     return ret;
 }
 
 void Client::runLocal(const std::string &reason)
 {
+    const Client::Data &data = Client::data();
+
     enum { Increment = 75000 };
-    auto run = [&reason]() {
-        char **argvCopy = new char*[sData.argc + 1];
-        argvCopy[0] = strdup(sData.compiler.c_str());
-        for (int i=1; i<sData.argc; ++i) {
-            argvCopy[i] = sData.argv[i];
+    auto run = [&reason, &data]() {
+        char **argvCopy = new char*[data.argc + 1];
+        argvCopy[0] = strdup(data.compiler.c_str());
+        for (int i=1; i<data.argc; ++i) {
+            argvCopy[i] = data.argv[i];
         }
-        argvCopy[sData.argc] = nullptr;
+        argvCopy[data.argc] = nullptr;
         size_t micros = 0;
         while (true) {
             WARN("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
-            ::execv(sData.compiler.c_str(), argvCopy);
+            ::execv(data.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;
-            ERROR("Trying execv(%s) again in %zu ms errno: %d %s", sData.compiler.c_str(), micros / 1000, errno, strerror(errno));
+            ERROR("Trying execv(%s) again in %zu ms errno: %d %s", data.compiler.c_str(), micros / 1000, errno, strerror(errno));
             usleep(75000);
         }
-        ERROR("fisk: Failed to exec %s (%d %s)", sData.compiler.c_str(), errno, strerror(errno));
+        ERROR("fisk: Failed to exec %s (%d %s)", data.compiler.c_str(), errno, strerror(errno));
     };
 
     pid_t pid;
@@ -465,7 +470,7 @@ void Client::runLocal(const std::string &reason)
             if (micros < Increment * 10)
                 micros += Increment;
             ERROR("Fork failed (%s) again errno: %d %s. Trying again... in %zums",
-                  sData.compiler.c_str(), errno, strerror(errno), micros / 1000);
+                  data.compiler.c_str(), errno, strerror(errno), micros / 1000);
             usleep(static_cast<unsigned int >(micros));
         } else {
             break;
@@ -675,6 +680,8 @@ std::string Client::base64(const std::string &src)
 
 bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)
 {
+    const Client::Data &data = Client::data();
+
     FILE *f = fopen(tarball.c_str(), "r");
     if (!f) {
         ERROR("Failed to open %s for reading: %d %s", tarball.c_str(), errno, strerror(errno));
@@ -690,7 +697,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
     {
         json11::Json::object msg {
             { "type", "uploadEnvironment" },
-            { "hash", sData.hash },
+            { "hash", data.hash },
             { "bytes", static_cast<int>(st.st_size) }
         };
 
@@ -724,6 +731,8 @@ extern "C" const unsigned char create_fisk_env[];
 extern "C" const unsigned create_fisk_env_size;
 std::string Client::prepareEnvironmentForUpload(std::string *directory)
 {
+    const Client::Data &data = Client::data();
+
     char dir[PATH_MAX];
     strcpy(dir, "/tmp/fisk-env-XXXXXX");
     if (!mkdtemp(dir)) {
@@ -734,7 +743,7 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
 
     // printf("GOT DIR %s\n", dir);
 
-    const std::string info = Client::format("%s/compiler-info_%s", dir, sData.hash.c_str());
+    const std::string info = Client::format("%s/compiler-info_%s", dir, data.hash.c_str());
     FILE *f = fopen(info.c_str(), "w");
     if (!f) {
         ERROR("Failed to create info file: %s %d %s", info.c_str(), errno, strerror(errno));
@@ -742,16 +751,16 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
     }
 
     fprintf(f, "{ \"hash\": \"%s\", \"system\": \"%s\", \"originalPath\": \"%s\" }\n",
-            sData.hash.c_str(), systemName, sData.resolvedCompiler.c_str());
+            data.hash.c_str(), systemName, data.resolvedCompiler.c_str());
 
     {
         std::string stdOut, stdErr;
-        TinyProcessLib::Process proc(sData.resolvedCompiler + " -v", dir,
+        TinyProcessLib::Process proc(data.resolvedCompiler + " -v", dir,
                                      [&stdOut](const char *bytes, size_t n) { stdOut.append(bytes, n); },
                                      [&stdErr](const char *bytes, size_t n) { stdErr.append(bytes, n); });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
-            ERROR("Failed to run %s -v\n%s", sData.resolvedCompiler.c_str(), stdErr.c_str());
+            ERROR("Failed to run %s -v\n%s", data.resolvedCompiler.c_str(), stdErr.c_str());
             int ret;
             EINTRWRAP(ret, fclose(f));
             return std::string();
@@ -787,10 +796,10 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
     proc.write(Client::format("export ARG1=%s\n"
                               "export ARG2=--addfile\n"
                               "export ARG3=%s:/etc/compiler_info\n",
-                              sData.resolvedCompiler.c_str(),
+                              data.resolvedCompiler.c_str(),
                               info.c_str()));
     proc.write(reinterpret_cast<const char *>(create_fisk_env), create_fisk_env_size);
-    DEBUG("Running create-fisk-env %s --addfile %s:/etc/compiler_info", sData.resolvedCompiler.c_str(), info.c_str());
+    DEBUG("Running create-fisk-env %s --addfile %s:/etc/compiler_info", data.resolvedCompiler.c_str(), info.c_str());
     proc.close_stdin();
     const int exit_status = proc.get_exit_status();
     if (exit_status) {

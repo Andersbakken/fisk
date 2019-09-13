@@ -11,22 +11,23 @@ class SlaveWebSocket : public WebSocket
 public:
     bool wait { false };
     virtual void onConnected() override;
-    virtual void onMessage(MessageType messageType, const void *data, size_t len) override
+    virtual void onMessage(MessageType messageType, const void *bytes, size_t len) override
     {
+        Client::Data &data = Client::data();
         DEBUG("Got message %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
 
         if (messageType == WebSocket::Binary) {
-            handleResponseBinary(data, len);
+            handleResponseBinary(bytes, len);
             return;
         }
 
         WARN("Got message from slave %s %s", url().c_str(),
-             std::string(reinterpret_cast<const char *>(data), len).c_str());
+             std::string(reinterpret_cast<const char *>(bytes), len).c_str());
         std::string err;
-        json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(data), len), err, json11::JsonParse::COMMENTS);
+        json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(bytes), len), err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
             ERROR("Failed to parse json from slave: %s", err.c_str());
-            Client::data().watchdog->stop();
+            data.watchdog->stop();
             error = "slave json parse error";
             done = true;
             return;
@@ -42,7 +43,7 @@ public:
 
         if (type == "heartbeat") {
             DEBUG("Got a heartbeat.");
-            Client::data().watchdog->heartbeat();
+            data.watchdog->heartbeat();
             return;
         }
 
@@ -50,24 +51,28 @@ public:
             const auto success = msg["success"];
             if (!success.is_bool() || !success.bool_value()) {
                 ERROR("Slave had some issue. Build locally");
-                Client::data().watchdog->stop();
+                data.watchdog->stop();
                 error = "slave run failure";
                 done = true;
                 return;
             }
 
             json11::Json::array index = msg["index"].array_items();
-            Client::data().exitCode = msg["exitCode"].int_value();
+            data.exitCode = msg["exitCode"].int_value();
             const std::string stdOut = msg["stdout"].string_value();
             if (!stdOut.empty())
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
             const std::string stdErr = msg["stderr"].string_value();
-            if (!stdErr.empty())
+            if (!stdErr.empty()) {
+                fprintf(stderr, "error: Fisk %s ran on slave %s\n",
+                        data.compilerArgs->sourceFile().c_str(),
+                        url().c_str());
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
+            }
 
             const auto objectCache = msg["objectCache"];
             if (objectCache.is_bool() && !objectCache.bool_value()) {
-                Client::data().objectCache = true;
+                data.objectCache = true;
             }
 
             if (!index.empty()) {
