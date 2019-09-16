@@ -59,14 +59,15 @@ public:
 
             json11::Json::array index = msg["index"].array_items();
             data.exitCode = msg["exitCode"].int_value();
+            if (data.exitCode) {
+                fprintf(stderr, "error: exit code: %d Fisk slave: %s source file: %s\n",
+                        data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str());
+            }
             const std::string stdOut = msg["stdout"].string_value();
             if (!stdOut.empty())
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
             const std::string stdErr = msg["stderr"].string_value();
             if (!stdErr.empty()) {
-                fprintf(stderr, "error: Fisk slave %s used for compiling %s\n",
-                        url().c_str(),
-                        data.compilerArgs->sourceFile().c_str());
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
             }
 
