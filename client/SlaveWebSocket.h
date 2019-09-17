@@ -59,14 +59,28 @@ public:
 
             json11::Json::array index = msg["index"].array_items();
             data.exitCode = msg["exitCode"].int_value();
+            const std::string stdOut = msg["stdout"].string_value();
+            const std::string stdErr = msg["stderr"].string_value();
+
             if (data.exitCode) {
+                if (stdErr.empty()
+                    || stdErr.find("unable to rename temporary ") != std::string::npos
+                    || stdErr.find("error trying to exec") != std::string::npos) {
+                    ERROR("Slave %s%s had a suspicious error. Building locally:\n%s",
+                          data.slaveHostname.empty() ? "" : (" " + data.slaveHostname).c_str(),
+                          url().c_str(),
+                          stdErr.c_str());
+                    data.watchdog->stop();
+                    error = "suspicious error";
+                    done = true;
+                    return;
+                }
                 fprintf(stderr, "error: exit code: %d Fisk slave: %s source file: %s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str());
             }
-            const std::string stdOut = msg["stdout"].string_value();
+
             if (!stdOut.empty())
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
-            const std::string stdErr = msg["stderr"].string_value();
             if (!stdErr.empty()) {
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
             }

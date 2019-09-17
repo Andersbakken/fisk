@@ -386,8 +386,8 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if ((schedulerWebsocket.slaveHostname.empty() && schedulerWebsocket.slaveIp.empty())
-        || !schedulerWebsocket.slavePort) {
+    if ((data.slaveHostname.empty() && data.slaveIp.empty())
+        || !data.slavePort) {
         DEBUG("Have to run locally because no slave");
         runLocal("no slave");
         return 0; // unreachable
@@ -398,14 +398,14 @@ int main(int argc, char **argv)
     SlaveWebSocket slaveWebSocket;
     select.add(&slaveWebSocket);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
-    headers["x-fisk-slave-ip"] = schedulerWebsocket.slaveIp;
+    headers["x-fisk-slave-ip"] = data.slaveIp;
     if (!schedulerWebsocket.environment.empty()) {
         DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket.environment.c_str());
         headers["x-fisk-environments"] = schedulerWebsocket.environment;
     }
     if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
-                                               schedulerWebsocket.slaveHostname.empty() ? schedulerWebsocket.slaveIp.c_str() : schedulerWebsocket.slaveHostname.c_str(),
-                                               schedulerWebsocket.slavePort), headers)) {
+                                               data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
+                                               data.slavePort), headers)) {
         DEBUG("Have to run locally because no slave connection");
         runLocal("slave connection failure");
         return 0; // unreachable
@@ -542,6 +542,12 @@ int main(int argc, char **argv)
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
         runLocal("slave connect error 4");
+        return 0; // unreachable
+    }
+
+    if (!slaveWebSocket.error.empty()) {
+        DEBUG("Have to run locally because something went wrong with the slave, part trois: %s", slaveWebSocket.error.c_str());
+        runLocal("slave connect error 5");
         return 0; // unreachable
     }
 
