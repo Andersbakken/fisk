@@ -104,7 +104,7 @@ function findLibraries(dir)
 findLibraries("/");
 console.log("Got lib directories", argv.root, libDirs);
 if (libDirs.length) {
-    process.env[os.type() == "Linux" ? "LD_LIBRARY_PATH" : "DYLD_LIBRARY_PATH"] = libDirs.join(":");
+    process.env[mac ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH"] = libDirs.join(":");
 }
 setTimeout(() => { // hack
     try {
