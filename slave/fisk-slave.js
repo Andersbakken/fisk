@@ -605,7 +605,7 @@ server.on("job", job => {
                 if (j.aborted)
                     return;
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name);
+                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name, event.exitCode, event.error);
                 if (idx != -1) {
                     jobQueue.splice(idx, 1);
                 } else {
@@ -624,6 +624,8 @@ server.on("job", job => {
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
+                if (event.error)
+                    response.error = event.error;
                 if (debug) {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }

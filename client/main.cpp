@@ -541,13 +541,13 @@ int main(int argc, char **argv)
 
     if (!slaveWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the slave, part deux");
-        runLocal("slave connect error 4");
+        runLocal("slave network error");
         return 0; // unreachable
     }
 
     if (!slaveWebSocket.error.empty()) {
         DEBUG("Have to run locally because something went wrong with the slave, part trois: %s", slaveWebSocket.error.c_str());
-        runLocal("slave connect error 5");
+        runLocal("slave error");
         return 0; // unreachable
     }
 

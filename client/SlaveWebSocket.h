@@ -50,7 +50,7 @@ public:
         if (type == "response") {
             const auto success = msg["success"];
             if (!success.is_bool() || !success.bool_value()) {
-                ERROR("Slave had some issue. Build locally");
+                ERROR("Slave had some issue. Build locally: %s", msg["error"].string_value().c_str());
                 data.watchdog->stop();
                 error = "slave run failure";
                 done = true;

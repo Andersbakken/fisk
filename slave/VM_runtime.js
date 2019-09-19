@@ -144,7 +144,11 @@ process.on('message', msg => {
             compile.on('stderr', data => send({ type: 'compileStdErr', id: msg.id, data: data }));
             compile.on('exit', event => {
                 delete compiles[msg.id];
-                send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
+                if ("error" in event) {
+                    send({type: 'compileFinished', success: false, error: event.error, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
+                } else {
+                    send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
+                }
                 if (destroying && !compiles.length)
                     process.exit();
             });

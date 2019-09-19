@@ -232,7 +232,8 @@ class Compile extends EventEmitter {
                         }
                     });
                 } catch (err) {
-                    that.emit('exit', { exitCode: 110, files: [], error: err, sourceFile: sourceFile });
+                    console.error("Got an error processing outputs for", sourceFile, err);
+                    that.emit('exit', { exitCode: 110, files: [], error: err.toString(), sourceFile: sourceFile });
                     return;
                 }
             }
