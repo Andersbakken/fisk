@@ -431,7 +431,17 @@ int main(int argc, char **argv)
     data.watchdog->transition(Watchdog::ConnectedToSlave);
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
-        data.preprocessed->wait();
+        while (!data.preprocessed->done()
+               && daemonSocket.state() == DaemonSocket::Connected
+               && !data.watchdog->timedOut()) {
+            select.exec();
+        }
+        if (data.watchdog->timedOut()) {
+            DEBUG("Have to run locally because we timed out waiting for preprocessing");
+            runLocal("watchdog preprocessing");
+            return 0; // unreachable
+        }
+
         daemonSocket.send(DaemonSocket::ReleaseCppSlot);
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");

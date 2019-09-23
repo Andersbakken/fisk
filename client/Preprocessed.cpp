@@ -9,7 +9,6 @@ Preprocessed::Preprocessed()
 
 Preprocessed::~Preprocessed()
 {
-    wait();
 }
 
 bool Preprocessed::done() const
@@ -17,21 +16,6 @@ bool Preprocessed::done() const
     std::unique_lock<std::mutex> lock(mMutex);
     return mDone;
 }
-
-void Preprocessed::wait()
-{
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-        if (mJoined)
-            return;
-        while (!mDone) {
-            mCond.wait(lock);
-        }
-        mJoined = true;
-    }
-    mThread.join();
-}
-
 
 std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                                                    const std::shared_ptr<CompilerArgs> &args,
@@ -122,7 +106,6 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
             ptr->mDone = true;
             ptr->cppSize = ptr->stdOut.size();
             ptr->duration = Client::mono() - started;
-            ptr->mCond.notify_one();
         }
         select.wakeup();
     });

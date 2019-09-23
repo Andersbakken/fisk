@@ -13,7 +13,6 @@ class Preprocessed
 {
 public:
     ~Preprocessed();
-    void wait();
     bool done() const;
 
     std::string stdOut, stdErr;
@@ -29,10 +28,8 @@ public:
 private:
     Preprocessed();
     mutable std::mutex mMutex;
-    std::condition_variable mCond;
     std::thread mThread;
     bool mDone { false };
-    bool mJoined { false };
 };
 
 #endif /* PREPROCESSED_H */
