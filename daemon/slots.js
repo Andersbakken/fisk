@@ -62,7 +62,7 @@ class Slots extends EventEmitter
         for (let p of this.used) {
             used[p[0]] = p[1];
         }
-        return { used: used, pending: pending };
+        return { used: used, pending: pending, capacity: this.count, used: this.used.size };
     }
 }
 
