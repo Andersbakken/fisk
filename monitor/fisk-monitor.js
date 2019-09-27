@@ -162,6 +162,8 @@ let notifications = [];
 function notify(msg)
 {
     if (notificationInterval) {
+        if (notifications.length == 5)
+            notifications.splice(0, 1);
         notifications.push(msg);
         return;
     }
@@ -174,12 +176,13 @@ function notify(msg)
     notificationInterval = setInterval(() => {
         if (notifications.length == 0) {
             clearInterval(notificationInterval);
+            notificationInterval = undefined;
             notifyNow();
             return;
         }
 
         notifyNow(notifications.shift());
-    }, 5000);
+    }, 2000);
 
     notifyNow(msg);
 }
@@ -204,6 +207,15 @@ try {
 const slaves = new Map();
 const jobs = new Map();
 const jobsForClient = new Map();
+
+function clearData()
+{
+    slaves.clear();
+    jobs.clear();
+    jobsForClient.clear();
+
+    update();
+}
 
 function formatCell(str, num, prefix, suffix)
 {
@@ -456,6 +468,7 @@ function connect()
         }
     });
     ws.on("close", () => {
+        clearData();
         setTimeout(connect, 1000);
     });
 }
