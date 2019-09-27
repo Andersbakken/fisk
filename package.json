@@ -17,6 +17,7 @@
   "homepage": "https://github.com/Andersbakken/fisk#readme",
   "dependencies": {
     "@jhanssen/options": "^1.0.25",
+    "blessed": "^0.1.81",
     "bytes": "^3.0.0",
     "compare-versions": "^3.4.0",
     "express": "^4.16.3",
