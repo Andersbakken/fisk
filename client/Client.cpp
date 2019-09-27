@@ -574,7 +574,7 @@ std::string Client::environmentHash(const std::string &compiler)
             flock(fd, LOCK_UN);
             ::close(fd);
         } else {
-            const off_t size = st.st_size;
+            const size_t size = static_cast<size_t>(st.st_size);
             if (size) {
                 std::string contents(size, ' ');
                 const size_t read = ::read(fd, &contents[0], size);
@@ -708,7 +708,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         char buf[1024 * 256];
         size_t sent = 0;
         do {
-            const off_t chunkSize = std::min<off_t>(st.st_size - sent, sizeof(buf));
+            const size_t chunkSize = std::min<size_t>(st.st_size - sent, sizeof(buf));
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
                 int ret;
