@@ -231,9 +231,9 @@ function updateSlaveBox()
     log("slave width", slaveWidth);
 
     let data = [];
-    let maxWidth = [6, 7, 8, 7];
+    let maxWidth = [6, 8, 7, 7];
     for (let [key, value] of slaves) {
-        const line = [key, `${value.slots}`, `${value.active}`, `${value.jobsPerformed}`];
+        const line = [key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`];
         data.push(line);
 
         maxWidth[0] = Math.max(maxWidth[0], line[0].length + 2);
@@ -242,12 +242,12 @@ function updateSlaveBox()
         maxWidth[3] = Math.max(maxWidth[3], line[3].length + 2);
     }
     data.sort((a, b) => {
-        let an = parseInt(a[2]);
-        let bn = parseInt(b[2]);
+        let an = parseInt(a[1]);
+        let bn = parseInt(b[1]);
         if (an != bn)
             return bn - an;
-        an = parseInt(a[3]);
-        bn = parseInt(b[3]);
+        an = parseInt(a[2]);
+        bn = parseInt(b[2]);
         if (an != bn)
             return bn - an;
         return a[0].localeCompare(b[0]);
@@ -261,9 +261,9 @@ function updateSlaveBox()
     }
     let header = "";
     header += formatCell("Host", maxWidth[0], "{bold}", "{/bold}");
-    header += formatCell("Slots", maxWidth[1], "{bold}", "{/bold}");
-    header += formatCell("Active", maxWidth[2], "{bold}", "{/bold}");
-    header += formatCell("Total", maxWidth[3], "{bold}", "{/bold}");
+    header += formatCell("Active", maxWidth[1], "{bold}", "{/bold}");
+    header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
+    header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     slaveHeader.setContent(header);
     let str = "";
     for (let i = 0; i < data.length; ++i) {
@@ -285,7 +285,7 @@ function updateClientBox()
     let data = [];
     let maxWidth = [6, 6, 7];
     for (let [key, value] of jobsForClient) {
-        const line = [key, `${value.size}`, `${value.get("total")}`];
+        const line = [key, `${value.size - 1}`, `${value.get("total")}`];
         data.push(line);
 
         maxWidth[0] = Math.max(maxWidth[0], line[0].length + 2);
@@ -296,7 +296,7 @@ function updateClientBox()
     data.sort((a, b) => a[0].localeCompare(b[0]));
 
     let used = 0;
-    for (let i of [1, 0, 2]) {
+    for (let i of [1, 2, 0]) {
         if (used + maxWidth[i] > clientWidth)
             maxWidth[i] = clientWidth - used;
         used += maxWidth[i];
@@ -404,7 +404,7 @@ function jobFinished(job)
     let client = jobsForClient.get(clientKey);
     if (client) {
         client.delete(job.id);
-        if (!client.size) {
+        if (client.size == 1) {
             jobsForClient.delete(clientKey);
         }
     }
