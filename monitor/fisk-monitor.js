@@ -58,7 +58,7 @@ const slaveBox = blessed.box({
     vi: true,
     style: {
         fg: 'white',
-        bg: 'magenta',
+        bg: 'black',
         border: {
             fg: '#f0f0f0'
         },
@@ -86,8 +86,8 @@ const clientHeader = blessed.box({
     height: '0%+1',
     tags: true,
     style: {
-        fg: 'white',
-        bg: '#400040',
+        fg: '#000000',
+        bg: '#00ff00',
         border: {
             fg: '#f0f0f0'
         }
@@ -107,7 +107,7 @@ const clientBox = blessed.box({
     vi: true,
     style: {
         fg: 'white',
-        bg: '#000040',
+        bg: '#404040',
         border: {
             fg: '#f0f0f0'
         },
@@ -147,11 +147,51 @@ screen.append(slaveContainer);
 screen.append(clientContainer);
 screen.append(notificationBox);
 
+let currentFocus = slaveBox;
 slaveBox.focus();
+
+function activate(box)
+{
+    if (currentFocus == box)
+        return;
+
+    currentFocus.style.bg = '#404040';
+    currentFocus = box;
+
+    box.style.bg = '#000000';
+    box.focus();
+    screen.render();
+}
+
+function focusRight()
+{
+    if (currentFocus == slaveBox) {
+        activate(clientBox);
+    }
+}
+
+function focusLeft()
+{
+    if (currentFocus == clientBox) {
+        activate(slaveBox);
+    }
+}
 
 // Quit on Escape, q, or Control-C.
 screen.key(['escape', 'q', 'C-c'], function(ch, key) {
     return process.exit(0);
+});
+screen.key(['right', 'l'], function(ch, key) {
+    focusRight();
+});
+screen.key(['left', 'h'], function(ch, key) {
+    focusLeft();
+});
+slaveBox.on('click', function() {
+    activate(slaveBox);
+});
+clientBox.on('click', function() {
+    activate(clientBox);
 });
 
 screen.render();
