@@ -345,8 +345,16 @@ function slaveAdded(msg)
 
 function slaveRemoved(msg)
 {
-    //log(msg);
-    slaves.delete(msg.ip + ":" + msg.port);
+    const slaveKey = msg.ip + ":" + msg.port;
+
+    for (let job of jobs) {
+        const jobSlaveKey = `${job.slave.ip}:${job.slave.port}`;
+        if (slaveKey === jobSlaveKey) {
+            deleteJob(job);
+        }
+    }
+
+    slaves.delete(slaveKey);
     update();
 }
 
@@ -393,14 +401,9 @@ function jobStarted(job)
     update();
 }
 
-function jobFinished(job)
+function deleteJob(job)
 {
-    const activejob = jobs.get(job.id);
-    if (!activejob)
-        return;
-    jobs.delete(job.id);
-
-    const clientKey = clientName(activejob.client);
+    const clientKey = clientName(job.client);
     let client = jobsForClient.get(clientKey);
     if (client) {
         client.delete(job.id);
@@ -408,6 +411,16 @@ function jobFinished(job)
             jobsForClient.delete(clientKey);
         }
     }
+}
+
+function jobFinished(job)
+{
+    const activejob = jobs.get(job.id);
+    if (!activejob)
+        return;
+    jobs.delete(job.id);
+
+    deleteJob(activejob);
 
     const key = `${activejob.slave.ip}:${activejob.slave.port}`;
     const slave = slaves.get(key);
