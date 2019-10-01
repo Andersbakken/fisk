@@ -211,6 +211,8 @@ clientBox.on("select", ev => {
                 widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
             }
 
+            data.sort((a, b) => a[2] - b[2]);
+
             data.forEach((line, idx) => {
                 if (!idx)
                     str += "{bold}";
