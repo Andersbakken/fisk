@@ -164,6 +164,56 @@ clientContainer.append(clientBox);
 screen.append(slaveContainer);
 screen.append(clientContainer);
 screen.append(notificationBox);
+let slaveDialogBox;
+
+
+slaveBox.on("select", ev => {
+    if (slaveDialogBox) {
+        slaveDialogBox.detach();
+        slaveDialogBox = undefined;
+    }
+    let slaveKey = /^ *([^ ]*)/.exec(ev.content)[1];
+    let slave = slaves.get(slaveKey);
+    if (slave) {
+        slaveBox.interactive = false;
+        let str = "";
+        for (let key in slave) {
+            let value = slave[key];
+            if (Array.isArray(value)) {
+                str += `{bold}${key}{/bold}: ${value[0]}\n`;
+                for (let i=1; i<value.length; ++i) {
+                    let pad = "".padStart(key.length + 2, ' ');
+                    str += pad + value[i].padStart(key.length + 2, ' ') + "\n";
+                }
+            } else {
+                str += `{bold}${key}{/bold}: ${value}\n`;
+            }
+        }
+        slaveDialogBox = blessed.box({
+            top: 'center',
+            left: 'center',
+            width: '50%',
+            height: '50%',
+            content: str,
+            tags: true,
+            border: {
+                type: 'line'
+            },
+            style: {
+                fg: 'white',
+                bg: 'magenta',
+                border: {
+                    fg: '#f0f0f0'
+                },
+                hover: {
+                    bg: 'green'
+                }
+            }
+        });
+        screen.append(slaveDialogBox);
+        screen.render();
+    }
+});
 
 let currentFocus = slaveBox;
 slaveBox.focus();
@@ -196,19 +246,30 @@ function focusLeft()
 }
 
 // Quit on Escape, q, or Control-C.
-screen.key(['escape', 'q', 'C-c'], function(ch, key) {
-    return process.exit(0);
+screen.key(['q', 'C-c'], (ch, key) => {
+    return process.exit();
 });
-screen.key(['right', 'l'], function(ch, key) {
+screen.key(['escape'], (ch, key) => {
+    if (currentFocus == slaveBox && slaveDialogBox) {
+        slaveDialogBox.detach();
+        slaveDialogBox = undefined;
+        slaveBox.interactive = true;
+        screen.render();
+        return;
+    }
+    process.exit();
+});
+screen.key(['right', 'l'], (ch, key) => {
     focusRight();
 });
-screen.key(['left', 'h'], function(ch, key) {
+screen.key(['left', 'h'], (ch, key) => {
     focusLeft();
 });
-slaveBox.on('click', function() {
+
+slaveBox.on('click', () => {
     activate(slaveBox);
 });
-clientBox.on('click', function() {
+clientBox.on('click', () => {
     activate(clientBox);
 });
 
@@ -258,17 +319,19 @@ function log(...args)
 }
 
 try {
-    fs.unlinkSync("/tmp/fisk-monitor.log");
+    // fs.unlinkSync("/tmp/fisk-monitor.log");
 } catch (e) {
 }
 
 const slaves = new Map();
+let slavesArray = [];
 const jobs = new Map();
 const jobsForClient = new Map();
 
 function clearData()
 {
     slaves.clear();
+    slavesArray = [];
     jobs.clear();
     jobsForClient.clear();
 
@@ -286,20 +349,19 @@ let timeout = 0;
 function updateSlaveBox()
 {
     const slaveWidth = slaveContainer.width - 3;
-    log("slave width", slaveWidth);
 
-    let data = [];
+    slavesArray = [];
     let maxWidth = [6, 8, 7, 7];
     for (let [key, value] of slaves) {
         const line = [key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`];
-        data.push(line);
+        slavesArray.push(line);
 
         maxWidth[0] = Math.max(maxWidth[0], line[0].length + 2);
         maxWidth[1] = Math.max(maxWidth[1], line[1].length + 2);
         maxWidth[2] = Math.max(maxWidth[2], line[2].length + 2);
         maxWidth[3] = Math.max(maxWidth[3], line[3].length + 2);
     }
-    data.sort((a, b) => {
+    slavesArray.sort((a, b) => {
         let an = parseInt(a[1]);
         let bn = parseInt(b[1]);
         if (an != bn)
@@ -323,7 +385,7 @@ function updateSlaveBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     slaveHeader.setContent(header);
-    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
+    let items = slavesArray.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
     slaveBox.setItems(items);
 }
 
@@ -380,6 +442,7 @@ function update()
 function slaveAdded(msg)
 {
     msg.active = 0;
+    delete msg.type;
     slaves.set(msg.ip + ":" + msg.port, msg);
     update();
 }
@@ -420,7 +483,7 @@ function clientName(client)
 
 function jobStarted(job)
 {
-    log(job);
+    // log(job);
     const slaveKey = `${job.slave.ip}:${job.slave.port}`;
     const slave = slaves.get(slaveKey);
     if (!slave)
