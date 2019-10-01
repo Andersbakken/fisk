@@ -45,7 +45,7 @@ const slaveHeader = blessed.box({
     }
 });
 
-const slaveBox = blessed.box({
+const slaveBox = blessed.list({
     top: '0%+1',
     left: '0%',
     width: '100%-2',
@@ -57,6 +57,15 @@ const slaveBox = blessed.box({
     keys: true,
     vi: true,
     style: {
+        item: {
+            hover: {
+                bg: 'blue'
+            }
+        },
+        selected: {
+            bg: 'blue',
+            bold: true
+        },
         fg: 'white',
         bg: 'black',
         border: {
@@ -94,7 +103,7 @@ const clientHeader = blessed.box({
     }
 });
 
-const clientBox = blessed.box({
+const clientBox = blessed.list({
     top: '0%+1',
     left: '0%',
     width: '100%-2',
@@ -106,6 +115,15 @@ const clientBox = blessed.box({
     keys: true,
     vi: true,
     style: {
+        item: {
+            hover: {
+                bg: 'blue'
+            }
+        },
+        selected: {
+            bg: 'blue',
+            bold: true
+        },
         fg: 'white',
         bg: '#404040',
         border: {
@@ -305,17 +323,8 @@ function updateSlaveBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     slaveHeader.setContent(header);
-    let str = "";
-    for (let i = 0; i < data.length; ++i) {
-        str += formatCell(data[i][0], maxWidth[0]);
-        str += formatCell(data[i][1], maxWidth[1]);
-        str += formatCell(data[i][2], maxWidth[2]);
-        str += formatCell(data[i][3], maxWidth[3]);
-        if (i + 1 < data.length)
-            str += "\n";
-    }
-
-    slaveBox.setContent(str);
+    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
+    slaveBox.setItems(items);
 }
 
 function updateClientBox()
@@ -348,16 +357,8 @@ function updateClientBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     clientHeader.setContent(header);
 
-    let str = "";
-    for (let i = 0; i < data.length; ++i) {
-        str += formatCell(data[i][0], maxWidth[0]);
-        str += formatCell(data[i][1], maxWidth[1]);
-        str += formatCell(data[i][2], maxWidth[2]);
-        if (i + 1 < data.length)
-            str += "\n";
-    }
-
-    clientBox.setContent(str);
+    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]));
+    clientBox.setItems(items);
 }
 
 function update()
