@@ -39,7 +39,7 @@ const slaveHeader = blessed.box({
     tags: true,
     style: {
         fg: 'white',
-        bg: 'blue',
+        bg: '#00ff00',
         border: {
             fg: '#f0f0f0'
         }
@@ -57,27 +57,9 @@ const slaveBox = blessed.list({
     alwaysScroll: true,
     keys: true,
     vi: true,
-    style: {
-        item: {
-            hover: {
-                bg: 'blue'
-            }
-        },
-        selected: {
-            bg: 'blue',
-            bold: true
-        },
-        fg: 'white',
-        bg: 'black',
-        border: {
-            fg: '#f0f0f0'
-        },
-        scrollbar: {
-            bg: 'red',
-            fg: 'blue'
-        }
-    }
+    style: {}
 });
+slaveBox.headerBox = slaveHeader;
 
 const clientContainer = blessed.box({
     top: '0%',
@@ -115,27 +97,9 @@ const clientBox = blessed.list({
     alwaysScroll: true,
     keys: true,
     vi: true,
-    style: {
-        item: {
-            hover: {
-                bg: 'blue'
-            }
-        },
-        selected: {
-            bg: 'blue',
-            bold: true
-        },
-        fg: 'white',
-        bg: '#404040',
-        border: {
-            fg: '#f0f0f0'
-        },
-        scrollbar: {
-            bg: 'red',
-            fg: 'blue'
-        }
-    }
+    style: {}
 });
+clientBox.headerBox = clientHeader;
 
 const notificationBox = blessed.box({
     top: '100%-3',
@@ -151,9 +115,6 @@ const notificationBox = blessed.box({
         bg: 'cyan',
         border: {
             fg: '#f0f0f0'
-        },
-        hover: {
-            bg: 'green'
         }
     }
 });
@@ -215,12 +176,9 @@ slaveBox.on("select", ev => {
                 },
                 style: {
                     fg: 'white',
-                    bg: 'black',
+                    bg: '#0f0f0f',
                     border: {
                         fg: '#f0f0f0'
-                    },
-                    hover: {
-                        bg: 'green'
                     }
                 }
             });
@@ -272,12 +230,9 @@ clientBox.on("select", ev => {
                 },
                 style: {
                     fg: 'white',
-                    bg: 'black',
+                    bg: '#0f0f0f',
                     border: {
                         fg: '#f0f0f0'
-                    },
-                    hover: {
-                        bg: 'green'
                     }
                 }
             });
@@ -289,21 +244,60 @@ clientBox.on("select", ev => {
         screen.render();
 });
 
-let currentFocus = slaveBox;
-slaveBox.focus();
-
+let currentFocus = undefined;
 function activate(box)
 {
     if (currentFocus == box)
         return;
 
-    currentFocus.style.bg = '#404040';
-    currentFocus = box;
+    if (currentFocus) {
+        currentFocus.style = {
+            selected: {
+                bg: '#404040',
+                bold: true
+            },
+            item: {
+                bg: '#404040'
+            },
+            fg: 'white',
+            bg: '#404040',
+            border: {
+                fg: '#f0f0f0'
+            },
+            scrollbar: {
+                bg: 'red',
+                fg: 'blue'
+            }
+        };
+        currentFocus.headerBox.style.fg = 'black';
+    }
 
-    box.style.bg = '#000000';
-    box.focus();
+    currentFocus = box;
+    currentFocus.style = {
+        selected: {
+            bg: 'blue',
+            bold: true
+        },
+        item: {
+            bg: "black"
+        },
+        fg: 'white',
+        bg: 'black',
+        border: {
+            fg: '#f0f0f0'
+        },
+        scrollbar: {
+            bg: 'red',
+            fg: 'blue'
+        }
+    }
+    currentFocus.headerBox.style.fg = 'white';
+    currentFocus.focus();
     screen.render();
 }
+
+activate(clientBox);
+activate(slaveBox);
 
 function focusRight()
 {
