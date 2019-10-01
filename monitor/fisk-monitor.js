@@ -6,6 +6,7 @@ const option = require('@jhanssen/options')({ prefix: 'fisk/monitor',
 const WebSocket = require('ws');
 const fs = require('fs');
 const blessed = require('blessed');
+const humanizeDuration = require('humanize-duration');
 
 const screen = blessed.screen({
     smartCSR: true
@@ -166,53 +167,126 @@ screen.append(clientContainer);
 screen.append(notificationBox);
 let slaveDialogBox;
 
-
-slaveBox.on("select", ev => {
+function hideDialogBoxes()
+{
+    let ret = false;
     if (slaveDialogBox) {
         slaveDialogBox.detach();
         slaveDialogBox = undefined;
+        ret = true;
     }
-    let slaveKey = /^ *([^ ]*)/.exec(ev.content)[1];
-    let slave = slaves.get(slaveKey);
-    if (slave) {
-        slaveBox.interactive = false;
-        let str = "";
-        for (let key in slave) {
-            let value = slave[key];
-            if (Array.isArray(value)) {
-                str += `{bold}${key}{/bold}: ${value[0]}\n`;
-                for (let i=1; i<value.length; ++i) {
-                    let pad = "".padStart(key.length + 2, ' ');
-                    str += pad + value[i].padStart(key.length + 2, ' ') + "\n";
+
+    if (clientDialogBox) {
+        clientDialogBox.detach();
+        clientDialogBox = undefined;
+        ret = true;
+    }
+    return ret;
+}
+
+slaveBox.on("select", ev => {
+    let render = hideDialogBoxes();
+    if (ev) {
+        let slaveKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        let slave = slaves.get(slaveKey);
+        if (slave) {
+            let str = "";
+            for (let key in slave) {
+                let value = slave[key];
+                if (Array.isArray(value)) {
+                    str += `{bold}${key}{/bold}: ${value[0]}\n`;
+                    for (let i=1; i<value.length; ++i) {
+                        let pad = "".padStart(key.length + 2, ' ');
+                        str += pad + value[i].padStart(key.length + 2, ' ') + "\n";
+                    }
+                } else {
+                    str += `{bold}${key}{/bold}: ${value}\n`;
                 }
-            } else {
-                str += `{bold}${key}{/bold}: ${value}\n`;
             }
-        }
-        slaveDialogBox = blessed.box({
-            top: 'center',
-            left: 'center',
-            width: '50%',
-            height: '50%',
-            content: str,
-            tags: true,
-            border: {
-                type: 'line'
-            },
-            style: {
-                fg: 'white',
-                bg: 'magenta',
+            slaveDialogBox = blessed.box({
+                top: 'center',
+                left: 'center',
+                width: '80%',
+                height: '50%',
+                content: str,
+                tags: true,
                 border: {
-                    fg: '#f0f0f0'
+                    type: 'line'
                 },
-                hover: {
-                    bg: 'green'
+                style: {
+                    fg: 'white',
+                    bg: 'black',
+                    border: {
+                        fg: '#f0f0f0'
+                    },
+                    hover: {
+                        bg: 'green'
+                    }
                 }
-            }
-        });
-        screen.append(slaveDialogBox);
-        screen.render();
+            });
+            screen.append(slaveDialogBox);
+            render = true;
+        }
     }
+    if (render)
+        screen.render();
+});
+
+let clientDialogBox;
+clientBox.on("select", ev => {
+    let render = hideDialogBoxes();
+    if (ev) {
+        // log("got ev", Object.keys(ev), ev.index, ev.$, ev.data);
+        let clientKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        let jobs = jobsForClient.get(clientKey);
+        // let client = clients.get(clientKey);
+        if (jobs) {
+            let str = "";
+            let data = [ [ "Source file", "Slave", "Start time" ] ];
+            let widest = [ data[0][0].length + 1, data[0][1].length + 1 ];
+            const now = Date.now();
+            for (let [jobKey, jobValue] of jobs) {
+                if (jobKey == "total")
+                    continue;
+                widest[0] = Math.max(jobValue.sourceFile.length + 1, widest[0]);
+                data.push([ jobValue.sourceFile, jobValue.slave.ip + ":" + jobValue.slave.port, humanizeDuration(now - jobValue.time)]);
+                widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
+            }
+
+            data.forEach((line, idx) => {
+                if (!idx)
+                    str += "{bold}";
+                str += line[0].padEnd(widest[0]) + "  " + line[1].padEnd(widest[1]) + "  " + line[2] + " ago\n";
+                if (!idx)
+                    str += "{/bold}";
+            });
+            clientDialogBox = blessed.box({
+                top: 'center',
+                left: 'center',
+                width: '80%',
+                height: '50%',
+                content: str,
+                tags: true,
+                border: {
+                    type: 'line'
+                },
+                style: {
+                    fg: 'white',
+                    bg: 'black',
+                    border: {
+                        fg: '#f0f0f0'
+                    },
+                    hover: {
+                        bg: 'green'
+                    }
+                }
+            });
+            screen.append(clientDialogBox);
+            render = true;
+        }
+    }
+    if (render)
+        screen.render();
 });
 
 let currentFocus = slaveBox;
@@ -250,14 +324,17 @@ screen.key(['q', 'C-c'], (ch, key) => {
     return process.exit();
 });
 screen.key(['escape'], (ch, key) => {
-    if (currentFocus == slaveBox && slaveDialogBox) {
+    if (slaveDialogBox) {
         slaveDialogBox.detach();
         slaveDialogBox = undefined;
-        slaveBox.interactive = true;
         screen.render();
-        return;
+    } else if (clientDialogBox) {
+        clientDialogBox.detach();
+        clientDialogBox = undefined;
+        screen.render();
+    } else {
+        process.exit();
     }
-    process.exit();
 });
 screen.key(['right', 'l'], (ch, key) => {
     focusRight();
@@ -324,14 +401,12 @@ try {
 }
 
 const slaves = new Map();
-let slavesArray = [];
 const jobs = new Map();
 const jobsForClient = new Map();
 
 function clearData()
 {
     slaves.clear();
-    slavesArray = [];
     jobs.clear();
     jobsForClient.clear();
 
@@ -350,18 +425,18 @@ function updateSlaveBox()
 {
     const slaveWidth = slaveContainer.width - 3;
 
-    slavesArray = [];
+    let data = [];
     let maxWidth = [6, 8, 7, 7];
     for (let [key, value] of slaves) {
         const line = [key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`];
-        slavesArray.push(line);
+        data.push(line);
 
         maxWidth[0] = Math.max(maxWidth[0], line[0].length + 2);
         maxWidth[1] = Math.max(maxWidth[1], line[1].length + 2);
         maxWidth[2] = Math.max(maxWidth[2], line[2].length + 2);
         maxWidth[3] = Math.max(maxWidth[3], line[3].length + 2);
     }
-    slavesArray.sort((a, b) => {
+    data.sort((a, b) => {
         let an = parseInt(a[1]);
         let bn = parseInt(b[1]);
         if (an != bn)
@@ -385,7 +460,7 @@ function updateSlaveBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     slaveHeader.setContent(header);
-    let items = slavesArray.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
+    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
     slaveBox.setItems(items);
 }
 
@@ -452,9 +527,11 @@ function slaveRemoved(msg)
     const slaveKey = msg.ip + ":" + msg.port;
 
     for (let job of jobs) {
-        const jobSlaveKey = `${job.slave.ip}:${job.slave.port}`;
-        if (slaveKey === jobSlaveKey) {
-            deleteJob(job);
+        if (job.slave) {
+            const jobSlaveKey = `${job.slave.ip}:${job.slave.port}`;
+            if (slaveKey === jobSlaveKey) {
+                deleteJob(job);
+            }
         }
     }
 
@@ -491,12 +568,15 @@ function jobStarted(job)
 
     const clientKey = clientName(job.client);
     let client = jobsForClient.get(clientKey);
+    job.time = Date.now();
+    // log("got job started", clientKey);
     if (!client) {
         client = new Map([["total", 1]]);
         jobsForClient.set(clientKey, client);
     } else {
         client.set("total", client.get("total") + 1);
     }
+    delete job.type;
     client.set(job.id, job);
 
     jobs.set(job.id, job);
