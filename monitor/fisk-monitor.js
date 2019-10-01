@@ -46,6 +46,23 @@ const slaveHeader = blessed.box({
     }
 });
 
+var prompt = blessed.prompt({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    height: 'shrink',
+    width: 'shrink',
+    keys: true,
+    style: {
+        fg: "white"
+    },
+    vi: true,
+    mouse: true,
+    tags: true,
+    border: 'line',
+    hidden: true
+});
+
 const slaveBox = blessed.list({
     top: '0%+1',
     left: '0%',
@@ -55,9 +72,17 @@ const slaveBox = blessed.list({
     scrollable: true,
     scrollbar: true,
     alwaysScroll: true,
+    mouse: true,
     keys: true,
     vi: true,
-    style: {}
+    style: {},
+    search: callback => {
+        prompt.input('Search:', '', (err, value) => {
+            if (err)
+                return;
+            return callback(null, value);
+        });
+    }
 });
 slaveBox.headerBox = slaveHeader;
 
@@ -94,6 +119,7 @@ const clientBox = blessed.list({
     tags: true,
     scrollable: true,
     scrollbar: true,
+    mouse: true,
     alwaysScroll: true,
     keys: true,
     vi: true,
@@ -147,10 +173,12 @@ function hideDialogBoxes()
 
 slaveBox.on("select", ev => {
     let render = hideDialogBoxes();
+    activate(slaveBox);
     if (ev) {
         let slaveKey = /^ *([^ ]*)/.exec(ev.content)[1];
         let slave = slaves.get(slaveKey);
         if (slave) {
+            slaveBox.current = slaveKey;
             let str = "";
             for (let key in slave) {
                 let value = slave[key];
@@ -193,12 +221,14 @@ slaveBox.on("select", ev => {
 let clientDialogBox;
 clientBox.on("select", ev => {
     let render = hideDialogBoxes();
+    activate(clientBox);
     if (ev) {
         // log("got ev", Object.keys(ev), ev.index, ev.$, ev.data);
         let clientKey = /^ *([^ ]*)/.exec(ev.content)[1];
         let jobs = jobsForClient.get(clientKey);
         // let client = clients.get(clientKey);
         if (jobs) {
+            clientBox.current = clientKey;
             let str = "";
             let data = [ [ "Source file", "Slave", "Start time" ] ];
             let widest = [ data[0][0].length + 1, data[0][1].length + 1 ];
@@ -255,7 +285,7 @@ function activate(box)
     if (currentFocus) {
         currentFocus.style = {
             selected: {
-                bg: '#404040',
+                bg: '#606060',
                 bold: true
             },
             item: {
@@ -456,8 +486,23 @@ function updateSlaveBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     slaveHeader.setContent(header);
-    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]));
+
+    let item = slaveBox.getItem(slaveBox.selected);
+    let selectedSlave;
+    if (item) {
+        selectedSlave = /^ *([^ ]*)/.exec(item.content)[1];
+    }
+    let current;
+    let items = data.map((item, idx) => {
+        if (item[0] == selectedSlave) {
+            current = idx;
+        }
+        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]);
+    });
     slaveBox.setItems(items);
+    if (current != undefined) {
+        slaveBox.selected = current;
+    }
 }
 
 function updateClientBox()
@@ -490,8 +535,23 @@ function updateClientBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     clientHeader.setContent(header);
 
-    let items = data.map(item => formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]));
+    let item = clientBox.getItem(clientBox.selected);
+    let selectedClient;
+    if (item) {
+        selectedClient = /^ *([^ ]*)/.exec(item.content)[1];
+    }
+    let current;
+    let items = data.map((item, idx) => {
+        if (item[0] == selectedClient) {
+            current = idx;
+        }
+        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]);
+    });
+
     clientBox.setItems(items);
+    if (current != undefined) {
+        clientBox.selected = current;
+    }
 }
 
 function update()
