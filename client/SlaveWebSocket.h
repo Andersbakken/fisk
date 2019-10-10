@@ -65,6 +65,8 @@ public:
             if (data.exitCode) {
                 if (stdErr.empty()
                     || stdErr.find("unable to rename temporary ") != std::string::npos
+                    || stdErr.find("execvp: No such file or directory") != std::string::npos
+                    || stdErr.find("cannot execute ") != std::string::npos
                     || stdErr.find("error trying to exec") != std::string::npos) {
                     ERROR("Slave %s%s had a suspicious error. Building locally:\n%s",
                           data.slaveHostname.empty() ? "" : (" " + data.slaveHostname).c_str(),
