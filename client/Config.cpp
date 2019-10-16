@@ -325,6 +325,7 @@ bool Config::init(int &argc, char **&argv)
     }
 
     for (const auto &getter : sGetters) {
+        VERBOSE("Config %s = %s", getter.first.c_str(), getter.second->toString().c_str());
         if (getter.second->mDone)
             continue;
         std::string key = getter.second->jsonKey();
