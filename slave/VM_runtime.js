@@ -133,7 +133,7 @@ process.on('message', msg => {
         } else {
             delete argv["debug"];
         }
-        console.log("set debug to", msg.debug);
+        console.log("set debug to", msg.debug, "for", argv.root);
         break;
     case 'cancel':
         let c = compiles[msg.id];

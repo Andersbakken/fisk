@@ -19,6 +19,7 @@ const child_process = require("child_process");
 const VM = require("./VM");
 const load = require("./load");
 const ObjectCache = require('./objectcache');
+const quitOnError = require('./quit-on-error')(option);
 
 if (process.getuid() !== 0) {
     console.error("fisk slave needs to run as root to be able to chroot");
@@ -27,15 +28,17 @@ if (process.getuid() !== 0) {
 
 process.on('unhandledRejection', (reason, p) => {
     console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
-    if (client)
+    if (client) {
         client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
-
+    }
+    quitOnError();
 });
 
 process.on('uncaughtException', err => {
     console.error("Uncaught exception", err);
     if (client)
         client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
+    quitOnError();
 });
 
 debug = option("debug");
@@ -261,12 +264,7 @@ function loadEnvironments()
                             } catch (err) {
                             }
                             if (env && env.hash) {
-                                let opts = {
-                                    user: option("vm-user"),
-                                    keepCompiles: option("keep-compiles"),
-                                    debug: option("debug")
-                                };
-                                let vm = new VM(dir, env.hash, opts);
+                                let vm = new VM(dir, env.hash, option);
                                 ++pending;
                                 environments[env.hash] = vm;
                                 let errorHandler = () => {
@@ -397,13 +395,7 @@ client.on("getEnvironments", message => {
                     console.log(`Unlink ${file} ${env}`);
                     return fs.unlink(file);
                 }).then(() => {
-                    let opts = {
-                        user: option("vm-user"),
-                        keepCompiles: option("keep-compiles"),
-                        debug: option("debug")
-                    };
-
-                    let vm = new VM(dir, env, opts);
+                    let vm = new VM(dir, env, option);
                     return new Promise((resolve, reject) => {
                         let done = false;
                         vm.on('error', err => {
