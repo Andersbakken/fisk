@@ -145,6 +145,10 @@ class VM extends EventEmitter
         // console.log("startCompile " + compile.id);
         return compile;
     }
+
+    setDebug(debug) {
+        this.child.send({type: "setDebug", debug: debug});
+    }
 };
 
 module.exports = VM;

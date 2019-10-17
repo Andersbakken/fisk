@@ -2,6 +2,8 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
+const http = require('http');
+const express = require('express');
 
 class Job extends EventEmitter {
     constructor(data) {
@@ -48,19 +50,38 @@ class Server extends EventEmitter {
         this.option = option;
         this.id = 0;
         this.configVersion = configVersion;
+        this.app = undefined;
     }
 
     listen() {
+        this.app = express();
         this.port = this.option.int("port", 8096);
-        this.ws = new WebSocket.Server({
-            port: this.port,
-            backlog: this.option.int("backlog", 50)
-        });
-        console.log("listening on", this.ws.options.port);
-        this.ws.on("connection", (ws, req) => { this._handleConnection(ws, req); });
-        this.ws.on('headers', (headers, request) => this.emit('headers', headers, request));
-    }
 
+        this.server = http.createServer(this.app);
+        this.ws = new WebSocket.Server({ noServer: true, backlog: this.option.int("backlog", 50) });
+        this.server.listen({ port: this.port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
+
+        this.server.on("upgrade", (req, socket, head) => {
+            this.ws.handleUpgrade(req, socket, head, (ws) => {
+                this._handleConnection(ws, req);
+            });
+        });
+
+        console.log("listening on", this.port);
+        this.ws.on('headers', (headers, request) => {
+            console.log("got headers", headers);
+            this.emit('headers', headers, request);
+        });
+
+        this.app.get("/debug", (req, res, next) => {
+            this.emit("debug", true);
+            res.sendStatus(200);
+        });
+        this.app.get("/nodebug", (req, res, next) => {
+            this.emit("debug", false);
+            res.sendStatus(200);
+        });
+    }
 
     _handleConnection(ws, req) {
         const connectTime = Date.now();

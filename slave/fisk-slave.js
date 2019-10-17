@@ -38,7 +38,7 @@ process.on('uncaughtException', err => {
         client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
 });
 
-const debug = option("debug");
+debug = option("debug");
 
 let restartOnInactivity = option("restart-on-inactivity");
 if (typeof restartOnInactivity === 'string')
@@ -498,6 +498,14 @@ server.on('headers', (headers, request) => {
     // console.log("request is", request.headers);
     let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(request.headers["x-fisk-md5"]) == "exists"));
     headers.push(`x-fisk-wait: ${wait}`);
+});
+
+server.on("debug", enabled => {
+    debug = enabled;
+    for (var i in environments) {
+        var env = environments[i];
+        env.setDebug(debug);
+    }
 });
 
 function startPending()

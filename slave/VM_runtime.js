@@ -127,6 +127,14 @@ process.on('message', msg => {
             destroying = true;
         }
         break;
+    case 'setDebug':
+        if (msg.debug) {
+            argv.debug = true;
+        } else {
+            delete argv["debug"];
+        }
+        console.log("set debug to", msg.debug);
+        break;
     case 'cancel':
         let c = compiles[msg.id];
         if (c)
