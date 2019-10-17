@@ -33,12 +33,12 @@ class CompileJob extends EventEmitter
             this.startCompile = Date.now();
             fs.close(this.fd);
             this.fd = undefined;
-            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir}, this.sendCallback);
+            this.vm.child.send({ type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir}, this.sendCallback.bind(this));
         }
     }
 
     cancel() {
-        this.vm.child.send({ type: "cancel", id: this.id}, this.sendCallback);
+        this.vm.child.send({ type: "cancel", id: this.id}, this.sendCallback.bind(this));
     }
 };
 
