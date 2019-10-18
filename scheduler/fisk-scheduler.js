@@ -442,6 +442,11 @@ server.on("listen", app => {
         res.send(JSON.stringify(environmentsInfo(), null, 4) + "\n");
     });
 
+    app.get("/clear-log-files", (req, res, next) => {
+        clearLogFiles();
+        res.sendStatus(200);
+    });
+
     app.get("/slaves", (req, res, next) => {
         let ret = [];
         for (let ip in slaves) {
@@ -556,14 +561,39 @@ server.on("listen", app => {
     });
 });
 
+function updateLogFilesToMonitors()
+{
+    if (monitors.length) {
+        fs.readdir(logFileDir, (err, files) => {
+            const msg = { type: "logFiles", files: files || [] };
+            // console.log("sending files", msg);
+            monitors.forEach(monitor => monitor.send(msg));
+        });
+    }
+}
+
+function clearLogFiles()
+{
+    fs.readdir(logFileDir, (err, files) => {
+        if (err) {
+            console.log("Got error removing log files", err);
+            return;
+        }
+
+        for (const file of files) {
+            fs.unlink(path.join(directory, file), err => {
+                if (err)
+                    console.log("failed to remove file", path.join(directory, file), err);
+            });
+        }
+        updateLogFilesToMonitors();
+    });
+}
+
 try {
     fs.watch(logFileDir, (type, filename) => {
-        if (type == "rename" && monitors.length) {
-            fs.readdir(logFileDir, (err, files) => {
-                const msg = { type: "logFiles", files: files || [] };
-                // console.log("sending files", msg);
-                monitors.forEach(monitor => monitor.send(msg));
-            });
+        if (type == "rename") {
+            updateLogFilesToMonitors();
         }
     });
 } catch (err) {
@@ -993,6 +1023,9 @@ server.on("monitor", client => {
         case 'sendInfo':
             sendInfoToClient(client);
             break;
+        case 'clearLogFiles':
+            clearLogFiles();
+            // fall through
         case 'logFiles':
             // console.log("logFiles:", message);
             fs.readdir(logFileDir, (err, files) => {
