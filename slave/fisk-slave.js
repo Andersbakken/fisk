@@ -562,7 +562,8 @@ server.on("job", job => {
                     // console.log("sending cachehit", info);
                     client.send(info);
 
-                    console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
+                    if (debug)
+                        console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
                 }
                 j.done = true;
                 let idx = jobQueue.indexOf(j);
