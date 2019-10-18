@@ -2,8 +2,8 @@
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
-const http = require('http');
-const express = require('express');
+const http = require("http");
+const express = require("express");
 
 class Job extends EventEmitter {
     constructor(data) {
@@ -13,6 +13,8 @@ class Job extends EventEmitter {
     }
 
     send(type, msg) {
+        if (this.ws.readyState !== WebSocket.OPEN)
+            return;
         try {
             if (msg === undefined) {
                 if (type instanceof Buffer) {
@@ -31,7 +33,7 @@ class Job extends EventEmitter {
                 this.ws.send(JSON.stringify(tosend));
             }
         } catch (err) {
-            console.error("got send error", type, err);
+            console.error("got send error", this.id, type, err);
         }
     }
 
@@ -40,6 +42,7 @@ class Job extends EventEmitter {
     }
 
     close() {
+        this.closed = true;
         this.ws.close();
     }
 };
@@ -68,9 +71,8 @@ class Server extends EventEmitter {
         });
 
         console.log("listening on", this.port);
-        this.ws.on('headers', (headers, request) => {
-            console.log("got headers", headers);
-            this.emit('headers', headers, request);
+        this.ws.on("headers", (headers, request) => {
+            this.emit("headers", headers, request);
         });
 
         this.app.get("/debug", (req, res, next) => {
@@ -99,8 +101,8 @@ class Server extends EventEmitter {
             }
         };
 
-        if (!ip) {
-            error("No ip");
+        if (!ip) { // already closed
+            // console.log(req.connection, ws.readyState);
             return;
         }
         if (ip.substr(0, 7) == "::ffff:") {

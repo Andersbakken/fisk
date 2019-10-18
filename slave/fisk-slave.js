@@ -1,40 +1,40 @@
 #!/usr/bin/env node
 
-const option = require('@jhanssen/options')({ prefix: 'fisk/slave',
+const option = require("@jhanssen/options")({ prefix: "fisk/slave",
                                               applicationPath: false,
                                               additionalFiles: [ "fisk/slave.conf.override" ] });
 
 const request = require("request");
-const ws = require('ws');
+const ws = require("ws");
 const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
 const Compile = require("./compile");
-const bytes = require('bytes');
-const parse_duration = require('parse-duration');
+const bytes = require("bytes");
+const parse_duration = require("parse-duration");
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
 const child_process = require("child_process");
 const VM = require("./VM");
 const load = require("./load");
-const ObjectCache = require('./objectcache');
-const quitOnError = require('./quit-on-error')(option);
+const ObjectCache = require("./objectcache");
+const quitOnError = require("./quit-on-error")(option);
 
 if (process.getuid() !== 0) {
     console.error("fisk slave needs to run as root to be able to chroot");
     process.exit(1);
 }
 
-process.on('unhandledRejection', (reason, p) => {
-    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+process.on("unhandledRejection", (reason, p) => {
+    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
     if (client) {
         client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
     }
     quitOnError();
 });
 
-process.on('uncaughtException', err => {
+process.on("uncaughtException", err => {
     console.error("Uncaught exception", err);
     if (client)
         client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
@@ -44,7 +44,7 @@ process.on('uncaughtException', err => {
 debug = option("debug");
 
 let restartOnInactivity = option("restart-on-inactivity");
-if (typeof restartOnInactivity === 'string')
+if (typeof restartOnInactivity === "string")
     restartOnInactivity = parse_duration(restartOnInactivity);
 
 let shutdownTimer;
@@ -178,11 +178,11 @@ function getFromCache(job, cb)
 let environments = {};
 const client = new Client(option, common.Version);
 client.on("objectCache", enabled => {
-    let objectCacheSize = bytes.parse(option('object-cache-size'));
+    let objectCacheSize = bytes.parse(option("object-cache-size"));
     if (enabled && objectCacheSize) {
-        const objectCacheDir = option('object-cache-dir') || path.join(common.cacheDir(), 'objectcache');
+        const objectCacheDir = option("object-cache-dir") || path.join(common.cacheDir(), "objectcache");
 
-        objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int('object-cache-purge-size') || objectCacheSize);
+        objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int("object-cache-purge-size") || objectCacheSize);
         objectCache.on("added", data => {
             client.send({ type: "objectCacheAdded", md5: data.md5, sourceFile: data.sourceFile });
         });
@@ -272,8 +272,8 @@ function loadEnvironments()
                                         resolve();
                                     }
                                 };
-                                vm.once('error', errorHandler);
-                                vm.once('ready', () => {
+                                vm.once("error", errorHandler);
+                                vm.once("ready", () => {
                                     vm.ready = true;
                                     vm.removeListener("error", errorHandler);
                                     if (!--pending)
@@ -398,12 +398,12 @@ client.on("getEnvironments", message => {
                     let vm = new VM(dir, env, option);
                     return new Promise((resolve, reject) => {
                         let done = false;
-                        vm.on('error', err => {
+                        vm.on("error", err => {
                             if (!done) {
                                 reject(err);
                             }
                         });
-                        vm.on('ready', () => {
+                        vm.on("ready", () => {
                             done = true;
                             resolve(vm);
                         });
@@ -422,7 +422,7 @@ client.on("getEnvironments", message => {
                 });
         });
         request.get(url)
-            .on('error', err => {
+            .on("error", err => {
                 console.log("Got error from request", err);
                 if (stream.destroy instanceof Function) {
                     stream.destroy();
@@ -438,7 +438,7 @@ client.on("getEnvironments", message => {
                     setTimeout(work, 0);
                 }
                 return;
-            }).on('end', event => {
+            }).on("end", event => {
                 stream.end();
                 console.log("got end", env);
             }).pipe(stream);
@@ -486,7 +486,7 @@ client.on("close", () => {
 const server = new Server(option, common.Version);
 let jobQueue = [];
 
-server.on('headers', (headers, request) => {
+server.on("headers", (headers, request) => {
     // console.log("request is", request.headers);
     let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(request.headers["x-fisk-md5"]) == "exists"));
     headers.push(`x-fisk-wait: ${wait}`);
@@ -631,7 +631,7 @@ server.on("job", job => {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }
                 job.send(response);
-                if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == 'none') {
+                if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == "none") {
                     response.sourceFile = job.sourceFile;
                     objectCache.add(response, contents);
                 }

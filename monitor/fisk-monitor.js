@@ -582,11 +582,11 @@ function slaveRemoved(msg)
 {
     const slaveKey = msg.ip + ":" + msg.port;
 
-    for (let job of jobs) {
-        if (job.slave) {
-            const jobSlaveKey = `${job.slave.ip}:${job.slave.port}`;
+    for (let [jobKey, jobValue] of jobs) {
+        if (jobValue.slave) {
+            const jobSlaveKey = `${jobValue.slave.ip}:${jobValue.slave.port}`;
             if (slaveKey === jobSlaveKey) {
-                deleteJob(job);
+                deleteJob(jobValue);
             }
         }
     }
