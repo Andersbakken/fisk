@@ -79,7 +79,7 @@ const slaveBox = blessed.list({
     search: callback => {
         prompt.input('Search:', '', (err, value) => {
             if (err)
-                return;
+                return undefined;
             return callback(null, value);
         });
     }
@@ -152,7 +152,8 @@ clientContainer.append(clientBox);
 screen.append(slaveContainer);
 screen.append(clientContainer);
 screen.append(notificationBox);
-let slaveDialogBox;
+
+let slaveDialogBox, clientDialogBox;
 
 function hideDialogBoxes()
 {
@@ -218,7 +219,6 @@ slaveBox.on("select", ev => {
         screen.render();
 });
 
-let clientDialogBox;
 clientBox.on("select", ev => {
     let render = hideDialogBoxes();
     activate(clientBox);
@@ -322,14 +322,14 @@ function activate(box)
             bg: 'red',
             fg: 'blue'
         }
-    }
+    };
     currentFocus.headerBox.style.fg = 'white';
     currentFocus.focus();
     screen.render();
 }
 
-activate(clientBox);
 activate(slaveBox);
+activate(clientBox);
 
 function focusRight()
 {
@@ -503,6 +503,9 @@ function updateSlaveBox()
     if (current != undefined) {
         slaveBox.selected = current;
     }
+    if (currentFocus != slaveBox) {
+        slaveBox.scrollTo(0);
+    }
 }
 
 function updateClientBox()
@@ -551,6 +554,9 @@ function updateClientBox()
     clientBox.setItems(items);
     if (current != undefined) {
         clientBox.selected = current;
+    }
+    if (currentFocus != clientBox) {
+        clientBox.scrollTo(0);
     }
 }
 
