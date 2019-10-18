@@ -38,8 +38,6 @@ const slaveHeader = blessed.box({
     height: '0%+1',
     tags: true,
     style: {
-        fg: 'white',
-        bg: '#00ff00',
         border: {
             fg: '#f0f0f0'
         }
@@ -103,8 +101,6 @@ const clientHeader = blessed.box({
     height: '0%+1',
     tags: true,
     style: {
-        fg: '#000000',
-        bg: '#00ff00',
         border: {
             fg: '#f0f0f0'
         }
@@ -297,11 +293,11 @@ function activate(box)
                 fg: '#f0f0f0'
             },
             scrollbar: {
-                bg: 'red',
-                fg: 'blue'
+                bg: '#770000'
             }
         };
-        currentFocus.headerBox.style.fg = 'black';
+        currentFocus.headerBox.style.fg = 'white';
+        currentFocus.headerBox.style.bg = '#004400';
     }
 
     currentFocus = box;
@@ -319,11 +315,11 @@ function activate(box)
             fg: '#f0f0f0'
         },
         scrollbar: {
-            bg: 'red',
-            fg: 'blue'
+            bg: 'red'
         }
     };
     currentFocus.headerBox.style.fg = 'white';
+    currentFocus.headerBox.style.bg = '#00ff00';
     currentFocus.focus();
     screen.render();
 }
@@ -346,10 +342,10 @@ function focusLeft()
 }
 
 // Quit on Escape, q, or Control-C.
-screen.key(['q', 'C-c'], (ch, key) => {
+screen.key(['C-c'], (ch, key) => {
     return process.exit();
 });
-screen.key(['escape'], (ch, key) => {
+screen.key(['escape', 'q'], (ch, key) => {
     if (slaveDialogBox) {
         slaveDialogBox.detach();
         slaveDialogBox = undefined;
