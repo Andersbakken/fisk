@@ -88,7 +88,7 @@ public:
             }
 
             const auto objectCache = msg["objectCache"];
-            if (objectCache.is_bool() && !objectCache.bool_value()) {
+            if (objectCache.is_bool() && objectCache.bool_value()) {
                 data.objectCache = true;
             }
 
