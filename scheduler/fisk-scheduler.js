@@ -1027,7 +1027,8 @@ server.on("monitor", client => {
             break;
         case 'clearLogFiles':
             clearLogFiles();
-            // fall through
+            updateLogFilesToMonitors();
+            break;
         case 'logFiles':
             // console.log("logFiles:", message);
             fs.readdir(logFileDir, (err, files) => {
