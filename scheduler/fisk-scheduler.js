@@ -565,7 +565,9 @@ function updateLogFilesToMonitors()
 {
     if (monitors.length) {
         fs.readdir(logFileDir, (err, files) => {
-            const msg = { type: "logFiles", files: files ? files.reverse() : [] };
+            if (files)
+                files = files.reverse();
+            const msg = { type: "logFiles", files: files || [] };
             // console.log("sending files", msg);
             monitors.forEach(monitor => monitor.send(msg));
         });
