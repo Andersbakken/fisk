@@ -581,9 +581,9 @@ function clearLogFiles()
         }
 
         for (const file of files) {
-            fs.unlink(path.join(directory, file), err => {
+            fs.unlink(path.join(logFileDir, file), err => {
                 if (err)
-                    console.log("failed to remove file", path.join(directory, file), err);
+                    console.log("failed to remove file", path.join(logFileDir, file), err);
             });
         }
         updateLogFilesToMonitors();
