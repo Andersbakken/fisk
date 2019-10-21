@@ -1031,6 +1031,8 @@ server.on("monitor", client => {
         case 'logFiles':
             // console.log("logFiles:", message);
             fs.readdir(logFileDir, (err, files) => {
+                if (files)
+                    files = files.reverse();
                 console.log("sending files", files);
                 client.send({ type: "logFiles", files: files || [] });
             });
