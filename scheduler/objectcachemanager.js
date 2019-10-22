@@ -207,7 +207,7 @@ class ObjectCacheManager extends EventEmitter
                             nodeIdx = 0;
                         let node = nodes[nodeIdx];
                         if (nodeRestriction && `${node.ip}:${node.port}` != nodeRestriction) {
-                            console.log(`skipping node ${node.ip}:${node.port}` because of restriction ${nodeRestriction}`);
+                            console.log(`skipping node ${node.ip}:${node.port} because of restriction ${nodeRestriction}`);
                             continue;
                         }
                         if (value.nodes.indexOf(node) != -1) {
