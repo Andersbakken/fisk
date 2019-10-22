@@ -187,6 +187,7 @@ class ObjectCacheManager extends EventEmitter
         this.byNode.forEach((value, key) => {
             commands.set(key, { objects: [], available: value.maxSize - value.size });
         });
+        let nodeRestriction = query.node;
         // console.log(commands);
         if (this.byNode.size >= 2) {
             // let max = 1;
@@ -205,6 +206,10 @@ class ObjectCacheManager extends EventEmitter
                         if (++nodeIdx == nodes.length)
                             nodeIdx = 0;
                         let node = nodes[nodeIdx];
+                        if (nodeRestriction && `${node.ip}:${node.port}` != nodeRestriction) {
+                            console.log(`skipping node `${node.ip}:${node.port}` because of restriction ${nodeRestriction}`);
+                            continue;
+                        }
                         if (value.nodes.indexOf(node) != -1) {
                             continue;
                         }
