@@ -267,10 +267,10 @@ class ObjectCache extends EventEmitter
         }
     }
 
-    get(md5)
+    get(md5, dontTouch)
     {
         let ret = this.cache[md5];
-        if (ret) {
+        if (!dontTouch && ret) {
             delete this.cache[md5];
             this.cache[md5] = ret;
         }

@@ -492,12 +492,45 @@ server.on("headers", (headers, request) => {
     headers.push(`x-fisk-wait: ${wait}`);
 });
 
-server.on("debug", enabled => {
-    debug = enabled;
-    for (var i in environments) {
-        var env = environments[i];
-        env.setDebug(debug);
+server.on("listen", app => {
+    function setDebug(enabled) {
+        debug = enabled;
+        for (var i in environments) {
+            var env = environments[i];
+            env.setDebug(debug);
+        }
     }
+    app.get("/debug", (req, res) => {
+        setDebug(true);
+        res.sendStatus(200);
+    });
+    app.get("/nodebug", (req, res) => {
+        setDebug(false);
+        res.sendStatus(200);
+    });
+
+    app.get("/objectcache/*", (req, res) => {
+        const md5 = req.url.substr(13);
+        let data = objectCache.get(md5, true);
+        if (!data) {
+            res.sendStatus(404);
+            return;
+        }
+        let file = path.join(objectCache.dir, md5);
+        try {
+            const stat = fs.statSync(file);
+            res.set('Content-Length', stat.size)
+            const rstream = fs.createReadStream(file);
+            rstream.on("error", err => {
+                console.error("Got read stream error for", file, err);
+                rstream.close();
+            });
+            rstream.pipe(res);
+        } catch (err) {
+            console.error("Got some error", err);
+            res.sendStatus(500);
+        }
+    });
 });
 
 function startPending()

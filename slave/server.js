@@ -58,6 +58,7 @@ class Server extends EventEmitter {
 
     listen() {
         this.app = express();
+        this.emit("listen", this.app);
         this.port = this.option.int("port", 8096);
 
         this.server = http.createServer(this.app);
@@ -73,15 +74,6 @@ class Server extends EventEmitter {
         console.log("listening on", this.port);
         this.ws.on("headers", (headers, request) => {
             this.emit("headers", headers, request);
-        });
-
-        this.app.get("/debug", (req, res, next) => {
-            this.emit("debug", true);
-            res.sendStatus(200);
-        });
-        this.app.get("/nodebug", (req, res, next) => {
-            this.emit("debug", false);
-            res.sendStatus(200);
         });
     }
 
