@@ -111,8 +111,8 @@ class ObjectCacheManager extends EventEmitter
         console.log("adding object cache node",
                     node.ip + ":" + node.port,
                     node.name, node.hostname,
-                    "maxSize", data.maxSize,
-                    "cacheSize", data.cacheSize,
+                    "maxSize", prettysize(data.maxSize),
+                    "cacheSize", prettysize(data.cacheSize),
                     "md5s", data.md5s.length);
         if (this.byNode.get(node)) {
             console.log("We already have", node.ip + ":" + node.port);
@@ -176,7 +176,7 @@ class ObjectCacheManager extends EventEmitter
 
     distribute(redundancy, max)
     {
-        console.log("distribute called with redundancy of", redundancy);
+        console.log("distribute called with redundancy of", redundancy, "and max of", max);
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
