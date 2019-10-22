@@ -176,6 +176,7 @@ class ObjectCacheManager extends EventEmitter
 
     distribute(redundancy)
     {
+        console.log("distribute called with redundancy of", redundancy);
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
@@ -183,28 +184,27 @@ class ObjectCacheManager extends EventEmitter
             commands.set(key, { objects: [], available: value.maxSize - value.size });
         });
         // console.log(commands);
-        let max = 100000000;
+        // let max = 1;
         let roundRobinIndex = 0;
         this.byMd5.forEach((value, key) => {
-            if (value.nodes.length < redundancy + 1 && max-- > 0) {
+            if (value.nodes.length < redundancy + 1) { // && max-- > 0) {
                 let needed = redundancy + 1 - value.nodes.length;
                 // console.log("should distribute", key, "to", needed, "nodes");
 
-                const old = 0;
+                const old = nodeIdx;
                 let found = 0;
                 while (found < needed) {
                     if (++nodeIdx == nodes.length)
                         nodeIdx = 0;
                     let node = nodes[nodeIdx];
                     if (value.nodes.indexOf(node) != -1) {
-                        if (nodeIdx == old)
-                            break;
                         continue;
                     }
                     let data = commands.get(node);
                     if (data.available < value.fileSize) {
-                        if (nodeIdx == old)
+                        if (nodeIdx == old) {
                             break;
+                        }
                         continue;
                     }
                     ++found;
@@ -218,6 +218,7 @@ class ObjectCacheManager extends EventEmitter
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
             if (value.objects.length) {
+                console.log("sending objects", value.objects.length, this.byMd5.size);
                 key.send({ type: "fetch_cache_objects", objects: value.objects });
             }
         });

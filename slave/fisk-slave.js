@@ -5,6 +5,7 @@ const option = require("@jhanssen/options")({ prefix: "fisk/slave",
                                               additionalFiles: [ "fisk/slave.conf.override" ] });
 
 const request = require("request");
+const allSettled = require('promise.allsettled');
 const ws = require("ws");
 const common = require("../common")(option);
 const Server = require("./server");
@@ -193,6 +194,49 @@ client.on("objectCache", enabled => {
     } else {
         objectCache = undefined;
     }
+});
+
+client.on("fetch_cache_objects", message => {
+    console.log("Fetching", message.objects.length, "objects");
+    let filesReceived = 0;
+    allSettled(message.objects.map(operation => {
+        return new Promise((resolve, reject) => {
+            try {
+                const file = path.join(objectCache.dir, operation.md5);
+                console.log(file);
+                const url = `http://${operation.source}/objectcache/${operation.md5}`;
+                console.log("Downloading", url, "->", file);
+                let expectedSize;
+                let stream = fs.createWriteStream(file);
+                stream.on('finish', () => {
+                    console.log("Finished writing file", file);
+                    const stat = fs.statSync(file);
+                    if (stat.size != expectedSize) {
+                        throw new Error("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
+                    }
+                    ++filesReceived;
+                    resolve();
+                });
+                // response_stream.on('response', function (response) {
+                let responseStream = request.get({ url:url });
+                responseStream.on('response', response => {
+                    console.log("got headers", response.headers);
+                    expectedSize = response.headers["content-length"];
+                    response.pipe(stream);
+                });
+            } catch (err) {
+                console.error("Got some error", err);
+                fs.unlinkSync(file);
+                reject(err);
+            }
+        });
+    })).then(results => {
+        console.log("got results", filesReceived);
+    });
+    // chain.then(() => {
+    //     console.log("Received", filesReceived, "files. Restarting");
+    //     process.exit();
+    // });
 });
 
 const environmentsRoot = path.join(common.cacheDir(), "environments");
