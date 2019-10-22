@@ -151,7 +151,7 @@ class ObjectCacheManager extends EventEmitter
             const verbose = "verbose" in query;
             this.byNode.forEach((value, key) => {
                 let data =  {
-                    md5s: verbose ? value.md5s : (value.md5s.length + " entries"),
+                    md5s: verbose ? value.md5s : value.md5s.length,
                     maxSize: prettysize(value.maxSize),
                     size: prettysize(value.size)
                 };
@@ -188,45 +188,49 @@ class ObjectCacheManager extends EventEmitter
             commands.set(key, { objects: [], available: value.maxSize - value.size });
         });
         // console.log(commands);
-        // let max = 1;
-        let roundRobinIndex = 0;
-        this.byMd5.forEach((value, key) => {
-            let needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
-            if (max != undefined && max-- <= 0)
-                return;
-            if (needed > 0) {
-                let needed = redundancy + 1 - value.nodes.length;
-                // console.log("should distribute", key, "to", needed, "nodes");
+        if (this.byNode.size >= 2) {
+            // let max = 1;
+            let roundRobinIndex = 0;
+            this.byMd5.forEach((value, key) => {
+                if (max != undefined && max <= 0)
+                    return;
+                let needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
+                if (needed > 0) {
+                    let needed = redundancy + 1 - value.nodes.length;
+                    // console.log("should distribute", key, "to", needed, "nodes");
 
-                const old = nodeIdx;
-                let found = 0;
-                while (found < needed) {
-                    if (++nodeIdx == nodes.length)
-                        nodeIdx = 0;
-                    let node = nodes[nodeIdx];
-                    if (value.nodes.indexOf(node) != -1) {
-                        continue;
-                    }
-                    let data = commands.get(node);
-                    if (data.available < value.fileSize) {
-                        if (nodeIdx == old) {
-                            break;
+                    const old = nodeIdx;
+                    let found = 0;
+                    while (found < needed) {
+                        if (++nodeIdx == nodes.length)
+                            nodeIdx = 0;
+                        let node = nodes[nodeIdx];
+                        if (value.nodes.indexOf(node) != -1) {
+                            continue;
                         }
-                        continue;
+                        let data = commands.get(node);
+                        if (data.available < value.fileSize) {
+                            if (nodeIdx == old) {
+                                break;
+                            }
+                            continue;
+                        }
+                        ++found;
+                        data.available -= value.fileSize;
+                        const src = value.nodes[roundRobinIndex++ % value.nodes.length];
+                        data.objects.push({ source: src.ip + ":" + src.port, md5: key });
+                        if (max != undefined && !--max)
+                            break;
                     }
-                    ++found;
-                    data.available -= value.fileSize;
-                    const src = value.nodes[roundRobinIndex++ % value.nodes.length];
-                    data.objects.push({ source: src.ip + ":" + src.port, md5: key });
+                    // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
                 }
-                // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
-            }
-        });
+            });
+        }
         let ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
             if (value.objects.length) {
-                console.log(`sending fetch_cache_objects to ${key.ip}:${key.port}`, value.objects.length, this.byMd5.size);
+                console.log(`sending ${value.objects.length}/${this.byMd5.size} fetch_cache_objects to ${key.ip}:${key.port}`);
                 ret[`${key.ip}:${key.port}`] = value.objects;
                 if (!dry)
                     key.send({ type: "fetch_cache_objects", objects: value.objects });

@@ -674,7 +674,7 @@ server.on("slave", slave => {
         removeSlave(slave);
         if (objectCache)
             objectCache.removeNode(slave);
-        console.log("slave disconnected", slave.ip, slave.name || "", slave.hostname || "", "slaveCount is", slaveCount);
+        console.log(`slave disconnected ${slave.ip}:${slave.port} ${slave.name} ${slave.hostname} slaveCount is ${slaveCount}`);
         slave.removeAllListeners();
     });
 
