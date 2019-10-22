@@ -126,7 +126,7 @@ class ObjectCache extends EventEmitter
                 } catch (err) {
                     if (fd)
                         fs.closeSync(fd);
-                    console.error("got failure", err,  jsonBuffer.toString().substr(0, 100));
+                    console.error("got failure", err, file.path, jsonBuffer.toString().substr(0, 100));
                     try {
                         fs.removeSync(file.path);
                     } catch (doubleError) {

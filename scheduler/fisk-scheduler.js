@@ -656,7 +656,7 @@ server.on("slave", slave => {
     });
 
     slave.on("objectCache", msg => {
-        objectCache.addNode(slave, msg.md5s);
+        objectCache.addNode(slave, msg);
     });
 
     slave.on("objectCacheAdded", msg => {
