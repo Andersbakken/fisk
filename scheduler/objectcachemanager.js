@@ -174,7 +174,7 @@ class ObjectCacheManager extends EventEmitter
         return ret;
     }
 
-    distribute(redundancy)
+    distribute(redundancy, max)
     {
         console.log("distribute called with redundancy of", redundancy);
         let nodes = Array.from(this.byNode.keys());
@@ -187,7 +187,7 @@ class ObjectCacheManager extends EventEmitter
         // let max = 1;
         let roundRobinIndex = 0;
         this.byMd5.forEach((value, key) => {
-            if (value.nodes.length < redundancy + 1) { // && max-- > 0) {
+            if (value.nodes.length < redundancy + 1 && max != undefined && max-- > 0) {
                 let needed = redundancy + 1 - value.nodes.length;
                 // console.log("should distribute", key, "to", needed, "nodes");
 
