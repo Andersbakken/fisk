@@ -178,14 +178,48 @@ class ObjectCacheManager extends EventEmitter
     {
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
-        function nextNode(disqualified, size)
-        {
-            const oldIdx = nodeIdx;
-        }
+        let commands = new Map();
+        this.byNode.forEach((value, key) => {
+            commands.set(key, { objects: [], available: value.maxSize - value.size });
+        });
+        // console.log(commands);
+        let max = 100000000;
+        let roundRobinIndex = 0;
         this.byMd5.forEach((value, key) => {
-            // if (value.length < redundancy + 1) {
-                // if (
-            // }
+            if (value.nodes.length < redundancy + 1 && max-- > 0) {
+                let needed = redundancy + 1 - value.nodes.length;
+                // console.log("should distribute", key, "to", needed, "nodes");
+
+                const old = 0;
+                let found = 0;
+                while (found < needed) {
+                    if (++nodeIdx == nodes.length)
+                        nodeIdx = 0;
+                    let node = nodes[nodeIdx];
+                    if (value.nodes.indexOf(node) != -1) {
+                        if (nodeIdx == old)
+                            break;
+                        continue;
+                    }
+                    let data = commands.get(node);
+                    if (data.available < value.fileSize) {
+                        if (nodeIdx == old)
+                            break;
+                        continue;
+                    }
+                    ++found;
+                    data.available -= value.fileSize;
+                    const src = value.nodes[roundRobinIndex++ % value.nodes.length];
+                    data.objects.push({ source: src.ip + ":" + src.port, md5: key });
+                }
+                // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
+            }
+        });
+        commands.forEach((value, key) => {
+            // console.log(key.ip + ": " + key.port, "will receive", value.objects);
+            if (value.objects.length) {
+                key.send({ type: "fetch_cache_objects", objects: value.objects });
+            }
         });
     }
 };
