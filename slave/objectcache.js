@@ -109,7 +109,7 @@ class ObjectCache extends EventEmitter
                         fd = fs.openSync(file.path, "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
-                        console.log("got headerSize", headerSize);
+                        // console.log("got headerSize", headerSize);
                         if (headerSize < 10 || headerSize > 1024 * 16)
                             throw new Error(`Got bad header size for ${file.fileName}: ${headerSize}`);
                         jsonBuffer = Buffer.allocUnsafe(headerSize);
