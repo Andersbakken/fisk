@@ -42,7 +42,7 @@ process.on("uncaughtException", err => {
     quitOnError();
 });
 
-debug = option("debug");
+let debug = option("debug");
 
 let restartOnInactivity = option("restart-on-inactivity");
 if (typeof restartOnInactivity === "string")
