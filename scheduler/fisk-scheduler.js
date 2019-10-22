@@ -504,7 +504,7 @@ server.on("listen", app => {
         res.send(JSON.stringify(obj, null, 4) + "\n");
     });
 
-    app.get("/objectcache", (req, res, next) => {
+    app.get("/objectcache", (req, res) => {
         if (!objectCache) {
             res.sendStatus(404);
             return;
@@ -521,7 +521,7 @@ server.on("listen", app => {
         }
     });
 
-    app.get("/quit-slaves", (req, res, next) => {
+    app.get("/quit-slaves", (req, res) => {
         res.sendStatus(200);
         const msg = {
             type: "quit",
@@ -534,7 +534,7 @@ server.on("listen", app => {
         }
     });
 
-    app.get('/environment/*', function(req, res, next) {
+    app.get('/environment/*', function(req, res) {
         const hash = req.path.substr(13);
         const env = Environments.environment(hash);
         console.log("got env request", hash, env);
@@ -551,7 +551,7 @@ server.on("listen", app => {
         rstream.pipe(res);
     });
 
-    app.get("/quit", (req, res, next) => {
+    app.get("/quit", (req, res) => {
         console.log("quitting", req.query);
         if ("purge_environments" in req.query) {
             try {
