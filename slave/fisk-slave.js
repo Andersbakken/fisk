@@ -209,21 +209,29 @@ client.on("fetch_cache_objects", message => {
                     console.log("Downloading", url, "->", file);
                     let expectedSize;
                     let stream = fs.createWriteStream(file);
-                    stream.on('finish', () => {
+                    stream.on("finish", () => {
                         console.log("Finished writing file", file);
                         const stat = fs.statSync(file);
                         if (stat.size != expectedSize) {
-                            throw new Error("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
+                            console("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
+                            fs.unlinkSync(file);
+                            resolve();
+                            return;
                         }
                         ++filesReceived;
                         resolve();
                     });
-                    // response_stream.on('response', function (response) {
+                    // response_stream.on("response", function (response) {
                     let responseStream = request.get({ url:url });
-                    responseStream.on('response', response => {
+                    responseStream.on("response", response => {
                         // console.log("got headers", response.headers);
                         expectedSize = response.headers["content-length"];
                         response.pipe(stream);
+                    });
+                    responseStream.on("error", error => {
+                        console.log("Got error downloading", url, error);
+                        fs.unlinkSync(file);
+                        resolve();
                     });
                 } catch (err) {
                     console.error("Got some error", err);
@@ -567,7 +575,7 @@ server.on("listen", app => {
         let file = path.join(objectCache.dir, md5);
         try {
             const stat = fs.statSync(file);
-            res.set('Content-Length', stat.size)
+            res.set("Content-Length", stat.size);
             const rstream = fs.createReadStream(file);
             rstream.on("error", err => {
                 console.error("Got read stream error for", file, err);
