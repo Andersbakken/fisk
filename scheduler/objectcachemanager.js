@@ -174,9 +174,13 @@ class ObjectCacheManager extends EventEmitter
         return ret;
     }
 
-    distribute(redundancy, max)
+    distribute(query)
     {
-        console.log("distribute called with redundancy of", redundancy, "and max of", max);
+        const redundancy = query.redundancy || 1;
+        const dry = "dry" in query;
+        let max = query.max || undefined;
+
+        console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry);
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
@@ -187,7 +191,9 @@ class ObjectCacheManager extends EventEmitter
         // let max = 1;
         let roundRobinIndex = 0;
         this.byMd5.forEach((value, key) => {
-            if (value.nodes.length < redundancy + 1 && max != undefined && max-- > 0) {
+            let needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
+            console.log("needed", needed, max);
+            if (needed > 0 && (max != undefined || max-- > 0)) {
                 let needed = redundancy + 1 - value.nodes.length;
                 // console.log("should distribute", key, "to", needed, "nodes");
 
@@ -215,13 +221,17 @@ class ObjectCacheManager extends EventEmitter
                 // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
             }
         });
+        let ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
             if (value.objects.length) {
-                console.log("sending objects", value.objects.length, this.byMd5.size);
-                key.send({ type: "fetch_cache_objects", objects: value.objects });
+                console.log(`sending fetch_cache_objects to ${key.ip}:${key.port}`, value.objects.length, this.byMd5.size);
+                ret[`${key.ip}:${key.port}`] = value.objects;
+                if (!dry)
+                    key.send({ type: "fetch_cache_objects", objects: value.objects });
             }
         });
+        return ret;
     }
 };
 

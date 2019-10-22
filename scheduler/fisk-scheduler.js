@@ -514,8 +514,8 @@ server.on("listen", app => {
             objectCache.clear();
             res.sendStatus(200);
         } else if (req.query && "distribute" in req.query) {
-            objectCache.distribute(req.query.distribute || 1, req.query.max);
-            res.sendStatus(200);
+            let result = objectCache.distribute(req.query || {});
+            res.send(JSON.stringify(result, null, 4) + "\n");
         } else {
             res.send(JSON.stringify(objectCache.dump(req.query || {}), null, 4) + "\n");
         }
