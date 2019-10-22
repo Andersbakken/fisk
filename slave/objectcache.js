@@ -109,6 +109,7 @@ class ObjectCache extends EventEmitter
                         fd = fs.openSync(file.path, "r");
                         fs.readSync(fd, headerSizeBuffer, 0, 4);
                         const headerSize = headerSizeBuffer.readUInt32LE(0);
+                        console.log("got headerSize", headerSize);
                         jsonBuffer = Buffer.allocUnsafe(headerSize);
                         fs.readSync(fd, jsonBuffer, 0, headerSize);
                         const response = JSON.parse(jsonBuffer.toString());
