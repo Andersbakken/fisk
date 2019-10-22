@@ -683,8 +683,9 @@ server.on("job", job => {
                 j.done = true;
                 if (j.aborted)
                     return;
+                const end = Date.now();
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name, event.exitCode, event.error);
+                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name, "exitCode", event.exitCode, "error", event.error, "in", (end - jobStartTime) + "ms");
                 if (idx != -1) {
                     jobQueue.splice(idx, 1);
                 } else {
@@ -718,7 +719,6 @@ server.on("job", job => {
                     job.send(contents[i].contents);
                 }
                 // job.close();
-                const end = Date.now();
                 // console.log("GOT ID", j);
                 if (event.success) {
                     client.send("jobFinished", {
