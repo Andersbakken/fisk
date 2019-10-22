@@ -231,7 +231,8 @@ client.on("fetch_cache_objects", message => {
             }
         });
     })).then(results => {
-        console.log("got results", filesReceived);
+        console.log("got results", filesReceived, "restarting");
+        process.exit();
     });
     // chain.then(() => {
     //     console.log("Received", filesReceived, "files. Restarting");
