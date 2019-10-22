@@ -192,7 +192,6 @@ class ObjectCacheManager extends EventEmitter
         let roundRobinIndex = 0;
         this.byMd5.forEach((value, key) => {
             let needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
-            console.log("needed", needed, max);
             if (needed > 0 && (max != undefined || max-- > 0)) {
                 let needed = redundancy + 1 - value.nodes.length;
                 // console.log("should distribute", key, "to", needed, "nodes");
