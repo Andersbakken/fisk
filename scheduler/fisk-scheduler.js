@@ -449,8 +449,8 @@ server.on("listen", app => {
 
     app.get("/slaves", (req, res, next) => {
         let ret = [];
-        for (let ip in slaves) {
-            let s = slaves[ip];
+        for (let slaveKey in slaves) {
+            let s = slaves[slaveKey];
             ret.push({
                 ip: s.ip,
                 name: s.name,
