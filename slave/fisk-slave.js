@@ -184,11 +184,11 @@ client.on("objectCache", enabled => {
 
         objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int("object-cache-purge-size") || objectCacheSize);
         objectCache.on("added", data => {
-            client.send({ type: "objectCacheAdded", md5: data.md5, sourceFile: data.sourceFile, size: objectCache.size });
+            client.send({ type: "objectCacheAdded", md5: data.md5, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
         });
 
         objectCache.on("removed", data => {
-            client.send({ type: "objectCacheRemoved", md5: data.md5, sourceFile: data.sourceFile, size: objectCache.size });
+            client.send({ type: "objectCacheRemoved", md5: data.md5, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
         });
     } else {
         objectCache = undefined;
@@ -461,7 +461,7 @@ client.on("connect", () => {
     if (!load.running)
         load.start(option("loadInterval", 1000));
     if (objectCache)
-        client.send({ type: "objectCache", md5s: objectCache.keys(), maxSize: objectCache.maxSize, size: objectCache.size });
+        client.send({ type: "objectCache", md5s: objectCache.syncData(), maxSize: objectCache.maxSize, cacheSize: objectCache.size });
 });
 
 client.on("error", err => {

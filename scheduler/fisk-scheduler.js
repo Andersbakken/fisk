@@ -513,6 +513,9 @@ server.on("listen", app => {
         if (req.query && "clear" in req.query) {
             objectCache.clear();
             res.sendStatus(200);
+        } else if (req.query && "distribute" in req.query) {
+            objectCache.distribute(req.query.distribute || 1);
+            res.sendStatus();
         } else {
             res.send(JSON.stringify(objectCache.dump(req.query || {}), null, 4) + "\n");
         }
@@ -828,9 +831,9 @@ server.on("compile", compile => {
     // ### should have a function match(s) that checks for env, score and compile.slave etc
     let foundInCache = false;
     if (objectCache) {
-        let cacheNodes = objectCache.get(compile.md5);
-        if (cacheNodes) {
-            cacheNodes.forEach(s => {
+        let data = objectCache.get(compile.md5);
+        if (data) {
+            data.nodes.forEach(s => {
                 if (compile.slave && slave != compile.slave)
                     return;
                 const slaveScore = score(s);

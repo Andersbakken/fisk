@@ -1,10 +1,10 @@
-const fs = require('fs-extra');
-const path = require('path');
+const fs = require("fs-extra");
+const path = require("path");
 const EventEmitter = require("events");
 
 function prettysize(bytes)
 {
-    const prettysize = require('prettysize');
+    const prettysize = require("prettysize");
     return prettysize(bytes, bytes >= 1024); // don't want 0Bytes
 }
 
@@ -196,7 +196,7 @@ class ObjectCache extends EventEmitter
                     }
                     this.cache[response.md5] = cacheItem;
                     // console.log(response);
-                    this.emit("added", { md5: response.md5, sourceFile: response.sourceFile });
+                    this.emit("added", { md5: response.md5, sourceFile: response.sourceFile, fileSize: cacheItem.fileSize });
 
                     this.size += cacheItem.fileSize;
                     if (this.size > this.maxSize)
@@ -245,10 +245,10 @@ class ObjectCache extends EventEmitter
     remove(md5)
     {
         try {
-            this.size -= this.cache[md5].fileSize;
             const info = this.cache[md5];
+            this.size -= info.fileSize;
             delete this.cache[md5];
-            this.emit("removed", { md5: md5, sourceFile: info.response.sourceFile });
+            this.emit("removed", { md5: md5, sourceFile: info.response.sourceFile, fileSize: info.fileSize });
             fs.unlinkSync(path.join(this.dir, md5));
         } catch (err) {
             console.error("Can't remove file", path.join(this.dir, md5), err.toString());
@@ -277,9 +277,13 @@ class ObjectCache extends EventEmitter
         return ret;
     }
 
-    keys()
+    syncData()
     {
-        return Object.keys(this.cache);
+        let ret = [];
+        for (let key in this.cache) {
+            ret.push({ md5: key, fileSize: this.cache[key].fileSize });
+        }
+        return ret;
     }
 };
 

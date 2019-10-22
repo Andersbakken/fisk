@@ -8,32 +8,41 @@ function prettysize(bytes)
 
 class NodeData
 {
-    constructor(data)
+    constructor(size, maxSize, md5s)
     {
-        this.md5s = data.md5s;
-        this.size = data.size;
-        this.maxSize = data.maxSize;
+        this.md5s = md5s;
+        this.size = size;
+        this.maxSize = maxSize;
     }
 };
 
-function addToMd5Map(byMd5, md5, node)
+class Md5Data
 {
-    let nodes = byMd5.get(md5);
-    if (nodes) {
-        nodes.push(node);
+    constructor(fileSize, node)
+    {
+        this.fileSize = fileSize;
+        this.nodes = [ node ];
+    }
+};
+
+function addToMd5Map(byMd5, md5, fileSize, node)
+{
+    let data = byMd5.get(md5);
+    if (data) {
+        data.nodes.push(node);
     } else {
-        byMd5.set(md5, [ node ]);
+        byMd5.set(md5, new Md5Data(fileSize, node));
     }
 }
 
 function removeFromMd5Map(byMd5, md5, node)
 {
-    let nodes = byMd5.get(md5);
-    if (nodes) {
-        let idx = nodes.indexOf(node);
+    let data = byMd5.get(md5);
+    if (data) {
+        let idx = data.nodes.indexOf(node);
         if (idx != -1) {
-            nodes.splice(idx, 1);
-            if (nodes.length == 0) {
+            data.nodes.splice(idx, 1);
+            if (data.nodes.length == 0) {
                 byMd5.delete(md5);
             }
         } else {
@@ -72,8 +81,8 @@ class ObjectCacheManager extends EventEmitter
         console.log("adding", msg.sourceFile, msg.md5, "for", node.ip + ":" + node.port, nodeData ? nodeData.md5s.length : -1);
         if (nodeData) {
             nodeData.md5s.push(msg.md5);
-            nodeData.size = msg.size;
-            addToMd5Map(this.byMd5, msg.md5, node);
+            nodeData.size = msg.cacheSize;
+            addToMd5Map(this.byMd5, msg.md5, msg.fileSize, node);
         } else {
             console.error("insert: We don't seem to have this node", node.ip + ":" + node.port);
         }
@@ -103,15 +112,16 @@ class ObjectCacheManager extends EventEmitter
                     node.ip + ":" + node.port,
                     node.name, node.hostname,
                     "maxSize", data.maxSize,
-                    "size", data.size,
+                    "cacheSize", data.cacheSize,
                     "md5s", data.md5s.length);
         if (this.byNode.get(node)) {
             console.log("We already have", node.ip + ":" + node.port);
             return;
         }
-        this.byNode.set(node, new NodeData(data));
-        data.md5s.forEach(md5 => {
-            addToMd5Map(this.byMd5, md5, node);
+        let md5s = data.md5s.map(item => item.md5);
+        this.byNode.set(node, new NodeData(data.cacheSize, data.maxSize, md5s));
+        data.md5s.forEach(item => {
+            addToMd5Map(this.byMd5, item.md5, item.fileSize, node);
         });
     }
 
@@ -156,11 +166,27 @@ class ObjectCacheManager extends EventEmitter
         if ("objects" in query) {
             ret.md5 = {};
             this.byMd5.forEach((value, key) => {
-                ret.md5[key] = value.map(node => node.ip + ":" + node.port);
+                // console.log(key, value);
+                ret.md5[key] = { fileSize: prettysize(value.fileSize), nodes: value.nodes.map(node => node.ip + ":" + node.port) };
             });
         }
 
         return ret;
+    }
+
+    distribute(redundancy)
+    {
+        let nodes = Array.from(this.byNode.keys());
+        let nodeIdx = 0;
+        function nextNode(disqualified, size)
+        {
+            const oldIdx = nodeIdx;
+        }
+        this.byMd5.forEach((value, key) => {
+            // if (value.length < redundancy + 1) {
+                // if (
+            // }
+        });
     }
 };
 
