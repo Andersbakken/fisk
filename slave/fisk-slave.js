@@ -209,18 +209,6 @@ client.on("fetch_cache_objects", message => {
                     console.log("Downloading", url, "->", file);
                     let expectedSize;
                     let stream = fs.createWriteStream(file);
-                    stream.on("finish", () => {
-                        console.log("Finished writing file", file);
-                        const stat = fs.statSync(file);
-                        if (stat.size != expectedSize) {
-                            console("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
-                            fs.unlinkSync(file);
-                            resolve();
-                            return;
-                        }
-                        ++filesReceived;
-                        resolve();
-                    });
                     // response_stream.on("response", function (response) {
                     let responseStream = request.get({ url:url });
                     responseStream.on("response", response => {
@@ -233,6 +221,19 @@ client.on("fetch_cache_objects", message => {
                         fs.unlinkSync(file);
                         resolve();
                     });
+                    stream.on("finish", () => {
+                        console.log("Finished writing file", file);
+                        const stat = fs.statSync(file);
+                        if (stat.size != expectedSize) {
+                            console("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
+                            fs.unlinkSync(file);
+                            resolve();
+                            return;
+                        }
+                        ++filesReceived;
+                        objectCache.loadFile(file, stat.size);
+                        resolve();
+                    });
                 } catch (err) {
                     console.error("Got some error", err);
                     fs.unlinkSync(file);
@@ -242,8 +243,7 @@ client.on("fetch_cache_objects", message => {
         });
     });
     promise.then(() => {
-        console.log("got results", filesReceived, "restarting");
-        process.exit();
+        console.log("got results", filesReceived);
     });
     // chain.then(() => {
     //     console.log("Received", filesReceived, "files. Restarting");
