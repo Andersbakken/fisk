@@ -206,10 +206,6 @@ class ObjectCacheManager extends EventEmitter
                         if (++nodeIdx == nodes.length)
                             nodeIdx = 0;
                         let node = nodes[nodeIdx];
-                        if (nodeRestriction && `${node.ip}:${node.port}` != nodeRestriction) {
-                            console.log(`skipping node ${node.ip}:${node.port} because of restriction ${nodeRestriction}`);
-                            continue;
-                        }
                         if (value.nodes.indexOf(node) != -1) {
                             continue;
                         }
@@ -234,7 +230,7 @@ class ObjectCacheManager extends EventEmitter
         let ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
-            if (value.objects.length) {
+            if (value.objects.length && (!nodeRestriction || (key.ip + ":" + key.port) == nodeRestriction)) {
                 console.log(`sending ${value.objects.length}/${this.byMd5.size} fetch_cache_objects to ${key.ip}:${key.port}`);
                 ret[`${key.ip}:${key.port}`] = value.objects;
                 if (!dry)
