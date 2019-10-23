@@ -192,6 +192,7 @@ class ObjectCacheManager extends EventEmitter
             commands.set(key, { objects: [], available: value.maxSize - value.size });
         });
         let nodeRestriction = query.node;
+        let count = 0;
         // console.log(commands);
         if (this.byNode.size >= 2) {
             // let max = 1;
@@ -237,10 +238,12 @@ class ObjectCacheManager extends EventEmitter
             if (value.objects.length && (!nodeRestriction || (key.ip + ":" + key.port) == nodeRestriction)) {
                 console.log(`sending ${value.objects.length}/${this.byMd5.size} fetch_cache_objects to ${key.ip}:${key.port}`);
                 ret[`${key.ip}:${key.port}`] = value.objects;
+                count += value.objects.length;
                 if (!dry)
                     key.send({ type: "fetch_cache_objects", objects: value.objects });
             }
         });
+        ret["count"] = count;
         return ret;
     }
 };
