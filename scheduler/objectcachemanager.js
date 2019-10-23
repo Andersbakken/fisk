@@ -176,9 +176,13 @@ class ObjectCacheManager extends EventEmitter
 
     distribute(query)
     {
-        const redundancy = typeof query.redundancy == "number" ? query.redundancy : 1;
+        let redundancy = parseInt(query.redundancy);
+        if (isNaN(redundancy) || redundancy <= 0)
+            redundancy = 1;
         const dry = "dry" in query;
-        let max = typeof query.max == 'number' ? query.max : undefined;
+        let max = parseInt(query.max);
+        if (isNaN(max) || max <= 0)
+            max = undefined;
 
         console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry);
         let nodes = Array.from(this.byNode.keys());
