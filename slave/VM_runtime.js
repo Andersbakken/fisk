@@ -102,7 +102,8 @@ function findLibraries(dir)
 }
 
 findLibraries("/");
-console.log("Got lib directories", argv.root, libDirs);
+if (argv.debug)
+    console.log("Got lib directories", argv.root, libDirs);
 if (libDirs.length) {
     process.env[mac ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH"] = libDirs.join(":");
 }
