@@ -176,6 +176,7 @@ class ObjectCacheManager extends EventEmitter
 
     distribute(query)
     {
+        let that = this;
         let redundancy = parseInt(query.redundancy);
         if (isNaN(redundancy) || redundancy <= 0)
             redundancy = 1;
@@ -183,24 +184,28 @@ class ObjectCacheManager extends EventEmitter
         let max = parseInt(query.max);
         if (isNaN(max) || max <= 0)
             max = undefined;
+        const md5 = query.md5;
 
-        console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry);
+        console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "md5", md5);
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
-        this.byNode.forEach((value, key) => {
-            commands.set(key, { objects: [], available: value.maxSize - value.size });
-        });
+        if (!md5) {
+            this.byNode.forEach((value, key) => {
+                commands.set(key, { objects: [], available: value.maxSize - value.size });
+            });
+        }
         let nodeRestriction = query.node;
         let count = 0;
         // console.log(commands);
         if (this.byNode.size >= 2) {
             // let max = 1;
             let roundRobinIndex = 0;
-            this.byMd5.forEach((value, key) => {
+            function processObject(md5, value)
+            {
                 if (max != undefined && max <= 0)
                     return;
-                let needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
+                let needed = Math.min(redundancy + 1 - value.nodes.length, that.byNode.size - 1);
                 if (needed > 0) {
                     let needed = redundancy + 1 - value.nodes.length;
                     // console.log("should distribute", key, "to", needed, "nodes");
@@ -215,22 +220,37 @@ class ObjectCacheManager extends EventEmitter
                             continue;
                         }
                         let data = commands.get(node);
-                        if (data.available < value.fileSize) {
+                        let available = data ? data.available : node.maxSize - node.size;
+                        if (available < value.fileSize) {
                             if (nodeIdx == old) {
                                 break;
                             }
                             continue;
                         }
+                        if (!data) {
+                            data = { objects: [], available: available };
+                            commands.set(node, data);
+                        }
                         ++found;
                         data.available -= value.fileSize;
                         const src = value.nodes[roundRobinIndex++ % value.nodes.length];
-                        data.objects.push({ source: src.ip + ":" + src.port, md5: key });
+                        data.objects.push({ source: src.ip + ":" + src.port, md5: md5 });
                         if (max != undefined && !--max)
                             break;
                     }
                     // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
                 }
-            });
+            }
+            if (md5) {
+                let val = this.byMd5.get(md5);
+                if (val) {
+                    processObject(md5, val);
+                } else {
+                    console.error("Couldn't find md5", md5);
+                }
+            } else {
+                this.byMd5.forEach((value, key) => processObject(key, value));
+            }
         }
         let ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
         commands.forEach((value, key) => {
