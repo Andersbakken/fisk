@@ -296,7 +296,7 @@ function forEachSlave(cb) {
 }
 
 if (option('object-cache')) {
-    objectCache = new ObjectCacheManager;
+    objectCache = new ObjectCacheManager(option);
     objectCache.on("cleared", () => {
         jobsFailed = 0;
         jobsStarted = 0;

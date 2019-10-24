@@ -30,8 +30,10 @@ function addToMd5Map(byMd5, md5, fileSize, node)
     let data = byMd5.get(md5);
     if (data) {
         data.nodes.push(node);
+        return data.nodes.length;
     } else {
         byMd5.set(md5, new Md5Data(fileSize, node));
+        return 1;
     }
 }
 
@@ -55,12 +57,17 @@ function removeFromMd5Map(byMd5, md5, node)
 
 class ObjectCacheManager extends EventEmitter
 {
-    constructor()
+    constructor(option)
     {
         super();
         this.hits = 0;
         this.byMd5 = new Map();
         this.byNode = new Map();
+        this.distributeRedundancy = option("distribute-object-cache-redundancy");
+
+        if (this.distributeRedundancy === true) {
+            this.distributeRedundancy = 1;
+        }
     }
 
     clear()
@@ -82,7 +89,10 @@ class ObjectCacheManager extends EventEmitter
         if (nodeData) {
             nodeData.md5s.push(msg.md5);
             nodeData.size = msg.cacheSize;
-            addToMd5Map(this.byMd5, msg.md5, msg.fileSize, node);
+            const count = addToMd5Map(this.byMd5, msg.md5, msg.fileSize, node);
+            if (this.distributeRedundancy && count - 1 < this.distributeRedundancy) {
+                this.distribute({ md5: msg.md5, redundancy: this.distributeRedundancy });
+            }
         } else {
             console.error("insert: We don't seem to have this node", node.ip + ":" + node.port);
         }
