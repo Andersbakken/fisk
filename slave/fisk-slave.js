@@ -646,13 +646,13 @@ server.on("job", job => {
                             user: job.user
                         },
                         sourceFile: job.sourceFile,
+                        md5: job.md5,
                         id: job.id
                     };
                     // console.log("sending cachehit", info);
                     client.send(info);
 
-                    if (debug)
-                        console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
+                    console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
                 }
                 j.done = true;
                 let idx = jobQueue.indexOf(j);

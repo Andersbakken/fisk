@@ -63,17 +63,25 @@ class ObjectCacheManager extends EventEmitter
         this.hits = 0;
         this.byMd5 = new Map();
         this.byNode = new Map();
-        this.distributeRedundancy = option("distribute-object-cache-redundancy");
-
-        if (this.distributeRedundancy === true) {
-            this.distributeRedundancy = 1;
-        }
+        this.redundancy = option.int("object-cache-redundancy", 1);
+        if (this.redundancy <= 0)
+            this.redundancy = 1;
+        this.distributeOnInsertion = option("distribute-object-cache-on-insertion") || false;
+        this.distributeOnCacheHit = option("distribute-object-cache-on-cache-hit") || false;
     }
 
     clear()
     {
         this.hits = 0;
         this.emit("cleared");
+    }
+
+    hit(md5)
+    {
+        if (this.distributeOnCacheHit) {
+            ++this.hits;
+            this.distribute({ md5: md5, redundancy: this.redundancy });
+        }
     }
 
     get(md5)
@@ -90,8 +98,8 @@ class ObjectCacheManager extends EventEmitter
             nodeData.md5s.push(msg.md5);
             nodeData.size = msg.cacheSize;
             const count = addToMd5Map(this.byMd5, msg.md5, msg.fileSize, node);
-            if (this.distributeRedundancy && count - 1 < this.distributeRedundancy) {
-                this.distribute({ md5: msg.md5, redundancy: this.distributeRedundancy });
+            if (this.distributeOnInsertion && count - 1 < this.redundancy) {
+                this.distribute({ md5: msg.md5, redundancy: this.redundancy });
             }
         } else {
             console.error("insert: We don't seem to have this node", node.ip + ":" + node.port);
@@ -186,17 +194,22 @@ class ObjectCacheManager extends EventEmitter
 
     distribute(query)
     {
-        let that = this;
+        const dry = "dry" in query;
         let redundancy = parseInt(query.redundancy);
         if (isNaN(redundancy) || redundancy <= 0)
             redundancy = 1;
-        const dry = "dry" in query;
         let max = parseInt(query.max);
         if (isNaN(max) || max <= 0)
             max = undefined;
         const md5 = query.md5;
 
-        console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "md5", md5);
+        let ret;
+        if (query.returnValue) {
+            ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
+            console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "md5", md5);
+        }
+
+        let that = this;
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
@@ -262,18 +275,19 @@ class ObjectCacheManager extends EventEmitter
                 this.byMd5.forEach((value, key) => processObject(key, value));
             }
         }
-        let ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
             if (value.objects.length && (!nodeRestriction || (key.ip + ":" + key.port) == nodeRestriction)) {
                 console.log(`sending ${value.objects.length}/${this.byMd5.size} fetch_cache_objects to ${key.ip}:${key.port}`);
-                ret[`${key.ip}:${key.port}`] = value.objects;
+                if (ret)
+                    ret[`${key.ip}:${key.port}`] = value.objects;
                 count += value.objects.length;
                 if (!dry)
                     key.send({ type: "fetch_cache_objects", objects: value.objects });
             }
         });
-        ret["count"] = count;
+        if (ret)
+            ret["count"] = count;
         return ret;
     }
 };

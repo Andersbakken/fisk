@@ -184,7 +184,7 @@ function jobStartedOrScheduled(type, job)
 function cacheHit(slave, job)
 {
     if (objectCache)
-        ++objectCache.hits;
+        objectCache.hit(job.md5);
     if (monitors.length) {
         let info = {
             type: "cacheHit",
@@ -514,7 +514,8 @@ server.on("listen", app => {
             objectCache.clear();
             res.sendStatus(200);
         } else if (req.query && "distribute" in req.query) {
-            let result = objectCache.distribute(req.query || {});
+            req.query.returnValue = true;
+            let result = objectCache.distribute(req.query);
             res.send(JSON.stringify(result, null, 4) + "\n");
         } else {
             res.send(JSON.stringify(objectCache.dump(req.query || {}), null, 4) + "\n");
