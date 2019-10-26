@@ -237,8 +237,10 @@ class ObjectCache extends EventEmitter
         return ret;
     }
 
-    dump(query)
+    info(query)
     {
+        if (!query)
+            query = {};
         const ret = Object.assign({ cacheHits: this.cacheHits, usage: ((this.size / this.maxSize) * 100).toFixed(1) }, this);
         ret.count = Object.keys(ret.cache).length;
         if (!("objects" in query))

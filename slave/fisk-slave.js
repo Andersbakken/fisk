@@ -412,8 +412,8 @@ client.on("getEnvironments", message => {
             let restart = option("restart-on-new-environments");
             if (!restart) {
                 setTimeout(() => {
-                        client.send("environments", { environments: Object.keys(environments) });
-                        console.log("Informing scheduler about our environments:", Object.keys(environments));
+                    client.send("environments", { environments: Object.keys(environments) });
+                    console.log("Informing scheduler about our environments:", Object.keys(environments));
                 }, option.int("inform-delay", 5000));
             } else {
                 console.log("Restarting after we got our new environments");
@@ -566,13 +566,22 @@ server.on("listen", app => {
     });
 
     app.get("/objectcache/*", (req, res) => {
-        const md5 = req.url.substr(13);
-        let data = objectCache.get(md5, true);
+        if (!objectCache) {
+            res.sendStatus(404);
+            return;
+        }
+
+        const path = req.url.substr(13);
+        if (path == "info") {
+            res.send(objectcache.info(res.query || {}));
+            return;
+        };
+        let data = objectCache.get(path, true);
         if (!data) {
             res.sendStatus(404);
             return;
         }
-        let file = path.join(objectCache.dir, md5);
+        let file = path.join(objectCache.dir, path);
         try {
             const stat = fs.statSync(file);
             res.set("Content-Length", stat.size);
@@ -723,6 +732,8 @@ server.on("job", job => {
                 job.send(response);
                 if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == "none") {
                     response.sourceFile = job.sourceFile;
+                    response.commandLine = job.commandLine;
+                    response.environment = job.hash;
                     objectCache.add(response, contents);
                 }
 
