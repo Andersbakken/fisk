@@ -571,7 +571,7 @@ server.on("listen", app => {
             return;
         }
 
-        const path = req.url.substr(13);
+        const path = req.path;
         if (path == "info") {
             res.send(objectCache.info(res.query || {}));
             return;
