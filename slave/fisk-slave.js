@@ -573,7 +573,7 @@ server.on("listen", app => {
 
         const path = req.url.substr(13);
         if (path == "info") {
-            res.send(objectcache.info(res.query || {}));
+            res.send(objectCache.info(res.query || {}));
             return;
         };
         let data = objectCache.get(path, true);
