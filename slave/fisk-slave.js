@@ -573,11 +573,10 @@ server.on("listen", app => {
         }
 
         const parsed = Url.parse(req.url);
-        console.log(parsed);
 
-        const path = req.path;
+        const path = parsed.pathname.substr(13);
         if (path == "info") {
-            res.send(objectCache.info(res.query || {}));
+            res.send(JSON.stringify(objectCache.info(req.query || {}), null, 4));
             return;
         };
         let data = objectCache.get(path, true);

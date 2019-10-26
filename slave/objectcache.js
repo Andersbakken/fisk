@@ -81,7 +81,6 @@ class ObjectCache extends EventEmitter
         this.purgeSize = purgeSize;
         this.cache = {};
         this.pending = {};
-        this.streams = {};
         this.size = 0;
         // console.log(fs.readdirSync(this.dir, { withFileTypes: true }));
         try {
@@ -243,10 +242,10 @@ class ObjectCache extends EventEmitter
             query = {};
         const ret = Object.assign({ cacheHits: this.cacheHits, usage: ((this.size / this.maxSize) * 100).toFixed(1) }, this);
         ret.count = Object.keys(ret.cache).length;
+        delete ret._events;
+        delete ret._eventsCount;
         if (!("objects" in query))
             delete ret.cache;
-        if (!("streams" in query))
-            delete ret.streams;
         if (!("pending" in query))
             delete ret.pending;
         [ "maxSize", "size", "purgeSize" ].forEach(key => {
