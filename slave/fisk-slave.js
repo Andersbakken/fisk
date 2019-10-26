@@ -6,6 +6,7 @@ const option = require("@jhanssen/options")({ prefix: "fisk/slave",
 
 const request = require("request");
 const ws = require("ws");
+const Url = require("url");
 const common = require("../common")(option);
 const Server = require("./server");
 const Client = require("./client");
@@ -570,6 +571,9 @@ server.on("listen", app => {
             res.sendStatus(404);
             return;
         }
+
+        const parsed = Url.parse(req.url);
+        console.log(parsed);
 
         const path = req.path;
         if (path == "info") {
