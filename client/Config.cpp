@@ -92,22 +92,23 @@ static Separator s6("CPU allowances:");
 Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(), [](const size_t &value) { return std::max<size_t>(1, value); });
 Getter<size_t> desiredCompileSlots("desired-slots", "Number of desired compile slots", 0);
 Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2, [](const size_t &value) { return std::max<size_t>(1, value); });
+Getter<std::string> releaseCppSlotMode("release-cpp-slot-mode", "Release cpp slot mode: cpp-finished or upload-finished", "cpp-finished");
 
 static Separator s7;
 static Separator s8("Identity:");
 Getter<std::string> hostname("hostname", "Set hostname", std::string(), [](const std::string &value) {
-        if (!value.empty())
-            return value;
-        std::string n(256, ' ');
-        ::gethostname(&n[0], n.size());
-        n.resize(strlen(n.c_str()));
-        return n;
-    });
+    if (!value.empty())
+        return value;
+    std::string n(256, ' ');
+    ::gethostname(&n[0], n.size());
+    n.resize(strlen(n.c_str()));
+    return n;
+});
 Getter<std::string> name("name", "Set name (used for visualization)", std::string(), [](const std::string &value) {
-        if (!value.empty())
-            return value;
-        return static_cast<std::string>(hostname);
-    });
+    if (!value.empty())
+        return value;
+    return static_cast<std::string>(hostname);
+});
 static  Separator s9;
 static Separator s10("Logging:");
 Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr than)", false);

@@ -297,6 +297,18 @@ int main(int argc, char **argv)
     }
     const std::string url = schedulerUrl();
 
+    bool releaseCppSlotOnCppFinished = true;
+    {
+        const std::string releaseCppSlotMode = Config::releaseCppSlotMode;
+        if (!strcasecmp("cpp-finished", releaseCppSlotMode.c_str())) {
+            releaseCppSlotOnCppFinished = true;
+        } else if (!strcasecmp("upload-finished", releaseCppSlotMode.c_str())) {
+            releaseCppSlotOnCppFinished = false;
+        } else {
+            FATAL("Invalid --release-cpp-slot-mode mode %s", releaseCppSlotMode.c_str());
+        }
+    }
+
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
         while (!data.preprocessed->done()
@@ -309,7 +321,8 @@ int main(int argc, char **argv)
             runLocal("watchdog preprocessing");
             return 0; // unreachable
         }
-        daemonSocket.send(DaemonSocket::ReleaseCppSlot);
+        if (releaseCppSlotOnCppFinished)
+            daemonSocket.send(DaemonSocket::ReleaseCppSlot);
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -442,7 +455,8 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
 
-        daemonSocket.send(DaemonSocket::ReleaseCppSlot);
+        if (releaseCppSlotOnCppFinished)
+            daemonSocket.send(DaemonSocket::ReleaseCppSlot);
         data.watchdog->transition(Watchdog::PreprocessFinished);
         DEBUG("Preprocessed finished");
         preprocessedDuration = data.preprocessed->duration;
@@ -516,6 +530,7 @@ int main(int argc, char **argv)
 
     assert(!slaveWebSocket.wait);
     slaveWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
+    data.preprocessed->stdOut.clear();
 
     while (data.watchdog->timedOut()
            && slaveWebSocket.hasPendingSendData()
@@ -536,6 +551,9 @@ int main(int argc, char **argv)
     }
 
     data.watchdog->transition(Watchdog::UploadedJob);
+    if (!releaseCppSlotOnCppFinished) {
+        daemonSocket.send(DaemonSocket::ReleaseCppSlot);
+    }
 
     while (!data.watchdog->timedOut()
            && !slaveWebSocket.done
