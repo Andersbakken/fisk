@@ -67,7 +67,8 @@ Getter<bool> verify("verify", "Only verify that the npm version is correct", fal
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
-static Separator s4("Timeouts:");
+static Separator s4;
+static Separator s5("Timeouts:");
 Getter<unsigned long long> daemonConnectTimeout("daemon-connect-timeout", "Set daemon connect timeout", 10000);
 Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "Set acquired slave watchdog timeout", 30000);
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 7500);
@@ -87,15 +88,15 @@ Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir", getenv("HOME"
                              });
 Getter<std::string> statisticsLog("statistics-log", "Dump statistics into this file");
 
-static Separator s5;
-static Separator s6("CPU allowances:");
+static Separator s6;
+static Separator s7("CPU allowances:");
 Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(), [](const size_t &value) { return std::max<size_t>(1, value); });
 Getter<size_t> desiredCompileSlots("desired-slots", "Number of desired compile slots", 0);
 Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2, [](const size_t &value) { return std::max<size_t>(1, value); });
 Getter<std::string> releaseCppSlotMode("release-cpp-slot-mode", "Release cpp slot mode: cpp-finished or upload-finished", "cpp-finished");
 
-static Separator s7;
-static Separator s8("Identity:");
+static Separator s8;
+static Separator s9("Identity:");
 Getter<std::string> hostname("hostname", "Set hostname", std::string(), [](const std::string &value) {
     if (!value.empty())
         return value;
@@ -109,8 +110,8 @@ Getter<std::string> name("name", "Set name (used for visualization)", std::strin
         return value;
     return static_cast<std::string>(hostname);
 });
-static  Separator s9;
-static Separator s10("Logging:");
+static  Separator s10;
+static Separator s11("Logging:");
 Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr than)", false);
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
@@ -275,7 +276,6 @@ bool Config::init(int &argc, char **&argv)
             } else {
                 version.apply(std::string());
             }
-            return true;
         }
     }
 

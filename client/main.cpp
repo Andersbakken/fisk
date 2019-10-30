@@ -52,7 +52,7 @@ int main(int argc, char **argv)
         Log::shutdown();
     });
 
-    if (!Config::init(argc, argv)) {
+    if (!Config::init(argc, argv) && !Config::help) {
         return 105;
     }
 
@@ -307,6 +307,7 @@ int main(int argc, char **argv)
         } else {
             FATAL("Invalid --release-cpp-slot-mode mode %s", releaseCppSlotMode.c_str());
         }
+        printf("SHIT %d %s\n", releaseCppSlotOnCppFinished, releaseCppSlotMode.c_str());
     }
 
     if (Config::objectCache) {
