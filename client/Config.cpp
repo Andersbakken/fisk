@@ -391,7 +391,7 @@ void Config::usage(FILE *f)
     for (const auto &getter : sGetters) {
         max = std::max<int>(max, static_cast<int>(2 + 7 + getter.first.size() + 1 + 8 + 3 + 3));
     }
-    fprintf(f, "  --help%*s%s (false)\n", max - 12, "", "Display this help (if argv0 is fiskc)");
+    fprintf(f, "  --help%*s%s (false)\n", max - 11, "", "Display this help (if argv0 is fiskc)");
     for (const GetterBase *getter : sOrderedGetters) {
         if (getter->jsonKey().empty()) {
             fprintf(f, "%s\n", getter->help());
