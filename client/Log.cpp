@@ -2,6 +2,7 @@
 #include "Client.h"
 #include <unistd.h>
 #include <sys/file.h>
+#include <sys/time.h>
 
 static Log::Level sLevel = Log::Fatal;
 static FILE *sLogFile = nullptr;
@@ -75,6 +76,16 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
     return Silent;
 }
 
+static void logTime(FILE *f, unsigned long long elapsed)
+{
+    const time_t t = time(nullptr);
+    struct tm *teeem = localtime(&t);
+    char buf[256];
+    // Oct 29 16:54:19
+    strftime(buf, sizeof(buf), "%b %d %T", teeem);
+    fprintf(f, "%s pid: %llu: elapsed: %llu.%03llu: ", buf, sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
+}
+
 void Log::log(Level level, const std::string &string, unsigned int flags)
 {
     if (level < sLevel && !sLogFile)
@@ -85,8 +96,9 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - Client::started;
     if (level >= sLevel) {
-        if (Config::logTimePrefix)
-            fprintf(f, "%llu: %llu.%03llu: ", sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
+        if (Config::logTimePrefix) {
+            logTime(f, elapsed);
+        }
         fwrite(string.c_str(), 1, string.size(), f);
     }
     int fd = -1;
@@ -100,7 +112,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
 
     if (sLogFile) {
         if (Config::logTimePrefix)
-            fprintf(sLogFile, "%llu: %llu.%03llu: ", sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
+            logTime(sLogFile, elapsed);
         fwrite(string.c_str(), 1, string.size(), sLogFile);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
