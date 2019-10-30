@@ -392,7 +392,7 @@ void Config::usage(FILE *f)
         max = std::max<int>(max, static_cast<int>(2 + 7 + getter.first.size() + 1 + 8 + 3 + 3));
     }
     fprintf(f, "  --help%*s%s (false)\n", max - 11, "", "Display this help (if argv0 is fiskc)");
-    fprintf(f, "  --version%*s%s (false)\n", max - 8, "", "Display version information (if argv0 is fiskc)");
+    fprintf(f, "  --version%*s%s (false)\n", max - 14, "", "Display version information (if argv0 is fiskc)");
 
     for (const GetterBase *getter : sOrderedGetters) {
         if (getter->jsonKey().empty()) {
