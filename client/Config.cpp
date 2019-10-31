@@ -57,6 +57,7 @@ Getter<std::string> socket("socket", "Set fiskc's socket file", "/var/fisk/daemo
 Getter<std::string> slave("slave", "Set to hostname, name or ip if you have a preferred slave");
 static Separator s2;
 static Separator s3("Options:");
+Getter<bool> color("color", "Set to false to disable colorized output", true);
 Getter<bool> dumpSlots("dump-slots", "Dump slots info for fisk-daemon", false);
 Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);

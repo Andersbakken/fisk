@@ -246,22 +246,23 @@ int main(int argc, char **argv)
             // printf("%zu: %s\n", i, argv[i]);
             args[i] = data.argv[i];
         }
+
+        if (!Config::color) {
+            for (std::string &arg : args) {
+                if (arg == "-fcolor-diagnostics") {
+                    arg = "-fno-color-diagnostics";
+                } else if (arg == "-fdiagnostics-color=always" || arg == "-fdiagnostics-color=auto") {
+                    arg = "-fdiagnostics-color=never";
+                }
+            }
+        }
+
         data.compilerArgs = CompilerArgs::create(args, &data.localReason);
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
         runLocal(Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
         return 0; // unreachable
-    }
-
-    if (!Client::isAtty()) {
-        for (auto it = data.compilerArgs->commandLine.begin(); it != data.compilerArgs->commandLine.end(); ++it) {
-            if (*it == "-fcolor-diagnostics") {
-                *it = "-fno-color-diagnostics";
-            } else if (*it == "-fdiagnostics-color=always" || *it == "-fdiagnostics-color=auto") {
-                *it = "-fdiagnostics-color=never";
-            }
-        }
     }
 
     daemonSocket.send(DaemonSocket::AcquireCppSlot);
