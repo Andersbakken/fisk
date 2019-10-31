@@ -708,7 +708,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         char buf[1024 * 256];
         size_t sent = 0;
         do {
-            const size_t chunkSize = std::min<size_t>(st.st_size - sent, sizeof(buf));
+            const size_t chunkSize = std::min(static_cast<size_t>(st.st_size - sent), sizeof(buf));
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
                 int ret;
