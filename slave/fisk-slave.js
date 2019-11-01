@@ -224,16 +224,24 @@ client.on("fetch_cache_objects", message => {
                     });
                     stream.on("finish", () => {
                         console.log("Finished writing file", file);
-                        const stat = fs.statSync(file);
-                        if (stat.size != expectedSize) {
-                            console("Got wrong size for", file, url, "\nGot", stat.size, "expected", expectedSize);
-                            fs.unlinkSync(file);
+                        let stat;
+                        try {
+                            stat = fs.statSync(file);
+                        } catch (err) {
+                        }
+                        if (!stat || stat.size != expectedSize) {
+                            console("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
+                            try {
+                                fs.unlinkSync(file);
+                            } catch (err) {
+                            }
                             resolve();
                             return;
                         }
                         ++filesReceived;
                         objectCache.loadFile(file, stat.size);
                         resolve();
+
                     });
                 } catch (err) {
                     console.error("Got some error", err);
