@@ -582,17 +582,17 @@ server.on("listen", app => {
 
         const parsed = Url.parse(req.url);
 
-        const path = parsed.pathname.substr(13);
-        if (path == "info") {
+        const urlPath = parsed.pathname.substr(13);
+        if (urlPath == "info") {
             res.send(JSON.stringify(objectCache.info(req.query || {}), null, 4));
             return;
         };
-        let data = objectCache.get(path, true);
+        let data = objectCache.get(urlPath, true);
         if (!data) {
             res.sendStatus(404);
             return;
         }
-        let file = path.join(objectCache.dir, path);
+        let file = path.join(objectCache.dir, urlPath);
         try {
             const stat = fs.statSync(file);
             res.set("Content-Length", stat.size);
