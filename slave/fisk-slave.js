@@ -230,7 +230,7 @@ client.on("fetch_cache_objects", message => {
                         } catch (err) {
                         }
                         if (!stat || stat.size != expectedSize) {
-                            console("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
+                            console.log("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
                             try {
                                 fs.unlinkSync(file);
                             } catch (err) {
