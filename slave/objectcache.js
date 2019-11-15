@@ -265,7 +265,6 @@ class ObjectCache extends EventEmitter
         } catch (err) {
             console.error("Can't remove file", path.join(this.dir, md5), err.toString());
         }
-
     }
 
     purge(targetSize)

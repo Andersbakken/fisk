@@ -219,7 +219,11 @@ client.on("fetch_cache_objects", message => {
                     });
                     responseStream.on("error", error => {
                         console.log("Got error downloading", url, error);
-                        fs.unlinkSync(file);
+                        try {
+                            fs.unlinkSync(file);
+                        } catch (err) {
+                            console.log("Got error unlinking file", file, err);
+                        }
                         resolve();
                     });
                     stream.on("finish", () => {
@@ -234,6 +238,7 @@ client.on("fetch_cache_objects", message => {
                             try {
                                 fs.unlinkSync(file);
                             } catch (err) {
+                                console.log("Got error unlinking file", file, err);
                             }
                             resolve();
                             return;
