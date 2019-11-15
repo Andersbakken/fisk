@@ -118,7 +118,7 @@ class ObjectCacheManager extends EventEmitter
                 console.error("We don't have", msg.md5, "on", node.ip + ":" + node.port);
             }
             removeFromMd5Map(this.byMd5, msg.md5, node);
-            nodeData.size = msg.size;
+            nodeData.size = msg.cacheSize;
         } else {
             console.error("remove: We don't seem to have this node", node.ip + ":" + node.port);
         }

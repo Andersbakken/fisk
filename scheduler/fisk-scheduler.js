@@ -631,6 +631,7 @@ function addLogFile(log, cb) {
     try {
         fs.writeFileSync(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents, cb);
     } catch (err) {
+        console.error(`Failed to write log file from ${log.ip}`, err);
     }
 }
 
