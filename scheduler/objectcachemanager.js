@@ -78,8 +78,8 @@ class ObjectCacheManager extends EventEmitter
 
     hit(md5)
     {
+        ++this.hits;
         if (this.distributeOnCacheHit) {
-            ++this.hits;
             this.distribute({ md5: md5, redundancy: this.redundancy });
         }
     }
