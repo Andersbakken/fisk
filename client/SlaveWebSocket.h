@@ -77,8 +77,9 @@ public:
                     done = true;
                     return;
                 }
-                fprintf(stderr, "error: exit code: %d Fisk slave: %s source file: %s\n",
-                        data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str());
+                fprintf(stderr, "error: exit code: %d Fisk slave: %s source file: %s cache: %s\n",
+                        data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
+                        data.objectCache ? "true" : "false");
             }
 
             if (!stdOut.empty())
