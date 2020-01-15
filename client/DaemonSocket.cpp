@@ -76,9 +76,9 @@ unsigned int DaemonSocket::mode() const
     int ret = Read;
     if (!mSendBuffer.empty()) {
         ret |= Write;
-        VERBOSE("DaemonSocket connecting, read|write %zu bytes pending", mSendBuffer.size());
+        VERBOSE("DaemonSocket selecting, read|write %zu bytes pending", mSendBuffer.size());
     } else {
-        VERBOSE("DaemonSocket connecting, read only");
+        VERBOSE("DaemonSocket selecting, read only");
     }
     return ret;
 }
