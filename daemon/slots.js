@@ -29,6 +29,20 @@ class Slots extends EventEmitter
         }
     }
 
+    tryAcquire(id, data, cb)
+    {
+        if (this.used.size < this.count) {
+            this.used.set(id, data);
+            if (this.debug)
+                console.log("acquired slot", id, data, this.toString());
+            cb(true);
+        } else {
+            if (this.debug)
+                console.log("failed to acquire slot", id, data, this.toString());
+            cb(false);
+        }
+    }
+
     release(id)
     {
         this.pending.delete(id);

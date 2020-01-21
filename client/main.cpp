@@ -217,22 +217,23 @@ int main(int argc, char **argv)
         return daemonSocket.state() == DaemonSocket::Closed ? 0 : 1;
     }
 
+    if (!Config::noDesire && Config::desiredCompileSlots) {
+        daemonSocket.send(DaemonSocket::TryAcquireCompileSlot);
+        daemonSocket.waitForCompileSlot(select);
+        if (daemonSocket.hasCompileSlot()) {
+            fprintf(stderr, "RUNNING LOCAL desire\n");
+            Client::runLocal("desire");
+            return 0;
+        }
+    }
+
     auto runLocal = [&daemonSocket, &data, &select](const std::string &reason) {
         data.watchdog->stop();
         daemonSocket.send(DaemonSocket::AcquireCompileSlot);
         daemonSocket.waitForCompileSlot(select);
+        fprintf(stderr, "RUNNING LOCAL %s\n", reason.c_str());
         Client::runLocal(reason);
     };
-
-
-#if 0
-    if (!Config::noDesire) {
-        if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-            runLocal("nodesire");
-            return 0;
-        }
-    }
-#endif
 
     if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
@@ -564,7 +565,7 @@ int main(int argc, char **argv)
 
     if (data.watchdog->timedOut()) {
         DEBUG("Have to run locally because we timed out waiting for slave somehoe");
-        runLocal("watchdog slave");
+        runLocal("watchdog slave connect");
         return 0; // unreachable
     }
 

@@ -24,9 +24,10 @@ public:
     enum Command {
         AcquireCppSlot = 1,
         AcquireCompileSlot = 2,
-        ReleaseCppSlot = 3,
-        ReleaseCompileSlot = 4,
-        JSON = 5
+        TryAcquireCompileSlot = 3,
+        ReleaseCppSlot = 4,
+        ReleaseCompileSlot = 5,
+        JSON = 6
     };
 
     void send(const std::string &json);
@@ -34,7 +35,7 @@ public:
     bool hasCppSlot() const;
     bool waitForCppSlot();
 
-    bool hasCompileSlot() const { return mHasCompileSlot; }
+    bool hasCompileSlot() const { return mCompileSlotState == CompileSlot_Acquired; }
     bool waitForCompileSlot(Select &select);
     std::string error() const { return mError; }
     void processJSON(const std::string &json);
@@ -52,7 +53,8 @@ private:
     enum Response {
         CppSlotAcquired = 10,
         CompileSlotAcquired = 11,
-        JSONResponse = 12
+        CompileSlotNotAcquired = 12,
+        JSONResponse = 13
     };
     size_t processMessage(const char *msg, size_t len);
 
@@ -62,7 +64,11 @@ private:
     size_t mSendBufferOffset { 0 };
     std::string mRecvBuffer;
     bool mHasCppSlot { false };
-    bool mHasCompileSlot { false };
+    enum CompileSlotState {
+        CompileSlot_None,
+        CompileSlot_Acquired,
+        CompileSlot_Failed
+    } mCompileSlotState { CompileSlot_None };
     std::string mError;
     mutable std::mutex mMutex;
     std::condition_variable mCond;

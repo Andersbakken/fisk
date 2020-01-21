@@ -94,6 +94,9 @@ class Compile extends EventEmitter
                 case Constants.AcquireCompileSlot:
                     emit('acquireCompileSlot');
                     continue;
+                case Constants.TryAcquireCompileSlot:
+                    emit('tryAcquireCompileSlot');
+                    continue;
                 case Constants.ReleaseCppSlot:
                     emit('releaseCppSlot');
                     continue;

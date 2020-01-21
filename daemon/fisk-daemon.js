@@ -42,6 +42,15 @@ server.on('error', (err) => {
 const cppSlots = new Slots(option.int('cpp-slots', Math.max(os.cpus().length * 2, 1)), 'cpp', debug);
 const compileSlots = new Slots(option.int('slots', Math.max(os.cpus().length, 1)), 'compile', debug);
 
+let desires = 0;
+let desireFails = 0;
+let cpp = 0;
+let compiles = 0;
+
+setInterval(() => {
+    console.log("shit", desires, desireFails, compiles, cpp);
+}, 3000);
+
 server.on('compile', compile => {
     compile.on("dumpSlots", () => {
         let ret = { cpp: cppSlots.dump(), compile: compileSlots.dump() };
@@ -60,6 +69,7 @@ server.on('compile', compile => {
         cppSlots.acquire(compile.id, {pid: compile.pid}, () => {
             // compile.send({ type: 'cppSlotAcquired' });
             compile.send(Constants.CppSlotAcquired);
+            ++cpp;
         });
     });
 
@@ -84,6 +94,25 @@ server.on('compile', compile => {
         compileSlots.acquire(compile.id, {pid: compile.pid}, () => {
             // compile.send({ type: 'compileSlotAcquired' });
             compile.send(Constants.CompileSlotAcquired);
+            ++compiles;
+        });
+    });
+
+    compile.on('tryAcquireCompileSlot', () => {
+        if (debug)
+            console.log('tryAcquireCompileSlot');
+
+        assert(!requestedCompileSlot);
+        compileSlots.tryAcquire(compile.id, {pid: compile.pid}, success => {
+            if (success) {
+                requestedCompileSlot = true;
+                // compile.send({ type: 'compileSlotAcquired' });
+                compile.send(Constants.CompileSlotAcquired);
+                ++desires;
+            } else {
+                compile.send(Constants.CompileSlotNotAcquired);
+                ++desireFails;
+            }
         });
     });
 
