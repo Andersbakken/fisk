@@ -449,6 +449,7 @@ server.on("listen", app => {
 
     app.get("/slaves", (req, res, next) => {
         let ret = [];
+        const now = Date.now();
         for (let slaveKey in slaves) {
             let s = slaves[slaveKey];
             ret.push({
@@ -467,6 +468,7 @@ server.on("listen", app => {
                 name: s.name,
                 created: s.created,
                 load: s.load,
+                uptime: now - s.created.valueOf(),
                 npmVersion: s.npmVersion,
                 environments: Object.keys(s.environments)
             });
