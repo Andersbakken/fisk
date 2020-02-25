@@ -6,7 +6,25 @@ const option = require('@jhanssen/options')({ prefix: 'fisk/monitor',
 const WebSocket = require('ws');
 const fs = require('fs');
 const blessed = require('blessed');
-const humanizeDuration = require('humanize-duration');
+const humanize = require('humanize-duration');
+
+function humanizeDuration(age)
+{
+    let units;
+    if (age < 60000) {
+        units = [ "s" ];
+    } else if (age < 60 * 60000) {
+        units = [ "m", "s" ];
+    } else if (age < 24 * 60 * 60000) {
+        units = [ "h", "m" ];
+    } else if (age < 7 * 24 * 60 * 60000) {
+        units = [ "d", "h" ];
+    } else {
+        units = [ "y", "mo", "w", "d" ];
+    }
+    const options = { units: units, round: true };
+    return humanize(age, options);
+}
 
 const screen = blessed.screen({
     smartCSR: true
@@ -448,15 +466,20 @@ function updateSlaveBox()
     const slaveWidth = slaveContainer.width - 3;
 
     let data = [];
-    let maxWidth = [6, 8, 7, 7];
+    let maxWidth = [6, 8, 7, 7, 12];
+    let newest = Number.MAX_SAFE_INTEGER;
+    const now = Date.now();
+    let f = true;
     for (let [key, value] of slaves) {
-        const line = [key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`];
+        const added = new Date(value.created).valueOf();
+        const age = now - added;
+        newest = Math.min(newest, age);
+        const line = [ key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}` ];
         data.push(line);
 
-        maxWidth[0] = Math.max(maxWidth[0], line[0].length + 2);
-        maxWidth[1] = Math.max(maxWidth[1], line[1].length + 2);
-        maxWidth[2] = Math.max(maxWidth[2], line[2].length + 2);
-        maxWidth[3] = Math.max(maxWidth[3], line[3].length + 2);
+        for (let i=0; i<line.length; ++i) {
+            maxWidth[i] = Math.max(maxWidth[i], line[i].length + 2);
+        }
     }
     data.sort((a, b) => {
         let an = parseInt(a[1]);
@@ -481,6 +504,8 @@ function updateSlaveBox()
     header += formatCell("Active", maxWidth[1], "{bold}", "{/bold}");
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
+    header += formatCell("Uptime", maxWidth[4], "{bold}", "{/bold}");
+
     slaveHeader.setContent(header);
 
     let item = slaveBox.getItem(slaveBox.selected);
@@ -493,7 +518,7 @@ function updateSlaveBox()
         if (item[0] == selectedSlave) {
             current = idx;
         }
-        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]);
+        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]) + formatCell(item[4], maxWidth[4]);
     });
     slaveBox.setItems(items);
     if (current != undefined) {
@@ -502,6 +527,13 @@ function updateSlaveBox()
     if (currentFocus != slaveBox) {
         slaveBox.scrollTo(0);
     }
+
+    if (newest < 60000) {
+        setTimeout(update, 1000);
+    } else {
+        setTimeout(update, 60000);
+    }
+
 }
 
 function updateClientBox()
