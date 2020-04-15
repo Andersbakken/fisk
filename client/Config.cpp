@@ -151,9 +151,9 @@ bool Config::init(int &argc, char **&argv)
             return false;
         }
     }
-    if (!load("/etc/xdg/fisk/client.conf", jsons))
-        return false;
     if (!load("/etc/xdg/fisk/client.conf.override", jsons))
+        return false;
+    if (!load("/etc/xdg/fisk/client.conf", jsons))
         return false;
 
     std::map<std::string, std::string> commandLine, environmentVariables;
