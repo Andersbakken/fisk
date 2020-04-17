@@ -56,7 +56,7 @@ int main(int argc, char **argv)
         return 105;
     }
 
-    if (Config::help) {
+    if (Config::help || argc == 1) {
         Config::usage(stdout);
         return 0;
     }
