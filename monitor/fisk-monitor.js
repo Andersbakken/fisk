@@ -474,7 +474,8 @@ function updateSlaveBox()
         const added = new Date(value.created).valueOf();
         const age = now - added;
         newest = Math.min(newest, age);
-        const line = [ key, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}` ];
+        const name = value.name || value.hostname || key;
+        const line = [ name, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}` ];
         data.push(line);
 
         for (let i=0; i<line.length; ++i) {
