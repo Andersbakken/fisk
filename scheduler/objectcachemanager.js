@@ -192,7 +192,7 @@ class ObjectCacheManager extends EventEmitter
         return ret;
     }
 
-    distribute(query)
+    distribute(query, res)
     {
         const dry = "dry" in query;
         let redundancy = parseInt(query.redundancy);
@@ -204,7 +204,7 @@ class ObjectCacheManager extends EventEmitter
         const md5 = query.md5;
 
         let ret;
-        if (query.returnValue) {
+        if (res) {
             ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
             console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "md5", md5);
         }
@@ -233,21 +233,29 @@ class ObjectCacheManager extends EventEmitter
                     let needed = redundancy + 1 - value.nodes.length;
                     // console.log("should distribute", key, "to", needed, "nodes");
 
-                    const old = nodeIdx;
+                    let firstIdx;
                     let found = 0;
                     while (found < needed) {
                         if (++nodeIdx == nodes.length)
                             nodeIdx = 0;
+                        if (firstIdx === undefined) {
+                            firstIdx = nodeIdx;
+                        } else if (firstIdx === nodeIdx) {
+                            break;
+                        }
                         let node = nodes[nodeIdx];
                         if (value.nodes.indexOf(node) != -1) {
                             continue;
                         }
                         let data = commands.get(node);
-                        let available = data ? data.available : node.maxSize - node.size;
+                        let available;
+                        if (data) {
+                            available = data.available;
+                        } else {
+                            let nodeData = this.byNode[node];
+                            available = nodeData.maxSize - nodeData.size;
+                        }
                         if (available < value.fileSize) {
-                            if (nodeIdx == old) {
-                                break;
-                            }
                             continue;
                         }
                         if (!data) {
@@ -286,9 +294,12 @@ class ObjectCacheManager extends EventEmitter
                     key.send({ type: "fetch_cache_objects", objects: value.objects });
             }
         });
-        if (ret)
+        if (ret) {
             ret["count"] = count;
-        return ret;
+            res.send(JSON.stringify(ret, null, 4));
+        } else if (res) {
+
+        }
     }
 };
 
