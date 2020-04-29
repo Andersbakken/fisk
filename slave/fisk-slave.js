@@ -199,11 +199,13 @@ client.on("objectCache", enabled => {
 client.on("fetch_cache_objects", message => {
     console.log("Fetching", message.objects.length, "objects");
     let filesReceived = 0;
-    let promise = Promise.resolve();
-    let pending = [];
-    message.objects.forEach(operation => {
-        pending.push(
-        promise = promise.then(() => {
+    let promises = [];
+    const max = Math.min(10, message.objects.length);
+    for (let idx=0; idx<max; ++idx) {
+        promises.push(Promise.resolve());
+    }
+    message.objects.forEach((operation, idx) => {
+        promises[idx % promises.length] = promises[idx % promises.length].then(() => {
             return new Promise((resolve, reject) => {
                 const file = path.join(objectCache.dir, operation.md5);
                 const url = `http://${operation.source}/objectcache/${operation.md5}`;
@@ -231,7 +233,7 @@ client.on("fetch_cache_objects", message => {
                             stream.destroy("http stream error");
                         });
                         // console
-                    }).catch(error => {
+                    }).catch(err => {
                         console.error("Got some error", err);
                         stream.destroy("http error");
                     });
@@ -247,7 +249,7 @@ client.on("fetch_cache_objects", message => {
                         try {
                             fs.unlinkSync(file);
                         } catch (err) {
-                            console.log("Got error unlinking file", file, err);
+                            // console.log("Got error unlinking file", file, err);
                         }
                     } else {
                         ++filesReceived;
@@ -262,7 +264,7 @@ client.on("fetch_cache_objects", message => {
             });
         });
     });
-    promise.then(() => {
+    Promise.all(promises).then(() => {
         console.log("got results", filesReceived);
     });
     // chain.then(() => {
