@@ -4,7 +4,7 @@ const option = require("@jhanssen/options")({ prefix: "fisk/slave",
                                               applicationPath: false,
                                               additionalFiles: [ "fisk/slave.conf.override" ] });
 
-const got = require("got");
+const request = require("request");
 const ws = require("ws");
 const Url = require("url");
 const common = require("../common")(option);
@@ -211,7 +211,7 @@ client.on("fetch_cache_objects", message => {
                     let expectedSize;
                     let stream = fs.createWriteStream(file);
                     // response_stream.on("response", function (response) {
-                    let responseStream = got.stream(url);
+                    let responseStream = request.get({ url:url });
                     responseStream.on("response", response => {
                         // console.log("got headers", response.headers);
                         expectedSize = response.headers["content-length"];
@@ -491,7 +491,7 @@ client.on("getEnvironments", message => {
                     setTimeout(work, 0);
                 });
         });
-        got.stream(url)
+        request.get(url)
             .on("error", err => {
                 console.log("Got error from request", err);
                 if (stream.destroy instanceof Function) {
