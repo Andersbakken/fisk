@@ -17,6 +17,7 @@
   "homepage": "https://github.com/Andersbakken/fisk#readme",
   "dependencies": {
     "@jhanssen/options": "^1.0.25",
+    "axios": "^0.19.2",
     "blessed": "^0.1.81",
     "bytes": "^3.0.0",
     "compare-versions": "^3.4.0",
@@ -30,7 +31,6 @@
     "posix": "Andersbakken/node-posix#node12fix",
     "prettysize": "^2.0.0",
     "random-words": "^1.1.0",
-    "request": "^2.88.0",
     "wake_on_lan": "^1.0.0",
     "ws": "^5.1.1"
   }

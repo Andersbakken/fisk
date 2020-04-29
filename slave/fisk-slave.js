@@ -4,7 +4,7 @@ const option = require("@jhanssen/options")({ prefix: "fisk/slave",
                                               applicationPath: false,
                                               additionalFiles: [ "fisk/slave.conf.override" ] });
 
-const request = require("request");
+const axios = require("axios");
 const ws = require("ws");
 const Url = require("url");
 const common = require("../common")(option);
@@ -200,59 +200,65 @@ client.on("fetch_cache_objects", message => {
     console.log("Fetching", message.objects.length, "objects");
     let filesReceived = 0;
     let promise = Promise.resolve();
+    let pending = [];
     message.objects.forEach(operation => {
+        pending.push(
         promise = promise.then(() => {
             return new Promise((resolve, reject) => {
                 const file = path.join(objectCache.dir, operation.md5);
+                const url = `http://${operation.source}/objectcache/${operation.md5}`;
+                console.log("Downloading", url, "->", file);
+                let expectedSize;
+                let stream;
                 try {
-                    console.log(file);
-                    const url = `http://${operation.source}/objectcache/${operation.md5}`;
-                    console.log("Downloading", url, "->", file);
-                    let expectedSize;
-                    let stream = fs.createWriteStream(file);
-                    // response_stream.on("response", function (response) {
-                    let responseStream = request.get({ url:url });
-                    responseStream.on("response", response => {
-                        // console.log("got headers", response.headers);
-                        expectedSize = response.headers["content-length"];
-                        response.pipe(stream);
+                    stream = fs.createWriteStream(file);
+                } catch (err) {
+                    console.error("Got some error from write stream", err);
+                    try {
+                        fs.unlinkSync(file);
+                    } catch (e) {
+                    }
+                    resolve();
+                    return;
+                }
+                // response_stream.on("response", function (response) {
+                axios({ method: 'get', url: url, responseType: 'stream' })
+                    .then(response => {
+                        expectedSize = parseInt(response.headers["content-length"]);
+                        response.data.pipe(stream);
+                        response.data.on("error", () => {
+                            console.error("Got some error from stream", err);
+                            stream.destroy("http stream error");
+                        });
+                        // console
+                    }).catch(error => {
+                        console.error("Got some error", err);
+                        stream.destroy("http error");
                     });
-                    responseStream.on("error", error => {
-                        console.log("Got error downloading", url, error);
+                stream.on("finish", () => {
+                    console.log("Finished writing file", file);
+                    let stat;
+                    try {
+                        stat = fs.statSync(file);
+                    } catch (err) {
+                    }
+                    if (!stat || stat.size != expectedSize) {
+                        console.log("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
                         try {
                             fs.unlinkSync(file);
                         } catch (err) {
                             console.log("Got error unlinking file", file, err);
                         }
-                        resolve();
-                    });
-                    stream.on("finish", () => {
-                        console.log("Finished writing file", file);
-                        let stat;
-                        try {
-                            stat = fs.statSync(file);
-                        } catch (err) {
-                        }
-                        if (!stat || stat.size != expectedSize) {
-                            console.log("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
-                            try {
-                                fs.unlinkSync(file);
-                            } catch (err) {
-                                console.log("Got error unlinking file", file, err);
-                            }
-                            resolve();
-                            return;
-                        }
+                    } else {
                         ++filesReceived;
                         objectCache.loadFile(file, stat.size);
-                        resolve();
-
-                    });
-                } catch (err) {
-                    console.error("Got some error", err);
-                    fs.unlinkSync(file);
+                    }
                     resolve();
-                }
+                });
+                stream.on("error", err => {
+                    console.error("Got stream error", err);
+                    resolve();
+                });
             });
         });
     });
@@ -491,8 +497,11 @@ client.on("getEnvironments", message => {
                     setTimeout(work, 0);
                 });
         });
-        request.get(url)
-            .on("error", err => {
+        axios({ method: 'get', url: url, responseType: 'stream' })
+            .then(response => {
+                response.data.pipe(stream);
+                // console
+            }).catch(error => {
                 console.log("Got error from request", err);
                 if (stream.destroy instanceof Function) {
                     stream.destroy();
@@ -507,11 +516,7 @@ client.on("getEnvironments", message => {
                     console.error("Can't create environment directory for slave: " + dir);
                     setTimeout(work, 0);
                 }
-                return;
-            }).on("end", event => {
-                stream.end();
-                console.log("got end", env);
-            }).pipe(stream);
+            });
     }
     work();
 });
