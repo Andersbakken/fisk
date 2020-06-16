@@ -52,11 +52,12 @@ int main(int argc, char **argv)
         Log::shutdown();
     });
 
+    const int argCount = argc;
     if (!Config::init(argc, argv) && !Config::help) {
         return 105;
     }
 
-    if (Config::help || argc == 1) {
+    if (Config::help || argCount == 1) {
         Config::usage(stdout);
         return 0;
     }
