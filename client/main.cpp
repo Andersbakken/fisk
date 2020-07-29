@@ -433,7 +433,7 @@ int main(int argc, char **argv)
     }
 
     if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out tryint to connect to slave");
+        DEBUG("Have to run locally because we timed out trying to connect to slave");
         runLocal("watchdog slave connect");
         return 0; // unreachable
     }
