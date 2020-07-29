@@ -507,16 +507,25 @@ int main(int argc, char **argv)
             select.exec();
         }
         if (slaveWebSocket.done) {
-            if (!data.preprocessed->stdErr.empty()) {
-                fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
-            }
-            data.watchdog->transition(Watchdog::UploadedJob);
-            data.watchdog->transition(Watchdog::Finished);
-            data.watchdog->stop();
-            schedulerWebsocket.close("cachehit");
+            if (slaveWebSocket.error.empty()) {
+                if (!data.preprocessed->stdErr.empty()) {
+                    fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+                }
+                data.watchdog->transition(Watchdog::UploadedJob);
+                data.watchdog->transition(Watchdog::Finished);
+                data.watchdog->stop();
+                schedulerWebsocket.close("cachehit");
 
-            Client::writeStatistics();
-            return data.exitCode;
+                Client::writeStatistics();
+                return data.exitCode;
+            } else {
+                ERROR("Have to run locally because something happened with the slave %s\n%s",
+                      data.compilerArgs->sourceFile().c_str(),
+                      slaveWebSocket.error.c_str());
+
+                runLocal("error");
+                return 0; // unreachable
+            }
         }
         if (data.watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out waiting for slave");
