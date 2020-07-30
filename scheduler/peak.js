@@ -78,7 +78,7 @@ class Peak {
                 let splice = 0;
                 for (let idx=0; idx<this.actives.length; ++idx) {
                     if (this.actives[idx][0] < cutoff) {
-                        splice = idx;
+                        splice = idx + 1;
                     } else {
                         peakActiveJobs = Math.max(peakActiveJobs, this.actives[idx][1]);
                     }
@@ -91,7 +91,7 @@ class Peak {
                 let splice = 0;
                 for (let idx=0; idx<this.utilizations.length; ++idx) {
                     if (this.utilizations[idx][0] < cutoff) {
-                        splice = idx;
+                        splice = idx + 1;
                     } else {
                         peakUtilization = Math.max(peakUtilization, this.utilizations[idx][1]);
                     }
