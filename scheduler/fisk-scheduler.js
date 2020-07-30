@@ -114,10 +114,10 @@ try {
 }
 
 const peaks = [
-    new Peak(60 * 1000, "Last hour"),
-    new Peak(24 * 60 * 1000, "Last 24 hours"),
-    new Peak(7 * 24 * 60 * 1000, "Last 7 days"),
-    new Peak(30 * 24 * 60 * 1000, "Last 30 days"),
+    new Peak(60 * 60 * 1000, "Last hour"),
+    new Peak(24 * 60 * 60 * 1000, "Last 24 hours"),
+    new Peak(7 * 24 * 60 * 60 * 1000, "Last 7 days"),
+    new Peak(30 * 24 * 60 * 60 * 1000, "Last 30 days"),
     new Peak(undefined, "Forever")
 ];
 
