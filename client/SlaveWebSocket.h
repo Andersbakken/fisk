@@ -71,7 +71,7 @@ public:
                     ERROR("Slave %s%s had a suspicious error. Building locally:\n%s",
                           data.slaveHostname.empty() ? "" : (" " + data.slaveHostname).c_str(),
                           url().c_str(),
-                          stdErr.c_str());
+                          Client::base64(stdErr).c_str());
                     data.watchdog->stop();
                     error = "suspicious error";
                     done = true;
