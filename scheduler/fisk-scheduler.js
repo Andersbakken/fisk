@@ -624,7 +624,7 @@ function formatDate(date)
         minute = "0" + minute;
     if (second < 10)
         second = "0" + second;
-    return `${month}_${day}_${hour}:${minute}:${second}`;
+    return `${year}_${month}_${day}_${hour}:${minute}:${second}`;
 }
 
 function addLogFile(log, cb) {
