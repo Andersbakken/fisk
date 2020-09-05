@@ -75,7 +75,7 @@ Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "S
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 7500);
 Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 7500);
 Getter<unsigned long long> slaveConnectTimeout("slave-connect-timeout", "Set slave connect watchdog timeout", 7500);
-Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 10000);
+Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 10 * 60000);
 Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload job watchdog timeout", 15000);
 Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))", 10000); // restarts on each heartbeat which happen every 5 seconds
 Getter<std::string> compiler("compiler", "Set fiskc's resolved compiler");
