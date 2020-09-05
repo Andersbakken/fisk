@@ -71,7 +71,7 @@ Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
 static Separator s4;
 static Separator s5("Timeouts:");
 Getter<unsigned long long> daemonConnectTimeout("daemon-connect-timeout", "Set daemon connect timeout", 10000);
-Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "Set acquired slave watchdog timeout", 30000);
+Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "Set local compile slot acquisition timeout", 30000);
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 7500);
 Getter<unsigned long long> acquiredSlaveTimeout("acquire-slave-timeout", "Set acquired slave watchdog timeout", 7500);
 Getter<unsigned long long> slaveConnectTimeout("slave-connect-timeout", "Set slave connect watchdog timeout", 7500);
