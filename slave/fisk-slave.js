@@ -504,7 +504,7 @@ client.on("getEnvironments", message => {
                 response.data.pipe(stream);
                 // console
             }).catch(error => {
-                console.log("Got error from request", err);
+                console.log("Got error from request", error);
                 if (stream.destroy instanceof Function) {
                     stream.destroy();
                 } else {
