@@ -37,15 +37,15 @@ if (argv.user) {
     try {
         process.initgroups(argv.user, pwd.gid);
     } catch(err) {
-        throw new Error('changing groups failed: ' + err.message);
+        throw new Error('Changing groups failed: ' + err.message);
     }
 }
 
 try {
-    console.log("chrooting to", argv.root);
+    console.log("Chrooting to", argv.root);
     posix.chroot(argv.root);
 } catch (err) {
-    console.error('changing root or user failed', err);
+    console.error('Changing root or user failed', err);
     process.exit(1);
 }
 

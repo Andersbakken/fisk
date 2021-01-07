@@ -445,7 +445,7 @@ client.on("getEnvironments", message => {
         }
         let env = message.environments.splice(0, 1)[0];
         const url = base + env;
-        console.log("got url", url);
+        console.log("Got environment url", url);
 
         const dir = path.join(environmentsRoot, env);
         try {
@@ -467,8 +467,9 @@ client.on("getEnvironments", message => {
                     console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
                     return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
                 }).then(() => {
-                    console.log("Write json file");
-                    return fs.writeFile(path.join(dir, "environment.json"), JSON.stringify({ hash: env, created: new Date().toString() }));
+                    const json = path.join(dir, "environment.json");
+                    console.log("Writing json file", json);
+                    return fs.writeFile(json, JSON.stringify({ hash: env, created: new Date().toString() }));
                 }).then(() => {
                     console.log(`Unlink ${file} ${env}`);
                     return fs.unlink(file);
