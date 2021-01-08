@@ -52,7 +52,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
             commandLine += '\'';
         }
         commandLine += " '-E'";
-        if (Client::data().slaveCompiler.find("clang") != std::string::npos) {
+        if (Client::data().builderCompiler.find("clang") != std::string::npos) {
             commandLine += " '-frewrite-includes'";
         } else {
             commandLine += " '-fdirectives-only'";

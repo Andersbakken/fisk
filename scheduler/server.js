@@ -57,7 +57,7 @@ class Client extends EventEmitter {
 };
 
 Client.Type = {
-    Slave: 0,
+    Builder: 0,
     Compile: 1,
     UploadEnvironment: 2,
     Monitor: 3,
@@ -153,9 +153,9 @@ class Server extends EventEmitter {
         const npmVersion = req.headers["x-fisk-npm-version"];
         if (npmVersion)
             data.npmVersion = npmVersion;
-        const preferredSlave = req.headers["x-fisk-slave"];
-        if (preferredSlave)
-            data.slave = preferredSlave;
+        const preferredBuilder = req.headers["x-fisk-builder"];
+        if (preferredBuilder)
+            data.builder = preferredBuilder;
         const clientName = req.headers["x-fisk-client-name"];
         if (clientName)
             data.name = clientName;
@@ -246,7 +246,7 @@ class Server extends EventEmitter {
         });
     }
 
-    _handleSlave(req, client) {
+    _handleBuilder(req, client) {
         client.ws.on("close", (code, reason) => {
             if (client)
                 client.emit("close", { code: code, reason: reason });
@@ -259,7 +259,7 @@ class Server extends EventEmitter {
         }
 
         if (!("x-fisk-environments" in req.headers)) {
-            client.error("No x-fisk-slave-environment header");
+            client.error("No x-fisk-builder-environment header");
             return;
         }
 
@@ -275,8 +275,8 @@ class Server extends EventEmitter {
         }
 
         const port = parseInt(req.headers["x-fisk-port"]);
-        const name = req.headers["x-fisk-slave-name"];
-        const hostname = req.headers["x-fisk-slave-hostname"];
+        const name = req.headers["x-fisk-builder-name"];
+        const hostname = req.headers["x-fisk-builder-hostname"];
         const system = req.headers["x-fisk-system"];
         const slots = parseInt(req.headers["x-fisk-slots"]);
         const npmVersion = req.headers["x-fisk-npm-version"];
@@ -299,7 +299,7 @@ class Server extends EventEmitter {
                         environments: environments,
                         system: system });
         client.ws.on("message", msg => {
-            // console.log("Got message from slave", typeof msg, msg.length);
+            // console.log("Got message from builder", typeof msg, msg.length);
             switch (typeof msg) {
             case "string":
                 // assume JSON
@@ -327,7 +327,7 @@ class Server extends EventEmitter {
             }
         });
         // console.log("Got dude", envs);
-        this.emit("slave", client);
+        this.emit("builder", client);
     }
 
     _handleMonitor(req, client) {
@@ -374,9 +374,9 @@ class Server extends EventEmitter {
             client = new Client({ type: Client.Compile, ws: ws, ip: ip });
             this._handleCompile(req, client);
             break;
-        case "/slave":
-            client = new Client({ type: Client.Slave, ws: ws, ip: ip });
-            this._handleSlave(req, client);
+        case "/builder":
+            client = new Client({ type: Client.Builder, ws: ws, ip: ip });
+            this._handleBuilder(req, client);
             break;
         case "/monitor":
             client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });

@@ -18,8 +18,8 @@ public:
         ConnectedToDaemon,
         PreprocessFinished,
         ConnectedToScheduler,
-        AcquiredSlave,
-        ConnectedToSlave,
+        AcquiredBuilder,
+        ConnectedToBuilder,
         UploadedJob,
         Finished
     };
@@ -32,8 +32,8 @@ public:
         case Initial: return "Initial";
         case ConnectedToDaemon: return "ConnectedToDaemon";
         case ConnectedToScheduler: return "ConnectedToScheduler";
-        case AcquiredSlave: return "AcquiredSlave";
-        case ConnectedToSlave: return "ConnectedToSlave";
+        case AcquiredBuilder: return "AcquiredBuilder";
+        case ConnectedToBuilder: return "ConnectedToBuilder";
         case PreprocessFinished: return "PreprocessFinished";
         case UploadedJob: return "UploadedJob";
         case Finished: return "Finished";

@@ -16,7 +16,7 @@
              var text;
              try {
                  var msg = JSON.parse(e.data);
-                 text = (new Date().toLocaleTimeString()) + ": " + msg.slave.name + ": " + msg.slave.port + " (" + msg.slave.ip + ") compiled " + msg.sourceFile + " for " + msg.client.name + " (" + msg.client.ip + ") in " + msg.compileDuration + "ms";
+                 text = (new Date().toLocaleTimeString()) + ": " + msg.builder.name + ": " + msg.builder.port + " (" + msg.builder.ip + ") compiled " + msg.sourceFile + " for " + msg.client.name + " (" + msg.client.ip + ") in " + msg.compileDuration + "ms";
              } catch (err) {
                  text = e.data;
              }

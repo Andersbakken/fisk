@@ -1,8 +1,8 @@
-Package: fisk-slave
+Package: fisk-builder
 Version: 1.0-40
 Architecture: all
 Priority: optional
 Section: devel
 Depends: nodejs, jq
 Maintainer: Anders Bakken <agbakken@gmail.com>
-Description: Fisk slave package
+Description: Fisk builder package

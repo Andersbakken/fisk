@@ -37,9 +37,9 @@ struct Data
     std::vector<std::string> originalArgs;
     std::string compiler; // this is the next one on the path and the one we will exec if we run locally
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
-    std::string slaveCompiler; // this is the one that actually will exist on the slave
-    uint16_t slavePort { 0 };
-    std::string slaveIp, slaveHostname;
+    std::string builderCompiler; // this is the one that actually will exist on the builder
+    uint16_t builderPort { 0 };
+    std::string builderIp, builderHostname;
     std::string hash;
     bool objectCache { false };
     int exitCode { 0 };

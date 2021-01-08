@@ -30,7 +30,7 @@ const screen = blessed.screen({
     smartCSR: true
 });
 
-const slaveContainer = blessed.box({
+const builderContainer = blessed.box({
     top: '0%',
     left: '0%',
     width: '50%',
@@ -41,15 +41,15 @@ const slaveContainer = blessed.box({
 });
 
 screen.on("resize", () => {
-    // log("resize", slaveContainer.width, slaveContainer.height);
+    // log("resize", builderContainer.width, builderContainer.height);
 
-    updateSlaveBox();
+    updateBuilderBox();
     updateClientBox();
 
     screen.render();
 });
 
-const slaveHeader = blessed.box({
+const builderHeader = blessed.box({
     top: '0%',
     left: '0%',
     width: '100%-2',
@@ -79,7 +79,7 @@ var prompt = blessed.prompt({
     hidden: true
 });
 
-const slaveBox = blessed.list({
+const builderBox = blessed.list({
     top: '0%+1',
     left: '0%',
     width: '100%-2',
@@ -100,7 +100,7 @@ const slaveBox = blessed.list({
         });
     }
 });
-slaveBox.headerBox = slaveHeader;
+builderBox.headerBox = builderHeader;
 
 const clientContainer = blessed.box({
     top: '0%',
@@ -159,22 +159,22 @@ const notificationBox = blessed.box({
     }
 });
 
-slaveContainer.append(slaveHeader);
-slaveContainer.append(slaveBox);
+builderContainer.append(builderHeader);
+builderContainer.append(builderBox);
 clientContainer.append(clientHeader);
 clientContainer.append(clientBox);
-screen.append(slaveContainer);
+screen.append(builderContainer);
 screen.append(clientContainer);
 screen.append(notificationBox);
 
-let slaveDialogBox, clientDialogBox;
+let builderDialogBox, clientDialogBox;
 
 function hideDialogBoxes()
 {
     let ret = false;
-    if (slaveDialogBox) {
-        slaveDialogBox.detach();
-        slaveDialogBox = undefined;
+    if (builderDialogBox) {
+        builderDialogBox.detach();
+        builderDialogBox = undefined;
         ret = true;
     }
 
@@ -186,17 +186,17 @@ function hideDialogBoxes()
     return ret;
 }
 
-slaveBox.on("select", ev => {
+builderBox.on("select", ev => {
     let render = hideDialogBoxes();
-    activate(slaveBox);
+    activate(builderBox);
     if (ev) {
-        let slaveKey = /^ *([^ ]*)/.exec(ev.content)[1];
-        let slave = slaves.get(slaveKey);
-        if (slave) {
-            slaveBox.current = slaveKey;
+        let builderKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        let builder = builders.get(builderKey);
+        if (builder) {
+            builderBox.current = builderKey;
             let str = "";
-            for (let key in slave) {
-                let value = slave[key];
+            for (let key in builder) {
+                let value = builder[key];
                 if (Array.isArray(value)) {
                     str += `{bold}${key}{/bold}: ${value[0]}\n`;
                     for (let i=1; i<value.length; ++i) {
@@ -207,7 +207,7 @@ slaveBox.on("select", ev => {
                     str += `{bold}${key}{/bold}: ${value}\n`;
                 }
             }
-            slaveDialogBox = blessed.box({
+            builderDialogBox = blessed.box({
                 top: 'center',
                 left: 'center',
                 width: '80%',
@@ -225,7 +225,7 @@ slaveBox.on("select", ev => {
                     }
                 }
             });
-            screen.append(slaveDialogBox);
+            screen.append(builderDialogBox);
             render = true;
         }
     }
@@ -244,14 +244,14 @@ clientBox.on("select", ev => {
         if (jobs) {
             clientBox.current = clientKey;
             let str = "";
-            let data = [ [ "Source file", "Slave", "Start time" ] ];
+            let data = [ [ "Source file", "Builder", "Start time" ] ];
             let widest = [ data[0][0].length + 1, data[0][1].length + 1 ];
             const now = Date.now();
             for (let [jobKey, jobValue] of jobs) {
                 if (jobKey == "total")
                     continue;
                 widest[0] = Math.max(jobValue.sourceFile.length + 1, widest[0]);
-                data.push([ jobValue.sourceFile, jobValue.slave.ip + ":" + jobValue.slave.port, humanizeDuration(now - jobValue.time)]);
+                data.push([ jobValue.sourceFile, jobValue.builder.ip + ":" + jobValue.builder.port, humanizeDuration(now - jobValue.time)]);
                 widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
             }
 
@@ -342,12 +342,12 @@ function activate(box)
     screen.render();
 }
 
-activate(slaveBox);
+activate(builderBox);
 activate(clientBox);
 
 function focusRight()
 {
-    if (currentFocus == slaveBox) {
+    if (currentFocus == builderBox) {
         activate(clientBox);
     }
 }
@@ -355,7 +355,7 @@ function focusRight()
 function focusLeft()
 {
     if (currentFocus == clientBox) {
-        activate(slaveBox);
+        activate(builderBox);
     }
 }
 
@@ -364,9 +364,9 @@ screen.key(['C-c'], (ch, key) => {
     return process.exit();
 });
 screen.key(['escape', 'q'], (ch, key) => {
-    if (slaveDialogBox) {
-        slaveDialogBox.detach();
-        slaveDialogBox = undefined;
+    if (builderDialogBox) {
+        builderDialogBox.detach();
+        builderDialogBox = undefined;
         screen.render();
     } else if (clientDialogBox) {
         clientDialogBox.detach();
@@ -383,8 +383,8 @@ screen.key(['left', 'h'], (ch, key) => {
     focusLeft();
 });
 
-slaveBox.on('click', () => {
-    activate(slaveBox);
+builderBox.on('click', () => {
+    activate(builderBox);
 });
 clientBox.on('click', () => {
     activate(clientBox);
@@ -440,13 +440,13 @@ try {
 } catch (e) {
 }
 
-const slaves = new Map();
+const builders = new Map();
 const jobs = new Map();
 const jobsForClient = new Map();
 
 function clearData()
 {
-    slaves.clear();
+    builders.clear();
     jobs.clear();
     jobsForClient.clear();
 
@@ -461,16 +461,16 @@ function formatCell(str, num, prefix, suffix)
 let updateTimer;
 let timeout = 0;
 
-function updateSlaveBox()
+function updateBuilderBox()
 {
-    const slaveWidth = slaveContainer.width - 3;
+    const builderWidth = builderContainer.width - 3;
 
     let data = [];
     let maxWidth = [6, 8, 7, 7, 12];
     let newest = Number.MAX_SAFE_INTEGER;
     const now = Date.now();
     let f = true;
-    for (let [key, value] of slaves) {
+    for (let [key, value] of builders) {
         const added = new Date(value.created).valueOf();
         const age = now - added;
         newest = Math.min(newest, age);
@@ -496,8 +496,8 @@ function updateSlaveBox()
 
     let used = 0;
     for (let i = 0; i < maxWidth.length; ++i) {
-        if (used + maxWidth[i] > slaveWidth)
-            maxWidth[i] = slaveWidth - used;
+        if (used + maxWidth[i] > builderWidth)
+            maxWidth[i] = builderWidth - used;
         used += maxWidth[i];
     }
     let header = "";
@@ -507,26 +507,26 @@ function updateSlaveBox()
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     header += formatCell("Uptime", maxWidth[4], "{bold}", "{/bold}");
 
-    slaveHeader.setContent(header);
+    builderHeader.setContent(header);
 
-    let item = slaveBox.getItem(slaveBox.selected);
-    let selectedSlave;
+    let item = builderBox.getItem(builderBox.selected);
+    let selectedBuilder;
     if (item) {
-        selectedSlave = /^ *([^ ]*)/.exec(item.content)[1];
+        selectedBuilder = /^ *([^ ]*)/.exec(item.content)[1];
     }
     let current;
     let items = data.map((item, idx) => {
-        if (item[0] == selectedSlave) {
+        if (item[0] == selectedBuilder) {
             current = idx;
         }
         return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]) + formatCell(item[4], maxWidth[4]);
     });
-    slaveBox.setItems(items);
+    builderBox.setItems(items);
     if (current != undefined) {
-        slaveBox.selected = current;
+        builderBox.selected = current;
     }
-    if (currentFocus != slaveBox) {
-        slaveBox.scrollTo(0);
+    if (currentFocus != builderBox) {
+        builderBox.scrollTo(0);
     }
 
     if (newest < 60000) {
@@ -598,35 +598,35 @@ function update()
         updateTimer = undefined;
         timeout = 500;
 
-        updateSlaveBox();
+        updateBuilderBox();
         updateClientBox();
 
         screen.render();
     }, timeout);
 }
 
-function slaveAdded(msg)
+function builderAdded(msg)
 {
     msg.active = 0;
     delete msg.type;
-    slaves.set(msg.ip + ":" + msg.port, msg);
+    builders.set(msg.ip + ":" + msg.port, msg);
     update();
 }
 
-function slaveRemoved(msg)
+function builderRemoved(msg)
 {
-    const slaveKey = msg.ip + ":" + msg.port;
+    const builderKey = msg.ip + ":" + msg.port;
 
     for (let [jobKey, jobValue] of jobs) {
-        if (jobValue.slave) {
-            const jobSlaveKey = `${jobValue.slave.ip}:${jobValue.slave.port}`;
-            if (slaveKey === jobSlaveKey) {
+        if (jobValue.builder) {
+            const jobBuilderKey = `${jobValue.builder.ip}:${jobValue.builder.port}`;
+            if (builderKey === jobBuilderKey) {
                 deleteJob(jobValue);
             }
         }
     }
 
-    slaves.delete(slaveKey);
+    builders.delete(builderKey);
     update();
 }
 
@@ -652,9 +652,9 @@ function clientName(client)
 function jobStarted(job)
 {
     // log(job);
-    const slaveKey = `${job.slave.ip}:${job.slave.port}`;
-    const slave = slaves.get(slaveKey);
-    if (!slave)
+    const builderKey = `${job.builder.ip}:${job.builder.port}`;
+    const builder = builders.get(builderKey);
+    if (!builder)
         return;
 
     const clientKey = clientName(job.client);
@@ -671,8 +671,8 @@ function jobStarted(job)
     client.set(job.id, job);
 
     jobs.set(job.id, job);
-    ++slave.jobsPerformed;
-    ++slave.active;
+    ++builder.jobsPerformed;
+    ++builder.active;
     update();
 }
 
@@ -697,11 +697,11 @@ function jobFinished(job)
 
     deleteJob(activejob);
 
-    const key = `${activejob.slave.ip}:${activejob.slave.port}`;
-    const slave = slaves.get(key);
-    if (!slave)
+    const key = `${activejob.builder.ip}:${activejob.builder.port}`;
+    const builder = builders.get(key);
+    if (!builder)
         return;
-    --slave.active;
+    --builder.active;
     update();
 }
 
@@ -737,11 +737,11 @@ function connect()
             notify(`msg parse error: ${msg}, ${e}`);
         }
         switch (obj.type) {
-        case "slaveAdded":
-            slaveAdded(obj);
+        case "builderAdded":
+            builderAdded(obj);
             break;
-        case "slaveRemoved":
-            slaveRemoved(obj);
+        case "builderRemoved":
+            builderRemoved(obj);
             break;
         case "jobStarted":
             jobStarted(obj);

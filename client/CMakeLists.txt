@@ -35,7 +35,7 @@ add_executable(fiskc
     Preprocessed.cpp
     SchedulerWebSocket.cpp
     Select.cpp
-    SlaveWebSocket.cpp
+    BuilderWebSocket.cpp
     Watchdog.cpp
     WebSocket.cpp
     main.cpp)

@@ -37,7 +37,7 @@ function handleConnection(ws, req)
             proxyWs.on("message", msg => {
                 // console.log("Got message", msg);
                 const message = JSON.parse(msg);
-                if (message.type == "slave" && message.ip) {
+                if (message.type == "builder" && message.ip) {
                     let copy = JSON.parse(msg);
                     let ip = req.connection.remoteAddress;
                     if (ip.substr(0, 7) == "::ffff:") {
@@ -46,7 +46,7 @@ function handleConnection(ws, req)
                     copy.ip = ip;
                     copy.port = port;
                     // console.log("sending copy", copy);
-                    tasks[copy.id] = { ws: ws, slaveIp: message.ip, slavePort: message.port };
+                    tasks[copy.id] = { ws: ws, builderIp: message.ip, builderPort: message.port };
                     ws.send(JSON.stringify(copy));
                 } else {
                     ws.send(msg);
@@ -93,7 +93,7 @@ function handleConnection(ws, req)
                 headers[key] = req.headers[key];
             }
         }
-        let proxyWs = new WebSocket(`ws://${task.slaveIp}:${task.slavePort}/compile`, { headers: headers });
+        let proxyWs = new WebSocket(`ws://${task.builderIp}:${task.builderPort}/compile`, { headers: headers });
         proxyWs.on("close", () => {
             // console.log("Got close 2");
             proxyWs = undefined;
@@ -123,11 +123,11 @@ function handleConnection(ws, req)
         });
 
         proxyWs.on("message", msg => {
-            // console.log("Got message from slave", msg);
+            // console.log("Got message from builder", msg);
             ws.send(msg);
         });
 
-        console.log("Now to connect to the slave");
+        console.log("Now to connect to the builder");
         // ws.on("close", () => {
         //     console.log("Client 2 closed");
         // });

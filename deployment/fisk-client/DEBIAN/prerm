@@ -2,7 +2,7 @@
 
 if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
     sudo service fisk-daemon stop
-    sudo systemctl disable fisk-slave.service
+    sudo systemctl disable fisk-builder.service
 fi
 if [ "$1" != "upgrade" ]; then
     rm -rf /var/fisk/client/compilers

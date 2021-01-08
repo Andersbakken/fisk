@@ -41,7 +41,7 @@ class Client extends EventEmitter {
             "x-fisk-npm-version": this.npmVersion
         };
         if (this.hostname)
-            headers["x-fisk-slave-hostname"] = this.hostname;
+            headers["x-fisk-builder-hostname"] = this.hostname;
 
         this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {

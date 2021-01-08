@@ -33,7 +33,7 @@ class Client extends EventEmitter {
     }
 
     connect(environments) {
-        const url = `${this.scheduler}/slave`;
+        const url = `${this.scheduler}/builder`;
         console.log("connecting to", url);
 
         let remaining = 0;
@@ -52,13 +52,13 @@ class Client extends EventEmitter {
             "x-fisk-port": this.serverPort,
             "x-fisk-environments": environments.join(";"),
             "x-fisk-config-version": this.configVersion,
-            "x-fisk-slave-name": this.name,
+            "x-fisk-builder-name": this.name,
             "x-fisk-system": system,
             "x-fisk-slots": this.slots,
             "x-fisk-npm-version": this.npmVersion
         };
         if (this.hostname)
-            headers["x-fisk-slave-hostname"] = this.hostname;
+            headers["x-fisk-builder-hostname"] = this.hostname;
 
         this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {

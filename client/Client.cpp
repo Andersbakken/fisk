@@ -201,7 +201,7 @@ bool Client::findCompiler(const std::string &preresolved)
     if (data.resolvedCompiler.empty())
         data.resolvedCompiler = exec;
     {
-        auto findSlaveCompiler = [&data](const std::string &path) {
+        auto findBuilderCompiler = [&data](const std::string &path) {
             size_t slash = path.rfind('/');
             if (slash == std::string::npos)
                 slash = 0;
@@ -209,19 +209,19 @@ bool Client::findCompiler(const std::string &preresolved)
             while (*ch) {
                 if (*ch == 'g') {
                     if (!strncmp(ch + 1, "++", 2)) {
-                        data.slaveCompiler =  "/usr/bin/g++";
+                        data.builderCompiler =  "/usr/bin/g++";
                         return true;
                     } else if (!strncmp(ch + 1, "cc", 2)) {
-                        data.slaveCompiler =  "/usr/bin/gcc";
+                        data.builderCompiler =  "/usr/bin/gcc";
                         return true;
                     }
                 } else if (*ch == 'c') {
                     if (!strncmp(ch + 1, "lang", 4)) {
                         if (!strncmp(ch + 5, "++", 2)) {
-                            data.slaveCompiler =  "/usr/bin/clang++";
+                            data.builderCompiler =  "/usr/bin/clang++";
                             return true;
                         } else {
-                            data.slaveCompiler =  "/usr/bin/clang";
+                            data.builderCompiler =  "/usr/bin/clang";
                             return true;
                         }
                     }
@@ -230,14 +230,14 @@ bool Client::findCompiler(const std::string &preresolved)
             }
             return false;
         };
-        if (!findSlaveCompiler(exec)
-            && !findSlaveCompiler(data.resolvedCompiler)
-            && !findSlaveCompiler(Client::realpath(exec))
-            && !findSlaveCompiler(Client::realpath(data.resolvedCompiler))) {
+        if (!findBuilderCompiler(exec)
+            && !findBuilderCompiler(data.resolvedCompiler)
+            && !findBuilderCompiler(Client::realpath(exec))
+            && !findBuilderCompiler(Client::realpath(data.resolvedCompiler))) {
             if (exec.find("++") != std::string::npos) {
-                findSlaveCompiler("g++");
+                findBuilderCompiler("g++");
             } else {
-                findSlaveCompiler("gcc");
+                findBuilderCompiler("gcc");
             }
         }
     }
@@ -261,11 +261,11 @@ bool Client::findCompiler(const std::string &preresolved)
             }
         }
     }
-    // printf("RESULT %s %s %s\n", data.resolvedCompiler.c_str(), data.slaveCompiler.c_str(), exec.c_str());
+    // printf("RESULT %s %s %s\n", data.resolvedCompiler.c_str(), data.builderCompiler.c_str(), exec.c_str());
 
     if (exec.size() >= 5 && !strcmp(exec.c_str() + exec.size() - 5, "fiskc")) { // resolved to ourselves
-        // printf("WE'RE HERE %s %s %s\n", exec.c_str(), data.slaveCompiler.c_str(), data.resolvedCompiler.c_str());
-        data.slaveCompiler.clear();
+        // printf("WE'RE HERE %s %s %s\n", exec.c_str(), data.builderCompiler.c_str(), data.resolvedCompiler.c_str());
+        data.builderCompiler.clear();
         data.resolvedCompiler.clear();
         return false;
     }

@@ -29,19 +29,19 @@ public:
             if (t == "needsEnvironment") {
                 needsEnvironment = true;
                 done = true;
-            } else if (t == "slave") {
-                data.slaveIp = msg["ip"].string_value();
-                Client::data().slaveHostname = msg["hostname"].string_value();
+            } else if (t == "builder") {
+                data.builderIp = msg["ip"].string_value();
+                Client::data().builderHostname = msg["hostname"].string_value();
                 environment = msg["environment"].string_value();
                 std::vector<json11::Json> extraArgs = msg["extraArgs"].array_items();
                 extraArguments.reserve(extraArgs.size());
                 for (const json11::Json &arg : extraArgs) {
                     extraArguments.push_back(arg.string_value());
                 }
-                data.slavePort = static_cast<uint16_t>(msg["port"].int_value());
+                data.builderPort = static_cast<uint16_t>(msg["port"].int_value());
                 jobId = msg["id"].int_value();
                 DEBUG("type %d", msg["port"].type());
-                DEBUG("Got here %s:%d", data.slaveIp.c_str(), data.slavePort);
+                DEBUG("Got here %s:%d", data.builderIp.c_str(), data.builderPort);
                 done = true;
             } else if (t == "version_mismatch") {
                 FATAL("*** Version mismatch detected, client version: %s minimum client version required: %s",

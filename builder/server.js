@@ -126,7 +126,7 @@ class Server extends EventEmitter {
                                sourceFile: req.headers["x-fisk-sourcefile"],
                                md5: req.headers["x-fisk-md5"],
                                id: parseInt(req.headers["x-fisk-job-id"]),
-                               slaveIp: req.headers["x-fisk-slave-ip"] });
+                               builderIp: req.headers["x-fisk-builder-ip"] });
 
             break;
         default:

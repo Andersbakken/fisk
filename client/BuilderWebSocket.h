@@ -1,12 +1,12 @@
-#ifndef SLAVEWEBSOCKET_H
-#define SLAVEWEBSOCKET_H
+#ifndef BUILDERWEBSOCKET_H
+#define BUILDERWEBSOCKET_H
 
 #include "WebSocket.h"
 #include "Client.h"
 #include "Watchdog.h"
 #include <string>
 
-class SlaveWebSocket : public WebSocket
+class BuilderWebSocket : public WebSocket
 {
 public:
     bool wait { false };
@@ -21,14 +21,14 @@ public:
             return;
         }
 
-        WARN("Got message from slave %s %s", url().c_str(),
+        WARN("Got message from builder %s %s", url().c_str(),
              std::string(reinterpret_cast<const char *>(bytes), len).c_str());
         std::string err;
         json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(bytes), len), err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
-            ERROR("Failed to parse json from slave: %s", err.c_str());
+            ERROR("Failed to parse json from builder: %s", err.c_str());
             data.watchdog->stop();
-            error = "slave json parse error";
+            error = "builder json parse error";
             done = true;
             return;
         }
@@ -50,9 +50,9 @@ public:
         if (type == "response") {
             const auto success = msg["success"];
             if (!success.is_bool() || !success.bool_value()) {
-                ERROR("Slave had some issue. Build locally: %s", msg["error"].string_value().c_str());
+                ERROR("Builder had some issue. Build locally: %s", msg["error"].string_value().c_str());
                 data.watchdog->stop();
-                error = "slave run failure";
+                error = "builder run failure";
                 done = true;
                 return;
             }
@@ -68,8 +68,8 @@ public:
                     || stdErr.find("execvp: No such file or directory") != std::string::npos
                     || stdErr.find("cannot execute ") != std::string::npos
                     || stdErr.find("error trying to exec") != std::string::npos) {
-                    ERROR("Slave %s%s had a suspicious error. Building locally:\n%s",
-                          data.slaveHostname.empty() ? "" : (" " + data.slaveHostname).c_str(),
+                    ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
+                          data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
                           url().c_str(),
                           Client::base64(stdErr).c_str());
                     data.watchdog->stop();
@@ -77,7 +77,7 @@ public:
                     done = true;
                     return;
                 }
-                fprintf(stderr, "error: exit code: %d Fisk slave: %s source file: %s cache: %s\n",
+                fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
                         data.objectCache ? "true" : "false");
             }
@@ -103,7 +103,7 @@ public:
                     if (ff.path.empty()) {
                         ERROR("No file for idx: %zu", i);
                         Client::data().watchdog->stop();
-                        error = "slave protocol error";
+                        error = "builder protocol error";
                         done = true;
                         return;
                     }
@@ -113,7 +113,7 @@ public:
                 if (!f) {
                     ERROR("Can't open file: %s", files[0].path.c_str());
                     Client::data().watchdog->stop();
-                    error = "slave file open error";
+                    error = "builder file open error";
                     done = true;
                     return;
                 }
@@ -128,7 +128,7 @@ public:
 
         ERROR("Unexpected message type %s.", msg["type"].string_value().c_str());
         Client::data().watchdog->stop();
-        error = "slave protocol error 5";
+        error = "builder protocol error 5";
         done = true;
     }
 
@@ -138,7 +138,7 @@ public:
         if (files.empty()) {
             ERROR("Unexpected binary data (%zu bytes)", len);
             Client::data().watchdog->stop();
-            error = "slave protocol error 2";
+            error = "builder protocol error 2";
             done = true;
             return;
         }
@@ -161,7 +161,7 @@ public:
                 if (fwrite(data + offset, 1, b, f) != b) {
                     ERROR("Failed to write to file %s (%d %s)", front->path.c_str(), errno, strerror(errno));
                     Client::data().watchdog->stop();
-                    error = "slave file write error";
+                    error = "builder file write error";
                     done = true;
                     return;
                 }
@@ -185,7 +185,7 @@ public:
                 DEBUG("Opened file [%s] -> [%s] -> %p", front->path.c_str(), Client::realpath(front->path).c_str(), f);
                 if (!f) {
                     Client::data().watchdog->stop();
-                    error = "slave file open error 2";
+                    error = "builder file open error 2";
                     done = true;
                     return;
                 }
@@ -197,7 +197,7 @@ public:
         if (offset < bytes) {
             ERROR("Extraneous bytes. Abandon ship (%zu/%zu)", offset, bytes);
             Client::data().watchdog->stop();
-            error = "slave protocol error 3";
+            error = "builder protocol error 3";
             done = true;
         }
     }
@@ -215,4 +215,4 @@ public:
 };
 
 
-#endif /* SLAVEWEBSOCKET_H */
+#endif /* BUILDERWEBSOCKET_H */

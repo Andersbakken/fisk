@@ -1,0 +1,7 @@
+#!/bin/bash
+
+mkdir -p /var/fisk/builder/data
+sudo -H npm install --unsafe-perm -g @andersbakken/fisk
+sudo systemctl enable fisk-builder.service
+sudo service fisk-builder start
+

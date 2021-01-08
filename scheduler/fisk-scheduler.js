@@ -19,14 +19,14 @@ const ObjectCacheManager = require('./objectcachemanager');
 const compareVersions = require('compare-versions');
 const humanizeDuration = require('humanize-duration');
 const wol = require('wake_on_lan');
-let wolSlaves = {};
-(option("wake-on-lan-slaves") || []).forEach(slave => {
-    if (!slave.name || !slave.mac) {
+let wolBuilders = {};
+(option("wake-on-lan-builders") || []).forEach(builder => {
+    if (!builder.name || !builder.mac) {
         console.error("Bad wol, missing name or mac address");
-    } else if (slave.name in wolSlaves) {
-        console.error(`Duplicate name for wol-slave ${JSON.stringify(slave)}`);
+    } else if (builder.name in wolBuilders) {
+        console.error(`Duplicate name for wol-builder ${JSON.stringify(builder)}`);
     } else {
-        wolSlaves[slave.name] = { mac: slave.mac, connected: false, address: slave.address || "255.255.255.255" };
+        wolBuilders[builder.name] = { mac: builder.mac, connected: false, address: builder.address || "255.255.255.255" };
     }
 });
 
@@ -60,7 +60,7 @@ try {
     process.exit();
 }
 
-const slaves = {};
+const builders = {};
 let lastWol = 0;
 function sendWols()
 {
@@ -71,33 +71,33 @@ function sendWols()
 
     lastWol = now;
     let byName;
-    for (let name in wolSlaves) {
-        const wolSlave = wolSlaves[name];
-        if (wolSlave.connected)
+    for (let name in wolBuilders) {
+        const wolBuilder = wolBuilders[name];
+        if (wolBuilder.connected)
             continue;
         if (!byName) {
             byName = {};
-            for (let key in slaves) {
-                const slave = slaves[key];
-                if (slave.name)
-                    byName[slave.name] = slave;
+            for (let key in builders) {
+                const builder = builders[key];
+                if (builder.name)
+                    byName[builder.name] = builder;
             }
         }
         if (!(name in byName)) {
-            wol.wake(wolSlave.mac, error => {
-                console.log("sending wol", JSON.stringify(wolSlave));
+            wol.wake(wolBuilder.mac, error => {
+                console.log("sending wol", JSON.stringify(wolBuilder));
                 if (error) {
-                    console.error(`Failed to wol slave: ${JSON.stringify(wolSlave)}: ${error}`);
+                    console.error(`Failed to wol builder: ${JSON.stringify(wolBuilder)}: ${error}`);
                 }
             });
         } else {
-            console.log(wolSlave, "is already connected");
+            console.log(wolBuilder, "is already connected");
         }
     }
 }
 
 const monitors = [];
-let slaveCount = 0;
+let builderCount = 0;
 let activeJobs = 0;
 let capacity = 0;
 let jobsFailed = 0;
@@ -165,15 +165,15 @@ function jobStartedOrScheduled(type, job)
                 user: job.client.user
             },
             sourceFile: job.sourceFile,
-            slave: {
-                ip: job.slave.ip,
-                name: job.slave.name,
-                port: job.slave.port
+            builder: {
+                ip: job.builder.ip,
+                name: job.builder.name,
+                port: job.builder.port
             },
             id: job.id
         };
-        if (job.slave.hostname)
-            info.slave.hostname = job.slave.hostname;
+        if (job.builder.hostname)
+            info.builder.hostname = job.builder.hostname;
 
         if (monitorsLog)
             console.log("send to monitors", info);
@@ -181,7 +181,7 @@ function jobStartedOrScheduled(type, job)
     }
 }
 
-function cacheHit(slave, job)
+function cacheHit(builder, job)
 {
     if (objectCache)
         objectCache.hit(job.md5);
@@ -195,10 +195,10 @@ function cacheHit(slave, job)
                 user: job.client.user
             },
             sourceFile: job.sourceFile,
-            slave: {
-                ip: slave.ip,
-                name: slave.name,
-                port: slave.port
+            builder: {
+                ip: builder.ip,
+                name: builder.name,
+                port: builder.port
             },
             id: job.id,
             jobs: (objectCache ? objectCache.hits : 0) + jobsFailed + jobsFinished,
@@ -208,8 +208,8 @@ function cacheHit(slave, job)
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        if (slave.hostname)
-            info.slave.hostname = slave.hostname;
+        if (builder.hostname)
+            info.builder.hostname = builder.hostname;
         if (monitorsLog)
             console.log("send to monitors", info);
         // console.log("sending info", info);
@@ -217,13 +217,13 @@ function cacheHit(slave, job)
     }
 }
 
-function jobFinished(slave, job)
+function jobFinished(builder, job)
 {
     ++jobsFinished;
-    ++slave.jobsPerformed;
-    slave.totalCompileSpeed += job.compileSpeed;
-    slave.totalUploadSpeed += job.uploadSpeed;
-    // console.log(`slave: ${slave.ip}:${slave.port} performed a job`, job);
+    ++builder.jobsPerformed;
+    builder.totalCompileSpeed += job.compileSpeed;
+    builder.totalUploadSpeed += job.uploadSpeed;
+    // console.log(`builder: ${builder.ip}:${builder.port} performed a job`, job);
     if (monitors.length) {
         const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
         const info = {
@@ -245,7 +245,7 @@ function jobFinished(slave, job)
     }
 }
 
-function slaveKey() {
+function builderKey() {
     if (arguments.length == 1) {
         return arguments[0].ip + " " + arguments[0].port;
     } else {
@@ -253,34 +253,34 @@ function slaveKey() {
     }
 }
 
-function slaveToMonitorInfo(slave, type)
+function builderToMonitorInfo(builder, type)
 {
     return {
         type: type,
-        ip: slave.ip,
-        name: slave.name,
-        hostname: slave.hostname,
-        slots: slave.slots,
-        port: slave.port,
-        jobsPerformed: slave.jobsPerformed,
-        compileSpeed: slave.jobsPerformed / slave.totalCompileSpeed || 0,
-        uploadSpeed: slave.jobsPerformed / slave.totalUploadSpeed || 0,
-        system: slave.system,
-        created: slave.created,
-        npmVersion: slave.npmVersion,
-        environments: Object.keys(slave.environments)
+        ip: builder.ip,
+        name: builder.name,
+        hostname: builder.hostname,
+        slots: builder.slots,
+        port: builder.port,
+        jobsPerformed: builder.jobsPerformed,
+        compileSpeed: builder.jobsPerformed / builder.totalCompileSpeed || 0,
+        uploadSpeed: builder.jobsPerformed / builder.totalUploadSpeed || 0,
+        system: builder.system,
+        created: builder.created,
+        npmVersion: builder.npmVersion,
+        environments: Object.keys(builder.environments)
     };
 }
 
-function insertSlave(slave) {
-    slaves[slaveKey(slave)] = slave;
-    if (slave.name && slave.name in wolSlaves) {
-        wolSlaves[slave.name].connected = true;
+function insertBuilder(builder) {
+    builders[builderKey(builder)] = builder;
+    if (builder.name && builder.name in wolBuilders) {
+        wolBuilders[builder.name].connected = true;
     }
-    ++slaveCount;
-    capacity += slave.slots;
+    ++builderCount;
+    capacity += builder.slots;
     if (monitors.length) {
-        const info = slaveToMonitorInfo(slave, "slaveAdded");
+        const info = builderToMonitorInfo(builder, "builderAdded");
         if (monitorsLog)
             console.log("send to monitors", info);
         monitors.forEach(monitor => {
@@ -289,9 +289,9 @@ function insertSlave(slave) {
     }
 }
 
-function forEachSlave(cb) {
-    for (let key in slaves) {
-        cb(slaves[key]);
+function forEachBuilder(cb) {
+    for (let key in builders) {
+        cb(builders[key]);
     }
 }
 
@@ -303,23 +303,23 @@ if (option('object-cache')) {
         jobsScheduled = 0;
         jobsFinished = 0;
         const msg = { type: "clearObjectCache" };
-        forEachSlave(slave => slave.send(msg));
+        forEachBuilder(builder => builder.send(msg));
         let info = statsMessage();
         monitors.forEach(monitor => monitor.send(info));
     });
 }
 
-function removeSlave(slave) {
-    --slaveCount;
-    capacity -= slave.slots;
-    delete slaves[slaveKey(slave)];
-    if (slave.name && slave.name in wolSlaves) {
+function removeBuilder(builder) {
+    --builderCount;
+    capacity -= builder.slots;
+    delete builders[builderKey(builder)];
+    if (builder.name && builder.name in wolBuilders) {
         lastWol = 0; // lets recussitate him right away!
-        wolSlaves[slave.name].connected = false;
+        wolBuilders[builder.name].connected = false;
     }
 
     if (monitors.length) {
-        const info = slaveToMonitorInfo(slave, "slaveRemoved");
+        const info = builderToMonitorInfo(builder, "builderRemoved");
         if (monitorsLog)
             console.log("send to monitors", info);
         monitors.forEach(monitor => {
@@ -386,38 +386,38 @@ function purgeEnvironmentsToMaxSize()
     });
 }
 
-function syncEnvironments(slave)
+function syncEnvironments(builder)
 {
-    if (!slave) {
-        forEachSlave(syncEnvironments);
+    if (!builder) {
+        forEachBuilder(syncEnvironments);
         return;
     }
     let needs = [];
     let unwanted = [];
     console.log("scheduler has", Object.keys(Environments.environments).sort());
-    console.log("slave has", slave.ip, Object.keys(slave.environments).sort());
+    console.log("builder has", builder.ip, Object.keys(builder.environments).sort());
     for (let env in Environments.environments) {
-        if (env in slave.environments) {
-            slave.environments[env] = -1;
-        } else if (Environments.environments[env].canRun(slave.system)) {
+        if (env in builder.environments) {
+            builder.environments[env] = -1;
+        } else if (Environments.environments[env].canRun(builder.system)) {
             needs.push(env);
         }
     }
-    for (let env in slave.environments) {
-        if (slave.environments[env] != -1) {
+    for (let env in builder.environments) {
+        if (builder.environments[env] != -1) {
             unwanted.push(env);
-            delete slave.environments[env];
+            delete builder.environments[env];
         } else {
-            slave.environments[env] = true;
+            builder.environments[env] = true;
         }
     }
     console.log("unwanted", unwanted);
     console.log("needs", needs);
     if (unwanted.length) {
-        slave.send({ type: "dropEnvironments", environments: unwanted });
+        builder.send({ type: "dropEnvironments", environments: unwanted });
     }
     if (needs.length) {
-        slave.send({ type: "getEnvironments", environments: needs });
+        builder.send({ type: "getEnvironments", environments: needs });
     }
 }
 
@@ -447,11 +447,11 @@ server.on("listen", app => {
         res.sendStatus(200);
     });
 
-    app.get("/slaves", (req, res, next) => {
+    app.get("/builders", (req, res, next) => {
         let ret = [];
         const now = Date.now();
-        for (let slaveKey in slaves) {
-            let s = slaves[slaveKey];
+        for (let builderKey in builders) {
+            let s = builders[builderKey];
             ret.push({
                 ip: s.ip,
                 name: s.name,
@@ -485,7 +485,7 @@ server.on("listen", app => {
         }
 
         let obj = {
-            slaveCount: Object.keys(slaves).length,
+            builderCount: Object.keys(builders).length,
             npmVersion: schedulerNpmVersion,
             environments: environmentsInfo(),
             configVersion: common.Version,
@@ -501,7 +501,7 @@ server.on("listen", app => {
             uptimeMS: now - serverStartTime,
             uptime: humanizeDuration(now - serverStartTime),
             serverStartTime: new Date(serverStartTime).toString(),
-            wolSlaves: wolSlaves
+            wolBuilders: wolBuilders
         };
         res.send(JSON.stringify(obj, null, 4) + "\n");
     });
@@ -522,16 +522,16 @@ server.on("listen", app => {
         }
     });
 
-    app.get("/quit-slaves", (req, res) => {
+    app.get("/quit-builders", (req, res) => {
         res.sendStatus(200);
         const msg = {
             type: "quit",
             code: req.query.code || 0,
             purgeEnvironments: "purge_environments" in req.query
         };
-        console.log("Sending quit message to slaves", msg, Object.keys(slaves));
-        for (let ip in slaves) {
-            slaves[ip].send(msg);
+        console.log("Sending quit message to builders", msg, Object.keys(builders));
+        for (let ip in builders) {
+            builders[ip].send(msg);
         }
     });
 
@@ -635,65 +635,65 @@ function addLogFile(log, cb) {
     }
 }
 
-server.on("slave", slave => {
-    if (compareVersions(schedulerNpmVersion, slave.npmVersion) >= 1) {
-        console.log(`slave ${slave.ip} has bad npm version: ${slave.npmVersion} should have been at least: ${schedulerNpmVersion}`);
-        slave.send({ type: "version_mismatch", required_version: schedulerNpmVersion, code: 1 });
+server.on("builder", builder => {
+    if (compareVersions(schedulerNpmVersion, builder.npmVersion) >= 1) {
+        console.log(`builder ${builder.ip} has bad npm version: ${builder.npmVersion} should have been at least: ${schedulerNpmVersion}`);
+        builder.send({ type: "version_mismatch", required_version: schedulerNpmVersion, code: 1 });
         return;
     }
-    slave.activeClients = 0;
-    insertSlave(slave);
-    console.log("slave connected", slave.npmVersion, slave.ip, slave.name || "", slave.hostname || "", Object.keys(slave.environments), "slaveCount is", slaveCount);
-    syncEnvironments(slave);
+    builder.activeClients = 0;
+    insertBuilder(builder);
+    console.log("builder connected", builder.npmVersion, builder.ip, builder.name || "", builder.hostname || "", Object.keys(builder.environments), "builderCount is", builderCount);
+    syncEnvironments(builder);
 
-    slave.on("environments", message => {
-        slave.environments = {};
-        message.environments.forEach(env => slave.environments[env] = true);
-        syncEnvironments(slave);
+    builder.on("environments", message => {
+        builder.environments = {};
+        message.environments.forEach(env => builder.environments[env] = true);
+        syncEnvironments(builder);
     });
 
-    slave.on("log", event => {
-        addLogFile({ source: "slave", ip: slave.ip, contents: event.message });
+    builder.on("log", event => {
+        addLogFile({ source: "builder", ip: builder.ip, contents: event.message });
     });
 
-    slave.on("error", msg => {
-        console.error(`slave error '${msg}' from ${slave.ip}`);
+    builder.on("error", msg => {
+        console.error(`builder error '${msg}' from ${builder.ip}`);
     });
 
-    slave.on("objectCache", msg => {
-        objectCache.addNode(slave, msg);
+    builder.on("objectCache", msg => {
+        objectCache.addNode(builder, msg);
     });
 
-    slave.on("objectCacheAdded", msg => {
-        objectCache.insert(msg, slave);
+    builder.on("objectCacheAdded", msg => {
+        objectCache.insert(msg, builder);
     });
 
-    slave.on("objectCacheRemoved", msg => {
-        objectCache.remove(msg, slave);
+    builder.on("objectCacheRemoved", msg => {
+        objectCache.remove(msg, builder);
     });
 
-    slave.on("close", () => {
-        removeSlave(slave);
+    builder.on("close", () => {
+        removeBuilder(builder);
         if (objectCache)
-            objectCache.removeNode(slave);
-        console.log(`slave disconnected ${slave.ip}:${slave.port} ${slave.name} ${slave.hostname} slaveCount is ${slaveCount}`);
-        slave.removeAllListeners();
+            objectCache.removeNode(builder);
+        console.log(`builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builderCount}`);
+        builder.removeAllListeners();
     });
 
-    slave.on("load", message => {
-        slave.load = message.measure;
+    builder.on("load", message => {
+        builder.load = message.measure;
         // console.log(message);
     });
 
-    slave.on("jobStarted", job => {
+    builder.on("jobStarted", job => {
         ++jobsStarted;
         jobStartedOrScheduled("jobStarted", job);
     });
-    slave.on("jobFinished", job => jobFinished(slave, job));
-    slave.on("cacheHit", job => cacheHit(slave, job));
+    builder.on("jobFinished", job => jobFinished(builder, job));
+    builder.on("cacheHit", job => cacheHit(builder, job));
 
-    slave.on("jobAborted", job => {
-        console.log(`slave: ${slave.ip}:${slave.port} aborted a job`, job);
+    builder.on("jobAborted", job => {
+        console.log(`builder: ${builder.ip}:${builder.port} aborted a job`, job);
         if (monitors.length) {
             const info = {
                 type: "jobAborted",
@@ -749,7 +749,7 @@ function requestEnvironment(compile)
             }).then(() => {
                 if (environment.last) {
                     file = undefined;
-                    // send any new environments to slaves
+                    // send any new environments to builders
                     delete pendingEnvironments[hash];
                     return purgeEnvironmentsToMaxSize();
                 }
@@ -814,7 +814,7 @@ server.on("compile", compile => {
 
     if (!usableEnvs.length) {
         console.log(`We're already waiting for ${compile.environment} and we don't have any compatible ones`);
-        compile.send("slave", {});
+        compile.send("builder", {});
         ++jobsFailed;
         return;
     }
@@ -824,53 +824,53 @@ server.on("compile", compile => {
         return available * (1 - s.load);
     }
     let file;
-    let slave;
+    let builder;
     let bestScore;
     let env;
     let extraArgs;
     let blacklistedArgs;
     // console.log("got usableEnvs", usableEnvs);
-    // ### should have a function match(s) that checks for env, score and compile.slave etc
+    // ### should have a function match(s) that checks for env, score and compile.builder etc
     let foundInCache = false;
     if (objectCache) {
         let data = objectCache.get(compile.md5);
         if (data) {
             data.nodes.forEach(s => {
-                if (compile.slave && slave != compile.slave)
+                if (compile.builder && builder != compile.builder)
                     return;
-                const slaveScore = score(s);
-                if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
-                    bestScore = slaveScore;
-                    slave = s;
+                const builderScore = score(s);
+                if (!builder || builderScore > bestScore || (builderScore == bestScore && builder.lastJob < s.lastJob)) {
+                    bestScore = builderScore;
+                    builder = s;
                     foundInCache = true;
                 }
             });
-            if (slave && !(compile.environment in slave.environments)) {
+            if (builder && !(compile.environment in builder.environments)) {
                 for (let i=0; i<usableEnvs.length; ++i) {
-                    // console.log("checking slave", s.name, s.environments);
-                    if (usableEnvs[i] in slave.environments) {
+                    // console.log("checking builder", s.name, s.environments);
+                    if (usableEnvs[i] in builder.environments) {
                         env = usableEnvs[i];
                         break;
                     }
                 }
                 if (!env)
-                    slave = undefined;
+                    builder = undefined;
             }
         }
     }
-    if (!slave) {
-        forEachSlave(s => {
-            if (compile.slave && compile.slave != s.ip && compile.slave != s.name)
+    if (!builder) {
+        forEachBuilder(s => {
+            if (compile.builder && compile.builder != s.ip && compile.builder != s.name)
                 return;
 
             for (let i=0; i<usableEnvs.length; ++i) {
-                // console.log("checking slave", s.name, s.environments);
+                // console.log("checking builder", s.name, s.environments);
                 if (usableEnvs[i] in s.environments) {
-                    const slaveScore = score(s);
-                    // console.log("comparing", slaveScore, bestScore);
-                    if (!slave || slaveScore > bestScore || (slaveScore == bestScore && slave.lastJob < s.lastJob)) {
-                        bestScore = slaveScore;
-                        slave = s;
+                    const builderScore = score(s);
+                    // console.log("comparing", builderScore, bestScore);
+                    if (!builder || builderScore > bestScore || (builderScore == bestScore && builder.lastJob < s.lastJob)) {
+                        bestScore = builderScore;
+                        builder = s;
                         env = usableEnvs[i];
                         break;
                     }
@@ -878,10 +878,10 @@ server.on("compile", compile => {
             }
         });
     }
-    if (!slave && compile.slave) {
+    if (!builder && compile.builder) {
         ++jobsFailed;
-        console.log(`Specific slave was requested and we couldn't match ${compile.environment} with that slave`);
-        compile.send("slave", {});
+        console.log(`Specific builder was requested and we couldn't match ${compile.environment} with that builder`);
+        compile.send("builder", {});
         return;
     }
     let data = {};
@@ -897,7 +897,7 @@ server.on("compile", compile => {
         }, 60 * 60000);
     }
 
-    if (slave) {
+    if (builder) {
         if (env != compile.environment) {
             data.environment = env;
             data.extraArgs = Environments.extraArgs(compile.environment, env);
@@ -915,39 +915,39 @@ server.on("compile", compile => {
             monitors.forEach(monitor => monitor.send(info));
         }
         let sendTime = Date.now();
-        ++slave.activeClients;
-        ++slave.jobsScheduled;
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to slave ${slave.ip} ${slave.port} ${slave.name} score: ${bestScore} objectCache: ${foundInCache}. `
-                    + `Slave has ${slave.activeClients} and performed ${slave.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
-        slave.lastJob = Date.now();
+        ++builder.activeClients;
+        ++builder.jobsScheduled;
+        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. `
+                    + `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
+        builder.lastJob = Date.now();
         let id = nextJobId();
         data.id = id;
-        data.ip = slave.ip;
-        data.hostname = slave.hostname;
-        data.port = slave.port;
-        compile.send("slave", data);
-        jobStartedOrScheduled("jobScheduled", { client: compile, slave: slave, id: id, sourceFile: compile.sourceFile });
+        data.ip = builder.ip;
+        data.hostname = builder.hostname;
+        data.port = builder.port;
+        compile.send("builder", data);
+        jobStartedOrScheduled("jobScheduled", { client: compile, builder: builder, id: id, sourceFile: compile.sourceFile });
         ++jobsScheduled;
     } else {
         ++jobsFailed;
-        console.log("No slave for you", compile.ip);
-        compile.send("slave", data);
+        console.log("No builder for you", compile.ip);
+        compile.send("builder", data);
     }
     compile.on("error", msg => {
-        if (slave) {
-            --slave.activeClients;
+        if (builder) {
+            --builder.activeClients;
             --activeJobs;
-            slave = undefined;
+            builder = undefined;
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
     compile.on("close", event => {
         // console.log("Client disappeared");
         compile.removeAllListeners();
-        if (slave) {
-            --slave.activeClients;
+        if (builder) {
+            --builder.activeClients;
             --activeJobs;
-            slave = undefined;
+            builder = undefined;
         }
     });
 });
@@ -985,8 +985,8 @@ function randomBytes(bytes)
 
 function sendInfoToClient(client)
 {
-    forEachSlave(slave => {
-        const info = slaveToMonitorInfo(slave, "slaveAdded");
+    forEachBuilder(builder => {
+        const info = builderToMonitorInfo(builder, "builderAdded");
         if (monitorsLog)
             console.log("sending to monitor", info);
         client.send(info);
@@ -1251,11 +1251,11 @@ function simulate(count)
     function randomSourceFile() { return randomWords({ min: 1, max: 2, join: "_" }) + ".cpp"; }
     function randomHostname() { return randomWords({ exactly: 1, wordsPerString: 1 + parseInt(Math.random() * 2), separator: '-' }); }
 
-    let fakeSlaves = [];
+    let fakeBuilders = [];
     let jobs = [];
     for (let i=0; i<count; ++i) {
         const ip = randomIp();
-        const fakeSlave = {
+        const fakeBuilder = {
             ip: ip,
             name: randomName(),
             hostname: randomHostname(),
@@ -1269,11 +1269,11 @@ function simulate(count)
             npmVersion: schedulerNpmVersion,
             environments: Object.keys(Environments.environments)
         };
-        for (let j=0; j<fakeSlave.slots; ++j) {
-            jobs.push({ slave: fakeSlave });
+        for (let j=0; j<fakeBuilder.slots; ++j) {
+            jobs.push({ builder: fakeBuilder });
         }
-        fakeSlaves.push(fakeSlave);
-        insertSlave(fakeSlave);
+        fakeBuilders.push(fakeBuilder);
+        insertBuilder(fakeBuilder);
     }
     const clients = [];
     const clientCount = count / 2 || 1;
@@ -1284,17 +1284,17 @@ function simulate(count)
     {
         for (let i=0; i<jobs.length; ++i) {
             const percentage = Math.random() * 100;
-            if (jobs[i].slave.gone) {
+            if (jobs[i].builder.gone) {
                 if (percentage <= 10) {
-                    jobs[i].slave.gone = false;
-                    insertSlave(jobs[i].slave);
+                    jobs[i].builder.gone = false;
+                    insertBuilder(jobs[i].builder);
                 } else {
                     continue;
                 }
             } else if (percentage <= 1) {
-                jobs[i].slave.gone = true;
-                removeSlave(jobs[i].slave);
-                while (jobs[i + 1] && jobs[i + 1].slave == jobs[i].slave) {
+                jobs[i].builder.gone = true;
+                removeBuilder(jobs[i].builder);
+                while (jobs[i + 1] && jobs[i + 1].builder == jobs[i].builder) {
                     ++i;
                 }
                 continue;
@@ -1303,12 +1303,12 @@ function simulate(count)
                 if (!jobs[i].client) {
                     jobs[i].client = clients[parseInt(Math.random() * clientCount)];
                     jobs[i].id = nextJobId();
-                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
-                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, slave: jobs[i].slave, id: jobs[i].id, sourceFile: randomSourceFile() });
+                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomSourceFile() });
+                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomSourceFile() });
                 } else {
                     // const client = jobs[i].client;
                     // const id = jobs[i].id;
-                    jobFinished(jobs[i].slave, { id: jobs[i].id,
+                    jobFinished(jobs[i].builder, { id: jobs[i].id,
                                                  cppSize: parseInt(Math.random() * 1024 * 1024 * 4),
                                                  compileDuration: parseInt(Math.random() * 5000),
                                                  uploadDuration: parseInt(Math.random() * 500) });

@@ -1,7 +1,7 @@
 #include "Client.h"
 #include "CompilerArgs.h"
 #include "Config.h"
-#include "SlaveWebSocket.h"
+#include "BuilderWebSocket.h"
 #include "SchedulerWebSocket.h"
 #include "Log.h"
 #include "Preprocessed.h"
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
         DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
               data.argv[0], preresolved.c_str(),
               data.compiler.c_str(), data.resolvedCompiler.c_str(),
-              data.slaveCompiler.c_str());
+              data.builderCompiler.c_str());
     }
 
     DaemonSocket daemonSocket;
@@ -282,15 +282,15 @@ int main(int argc, char **argv)
         }
     }
 
-    headers["x-fisk-environments"] = data.hash; // always a single one but fisk-slave sends multiple so we'll just keep it like this for now
+    headers["x-fisk-environments"] = data.hash; // always a single one but fisk-builder sends multiple so we'll just keep it like this for now
     Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], nullptr);
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
     {
-        std::string slave = Config::slave;
-        if (!slave.empty())
-            headers["x-fisk-slave"] = std::move(slave);
+        std::string builder = Config::builder;
+        if (!builder.empty())
+            headers["x-fisk-builder"] = std::move(builder);
     }
     {
         std::string hostname = Config::hostname;
@@ -401,49 +401,49 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if ((data.slaveHostname.empty() && data.slaveIp.empty())
-        || !data.slavePort) {
-        DEBUG("Have to run locally because no slave");
-        runLocal("no slave");
+    if ((data.builderHostname.empty() && data.builderIp.empty())
+        || !data.builderPort) {
+        DEBUG("Have to run locally because no builder");
+        runLocal("no builder");
         return 0; // unreachable
     }
 
     // usleep(1000 * 1000 * 16);
-    data.watchdog->transition(Watchdog::AcquiredSlave);
-    SlaveWebSocket slaveWebSocket;
-    select.add(&slaveWebSocket);
+    data.watchdog->transition(Watchdog::AcquiredBuilder);
+    BuilderWebSocket builderWebSocket;
+    select.add(&builderWebSocket);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
-    headers["x-fisk-slave-ip"] = data.slaveIp;
+    headers["x-fisk-builder-ip"] = data.builderIp;
     if (!schedulerWebsocket.environment.empty()) {
         DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket.environment.c_str());
         headers["x-fisk-environments"] = schedulerWebsocket.environment;
     }
-    if (!slaveWebSocket.connect(Client::format("ws://%s:%d/compile",
-                                               data.slaveHostname.empty() ? data.slaveIp.c_str() : data.slaveHostname.c_str(),
-                                               data.slavePort), headers)) {
-        DEBUG("Have to run locally because no slave connection");
-        runLocal("slave connection failure");
+    if (!builderWebSocket.connect(Client::format("ws://%s:%d/compile",
+                                               data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+                                               data.builderPort), headers)) {
+        DEBUG("Have to run locally because no builder connection");
+        runLocal("builder connection failure");
         return 0; // unreachable
     }
 
     while (!data.watchdog->timedOut()
-           && slaveWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket
-           && slaveWebSocket.state() > WebSocket::None) {
+           && builderWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket
+           && builderWebSocket.state() > WebSocket::None) {
         select.exec();
     }
 
     if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out trying to connect to slave");
-        runLocal("watchdog slave connect");
+        DEBUG("Have to run locally because we timed out trying to connect to builder");
+        runLocal("watchdog builder connect");
         return 0; // unreachable
     }
 
-    if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
-        DEBUG("Have to run locally because no slave connection 2");
-        runLocal("slave connection failure 2");
+    if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+        DEBUG("Have to run locally because no builder connection 2");
+        runLocal("builder connection failure 2");
         return 0;
     }
-    data.watchdog->transition(Watchdog::ConnectedToSlave);
+    data.watchdog->transition(Watchdog::ConnectedToBuilder);
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
         while (!data.preprocessed->done()
@@ -479,7 +479,7 @@ int main(int argc, char **argv)
 
 
     std::vector<std::string> args = data.compilerArgs->commandLine;
-    args[0] = data.slaveCompiler;
+    args[0] = data.builderCompiler;
     if (!schedulerWebsocket.extraArguments.empty()) {
         args.reserve(args.size() + schedulerWebsocket.extraArguments.size());
         for (std::string &arg : schedulerWebsocket.extraArguments) {
@@ -488,7 +488,7 @@ int main(int argc, char **argv)
         schedulerWebsocket.extraArguments.clear(); // since we moved it out
     }
 
-    const bool wait = slaveWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
+    const bool wait = builderWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
     json11::Json::object msg {
         { "commandLine", args },
         { "argv0", data.compiler },
@@ -497,17 +497,17 @@ int main(int argc, char **argv)
     };
 
     const std::string json = json11::Json(msg).dump();
-    DEBUG("Sending to slave:\n%s\n", json.c_str());
-    slaveWebSocket.wait = wait;
-    slaveWebSocket.send(WebSocket::Text, json.c_str(), json.size());
+    DEBUG("Sending to builder:\n%s\n", json.c_str());
+    builderWebSocket.wait = wait;
+    builderWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
-        while (!slaveWebSocket.done
+        while (!builderWebSocket.done
                && !data.watchdog->timedOut()
-               && (slaveWebSocket.hasPendingSendData() || slaveWebSocket.wait) && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+               && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
             select.exec();
         }
-        if (slaveWebSocket.done) {
-            if (slaveWebSocket.error.empty()) {
+        if (builderWebSocket.done) {
+            if (builderWebSocket.error.empty()) {
                 if (!data.preprocessed->stdErr.empty()) {
                     fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
                 }
@@ -519,45 +519,45 @@ int main(int argc, char **argv)
                 Client::writeStatistics();
                 return data.exitCode;
             } else {
-                ERROR("Have to run locally because something happened with the slave %s\n%s",
+                ERROR("Have to run locally because something happened with the builder %s\n%s",
                       data.compilerArgs->sourceFile().c_str(),
-                      slaveWebSocket.error.c_str());
+                      builderWebSocket.error.c_str());
 
                 runLocal("error");
                 return 0; // unreachable
             }
         }
         if (data.watchdog->timedOut()) {
-            DEBUG("Have to run locally because we timed out waiting for slave");
+            DEBUG("Have to run locally because we timed out waiting for builder");
             runLocal("watchdog");
             return 0; // unreachable
         }
-        if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
-            DEBUG("Have to run locally because something went wrong with the slave");
-            runLocal("slave protocol error 6");
+        if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+            DEBUG("Have to run locally because something went wrong with the builder");
+            runLocal("builder protocol error 6");
             return 0; // unreachable
         }
     }
 
-    assert(!slaveWebSocket.wait);
-    slaveWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
+    assert(!builderWebSocket.wait);
+    builderWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
     data.preprocessed->stdOut.clear();
 
     while (data.watchdog->timedOut()
-           && slaveWebSocket.hasPendingSendData()
-           && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+           && builderWebSocket.hasPendingSendData()
+           && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
     if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out waiting for slave");
+        DEBUG("Have to run locally because we timed out waiting for builder");
         runLocal("watchdog upload");
         return 0; // unreachable
     }
 
-    if (slaveWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
-        DEBUG("Have to run locally because something went wrong with the slave");
-        runLocal("slave connect error 3");
+    if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+        DEBUG("Have to run locally because something went wrong with the builder");
+        runLocal("builder connect error 3");
         return 0; // unreachable
     }
 
@@ -567,26 +567,26 @@ int main(int argc, char **argv)
     }
 
     while (!data.watchdog->timedOut()
-           && !slaveWebSocket.done
-           && slaveWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+           && !builderWebSocket.done
+           && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
     if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out waiting for slave somehoe");
-        runLocal("watchdog slave");
+        DEBUG("Have to run locally because we timed out waiting for builder somehoe");
+        runLocal("watchdog builder");
         return 0; // unreachable
     }
 
-    if (!slaveWebSocket.done) {
-        DEBUG("Have to run locally because something went wrong with the slave, part deux");
-        runLocal("slave network error");
+    if (!builderWebSocket.done) {
+        DEBUG("Have to run locally because something went wrong with the builder, part deux");
+        runLocal("builder network error");
         return 0; // unreachable
     }
 
-    if (!slaveWebSocket.error.empty()) {
-        DEBUG("Have to run locally because something went wrong with the slave, part trois: %s", slaveWebSocket.error.c_str());
-        runLocal("slave error");
+    if (!builderWebSocket.error.empty()) {
+        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket.error.c_str());
+        runLocal("builder error");
         return 0; // unreachable
     }
 
@@ -595,7 +595,7 @@ int main(int argc, char **argv)
     }
     data.watchdog->transition(Watchdog::Finished);
     data.watchdog->stop();
-    schedulerWebsocket.close("slaved");
+    schedulerWebsocket.close("builderd");
 
     Client::writeStatistics();
     return data.exitCode;

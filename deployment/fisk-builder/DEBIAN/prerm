@@ -2,7 +2,7 @@
 
 mount | grep --quiet /mnt/fisk_objectcache_ram_drive && umount /mnt/fisk_objectcache_ram_drive
 rm -rf /mnt/fisk_objectcache_ram_drive
-rm -rf /var/fisk/slave/data
-sudo service fisk-slave stop
+rm -rf /var/fisk/builder/data
+sudo service fisk-builder stop
 npm  --unsafe-perm uninstall -g @andersbakken/fisk
-sudo systemctl disable fisk-slave.service
+sudo systemctl disable fisk-builder.service

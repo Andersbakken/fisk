@@ -8,9 +8,9 @@ Watchdog::Watchdog()
 {
     mTransitionTime = Watchdog::timings[Initial] = Client::mono();
     if (Config::objectCache) {
-        stages = { Initial, ConnectedToDaemon, PreprocessFinished, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, UploadedJob, Finished };
+        stages = { Initial, ConnectedToDaemon, PreprocessFinished, ConnectedToScheduler, AcquiredBuilder, ConnectedToBuilder, UploadedJob, Finished };
     } else {
-        stages = { Initial, ConnectedToDaemon, ConnectedToScheduler, AcquiredSlave, ConnectedToSlave, PreprocessFinished, UploadedJob, Finished };
+        stages = { Initial, ConnectedToDaemon, ConnectedToScheduler, AcquiredBuilder, ConnectedToBuilder, PreprocessFinished, UploadedJob, Finished };
     }
 }
 
@@ -59,11 +59,11 @@ int Watchdog::timeout()
     case PreprocessFinished:
         mTimeoutTime += Config::preprocessTimeout;
         break;
-    case AcquiredSlave:
-        mTimeoutTime += Config::acquiredSlaveTimeout;
+    case AcquiredBuilder:
+        mTimeoutTime += Config::acquiredBuilderTimeout;
         break;
-    case ConnectedToSlave:
-        mTimeoutTime += Config::slaveConnectTimeout;
+    case ConnectedToBuilder:
+        mTimeoutTime += Config::builderConnectTimeout;
         break;
     case UploadedJob:
         mTimeoutTime += Config::uploadJobTimeout;

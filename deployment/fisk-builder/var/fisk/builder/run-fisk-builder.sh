@@ -22,7 +22,7 @@ function option()
     local OPT=$1
     local RET=$2
     local VAR=
-    for FILE in $HOME/.config/slave.conf /etc/xdg/fisk/slave.conf.override /etc/xdg/fisk/slave.conf ; do
+    for FILE in $HOME/.config/builder.conf /etc/xdg/fisk/builder.conf.override /etc/xdg/fisk/builder.conf ; do
         [ ! -e $FILE ] && continue
         VAR=$(cat $FILE | jq ".\"$OPT\" // -666")
         if [ -n "$VAR" ] && [ ! "$VAR" = "-666" ]; then
@@ -54,10 +54,10 @@ VERSION=
 while true; do
     npm cache clear --force --global
     VERSION=`cat $NPM_VERSION_FILE 2>/dev/null`
-    if [ ! -x "$PREFIX/lib/node_modules/@andersbakken/fisk/slave/fisk-slave.js" ] || [ -n "$FORCE_INSTALL" ]; then
+    if [ ! -x "$PREFIX/lib/node_modules/@andersbakken/fisk/builder/fisk-builder.js" ] || [ -n "$FORCE_INSTALL" ]; then
         npm install --unsafe-perm --global @andersbakken/fisk${VERSION}
     fi
-    node "$PREFIX/lib/node_modules/@andersbakken/fisk/slave/fisk-slave.js" --npm-version-file=$NPM_VERSION_FILE | logger --tag fisk-slave
+    node "$PREFIX/lib/node_modules/@andersbakken/fisk/builder/fisk-builder.js" --npm-version-file=$NPM_VERSION_FILE | logger --tag fisk-builder
     if [ "$PIPESTATUS[0]" != "0" ]; then
         FORCE_INSTALL=1
     else

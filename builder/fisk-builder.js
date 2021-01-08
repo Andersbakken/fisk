@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")({ prefix: "fisk/slave",
+const option = require("@jhanssen/options")({ prefix: "fisk/builder",
                                               applicationPath: false,
-                                              additionalFiles: [ "fisk/slave.conf.override" ] });
+                                              additionalFiles: [ "fisk/builder.conf.override" ] });
 
 const axios = require("axios");
 const ws = require("ws");
@@ -23,7 +23,7 @@ const ObjectCache = require("./objectcache");
 const quitOnError = require("./quit-on-error")(option);
 
 if (process.getuid() !== 0) {
-    console.error("fisk slave needs to run as root to be able to chroot");
+    console.error("fisk builder needs to run as root to be able to chroot");
     process.exit(1);
 }
 
@@ -453,7 +453,7 @@ client.on("getEnvironments", message => {
         } catch (err) {
         }
         if (!fs.mkdirpSync(dir)) {
-            console.error("Can't create environment directory for slave: " + dir);
+            console.error("Can't create environment directory for builder: " + dir);
             setTimeout(work, 0);
             return;
         }
@@ -516,7 +516,7 @@ client.on("getEnvironments", message => {
                 } catch (err) {
                 }
                 if (!fs.mkdirpSync(dir)) {
-                    console.error("Can't create environment directory for slave: " + dir);
+                    console.error("Can't create environment directory for builder: " + dir);
                     setTimeout(work, 0);
                 }
             });
@@ -706,8 +706,8 @@ server.on("job", job => {
                     ip: job.ip,
                     user: job.user
                 },
-                slave: {
-                    ip: job.slaveIp,
+                builder: {
+                    ip: job.builderIp,
                     name: option("name"),
                     hostname: option("hostname") || os.hostname(),
                     port: server.port
