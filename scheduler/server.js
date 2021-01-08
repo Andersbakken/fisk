@@ -285,7 +285,6 @@ class Server extends EventEmitter {
         let labels = req.headers["x-fisk-builder-labels"];
         if (labels)
             labels = labels.split(/ +/).filter(x => x);
-        console.log("got labels", labels, req.headers["x-fisk-builder-labels"]);
         const system = req.headers["x-fisk-system"];
         const slots = parseInt(req.headers["x-fisk-slots"]);
         const npmVersion = req.headers["x-fisk-npm-version"];
