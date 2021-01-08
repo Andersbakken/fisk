@@ -67,7 +67,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-
     std::string clientName = Config::name;
 
     Log::Level level = Log::Fatal;
@@ -291,6 +290,11 @@ int main(int argc, char **argv)
         std::string builder = Config::builder;
         if (!builder.empty())
             headers["x-fisk-builder"] = std::move(builder);
+    }
+    {
+        std::string labels = Config::labels;
+        if (!labels.empty())
+            headers["x-fisk-builder-labels"] = std::move(labels);
     }
     {
         std::string hostname = Config::hostname;

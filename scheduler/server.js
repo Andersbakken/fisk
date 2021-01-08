@@ -156,6 +156,11 @@ class Server extends EventEmitter {
         const preferredBuilder = req.headers["x-fisk-builder"];
         if (preferredBuilder)
             data.builder = preferredBuilder;
+        const labels = req.headers["x-fisk-builder-labels"];
+        console.log("shit labels", labels);
+        if (labels) {
+            data.labels = labels.split(/ +/).filter(x => x);
+        }
         const clientName = req.headers["x-fisk-client-name"];
         if (clientName)
             data.name = clientName;
@@ -277,6 +282,10 @@ class Server extends EventEmitter {
         const port = parseInt(req.headers["x-fisk-port"]);
         const name = req.headers["x-fisk-builder-name"];
         const hostname = req.headers["x-fisk-builder-hostname"];
+        let labels = req.headers["x-fisk-builder-labels"];
+        if (labels)
+            labels = labels.split(/ +/).filter(x => x);
+        console.log("got labels", labels, req.headers["x-fisk-builder-labels"]);
         const system = req.headers["x-fisk-system"];
         const slots = parseInt(req.headers["x-fisk-slots"]);
         const npmVersion = req.headers["x-fisk-npm-version"];
@@ -287,6 +296,7 @@ class Server extends EventEmitter {
         });
         client.assign({ port: port,
                         name: name,
+                        labels: labels,
                         slots: slots,
                         jobsPerformed: 0,
                         jobsScheduled: 0,

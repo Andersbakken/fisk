@@ -55,6 +55,7 @@ static Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
 Getter<std::string> socket("socket", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> builder("builder", "Set to hostname, name or ip if you have a preferred builder");
+Getter<std::string> labels("labels", "Set to whitespace separated list of labels. The selected builder must match all these labels");
 static Separator s2;
 static Separator s3("Options:");
 Getter<bool> color("color", "Set to false to disable colorized output", true);

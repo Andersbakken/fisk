@@ -18,6 +18,7 @@ class Client extends EventEmitter {
         this.hostname = option("hostname");
         this.name = option("name");
         this.slots = option.int("slots", os.cpus().length);
+        this.labels = option("labels");
         try {
             this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
         } catch (err) {
@@ -57,8 +58,14 @@ class Client extends EventEmitter {
             "x-fisk-slots": this.slots,
             "x-fisk-npm-version": this.npmVersion
         };
-        if (this.hostname)
+
+        if (this.labels) {
+            headers["x-fisk-builder-labels"] = this.labels;
+        }
+
+        if (this.hostname) {
             headers["x-fisk-builder-hostname"] = this.hostname;
+        }
 
         this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {

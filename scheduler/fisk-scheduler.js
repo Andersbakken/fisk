@@ -455,6 +455,7 @@ server.on("listen", app => {
             ret.push({
                 ip: s.ip,
                 name: s.name,
+                labels: s.labels,
                 slots: s.slots,
                 port: s.port,
                 activeClients: s.activeClients,
@@ -470,7 +471,7 @@ server.on("listen", app => {
                 load: s.load,
                 uptime: now - s.created.valueOf(),
                 npmVersion: s.npmVersion,
-                environments: Object.keys(s.environments)
+                environments: Object.keys(s.environments),
             });
         }
         res.send(JSON.stringify(ret, null, 4) + "\n");
@@ -862,6 +863,14 @@ server.on("compile", compile => {
             if (compile.builder && compile.builder != s.ip && compile.builder != s.name)
                 return;
 
+            if (compile.labels) {
+                for (let i=0; i<compile.labels.length; ++i) {
+                    if (!s.labels || s.labels.indexOf(compile.labels[i]) === -1) {
+                        return;
+                    }
+                }
+            }
+
             for (let i=0; i<usableEnvs.length; ++i) {
                 // console.log("checking builder", s.name, s.environments);
                 if (usableEnvs[i] in s.environments) {
@@ -877,12 +886,22 @@ server.on("compile", compile => {
             }
         });
     }
-    if (!builder && compile.builder) {
-        ++jobsFailed;
-        console.log(`Specific builder was requested and we couldn't match ${compile.environment} with that builder`);
-        compile.send("builder", {});
-        return;
+    if (!builder) {
+        if (compile.builder) {
+            ++jobsFailed;
+            console.log(`Specific builder "${compile.builder}" was requested and we couldn't find a builder with that ${compile.environment}`);
+            compile.send("builder", {});
+            return;
+        }
+
+        if (compile.labels) {
+            ++jobsFailed;
+            console.log(`Specific labels "${compile.labels}" were specified we couldn't match ${compile.environment} with any builder with those labels`);
+            compile.send("builder", {});
+            return;
+        }
     }
+
     let data = {};
 
     if (builder) {
