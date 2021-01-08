@@ -439,7 +439,8 @@ function environmentsInfo()
 
 server.on("listen", app => {
     app.get("/environments", (req, res, next) => {
-        res.send(JSON.stringify(environmentsInfo(), null, 4) + "\n");
+        const pretty = req.query && req.query.unpretty ? undefined : 4;
+        res.send(JSON.stringify(environmentsInfo(), null, pretty) + "\n");
     });
 
     app.get("/clear-log-files", (req, res, next) => {
@@ -474,7 +475,8 @@ server.on("listen", app => {
                 environments: Object.keys(s.environments),
             });
         }
-        res.send(JSON.stringify(ret, null, 4) + "\n");
+        const pretty = req.query && req.query.unpretty ? undefined : 4;
+        res.send(JSON.stringify(ret, null, pretty) + "\n");
     });
 
     app.get("/info", (req, res, next) => {
@@ -504,7 +506,8 @@ server.on("listen", app => {
             serverStartTime: new Date(serverStartTime).toString(),
             wolBuilders: wolBuilders
         };
-        res.send(JSON.stringify(obj, null, 4) + "\n");
+        const pretty = req.query && req.query.unpretty ? undefined : 4;
+        res.send(JSON.stringify(obj, null, pretty) + "\n");
     });
 
     app.get("/objectcache", (req, res) => {
@@ -519,7 +522,8 @@ server.on("listen", app => {
         } else if (req.query && "distribute" in req.query) {
             objectCache.distribute(req.query, res);
         } else {
-            res.send(JSON.stringify(objectCache.dump(req.query || {}), null, 4) + "\n");
+            const pretty = req.query && req.query.unpretty ? undefined : 4;
+            res.send(JSON.stringify(objectCache.dump(req.query || {}), null, pretty) + "\n");
         }
     });
 
