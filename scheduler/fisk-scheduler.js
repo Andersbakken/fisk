@@ -791,7 +791,6 @@ server.on("clientVerify", clientVerify => {
     }
 });
 
-let semaphoreMaintenanceTimers = {};
 server.on("compile", compile => {
     sendWols();
     compile.on("log", event => {
@@ -885,17 +884,6 @@ server.on("compile", compile => {
         return;
     }
     let data = {};
-    // console.log("WE'RE HERE", Object.keys(semaphoreMaintenanceTimers), compile.ip);
-    if (option("maintain-semaphores")) {
-        if (compile.ip in semaphoreMaintenanceTimers) {
-            clearTimeout(semaphoreMaintenanceTimers[compile.ip]);
-        } else {
-            data.maintain_semaphores = true;
-        }
-        semaphoreMaintenanceTimers[compile.ip] = setTimeout(() => {
-            delete semaphoreMaintenanceTimers[compile.ip];
-        }, 60 * 60000);
-    }
 
     if (builder) {
         if (env != compile.environment) {

@@ -20,7 +20,6 @@
 #include <sys/wait.h>
 #include <process.hpp>
 #ifdef __APPLE__
-#include <semaphore.h>
 #include <mach-o/dyld.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
