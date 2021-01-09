@@ -836,11 +836,27 @@ server.on("compile", compile => {
     // console.log("got usableEnvs", usableEnvs);
     // ### should have a function match(s) that checks for env, score and compile.builder etc
     let foundInCache = false;
+
+    function filterBuilder(s)
+    {
+        if (compile.builder && compile.builder != s.ip && compile.builder != s.name)
+            return false;
+
+        if (compile.labels) {
+            for (let i=0; i<compile.labels.length; ++i) {
+                if (!s.labels || s.labels.indexOf(compile.labels[i]) === -1) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     if (objectCache) {
         let data = objectCache.get(compile.md5);
         if (data) {
             data.nodes.forEach(s => {
-                if (compile.builder && builder != compile.builder)
+                if (!filterBuilder(s))
                     return;
                 const builderScore = score(s);
                 if (!builder || builderScore > bestScore || (builderScore == bestScore && builder.lastJob < s.lastJob)) {
@@ -849,30 +865,12 @@ server.on("compile", compile => {
                     foundInCache = true;
                 }
             });
-            if (builder && !(compile.environment in builder.environments)) {
-                for (let i=0; i<usableEnvs.length; ++i) {
-                    // console.log("checking builder", s.name, s.environments);
-                    if (usableEnvs[i] in builder.environments) {
-                        env = usableEnvs[i];
-                        break;
-                    }
-                }
-                if (!env)
-                    builder = undefined;
-            }
         }
     }
     if (!builder) {
         forEachBuilder(s => {
-            if (compile.builder && compile.builder != s.ip && compile.builder != s.name)
+            if (!filterBuilder(s)) {
                 return;
-
-            if (compile.labels) {
-                for (let i=0; i<compile.labels.length; ++i) {
-                    if (!s.labels || s.labels.indexOf(compile.labels[i]) === -1) {
-                        return;
-                    }
-                }
             }
 
             for (let i=0; i<usableEnvs.length; ++i) {
@@ -904,46 +902,43 @@ server.on("compile", compile => {
             compile.send("builder", {});
             return;
         }
-    }
-
-    let data = {};
-
-    if (builder) {
-        if (env != compile.environment) {
-            data.environment = env;
-            data.extraArgs = Environments.extraArgs(compile.environment, env);
-        }
-        ++activeJobs;
-        let utilization = (activeJobs / capacity);
-        let peakInfo = false;
-        const now = Date.now();
-        peaks.forEach(peak => {
-            if (peak.record(now, activeJobs, utilization))
-                peakInfo = true;
-        });
-        if (peakInfo && monitors.length) {
-            let info = statsMessage();
-            monitors.forEach(monitor => monitor.send(info));
-        }
-        let sendTime = Date.now();
-        ++builder.activeClients;
-        ++builder.jobsScheduled;
-        console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. `
-                    + `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
-        builder.lastJob = Date.now();
-        let id = nextJobId();
-        data.id = id;
-        data.ip = builder.ip;
-        data.hostname = builder.hostname;
-        data.port = builder.port;
-        compile.send("builder", data);
-        jobStartedOrScheduled("jobScheduled", { client: compile, builder: builder, id: id, sourceFile: compile.sourceFile });
-        ++jobsScheduled;
-    } else {
         ++jobsFailed;
         console.log("No builder for you", compile.ip);
         compile.send("builder", data);
+        return;
     }
+
+    let data = {};
+    if (env != compile.environment) {
+        data.environment = env;
+        data.extraArgs = Environments.extraArgs(compile.environment, env);
+    }
+    ++activeJobs;
+    let utilization = (activeJobs / capacity);
+    let peakInfo = false;
+    const now = Date.now();
+    peaks.forEach(peak => {
+        if (peak.record(now, activeJobs, utilization))
+            peakInfo = true;
+    });
+    if (peakInfo && monitors.length) {
+        let info = statsMessage();
+        monitors.forEach(monitor => monitor.send(info));
+    }
+    let sendTime = Date.now();
+    ++builder.activeClients;
+    ++builder.jobsScheduled;
+    console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. `
+                + `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
+    builder.lastJob = Date.now();
+    let id = nextJobId();
+    data.id = id;
+    data.ip = builder.ip;
+    data.hostname = builder.hostname;
+    data.port = builder.port;
+    compile.send("builder", data);
+    jobStartedOrScheduled("jobScheduled", { client: compile, builder: builder, id: id, sourceFile: compile.sourceFile });
+    ++jobsScheduled;
     compile.on("error", msg => {
         if (builder) {
             --builder.activeClients;

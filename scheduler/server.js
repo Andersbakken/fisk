@@ -157,7 +157,6 @@ class Server extends EventEmitter {
         if (preferredBuilder)
             data.builder = preferredBuilder;
         const labels = req.headers["x-fisk-builder-labels"];
-        console.log("shit labels", labels);
         if (labels) {
             data.labels = labels.split(/ +/).filter(x => x);
         }
