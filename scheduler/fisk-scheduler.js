@@ -162,13 +162,15 @@ function jobStartedOrScheduled(type, job)
                 hostname: job.client.hostname,
                 ip: job.client.ip,
                 name: job.client.name,
-                user: job.client.user
+                user: job.client.user,
+                labels: job.client.labels
             },
             sourceFile: job.sourceFile,
             builder: {
                 ip: job.builder.ip,
                 name: job.builder.name,
-                port: job.builder.port
+                port: job.builder.port,
+                labels: job.builder.labels
             },
             id: job.id
         };
@@ -192,13 +194,15 @@ function cacheHit(builder, job)
                 hostname: job.client.hostname,
                 ip: job.client.ip,
                 name: job.client.name,
-                user: job.client.user
+                user: job.client.user,
+                labels: job.client.labels
             },
             sourceFile: job.sourceFile,
             builder: {
                 ip: builder.ip,
                 name: builder.name,
-                port: builder.port
+                port: builder.port,
+                labels: builder.labels
             },
             id: job.id,
             jobs: (objectCache ? objectCache.hits : 0) + jobsFailed + jobsFinished,
@@ -268,7 +272,8 @@ function builderToMonitorInfo(builder, type)
         system: builder.system,
         created: builder.created,
         npmVersion: builder.npmVersion,
-        environments: Object.keys(builder.environments)
+        environments: Object.keys(builder.environments),
+        labels: builder.labels
     };
 }
 

@@ -466,7 +466,7 @@ function updateBuilderBox()
     const builderWidth = builderContainer.width - 3;
 
     let data = [];
-    let maxWidth = [6, 8, 7, 7, 12];
+    let maxWidth = [6, 8, 7, 7, 12, 20];
     let newest = Number.MAX_SAFE_INTEGER;
     const now = Date.now();
     let f = true;
@@ -475,7 +475,8 @@ function updateBuilderBox()
         const age = now - added;
         newest = Math.min(newest, age);
         const name = value.name || value.hostname || key;
-        const line = [ name, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}` ];
+        const labels = value.labels ? value.labels.join(" ") : "";
+        const line = [ name, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}`, labels ];
         data.push(line);
 
         for (let i=0; i<line.length; ++i) {
@@ -506,6 +507,7 @@ function updateBuilderBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     header += formatCell("Slots", maxWidth[3], "{bold}", "{/bold}");
     header += formatCell("Uptime", maxWidth[4], "{bold}", "{/bold}");
+    header += formatCell("Labels", maxWidth[5], "{bold}", "{/bold}");
 
     builderHeader.setContent(header);
 
@@ -519,7 +521,7 @@ function updateBuilderBox()
         if (item[0] == selectedBuilder) {
             current = idx;
         }
-        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]) + formatCell(item[4], maxWidth[4]);
+        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]) + formatCell(item[4], maxWidth[4]) + formatCell(item[5], maxWidth[5]);
     });
     builderBox.setItems(items);
     if (current != undefined) {
@@ -610,6 +612,7 @@ function builderAdded(msg)
     msg.active = 0;
     delete msg.type;
     builders.set(msg.ip + ":" + msg.port, msg);
+   // console.log("Got builder", msg);
     update();
 }
 
