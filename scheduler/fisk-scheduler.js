@@ -883,7 +883,7 @@ server.on("compile", compile => {
                 if (usableEnvs[i] in s.environments) {
                     const builderScore = score(s);
                     // console.log("comparing", builderScore, bestScore);
-                    if (!builder || builderScore > bestScore || (builderScore == bestScore && builder.lastJob < s.lastJob)) {
+                    if (!builder || builderScore > bestScore || (builderScore == bestScore && s.lastJob < builder.lastJob)) {
                         bestScore = builderScore;
                         builder = s;
                         env = usableEnvs[i];
