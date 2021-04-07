@@ -909,7 +909,7 @@ server.on("compile", compile => {
         }
         ++jobsFailed;
         console.log("No builder for you", compile.ip);
-        compile.send("builder", data);
+        compile.send("builder", {});
         return;
     }
 
