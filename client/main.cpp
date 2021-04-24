@@ -577,7 +577,7 @@ int main(int argc, char **argv)
     }
 
     if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out waiting for builder somehoe");
+        DEBUG("Have to run locally because we timed out waiting for builder somehow");
         runLocal("watchdog builder");
         return 0; // unreachable
     }
