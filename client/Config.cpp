@@ -56,6 +56,8 @@ Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://lo
 Getter<std::string> socket("socket", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> builder("builder", "Set to hostname, name or ip if you have a preferred builder");
 Getter<std::string> labels("labels", "Set to whitespace separated list of labels. The selected builder must match all these labels");
+Getter<std::string> srcRoot("src-root", "Set to indicate directory of src root of build, this only impacts md5 calculation for objectcache");
+Getter<std::string> buildRoot("build-root", "Set to indicate directory of build root, this only impacts md5 calculation for objectcache");
 static Separator s2;
 static Separator s3("Options:");
 Getter<bool> color("color", "Set to false to disable colorized output", true);
