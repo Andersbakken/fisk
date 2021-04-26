@@ -346,7 +346,12 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
 
+        VERBOSE("Md5'ing compiler hash [%s]", data.hash.c_str());
         MD5_Update(&Client::data().md5, data.hash.c_str(), data.hash.size());
+
+        const std::string tag = Config::objectCacheTag;
+        VERBOSE("Md5'ing object cache tag [%s]", tag.c_str());
+        MD5_Update(&Client::data().md5, tag.c_str(), tag.size());
 
         unsigned char md5Buf[MD5_DIGEST_LENGTH];
         MD5_Final(md5Buf, &data.md5);

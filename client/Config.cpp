@@ -49,6 +49,26 @@ GetterBase::~GetterBase()
 {
 }
 
+static std::string defaultObjectCacheTag()
+{
+    char username[256];
+    const char *user;
+    if (!getlogin_r(username, sizeof(username))) {
+        user = username;
+    } else {
+        user = getenv("USER");
+        if (!user) {
+            user = getenv("USERNAME");
+            if (!user) {
+                user = "unknown";
+            }
+        }
+    }
+    char hostname[1024];
+    ::gethostname(hostname, sizeof(hostname));
+    return Client::format("%s-%s", user, hostname);
+}
+
 Getter<bool> help("help", "Display this help", false);
 Getter<bool> version("version", "Display fisk version and exit", false);
 static Separator s1;
@@ -64,6 +84,7 @@ Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes",
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
 Getter<bool> objectCache("object-cache", "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be configured with --object-cache and the builders to have --object-cache-size", true);
+Getter<std::string> objectCacheTag("object-cache-tag", "Additional tag that gets md5'ed into the cache key, default is username-hostname", defaultObjectCacheTag());
 Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", true);
 Getter<bool> verify("verify", "Only verify that the npm version is correct", false);
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);

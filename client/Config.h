@@ -208,6 +208,7 @@ extern Getter<std::string> builder;
 extern Getter<std::string> labels;
 extern Getter<bool> color;
 extern Getter<bool> objectCache;
+extern Getter<std::string> objectCacheTag;
 extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<bool> help;
