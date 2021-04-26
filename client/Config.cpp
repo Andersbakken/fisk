@@ -64,9 +64,9 @@ static std::string defaultObjectCacheTag()
             }
         }
     }
-    char hostname[1024];
-    ::gethostname(hostname, sizeof(hostname));
-    return Client::format("%s-%s", user, hostname);
+    char host[1024];
+    ::gethostname(host, sizeof(host));
+    return Client::format("%s-%s", user, host);
 }
 
 Getter<bool> help("help", "Display this help", false);
