@@ -206,8 +206,6 @@ extern Getter<std::string> compiler;
 extern Getter<std::string> cacheDir;
 extern Getter<std::string> builder;
 extern Getter<std::string> labels;
-extern Getter<std::string> srcRoot;
-extern Getter<std::string> buildRoot;
 extern Getter<bool> color;
 extern Getter<bool> objectCache;
 extern Getter<bool> noDesire;

@@ -177,9 +177,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         }
     };
 
-    const std::string buildRoot = Config::buildRoot;
-    const std::string srcRoot = Config::srcRoot;
-
     for (i=1; i<args.size(); ++i) {
         const std::string &arg = args[i];
 
@@ -418,13 +415,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         }
 
         if (!strncmp("-I", arg.c_str(), 2)) {
-            if (!buildRoot.empty() && !strncmp(arg.c_str() + 2, buildRoot.c_str(), buildRoot.size())) {
-                VERBOSE("Md5'ing -I arg %zu [%s]", i, arg.c_str() + 2 + buildRoot.size());
-                MD5_Update(&Client::data().md5, arg.c_str() + 2 + buildRoot.size(), arg.size() - 2 - buildRoot.size());
-            } else if (!srcRoot.empty() && !strncmp(arg.c_str() + 2, srcRoot.c_str(), srcRoot.size())) {
-                VERBOSE("Md5'ing -I arg %zu [%s]", i, arg.c_str() + 2 + srcRoot.size());
-                MD5_Update(&Client::data().md5, arg.c_str() + 2 + srcRoot.size(), arg.size() - 2 - srcRoot.size());
-            }
             continue;
         }
 
@@ -485,16 +475,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                         }
                     }
                 }
-            }
-            if (!srcRoot.empty() && !strncmp(arg.c_str(), srcRoot.c_str(), srcRoot.size())) {
-                VERBOSE("Md5'ing src file arg %zu [%s]", i, arg.c_str() + srcRoot.size());
-                MD5_Update(&Client::data().md5, arg.c_str() + srcRoot.size(), arg.size() - srcRoot.size());
-                continue;
-            }
-            if (!buildRoot.empty() && !strncmp(arg.c_str(), buildRoot.c_str(), buildRoot.size())) {
-                VERBOSE("Md5'ing src file arg %zu [%s]", i, arg.c_str() + buildRoot.size());
-                MD5_Update(&Client::data().md5, arg.c_str() + buildRoot.size(), arg.size() - buildRoot.size());
-                continue;
             }
         }
 
