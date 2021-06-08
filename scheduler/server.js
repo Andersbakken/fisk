@@ -7,10 +7,15 @@ const path = require("path");
 const crypto = require("crypto");
 
 class Client extends EventEmitter {
-    constructor(object, ws) {
+    constructor(object) {
         super();
         this.created = new Date();
         this.assign(object);
+        this.pingSent = undefined;
+        this.ws.on("pong", () => {
+            // console.log("got pong", this.name);
+            this.pingSent = undefined;
+        });
     }
 
     assign(object) {
@@ -43,7 +48,16 @@ class Client extends EventEmitter {
     }
 
     ping() {
+        if (this.option && this.pingSent) {
+            const max = this.option.int("max-pong-interval", 60000);
+            console.log("checking ping", max, Date.now() - max, this.pingSent);
+            if (Date.now() - max > this.pingSent) {
+                this.ws.close();
+                return;
+            }
+        }
         this.ws.ping();
+        this.pingSent = Date.now();
     }
 
     error(message) {
@@ -391,7 +405,7 @@ class Server extends EventEmitter {
             this._handleCompile(req, client);
             break;
         case "/builder":
-            client = new Client({ type: Client.Builder, ws: ws, ip: ip });
+            client = new Client({ type: Client.Builder, ws: ws, ip: ip, option: this.option });
             this._handleBuilder(req, client);
             break;
         case "/monitor":
