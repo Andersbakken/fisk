@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 
-const path = require('path');
-const os = require('os');
-const option = require('@jhanssen/options')({ prefix: 'fisk/scheduler',
+const path = require("path");
+const os = require("os");
+const option = require("@jhanssen/options")({ prefix: "fisk/scheduler",
                                               applicationPath: false,
                                               additionalFiles: [ "fisk/scheduler.conf.override" ] });
-const posix = require('posix');
-const Server = require('./server');
-const common = require('../common')(option);
-const Environments = require('./environments');
+const posix = require("posix");
+const Server = require("./server");
+const common = require("../common")(option);
+const Environments = require("./environments");
 const server = new Server(option, common.Version);
-const fs = require('fs-extra');
-const bytes = require('bytes');
-const crypto = require('crypto');
-const Database = require('./database');
-const Peak = require('./peak');
-const ObjectCacheManager = require('./objectcachemanager');
-const compareVersions = require('compare-versions');
-const humanizeDuration = require('humanize-duration');
-const wol = require('wake_on_lan');
+const fs = require("fs-extra");
+const bytes = require("bytes");
+const crypto = require("crypto");
+const Database = require("./database");
+const Peak = require("./peak");
+const ObjectCacheManager = require("./objectcachemanager");
+const compareVersions = require("compare-versions");
+const humanizeDuration = require("humanize-duration");
+const wol = require("wake_on_lan");
 let wolBuilders = {};
 (option("wake-on-lan-builders") || []).forEach(builder => {
     if (!builder.name || !builder.mac) {
@@ -32,14 +32,14 @@ let wolBuilders = {};
 
 const clientMinimumVersion = "3.1.39";
 const serverStartTime = Date.now();
-process.on('unhandledRejection', (reason, p) => {
-    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+process.on("unhandledRejection", (reason, p) => {
+    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
     addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}\n` }, () => {
         process.exit();
     });
 });
 
-process.on('uncaughtException', err => {
+process.on("uncaughtException", err => {
     console.error("Uncaught exception", err);
     addLogFile({ source: "no source file", ip: "self", contents: err.toString() + err.stack + "\n" }, () => {
         process.exit();
@@ -54,7 +54,7 @@ server.on("error", error => {
 
 let schedulerNpmVersion;
 try {
-    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'))).version;
+    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
 } catch (err) {
     console.log("Couldn't parse package json", err);
     process.exit();
@@ -300,7 +300,7 @@ function forEachBuilder(cb) {
     }
 }
 
-if (option('object-cache')) {
+if (option("object-cache")) {
     objectCache = new ObjectCacheManager(option);
     objectCache.on("cleared", () => {
         jobsFailed = 0;
@@ -545,7 +545,7 @@ server.on("listen", app => {
         }
     });
 
-    app.get('/environment/*', function(req, res) {
+    app.get("/environment/*", function(req, res) {
         const hash = req.path.substr(13);
         const env = Environments.environment(hash);
         console.log("got env request", hash, env);
@@ -625,11 +625,11 @@ function formatDate(date)
         second = date.getSeconds();
 
     if (month < 10)
-        month = '0' + month;
+        month = "0" + month;
     if (day < 10)
-        day = '0' + day;
+        day = "0" + day;
     if (hour < 10)
-        hour = '0' + hour;
+        hour = "0" + hour;
     if (minute < 10)
         minute = "0" + minute;
     if (second < 10)
@@ -1038,14 +1038,14 @@ server.on("monitor", client => {
             return;
         }
         switch (message.type) {
-        case 'sendInfo':
+        case "sendInfo":
             sendInfoToClient(client);
             break;
-        case 'clearLogFiles':
+        case "clearLogFiles":
             clearLogFiles();
             updateLogFilesToMonitors();
             break;
-        case 'logFiles':
+        case "logFiles":
             // console.log("logFiles:", message);
             fs.readdir(logFileDir, (err, files) => {
                 if (files)
@@ -1054,7 +1054,7 @@ server.on("monitor", client => {
                 client.send({ type: "logFiles", files: files || [] });
             });
             break;
-        case 'logFile':
+        case "logFile":
             // console.log("logFile:", message);
             if (message.file.indexOf("../") != -1 || message.file.indexOf("/..") != -1) {
                 client.close();
@@ -1066,31 +1066,31 @@ server.on("monitor", client => {
                 client.send({ type: "logFile", file: f, contents: contents || ""});
             });
             break;
-        case 'readConfiguration':
+        case "readConfiguration":
             break;
-        case 'writeConfiguration':
+        case "writeConfiguration":
             if (!user) {
                 client.send({ type: "writeConfiguration", success: false, "error": `Unauthenticated message: ${message.type}` });
                 return;
             }
             writeConfiguration(message);
             break;
-        case 'listEnvironments':
+        case "listEnvironments":
             client.send({ type: "listEnvironments", environments: environmentsInfo() });
             break;
-        case 'linkEnvironments':
+        case "linkEnvironments":
             Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist).then(() => {
                 const info = { type: "listEnvironments", environments: environmentsInfo() };
                 monitors.forEach(monitor => monitor.send(info));
             });
             break;
-        case 'unlinkEnvironments':
+        case "unlinkEnvironments":
             Environments.unlink(message.srcHash, message.targetHash).then(() => {
                 const info = { type: "listEnvironments", environments: environmentsInfo() };
                 monitors.forEach(monitor => monitor.send(info));
             });
             break;
-        case 'listUsers': {
+        case "listUsers": {
             if (!user) {
                 client.send({ type: "listUsers", success: false, "error": `Unauthenticated message: ${message.type}` });
                 return;
@@ -1104,7 +1104,7 @@ server.on("monitor", client => {
                 client.send({ type: "listUsers", success: false, error: err.toString() });
             });
             break; }
-        case 'removeUser': {
+        case "removeUser": {
             if (!user) {
                 client.send({ type: "removeUser", success: false, "error": `Unauthenticated message: ${message.type}` });
                 return;
@@ -1137,7 +1137,7 @@ server.on("monitor", client => {
 
             // console.log("gotta remove user", message);
             break; }
-        case 'login': {
+        case "login": {
             user = undefined;
             if (!message.user || (!message.password && !message.hmac)) {
                 client.send({ type: "login", success: false, error: "Bad login message" });
@@ -1168,7 +1168,7 @@ server.on("monitor", client => {
                     }
                 } else {
                     return hash(message.password, Buffer.from(users[message.user].salt, "base64")).then(hash => {
-                        if (users[message.user].hash != hash.toString('base64')) {
+                        if (users[message.user].hash != hash.toString("base64")) {
                             throw new Error(`Wrong password ${message.user}`);
                         }
                     });
@@ -1189,7 +1189,7 @@ server.on("monitor", client => {
                 client.send({ type: "login", success: false, error: err.toString() });
             });
             break; }
-        case 'addUser': {
+        case "addUser": {
             if (!message.user || !message.password) {
                 client.send({ type: "addUser", success: false, error: "Bad addUser message" });
                 return;
@@ -1257,10 +1257,10 @@ function simulate(count)
         return ip;
     }
 
-    const randomWords = require('random-words');
+    const randomWords = require("random-words");
     function randomName() { return randomWords({ min: 1, max: 5, join: " " }); }
     function randomSourceFile() { return randomWords({ min: 1, max: 2, join: "_" }) + ".cpp"; }
-    function randomHostname() { return randomWords({ exactly: 1, wordsPerString: 1 + parseInt(Math.random() * 2), separator: '-' }); }
+    function randomHostname() { return randomWords({ exactly: 1, wordsPerString: 1 + parseInt(Math.random() * 2), separator: "-" }); }
 
     let fakeBuilders = [];
     let jobs = [];
@@ -1335,10 +1335,10 @@ function simulate(count)
 
 Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environments")))
     .then(() => {
-        const limit = option.int('max-file-descriptors');
+        const limit = option.int("max-file-descriptors");
         if (limit) {
             console.log("setting limit", limit);
-            posix.setrlimit('nofile', { soft: limit });
+            posix.setrlimit("nofile", { soft: limit });
         }
     })
     .then(purgeEnvironmentsToMaxSize)

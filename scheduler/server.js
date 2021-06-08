@@ -80,7 +80,7 @@ class Server extends EventEmitter {
 
             let ui = this.option("ui");
             if (ui) {
-                this.app.all('/*', function(req, res, next) {
+                this.app.all("/*", function(req, res, next) {
                     res.redirect(ui);
                 });
             }
@@ -96,7 +96,7 @@ class Server extends EventEmitter {
                 });
             });
 
-            this.ws.on('headers', (headers, request) => {
+            this.ws.on("headers", (headers, request) => {
                 const url = Url.parse(request.url);
                 headers.push("x-fisk-object-cache: " + (this.option("object-cache") ? "true" : "false"));
                 if (url.pathname == "/monitor") {
@@ -172,8 +172,8 @@ class Server extends EventEmitter {
         client.assign(data);
         this.emit("compile", client);
         let remaining = { bytes: undefined, type: undefined };
-        client.ws.on('close', (status, reason) => client.emit('close', status, reason));
-        client.ws.on('error', err => client.emit('error', err));
+        client.ws.on("close", (status, reason) => client.emit("close", status, reason));
+        client.ws.on("error", err => client.emit("error", err));
         client.ws.on("close", (code, reason) => {
             if (remaining.bytes)
                 client.emit("error", "Got close while reading a binary message");
@@ -201,7 +201,7 @@ class Server extends EventEmitter {
                     return;
                 }
 
-                if (json.type == 'log') {
+                if (json.type == "log") {
                     client.emit("log", json);
                     return;
                 }
@@ -252,8 +252,7 @@ class Server extends EventEmitter {
 
     _handleBuilder(req, client) {
         client.ws.on("close", (code, reason) => {
-            if (client)
-                client.emit("close", { code: code, reason: reason });
+            client.emit("close", { code: code, reason: reason });
             client.ws.removeAllListeners();
         });
 
@@ -288,7 +287,7 @@ class Server extends EventEmitter {
         const slots = parseInt(req.headers["x-fisk-slots"]);
         const npmVersion = req.headers["x-fisk-npm-version"];
         let environments = {};
-        req.headers["x-fisk-environments"].replace(/\s+/g, '').split(';').forEach(env => {
+        req.headers["x-fisk-environments"].replace(/\s+/g, "").split(";").forEach(env => {
             if (env)
                 environments[env] = true;
         });
@@ -343,23 +342,23 @@ class Server extends EventEmitter {
         // console.log("Got nonce", req.nonce);
         client.ws.on("message", message => client.emit("message", message));
         this.emit("monitor", client);
-        client.ws.on('close', (code, reason) => {
+        client.ws.on("close", (code, reason) => {
             client.ws.removeAllListeners();
-            client.emit('close', { code: code, reason: reason });
+            client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on('error', err => client.emit('error', err));
+        client.ws.on("error", err => client.emit("error", err));
     }
 
     _handleClientVerify(req, client) {
         client.assign({npmVersion: req.headers["x-fisk-npm-version"] });
         this.emit("clientVerify", client);
-        client.ws.on('close', (code, reason) => {
+        client.ws.on("close", (code, reason) => {
             client.ws.removeAllListeners();
-            client.emit('close', { code: code, reason: reason });
+            client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on('error', err => client.emit('error', err));
+        client.ws.on("error", err => client.emit("error", err));
     }
 
     _handleConnection(ws, req) {
@@ -368,7 +367,7 @@ class Server extends EventEmitter {
         // console.log("_handleConnection", ip);
 
         if (!ip) {
-            ws.send('{"error": "no ip for some reason"}');
+            ws.send("{\"error\": \"no ip for some reason\"}");
             ws.close();
             return;
         }

@@ -1,8 +1,8 @@
-const EventEmitter = require('events');
+const EventEmitter = require("events");
 
 function prettysize(bytes)
 {
-    const prettysize = require('prettysize');
+    const prettysize = require("prettysize");
     return prettysize(bytes, bytes >= 1024); // don't want 0Bytes
 }
 
