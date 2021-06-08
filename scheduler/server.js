@@ -42,6 +42,10 @@ class Client extends EventEmitter {
         }
     }
 
+    ping() {
+        this.ws.ping();
+    }
+
     error(message) {
         try {
             this.ws.send(`{"error": "${message}"}`);
@@ -253,6 +257,11 @@ class Server extends EventEmitter {
     _handleBuilder(req, client) {
         client.ws.on("close", (code, reason) => {
             client.emit("close", { code: code, reason: reason });
+            client.ws.removeAllListeners();
+        });
+
+        client.ws.on("error", (code, reason) => {
+            client.emit("close", { code: 1005, reason: "unknown" });
             client.ws.removeAllListeners();
         });
 

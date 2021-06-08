@@ -1353,6 +1353,13 @@ Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environmen
         const simulateCount = option("simulate");
         if (simulateCount) {
             simulate(parseInt(simulateCount) || 64);
+        } else {
+            setInterval(() => {
+                for (let key in builders) {
+                    const builder = builders[key];
+                    builder.ping();
+                }
+            }, 20000);
         }
     }).catch(e => {
         console.error(e);
