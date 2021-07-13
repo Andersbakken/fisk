@@ -6,6 +6,7 @@
 #include "Watchdog.h"
 #include <string>
 
+extern "C" const char *npm_version;
 class BuilderWebSocket : public WebSocket
 {
 public:
@@ -78,9 +79,9 @@ public:
                     done = true;
                     return;
                 }
-                fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s\n",
+                fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
-                        data.objectCache ? "true" : "false");
+                        data.objectCache ? "true" : "false", npm_version);
             }
 
             if (!stdOut.empty())
