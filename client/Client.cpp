@@ -677,6 +677,20 @@ std::string Client::base64(const std::string &src)
     return ret;
 }
 
+std::string Client::uncolor(std::string str)
+{
+    while (true) {
+        const size_t last = str.find("\x1b");
+        if (last == std::string::npos)
+            break;
+        const size_t end = std::min(str.find("m", last), str.find("K", last));
+        if (end == std::string::npos)
+            break;
+        str.erase(last, end - last + 1);
+    }
+    return str;
+}
+
 bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)
 {
     const Client::Data &data = Client::data();

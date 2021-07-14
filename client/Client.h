@@ -136,6 +136,7 @@ inline std::string sha1(const std::string &str)
 }
 
 std::string base64(const std::string &src);
+std::string uncolor(std::string src);
 inline std::string toHex(const void *t, size_t s)
 {
     std::string ret(s * 2, ' ');

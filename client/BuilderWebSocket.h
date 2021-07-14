@@ -64,22 +64,21 @@ public:
             const std::string stdErr = msg["stderr"].string_value();
 
             if (data.exitCode) {
-                for (const std::string &out : { stdOut, stdErr }) {
-                    if (out.empty()
-                        || out.find("unable to rename temporary ") != std::string::npos
-                        || out.find("execvp: No such file or directory") != std::string::npos
-                        || out.find("cannot execute ") != std::string::npos
-                        || out.find("internal compiler error") != std::string::npos
-                        || out.find("error trying to exec") != std::string::npos) {
-                        ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
-                              data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
-                              url().c_str(),
-                              Client::base64(stdErr).c_str());
-                        data.watchdog->stop();
-                        error = "suspicious error";
-                        done = true;
-                        return;
-                    }
+                const std::string uncolored = Client::uncolor(stdErr);
+                if (uncolored.empty()
+                    || uncolored.find("unable to rename temporary ") != std::string::npos
+                    || uncolored.find("execvp: No such file or directory") != std::string::npos
+                    || uncolored.find("cannot execute ") != std::string::npos
+                    || uncolored.find("internal compiler error") != std::string::npos
+                    || uncolored.find("error trying to exec") != std::string::npos) {
+                    ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
+                          data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
+                          url().c_str(),
+                          Client::base64(stdErr).c_str());
+                    data.watchdog->stop();
+                    error = "suspicious error";
+                    done = true;
+                    return;
                 }
                 fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
