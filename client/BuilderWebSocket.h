@@ -64,29 +64,34 @@ public:
             const std::string stdErr = msg["stderr"].string_value();
 
             if (data.exitCode) {
-                if (stdErr.empty()
-                    || stdErr.find("unable to rename temporary ") != std::string::npos
-                    || stdErr.find("execvp: No such file or directory") != std::string::npos
-                    || stdErr.find("cannot execute ") != std::string::npos
-                    || stdErr.find("internal compiler error: Segmentation fault") != std::string::npos
-                    || stdErr.find("error trying to exec") != std::string::npos) {
-                    ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
-                          data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
-                          url().c_str(),
-                          Client::base64(stdErr).c_str());
-                    data.watchdog->stop();
-                    error = "suspicious error";
-                    done = true;
-                    return;
+                for (const std::string &out : { stdOut, stdErr }) {
+                    if (out.empty()
+                        || out.find("unable to rename temporary ") != std::string::npos
+                        || out.find("execvp: No such file or directory") != std::string::npos
+                        || out.find("cannot execute ") != std::string::npos
+                        || out.find("internal compiler error") != std::string::npos
+                        || out.find("error trying to exec") != std::string::npos) {
+                        ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
+                              data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
+                              url().c_str(),
+                              Client::base64(stdErr).c_str());
+                        data.watchdog->stop();
+                        error = "suspicious error";
+                        done = true;
+                        return;
+                    }
                 }
                 fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
                         data.objectCache ? "true" : "false", npm_version);
             }
 
-            if (!stdOut.empty())
+            if (!stdOut.empty()) {
+                fprintf(stdout, "stdout: ");
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
+            }
             if (!stdErr.empty()) {
+                fprintf(stderr, "stderr: ");
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
             }
 
