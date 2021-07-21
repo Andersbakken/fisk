@@ -476,6 +476,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     }
                 }
             }
+
+            int len = 0;
+            const char *fn = Client::trimSourceRoot(arg, &len);
+            MD5_Update(&Client::data().md5, fn, len);
+            VERBOSE("Md5'ing arg %zu [%.*s]", i, len, fn);
+            continue;
         }
 
         VERBOSE("Unhandled arg %s", arg.c_str());

@@ -288,6 +288,39 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
+const char *Client::trimSourceRoot(const std::string &str, int *len)
+{
+    const char *cstr = str.c_str();
+    char buf[PATH_MAX];
+    // strcpy
+    size_t idx = 0;
+    struct stat st;
+    static const char *files[] = {
+        ".git",
+        "CMakeLists.txt",
+        "configure"
+    };
+    while (true) {
+        const size_t tmp = str.find('/', idx) + 1;
+        if (!tmp)
+            break;
+        memcpy(buf + idx, cstr + idx, tmp - idx);
+        for (const char *file : files) {
+            strncpy(buf + tmp, file, sizeof(buf) - tmp - strlen(file));
+            // ERROR("TESTING %s\n", buf);
+            if (!::stat(buf, &st)) {
+                // ERROR("Found it at %s -> %s", buf, cstr + tmp);
+                *len = str.size() - tmp;
+                return cstr + tmp;
+            }
+        }
+        buf[tmp + 1] = '\0';
+        idx = tmp;
+    }
+    *len = str.size();
+    return str.c_str();
+}
+
 bool Client::setFlag(int fd, int flag)
 {
     int flags, r;
