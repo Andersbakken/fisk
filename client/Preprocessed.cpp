@@ -88,14 +88,16 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                 ptr->exitStatus = proc.get_exit_status();
                 DEBUG("Preprocess got status %d", ptr->exitStatus);
                 if (Config::objectCache) {
+                    // FILE *f = fopen("/tmp/preproc.i", "w");
                     const char *ch = ptr->stdOut.c_str();
                     const char *last = ch;
                     while (*ch) {
                         // VERBOSE("GETTING CHAR [%c]", *ch);
                         if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
                             if (ch > last) {
-                                VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
+                                VERBOSE("Adding to Md5:\n%.*s\n", static_cast<int>(ch - last), last);
                                 MD5_Update(&Client::data().md5, last, ch - last);
+                                // fwrite(last, 1, ch - last, f);
                             }
                             while (*ch && *ch != '\n')
                                 ++ch;
@@ -105,9 +107,11 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                         }
                     }
                     if (last < ch) {
-                        VERBOSE("Adding to MD5:\n%.*s\n", static_cast<int>(ch - last), last);
+                        VERBOSE("Adding to Md5:\n%.*s\n", static_cast<int>(ch - last), last);
                         MD5_Update(&Client::data().md5, last, ch - last);
+                        // fwrite(last, 1, ch - last, f);
                     }
+                    // fclose(f);
                 }
             }
         }
