@@ -550,7 +550,8 @@ int main(int argc, char **argv)
 
     assert(!builderWebSocket.wait);
     builderWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
-    // data.preprocessed->stdOut.clear();
+    if (!Config::storePreprocessedDataOnError)
+        data.preprocessed->stdOut.clear();
 
     while (data.watchdog->timedOut()
            && builderWebSocket.hasPendingSendData()

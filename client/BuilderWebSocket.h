@@ -82,7 +82,7 @@ public:
                     return;
                 }
                 std::string msg;
-                if (Client::data().preprocessed) {
+                if (Client::data().preprocessed && Config::storePreprocessedDataOnError) {
                     std::string basename;
                     Client::parsePath(data.compilerArgs->sourceFile(), &basename, nullptr);
                     FILE *f = fopen((basename + ".error.ii").c_str(), "w");
