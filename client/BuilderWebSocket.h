@@ -3,6 +3,7 @@
 
 #include "WebSocket.h"
 #include "Client.h"
+#include "Preprocessed.h"
 #include "Watchdog.h"
 #include <string>
 
@@ -80,9 +81,24 @@ public:
                     done = true;
                     return;
                 }
-                fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n",
+                std::string msg;
+                if (Client::data().preprocessed) {
+                    std::string basename;
+                    Client::parsePath(data.compilerArgs->sourceFile(), nullptr, &basename);
+                    FILE *f = fopen((basename + ".error.ii").c_str(), "w");
+                    if (f) {
+                        fwrite(Client::data().preprocessed->stdOut.c_str(), Client::data().preprocessed->stdOut.size(), 1, f);
+                        fclose(f);
+                        msg = "Wrote error to " + (basename + ".error.ii");
+                    } else {
+                        msg = std::string("Failed to open file ") + strerror(errno);
+                    }
+                }
+
+                fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n%s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
-                        data.objectCache ? "true" : "false", npm_version);
+                        data.objectCache ? "true" : "false", npm_version, msg.c_str());
+
             }
 
             if (!stdOut.empty()) {
