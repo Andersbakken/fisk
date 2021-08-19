@@ -319,7 +319,7 @@ function setObjectCacheEnabled(on)
         objectCache.on("cleared", onObjectCacheCleared);
         server.objectCache = true;
     } else if (!on && objectCache) {
-        objectCache.off("cleared", onObjectCacheCleared);
+        objectCache.removeAllListeners();
         objectCache = undefined;
         server.objectCache = false;
     }
