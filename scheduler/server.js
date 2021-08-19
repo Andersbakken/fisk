@@ -89,6 +89,7 @@ class Server extends EventEmitter {
         this.configVersion = configVersion;
         this.id = 0;
         this.nonces = {};
+        this.objectCache = undefined;
     }
 
     listen() {
@@ -116,7 +117,7 @@ class Server extends EventEmitter {
 
             this.ws.on("headers", (headers, request) => {
                 const url = Url.parse(request.url);
-                headers.push("x-fisk-object-cache: " + (this.option("object-cache") ? "true" : "false"));
+                headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
                 if (url.pathname == "/monitor") {
                     const nonce = crypto.randomBytes(256).toString("base64");
                     headers.push(`x-fisk-nonce: ${nonce}`);

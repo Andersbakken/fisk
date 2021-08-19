@@ -300,18 +300,33 @@ function forEachBuilder(cb) {
     }
 }
 
+function onObjectCacheCleared()
+{
+    jobsFailed = 0;
+    jobsStarted = 0;
+    jobsScheduled = 0;
+    jobsFinished = 0;
+    const msg = { type: "clearObjectCache" };
+    forEachBuilder(builder => builder.send(msg));
+    let info = statsMessage();
+    monitors.forEach(monitor => monitor.send(info));
+}
+
+function setObjectCacheEnabled(on)
+{
+    if (on && !objectCache) {
+        objectCache = new ObjectCacheManager(option);
+        objectCache.on("cleared", onObjectCacheCleared);
+        server.objectCache = true;
+    } else if (!on && objectCache) {
+        objectCache.off("cleared", onObjectCacheCleared);
+        objectCache = undefined;
+        server.objectCache = false;
+    }
+}
+
 if (option("object-cache")) {
-    objectCache = new ObjectCacheManager(option);
-    objectCache.on("cleared", () => {
-        jobsFailed = 0;
-        jobsStarted = 0;
-        jobsScheduled = 0;
-        jobsFinished = 0;
-        const msg = { type: "clearObjectCache" };
-        forEachBuilder(builder => builder.send(msg));
-        let info = statsMessage();
-        monitors.forEach(monitor => monitor.send(info));
-    });
+    setObjectCacheEnabled(true);
 }
 
 function removeBuilder(builder) {
@@ -516,6 +531,22 @@ server.on("listen", app => {
     });
 
     app.get("/objectcache", (req, res) => {
+        if ("on" in req.query) {
+            if (option("object-cache")) {
+                setObjectCacheEnabled(true);
+                res.sendStatus(200);
+            } else {
+                res.sendStatus(400);
+            }
+            return;
+        }
+
+        if ("off" in req.query) {
+            setObjectCacheEnabled(false);
+            res.sendStatus(200);
+            return;
+        }
+
         if (!objectCache) {
             res.sendStatus(404);
             return;
@@ -526,6 +557,7 @@ server.on("listen", app => {
             res.sendStatus(200);
         } else if (req.query && "distribute" in req.query) {
             objectCache.distribute(req.query, res);
+            res.sendStatus(200);
         } else {
             const pretty = req.query && req.query.unpretty ? undefined : 4;
             res.send(JSON.stringify(objectCache.dump(req.query || {}), null, pretty) + "\n");
