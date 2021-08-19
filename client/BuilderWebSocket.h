@@ -84,7 +84,7 @@ public:
                 std::string msg;
                 if (Client::data().preprocessed) {
                     std::string basename;
-                    Client::parsePath(data.compilerArgs->sourceFile(), nullptr, &basename);
+                    Client::parsePath(data.compilerArgs->sourceFile(), &basename, nullptr);
                     FILE *f = fopen((basename + ".error.ii").c_str(), "w");
                     if (f) {
                         fwrite(Client::data().preprocessed->stdOut.c_str(), Client::data().preprocessed->stdOut.size(), 1, f);
