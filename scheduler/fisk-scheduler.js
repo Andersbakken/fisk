@@ -30,7 +30,7 @@ let wolBuilders = {};
     }
 });
 
-const clientMinimumVersion = "3.1.39";
+const clientMinimumVersion = "3.4.96";
 const serverStartTime = Date.now();
 process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
