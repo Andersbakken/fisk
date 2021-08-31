@@ -346,19 +346,19 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
 
-        VERBOSE("Md5'ing compiler hash [%s]", data.hash.c_str());
-        MD5_Update(&Client::data().md5, data.hash.c_str(), data.hash.size());
+        VERBOSE("SHA1'ing compiler hash [%s]", data.hash.c_str());
+        SHA1_Update(&Client::data().sha1, data.hash.c_str(), data.hash.size());
 
         const std::string tag = Config::objectCacheTag;
-        VERBOSE("Md5'ing object cache tag [%s]", tag.c_str());
-        MD5_Update(&Client::data().md5, tag.c_str(), tag.size());
+        VERBOSE("SHA1'ing object cache tag [%s]", tag.c_str());
+        SHA1_Update(&Client::data().sha1, tag.c_str(), tag.size());
 
-        unsigned char md5Buf[MD5_DIGEST_LENGTH];
-        MD5_Final(md5Buf, &data.md5);
-        std::string md5 = Client::toHex(md5Buf, sizeof(md5Buf));
+        unsigned char sha1Buf[SHA_DIGEST_LENGTH];
+        SHA1_Final(sha1Buf, &data.sha1);
+        std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
 
-        WARN("Got md5: %s", md5.c_str());
-        headers["x-fisk-md5"] = std::move(md5);
+        WARN("Got sha1: %s", sha1.c_str());
+        headers["x-fisk-sha1"] = std::move(sha1);
     }
 
     SchedulerWebSocket schedulerWebsocket;

@@ -13,7 +13,6 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
-#include <openssl/md5.h>
 
 #include <set>
 #include <string.h>
@@ -52,9 +51,9 @@ struct Data
 
     std::string commandLineAsString() const;
 
-    MD5state_st md5 = []() {
-        MD5state_st ret;
-        MD5_Init(&ret);
+    SHAstate_st sha1 = []() {
+        SHAstate_st ret;
+        SHA1_Init(&ret);
         return ret;
     }();
 };

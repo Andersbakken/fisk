@@ -95,8 +95,8 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                         // VERBOSE("GETTING CHAR [%c]", *ch);
                         if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
                             if (ch > last) {
-                                VERBOSE("Adding to Md5:\n%.*s\n", static_cast<int>(ch - last), last);
-                                MD5_Update(&Client::data().md5, last, ch - last);
+                                VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
+                                SHA1_Update(&Client::data().sha1, last, ch - last);
                                 // fwrite(last, 1, ch - last, f);
                             }
                             while (*ch && *ch != '\n')
@@ -107,8 +107,8 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                         }
                     }
                     if (last < ch) {
-                        VERBOSE("Adding to Md5:\n%.*s\n", static_cast<int>(ch - last), last);
-                        MD5_Update(&Client::data().md5, last, ch - last);
+                        VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
+                        SHA1_Update(&Client::data().sha1, last, ch - last);
                         // fwrite(last, 1, ch - last, f);
                     }
                     // fclose(f);

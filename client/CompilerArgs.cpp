@@ -21,7 +21,7 @@
 struct OptionArg {
     const char *name;
     size_t args;
-    bool md5;
+    bool sha1;
     bool operator<(const OptionArg &other) const { return strcmp(name, other.name) < 0; }
 };
 
@@ -135,13 +135,13 @@ static const OptionArg argOptions[] = {
 // { // -Xopenmp-target=<triple> 1, true },
 // { // -Xopenmp-target=<triple>, 1, true },
 
-static inline size_t hasArg(const std::string &arg, bool &md5)
+static inline size_t hasArg(const std::string &arg, bool &sha1)
 {
     const OptionArg a { arg.c_str(), 1, false };
     const size_t idx = std::lower_bound(argOptions, argOptions + (sizeof(argOptions) / sizeof(argOptions[0])), a) - argOptions;
     if (idx < sizeof(argOptions) / sizeof(argOptions[0])) {
         if (!strcmp(arg.c_str(), argOptions[idx].name)) {
-            md5 = argOptions[idx].md5;
+            sha1 = argOptions[idx].sha1;
             return argOptions[idx].args;
         }
     }
@@ -167,12 +167,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
     size_t i;
 
-    auto md5 = [&i, &args, objectCache](size_t count = 1) {
+    auto sha1 = [&i, &args, objectCache](size_t count = 1) {
         if (objectCache) {
             for (size_t aa = i; aa < i + count; ++aa) {
                 const std::string &arg = args[aa];
-                VERBOSE("Md5'ing arg %zu [%s]", aa, arg.c_str());
-                MD5_Update(&Client::data().md5, arg.c_str(), arg.size());
+                VERBOSE("SHA1'ing arg %zu [%s]", aa, arg.c_str());
+                SHA1_Update(&Client::data().sha1, arg.c_str(), arg.size());
             }
         }
     };
@@ -230,7 +230,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
         if (arg == "-c") {
             hasDashC = true;
-            md5();
+            sha1();
             continue;
         }
 
@@ -242,57 +242,57 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             }
             ret->flags |= HasDashO;
             ret->objectFileIndex = i + 1;
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
 
         if (!strncmp(arg.c_str(), "-fprofile-dir=", 14)) {
             hasProfileDir = true;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-ftest-coverage" || arg == "-fprofile-arcs") {
             hasProfiling = true;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-m32") {
             ret->flags |= HasDashM32;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-m64") {
             ret->flags |= HasDashM64;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-MF") {
             ret->flags |= HasDashMF;
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
 
         if (arg == "-MD") {
             ret->flags |= HasDashMD;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-MMD") {
             ret->flags |= HasDashMMD;
-            md5();
+            sha1();
             continue;
         }
 
         if (arg == "-MT") {
             ret->flags |= HasDashMT;
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
@@ -348,7 +348,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 *localReason = Local_ExtraFiles;
                 return nullptr;
             }
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
@@ -360,7 +360,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 return nullptr;
             }
             hasArch = true;
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
@@ -390,7 +390,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     break;
                 }
             }
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
@@ -399,16 +399,16 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             // we may have to handle this differently, gcc apparently falls back
             // to not using the pch file if it can't be found. Icecream code is
             // extremely confusing.
-            md5(2);
+            sha1(2);
             ++i;
             continue;
         }
 
         {
-            bool needMd5 = false;
-            if (size_t count = hasArg(arg, needMd5)) {
-                if (needMd5)
-                    md5(count + 1);
+            bool needSHA1 = false;
+            if (size_t count = hasArg(arg, needSHA1)) {
+                if (needSHA1)
+                    sha1(count + 1);
                 i += count;
                 continue;
             }
@@ -479,13 +479,13 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
             int len = 0;
             const char *fn = Client::trimSourceRoot(arg, &len);
-            MD5_Update(&Client::data().md5, fn, len);
-            VERBOSE("Md5'ing arg %zu [%.*s]", i, len, fn);
+            SHA1_Update(&Client::data().sha1, fn, len);
+            VERBOSE("SHA1'ing arg %zu [%.*s]", i, len, fn);
             continue;
         }
 
         VERBOSE("Unhandled arg %s", arg.c_str());
-        md5();
+        sha1();
     }
 
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
@@ -512,10 +512,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-o");
         std::string out = ret->output();
         if (objectCache) {
-            MD5_Update(&Client::data().md5, "-o", 2);
-            MD5_Update(&Client::data().md5, out.c_str(), out.size());
-            VERBOSE("Md5'ing arg [-o]");
-            VERBOSE("Md5'ing arg [%s]", out.c_str());
+            SHA1_Update(&Client::data().sha1, "-o", 2);
+            SHA1_Update(&Client::data().sha1, out.c_str(), out.size());
+            VERBOSE("SHA1'ing arg [-o]");
+            VERBOSE("SHA1'ing arg [%s]", out.c_str());
         }
         ret->commandLine.push_back(std::move(out));
         ret->flags |= HasDashO;
@@ -526,9 +526,9 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         Client::parsePath(ret->output(), nullptr, &dir);
         dir = Client::realpath(dir);
         if (objectCache) {
-            MD5_Update(&Client::data().md5, "-fprofile-dir=", 14);
-            MD5_Update(&Client::data().md5, dir.c_str(), dir.size());
-            VERBOSE("Md5'ing arg [-fprofile-dir=%s]", dir.c_str());
+            SHA1_Update(&Client::data().sha1, "-fprofile-dir=", 14);
+            SHA1_Update(&Client::data().sha1, dir.c_str(), dir.size());
+            VERBOSE("SHA1'ing arg [-fprofile-dir=%s]", dir.c_str());
         }
         ret->commandLine.push_back("-fprofile-dir=" + dir);
     }
@@ -538,10 +538,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-MF");
         std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
         if (objectCache) {
-            MD5_Update(&Client::data().md5, "-MF", 2);
-            MD5_Update(&Client::data().md5, dfile.c_str(), dfile.size());
-            VERBOSE("Md5'ing arg [-MF]");
-            VERBOSE("Md5'ing arg [%s]", dfile.c_str());
+            SHA1_Update(&Client::data().sha1, "-MF", 2);
+            SHA1_Update(&Client::data().sha1, dfile.c_str(), dfile.size());
+            VERBOSE("SHA1'ing arg [-MF]");
+            VERBOSE("SHA1'ing arg [%s]", dfile.c_str());
         }
         ret->commandLine.push_back(std::move(dfile));
     }
