@@ -1289,10 +1289,14 @@ function simulate(count)
         return ip;
     }
 
-    const randomWords = require("random-words");
-    function randomName() { return randomWords({ min: 1, max: 5, join: " " }); }
-    function randomSourceFile() { return randomWords({ min: 1, max: 2, join: "_" }) + ".cpp"; }
-    function randomHostname() { return randomWords({ exactly: 1, wordsPerString: 1 + parseInt(Math.random() * 2), separator: "-" }); }
+    function randomWord()
+    {
+        if (!words) {
+            words = fs.readFileSync("/etc/dictionaries-common/words", "utf8").split("\n").filter(x => x);
+        }
+        const idx = Math.floor(Math.random() * words.length);
+        return words[idx];
+    }
 
     let fakeBuilders = [];
     let jobs = [];
@@ -1300,8 +1304,8 @@ function simulate(count)
         const ip = randomIp();
         const fakeBuilder = {
             ip: ip,
-            name: randomName(),
-            hostname: randomHostname(),
+            name: randomWord(),
+            hostname: randomWord(),
             slots: [4, 16, 32][parseInt(Math.random() * 3)],
             port: 8097,
             jobsPerformed: 0,
@@ -1321,7 +1325,7 @@ function simulate(count)
     const clients = [];
     const clientCount = count / 2 || 1;
     for (let i=0; i<clientCount; ++i) {
-        clients[i] = { hostname: randomHostname(), ip: randomIp(true), name: randomName() };
+        clients[i] = { hostname: randomWord(), ip: randomIp(true), name: randomWord() };
     }
     function tick()
     {
@@ -1346,8 +1350,8 @@ function simulate(count)
                 if (!jobs[i].client) {
                     jobs[i].client = clients[parseInt(Math.random() * clientCount)];
                     jobs[i].id = nextJobId();
-                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomSourceFile() });
-                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomSourceFile() });
+                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomWord() + ".cpp" });
+                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomWord() + ".cpp" });
                 } else {
                     // const client = jobs[i].client;
                     // const id = jobs[i].id;

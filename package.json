@@ -30,7 +30,6 @@
     "parse-duration": "^0.1.1",
     "posix": "^4.2.0",
     "prettysize": "^2.0.0",
-    "random-words": "^1.1.0",
     "wake_on_lan": "^1.0.0",
     "ws": "^7.4.6"
   }
