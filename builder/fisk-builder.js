@@ -754,7 +754,7 @@ server.on("job", job => {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }
                 job.send(response);
-                if (event.success && objectCache && response.md5 && objectCache.state(response.md5) == "none") {
+                if (response.exitCode === 0 && event.success && objectCache && response.md5 && objectCache.state(response.md5) == "none") {
                     response.sourceFile = job.sourceFile;
                     response.commandLine = job.commandLine;
                     response.environment = job.hash;
