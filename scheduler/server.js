@@ -165,7 +165,7 @@ class Server extends EventEmitter {
             sha1: req.headers["x-fisk-sha1"]
         };
 
-        if (data.sha1 && data.sha1.length != 32) {
+        if (data.sha1 && data.sha1.length != 40) {
             client.error(`Bad sha1 sum: ${data.sha1}`);
             return;
         }
