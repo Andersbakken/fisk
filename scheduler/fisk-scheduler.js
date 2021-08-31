@@ -186,7 +186,7 @@ function jobStartedOrScheduled(type, job)
 function cacheHit(builder, job)
 {
     if (objectCache)
-        objectCache.hit(job.md5);
+        objectCache.hit(job.sha1);
     if (monitors.length) {
         let info = {
             type: "cacheHit",
@@ -890,7 +890,7 @@ server.on("compile", compile => {
     }
 
     if (objectCache) {
-        let data = objectCache.get(compile.md5);
+        let data = objectCache.get(compile.sha1);
         if (data) {
             data.nodes.forEach(s => {
                 if (!filterBuilder(s))

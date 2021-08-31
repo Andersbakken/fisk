@@ -126,15 +126,15 @@ class ObjectCache extends EventEmitter
                 jsonBuffer = Buffer.allocUnsafe(headerSize);
                 fs.readSync(fd, jsonBuffer, 0, headerSize);
                 const response = JSON.parse(jsonBuffer.toString());
-                if (response.md5 != fileName)
-                    throw new Error(`Got bad filename: ${fileName} vs ${response.md5}`);
+                if (response.sha1 != fileName)
+                    throw new Error(`Got bad filename: ${fileName} vs ${response.sha1}`);
                 let item = new ObjectCacheItem(response, headerSize);
                 if (item.fileSize != fileSize)
                     throw new Error(`Got bad size for ${fileName} expected ${item.fileSize} got ${fileSize}`);
                 fs.closeSync(fd);
                 this.size += item.fileSize;
                 this.cache[fileName] = item;
-                this.emit("added", { md5: response.md5, sourceFile: response.sourceFile, fileSize: stat.size });
+                this.emit("added", { sha1: response.sha1, sourceFile: response.sourceFile, fileSize: stat.size });
             } else {
                 throw new Error("Unexpected file " + fileName);
             }
@@ -151,11 +151,11 @@ class ObjectCache extends EventEmitter
         return undefined;
     }
 
-    state(md5)
+    state(sha1)
     {
-        if (md5 in this.cache) {
+        if (sha1 in this.cache) {
             return "exists";
-        } else if (md5 in this.pending) {
+        } else if (sha1 in this.pending) {
             return "pending";
         }
         return "none";
@@ -171,13 +171,13 @@ class ObjectCache extends EventEmitter
     }
 
     add(response, contents) {
-        if (response.md5 in this.pending) {
+        if (response.sha1 in this.pending) {
             console.log("Already writing this, I suppose this is possible", response);
             return;
-        } else if (response.md5 in this.cache) {
-            throw new Error("This should not happen. We already have " + response.md5 + " in the cache");
+        } else if (response.sha1 in this.cache) {
+            throw new Error("This should not happen. We already have " + response.sha1 + " in the cache");
         }
-        let absolutePath = path.join(this.dir, response.md5);
+        let absolutePath = path.join(this.dir, response.sha1);
         try {
             fs.mkdirpSync(this.dir);
         } catch (err) {
@@ -189,29 +189,29 @@ class ObjectCache extends EventEmitter
         let pendingItem = new PendingItem(response, absolutePath, remaining);
         pendingItem.file.on("error", err => {
             console.error("Failed to write pendingItem", response, err);
-            delete this.pending[response.md5];
+            delete this.pending[response.sha1];
         });
-        this.pending[response.md5] = pendingItem;
+        this.pending[response.sha1] = pendingItem;
         contents.forEach(c => pendingItem.write(c.contents));
         pendingItem.end(() => {
-            if (this.pending[response.md5] == pendingItem) {
+            if (this.pending[response.sha1] == pendingItem) {
                 let cacheItem = new ObjectCacheItem(response, pendingItem.jsonLength);
                 try {
-                    let stat = fs.statSync(path.join(this.dir, response.md5));
-                    // console.log("stat is", stat.size, "for", path.join(this.dir, response.md5));
+                    let stat = fs.statSync(path.join(this.dir, response.sha1));
+                    // console.log("stat is", stat.size, "for", path.join(this.dir, response.sha1));
                     // console.log("shit", cacheItem);
                     // console.log("ass", pendingItem);
                     if (cacheItem.fileSize != stat.size) {
-                        throw new Error(`Wrong file size for ${path.join(this.dir, response.md5)}, should have been ${cacheItem.fileSize} but ended up being ${stat.size}`);
+                        throw new Error(`Wrong file size for ${path.join(this.dir, response.sha1)}, should have been ${cacheItem.fileSize} but ended up being ${stat.size}`);
                     }
-                    this.cache[response.md5] = cacheItem;
+                    this.cache[response.sha1] = cacheItem;
                     // console.log(response);
-                    this.emit("added", { md5: response.md5, sourceFile: response.sourceFile, fileSize: cacheItem.fileSize });
+                    this.emit("added", { sha1: response.sha1, sourceFile: response.sourceFile, fileSize: cacheItem.fileSize });
 
                     this.size += cacheItem.fileSize;
                     if (this.size > this.maxSize)
                         this.purge(this.purgeSize);
-                    console.log("Finished writing", response.md5);
+                    console.log("Finished writing", response.sha1);
                 } catch (err) {
                     console.error("Something wrong", err);
                     try {
@@ -222,7 +222,7 @@ class ObjectCache extends EventEmitter
                     }
                 }
 
-                delete this.pending[response.md5];
+                delete this.pending[response.sha1];
             }
         });
     }
@@ -230,8 +230,8 @@ class ObjectCache extends EventEmitter
     get cacheHits()
     {
         let ret = 0;
-        for (let md5 in this.cache) {
-            ret += this.cache[md5].cacheHits;
+        for (let sha1 in this.cache) {
+            ret += this.cache[sha1].cacheHits;
         }
         return ret;
     }
@@ -254,36 +254,36 @@ class ObjectCache extends EventEmitter
         return ret;
     }
 
-    remove(md5)
+    remove(sha1)
     {
         try {
-            const info = this.cache[md5];
+            const info = this.cache[sha1];
             this.size -= info.fileSize;
-            delete this.cache[md5];
-            this.emit("removed", { md5: md5, sourceFile: info.response.sourceFile, fileSize: info.fileSize });
-            fs.unlinkSync(path.join(this.dir, md5));
+            delete this.cache[sha1];
+            this.emit("removed", { sha1: sha1, sourceFile: info.response.sourceFile, fileSize: info.fileSize });
+            fs.unlinkSync(path.join(this.dir, sha1));
         } catch (err) {
-            console.error("Can't remove file", path.join(this.dir, md5), err.toString());
+            console.error("Can't remove file", path.join(this.dir, sha1), err.toString());
         }
     }
 
     purge(targetSize)
     {
-        for (let md5 in this.cache) {
+        for (let sha1 in this.cache) {
             if (this.size <= targetSize) {
                 break;
             }
-            console.log(`purging ${md5} because ${this.size} >= ${targetSize}`);
-            this.remove(md5);
+            console.log(`purging ${sha1} because ${this.size} >= ${targetSize}`);
+            this.remove(sha1);
         }
     }
 
-    get(md5, dontTouch)
+    get(sha1, dontTouch)
     {
-        let ret = this.cache[md5];
+        let ret = this.cache[sha1];
         if (!dontTouch && ret) {
-            delete this.cache[md5];
-            this.cache[md5] = ret;
+            delete this.cache[sha1];
+            this.cache[sha1] = ret;
         }
         return ret;
     }
@@ -292,7 +292,7 @@ class ObjectCache extends EventEmitter
     {
         let ret = [];
         for (let key in this.cache) {
-            ret.push({ md5: key, fileSize: this.cache[key].fileSize });
+            ret.push({ sha1: key, fileSize: this.cache[key].fileSize });
         }
         return ret;
     }

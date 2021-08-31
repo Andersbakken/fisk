@@ -8,15 +8,15 @@ function prettysize(bytes)
 
 class NodeData
 {
-    constructor(size, maxSize, md5s)
+    constructor(size, maxSize, sha1s)
     {
-        this.md5s = md5s;
+        this.sha1s = sha1s;
         this.size = size;
         this.maxSize = maxSize;
     }
 };
 
-class Md5Data
+class SHA1Data
 {
     constructor(fileSize, node)
     {
@@ -25,33 +25,33 @@ class Md5Data
     }
 };
 
-function addToMd5Map(byMd5, md5, fileSize, node)
+function addToSHA1Map(bySHA1, sha1, fileSize, node)
 {
-    let data = byMd5.get(md5);
+    let data = bySHA1.get(sha1);
     if (data) {
         data.nodes.push(node);
         return data.nodes.length;
     } else {
-        byMd5.set(md5, new Md5Data(fileSize, node));
+        bySHA1.set(sha1, new SHA1Data(fileSize, node));
         return 1;
     }
 }
 
-function removeFromMd5Map(byMd5, md5, node)
+function removeFromSHA1Map(bySHA1, sha1, node)
 {
-    let data = byMd5.get(md5);
+    let data = bySHA1.get(sha1);
     if (data) {
         let idx = data.nodes.indexOf(node);
         if (idx != -1) {
             data.nodes.splice(idx, 1);
             if (data.nodes.length == 0) {
-                byMd5.delete(md5);
+                bySHA1.delete(sha1);
             }
         } else {
-            console.error("We don't have", node.ip + ":" + node.port, "for", md5);
+            console.error("We don't have", node.ip + ":" + node.port, "for", sha1);
         }
     } else {
-        console.error("We don't have", md5);
+        console.error("We don't have", sha1);
     }
 }
 
@@ -61,7 +61,7 @@ class ObjectCacheManager extends EventEmitter
     {
         super();
         this.hits = 0;
-        this.byMd5 = new Map();
+        this.bySHA1 = new Map();
         this.byNode = new Map();
         this.redundancy = option.int("object-cache-redundancy", 1);
         if (this.redundancy <= 0)
@@ -76,30 +76,30 @@ class ObjectCacheManager extends EventEmitter
         this.emit("cleared");
     }
 
-    hit(md5)
+    hit(sha1)
     {
         ++this.hits;
         if (this.distributeOnCacheHit) {
-            this.distribute({ md5: md5, redundancy: this.redundancy });
+            this.distribute({ sha1: sha1, redundancy: this.redundancy });
         }
     }
 
-    get(md5)
+    get(sha1)
     {
-        // console.log("looking for", md5, [ this.byMd5.keys() ]);
-        return this.byMd5.get(md5);
+        // console.log("looking for", sha1, [ this.bySHA1.keys() ]);
+        return this.bySHA1.get(sha1);
     }
 
     insert(msg, node)
     {
         let nodeData = this.byNode.get(node);
-        console.log("adding", msg.sourceFile, msg.md5, "for", node.ip + ":" + node.port, nodeData ? nodeData.md5s.length : -1);
+        console.log("adding", msg.sourceFile, msg.sha1, "for", node.ip + ":" + node.port, nodeData ? nodeData.sha1s.length : -1);
         if (nodeData) {
-            nodeData.md5s.push(msg.md5);
+            nodeData.sha1s.push(msg.sha1);
             nodeData.size = msg.cacheSize;
-            const count = addToMd5Map(this.byMd5, msg.md5, msg.fileSize, node);
+            const count = addToSHA1Map(this.bySHA1, msg.sha1, msg.fileSize, node);
             if (this.distributeOnInsertion && count - 1 < this.redundancy) {
-                this.distribute({ md5: msg.md5, redundancy: this.redundancy });
+                this.distribute({ sha1: msg.sha1, redundancy: this.redundancy });
             }
         } else {
             console.error("insert: We don't seem to have this node", node.ip + ":" + node.port);
@@ -109,15 +109,15 @@ class ObjectCacheManager extends EventEmitter
     remove(msg, node)
     {
         let nodeData = this.byNode.get(node);
-        console.log("removing", msg.sourceFile, msg.md5, "for", node.ip + ":" + node.port, nodeData ? nodeData.md5s.length : -1);
+        console.log("removing", msg.sourceFile, msg.sha1, "for", node.ip + ":" + node.port, nodeData ? nodeData.sha1s.length : -1);
         if (nodeData) {
-            let idx = nodeData.md5s.indexOf(msg.md5);
+            let idx = nodeData.sha1s.indexOf(msg.sha1);
             if (idx != -1) {
-                nodeData.md5s.splice(idx, 1);
+                nodeData.sha1s.splice(idx, 1);
             } else {
-                console.error("We don't have", msg.md5, "on", node.ip + ":" + node.port);
+                console.error("We don't have", msg.sha1, "on", node.ip + ":" + node.port);
             }
-            removeFromMd5Map(this.byMd5, msg.md5, node);
+            removeFromSHA1Map(this.bySHA1, msg.sha1, node);
             nodeData.size = msg.cacheSize;
         } else {
             console.error("remove: We don't seem to have this node", node.ip + ":" + node.port);
@@ -131,15 +131,15 @@ class ObjectCacheManager extends EventEmitter
                     node.name, node.hostname,
                     "maxSize", prettysize(data.maxSize),
                     "cacheSize", prettysize(data.cacheSize),
-                    "md5s", data.md5s.length);
+                    "sha1s", data.sha1s.length);
         if (this.byNode.get(node)) {
             console.log("We already have", node.ip + ":" + node.port);
             return;
         }
-        let md5s = data.md5s.map(item => item.md5);
-        this.byNode.set(node, new NodeData(data.cacheSize, data.maxSize, md5s));
-        data.md5s.forEach(item => {
-            addToMd5Map(this.byMd5, item.md5, item.fileSize, node);
+        let sha1s = data.sha1s.map(item => item.sha1);
+        this.byNode.set(node, new NodeData(data.cacheSize, data.maxSize, sha1s));
+        data.sha1s.forEach(item => {
+            addToSHA1Map(this.bySHA1, item.sha1, item.fileSize, node);
         });
     }
 
@@ -152,7 +152,7 @@ class ObjectCacheManager extends EventEmitter
             return;
         }
         this.byNode.delete(node);
-        nodeData.md5s.forEach(md5 => removeFromMd5Map(this.byMd5, md5, node));
+        nodeData.sha1s.forEach(sha1 => removeFromSHA1Map(this.bySHA1, sha1, node));
     }
 
     dump(query)
@@ -169,7 +169,7 @@ class ObjectCacheManager extends EventEmitter
             const verbose = "verbose" in query;
             this.byNode.forEach((value, key) => {
                 let data =  {
-                    md5s: verbose ? value.md5s : value.md5s.length,
+                    sha1s: verbose ? value.sha1s : value.sha1s.length,
                     maxSize: prettysize(value.maxSize),
                     size: prettysize(value.size)
                 };
@@ -182,10 +182,10 @@ class ObjectCacheManager extends EventEmitter
         }
 
         if ("objects" in query) {
-            ret.md5 = {};
-            this.byMd5.forEach((value, key) => {
+            ret.sha1 = {};
+            this.bySHA1.forEach((value, key) => {
                 // console.log(key, value);
-                ret.md5[key] = { fileSize: prettysize(value.fileSize), nodes: value.nodes.map(node => node.ip + ":" + node.port) };
+                ret.sha1[key] = { fileSize: prettysize(value.fileSize), nodes: value.nodes.map(node => node.ip + ":" + node.port) };
             });
         }
 
@@ -201,19 +201,19 @@ class ObjectCacheManager extends EventEmitter
         let max = parseInt(query.max);
         if (isNaN(max) || max <= 0)
             max = undefined;
-        const md5 = query.md5;
+        const sha1 = query.sha1;
 
         let ret;
         if (res) {
             ret = { type: "fetch_cache_objects", "dry": dry, commands: {} };
-            console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "md5", md5);
+            console.log("distribute called with redundancy of", redundancy, "and max of", max, "dry", dry, "sha1", sha1);
         }
 
         let that = this;
         let nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
         let commands = new Map();
-        if (!md5) {
+        if (!sha1) {
             this.byNode.forEach((value, key) => {
                 commands.set(key, { objects: [], available: value.maxSize - value.size });
             });
@@ -224,7 +224,7 @@ class ObjectCacheManager extends EventEmitter
         if (this.byNode.size >= 2) {
             // let max = 1;
             let roundRobinIndex = 0;
-            function processObject(md5, value)
+            function processObject(sha1, value)
             {
                 if (max != undefined && max <= 0)
                     return;
@@ -265,28 +265,28 @@ class ObjectCacheManager extends EventEmitter
                         ++found;
                         data.available -= value.fileSize;
                         const src = value.nodes[roundRobinIndex++ % value.nodes.length];
-                        data.objects.push({ source: src.ip + ":" + src.port, md5: md5 });
+                        data.objects.push({ source: src.ip + ":" + src.port, sha1: sha1 });
                         if (max != undefined && !--max)
                             break;
                     }
                     // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
                 }
             }
-            if (md5) {
-                let val = this.byMd5.get(md5);
+            if (sha1) {
+                let val = this.bySHA1.get(sha1);
                 if (val) {
-                    processObject(md5, val);
+                    processObject(sha1, val);
                 } else {
-                    console.error("Couldn't find md5", md5);
+                    console.error("Couldn't find sha1", sha1);
                 }
             } else {
-                this.byMd5.forEach((value, key) => processObject(key, value));
+                this.bySHA1.forEach((value, key) => processObject(key, value));
             }
         }
         commands.forEach((value, key) => {
             // console.log(key.ip + ": " + key.port, "will receive", value.objects);
             if (value.objects.length && (!nodeRestriction || (key.ip + ":" + key.port) == nodeRestriction)) {
-                console.log(`sending ${value.objects.length}/${this.byMd5.size} fetch_cache_objects to ${key.ip}:${key.port}`);
+                console.log(`sending ${value.objects.length}/${this.bySHA1.size} fetch_cache_objects to ${key.ip}:${key.port}`);
                 if (ret)
                     ret[`${key.ip}:${key.port}`] = value.objects;
                 count += value.objects.length;

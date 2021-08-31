@@ -94,37 +94,37 @@ let objectCache;
 
 function getFromCache(job, cb)
 {
-    // console.log("got job", job.md5, objectCache ? objectCache.state(job.md5) : false);
+    // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
     // if (objectCache)
-    //     console.log("objectCache", job.md5, objectCache.state(job.md5), objectCache.keys);
-    if (!objectCache || objectCache.state(job.md5) != "exists")
+    //     console.log("objectCache", job.sha1, objectCache.state(job.sha1), objectCache.keys);
+    if (!objectCache || objectCache.state(job.sha1) != "exists")
         return false;
-    const file = path.join(objectCache.dir, job.md5);
+    const file = path.join(objectCache.dir, job.sha1);
     if (!fs.existsSync(file)) {
         console.log("The file is not even there", file);
-        objectCache.remove(job.md5);
+        objectCache.remove(job.sha1);
         return false;
     }
-    // console.log("we have it cached", job.md5);
+    // console.log("we have it cached", job.sha1);
 
     let pointOfNoReturn = false;
     let fd;
     try {
-        let item = objectCache.get(job.md5);
+        let item = objectCache.get(job.sha1);
         job.send(Object.assign({objectCache: true}, item.response));
         job.objectcache = true;
         pointOfNoReturn = true;
-        fd = fs.openSync(path.join(objectCache.dir, item.response.md5), "r");
+        fd = fs.openSync(path.join(objectCache.dir, item.response.sha1), "r");
         // console.log("here", item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;
         const work = () => {
-            // console.log("work", job.md5);
+            // console.log("work", job.sha1);
             function finish(err)
             {
                 fs.closeSync(fd);
                 if (err) {
-                    objectCache.remove(job.md5);
+                    objectCache.remove(job.sha1);
                     job.close();
                 } else {
                     ++item.cacheHits;
@@ -138,14 +138,14 @@ function getFromCache(job, cb)
                 return;
             }
             const buffer = Buffer.allocUnsafe(file.bytes);
-            // console.log("reading from", file, path.join(objectCache.dir, item.response.md5), pos);
+            // console.log("reading from", file, path.join(objectCache.dir, item.response.sha1), pos);
             fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
                 // console.log("GOT READ RESPONSE", file, fileIdx, err, read);
                 if (err || read != file.bytes) {
                     if (!err) {
                         err = `Short read ${read}/${file.bytes}`;
                     }
-                    console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.md5)} got ${read} ${err}`);
+                    console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.sha1)} got ${read} ${err}`);
                     finish(err);
                 } else {
                     // console.log("got good response from file", file);
@@ -185,11 +185,11 @@ client.on("objectCache", enabled => {
 
         objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int("object-cache-purge-size") || objectCacheSize);
         objectCache.on("added", data => {
-            client.send({ type: "objectCacheAdded", md5: data.md5, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
+            client.send({ type: "objectCacheAdded", sha1: data.sha1, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
         });
 
         objectCache.on("removed", data => {
-            client.send({ type: "objectCacheRemoved", md5: data.md5, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
+            client.send({ type: "objectCacheRemoved", sha1: data.sha1, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
         });
     } else {
         objectCache = undefined;
@@ -207,8 +207,8 @@ client.on("fetch_cache_objects", message => {
     message.objects.forEach((operation, idx) => {
         promises[idx % promises.length] = promises[idx % promises.length].then(() => {
             return new Promise((resolve, reject) => {
-                const file = path.join(objectCache.dir, operation.md5);
-                const url = `http://${operation.source}/objectcache/${operation.md5}`;
+                const file = path.join(objectCache.dir, operation.sha1);
+                const url = `http://${operation.source}/objectcache/${operation.sha1}`;
                 console.log("Downloading", url, "->", file);
                 let expectedSize;
                 let stream;
@@ -539,7 +539,7 @@ client.on("connect", () => {
     if (!load.running)
         load.start(option("loadInterval", 1000));
     if (objectCache)
-        client.send({ type: "objectCache", md5s: objectCache.syncData(), maxSize: objectCache.maxSize, cacheSize: objectCache.size });
+        client.send({ type: "objectCache", sha1s: objectCache.syncData(), maxSize: objectCache.maxSize, cacheSize: objectCache.size });
 });
 
 client.on("error", err => {
@@ -566,7 +566,7 @@ let jobQueue = [];
 
 server.on("headers", (headers, req) => {
     // console.log("request is", req.headers);
-    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-md5"]) == "exists"));
+    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) == "exists"));
     headers.push(`x-fisk-wait: ${wait}`);
 });
 
@@ -679,7 +679,7 @@ server.on("job", job => {
                             user: job.user
                         },
                         sourceFile: job.sourceFile,
-                        md5: job.md5,
+                        sha1: job.sha1,
                         id: job.id
                     };
                     // console.log("sending cachehit", info);
@@ -744,7 +744,7 @@ server.on("job", job => {
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
                     success: event.success,
                     exitCode: event.exitCode,
-                    md5: job.md5,
+                    sha1: job.sha1,
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
@@ -754,7 +754,7 @@ server.on("job", job => {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }
                 job.send(response);
-                if (response.exitCode === 0 && event.success && objectCache && response.md5 && objectCache.state(response.md5) == "none") {
+                if (response.exitCode === 0 && event.success && objectCache && response.sha1 && objectCache.state(response.sha1) == "none") {
                     response.sourceFile = job.sourceFile;
                     response.commandLine = job.commandLine;
                     response.environment = job.hash;

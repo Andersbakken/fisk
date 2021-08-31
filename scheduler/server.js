@@ -162,11 +162,11 @@ class Server extends EventEmitter {
         let data = {
             environment: compileEnvironment,
             sourceFile: req.headers["x-fisk-sourcefile"],
-            md5: req.headers["x-fisk-md5"]
+            sha1: req.headers["x-fisk-sha1"]
         };
 
-        if (data.md5 && data.md5.length != 32) {
-            client.error(`Bad md5 sum: ${data.md5}`);
+        if (data.sha1 && data.sha1.length != 32) {
+            client.error(`Bad sha1 sum: ${data.sha1}`);
             return;
         }
         const npmVersion = req.headers["x-fisk-npm-version"];
