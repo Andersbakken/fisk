@@ -44,11 +44,11 @@ public:
                 DEBUG("Got here %s:%d", data.builderIp.c_str(), data.builderPort);
                 done = true;
             } else if (t == "version_mismatch") {
-                FATAL("*** Version mismatch detected, client version: %s minimum client version required: %s",
+                FATAL("*** Fisk Version mismatch detected, client version: %s minimum client version required: %s. Please update your fisk client.",
                       npm_version, msg["minimum_version"].string_value().c_str());
                 _exit(108);
             } else if (t == "version_verified") {
-                ERROR("Version verified, client version: %s minimum client version required: %s",
+                ERROR("Fisk Version verified, client version: %s minimum client version required: %s",
                       npm_version, msg["minimum_version"].string_value().c_str());
                 done = true;
             } else {
