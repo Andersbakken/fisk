@@ -102,11 +102,9 @@ public:
             }
 
             if (!stdOut.empty()) {
-                fprintf(stdout, "stdout: ");
                 fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
             }
             if (!stdErr.empty()) {
-                fprintf(stderr, "stderr: ");
                 fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
             }
 
