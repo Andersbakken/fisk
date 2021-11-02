@@ -361,49 +361,46 @@ int main(int argc, char **argv)
         headers["x-fisk-sha1"] = std::move(sha1);
     }
 
-    SchedulerWebSocket schedulerWebsocket;
-    if (!schedulerWebsocket.connect(url + "/compile", headers)) {
-        DEBUG("Have to run locally because no server");
-        runLocal("scheduler connect error");
+    std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
+    do {
+        schedulerWebsocket = std::make_unique<SchedulerWebSocket>();
+        if (!schedulerWebsocket->connect(url + "/compile", headers)) {
+            DEBUG("Have to run locally because no server");
+            runLocal("scheduler connect error");
+            return 0; // unreachable
+        }
+
+        select.add(schedulerWebsocket.get());
+        DEBUG("Starting schedulerWebsocket");
+        while (!schedulerWebsocket->done
+               && !data.watchdog->timedOut()
+               && schedulerWebsocket->state() >= SchedulerWebSocket::None
+               && schedulerWebsocket->state() <= SchedulerWebSocket::ConnectedWebSocket) {
+            select.exec();
+        }
+
+        if (data.watchdog->timedOut()) {
+            DEBUG("Have to run locally because we timed out trying to connect ro the scheduler");
+            runLocal("watchdog scheduler connect");
+            return 0; // unreachable
+        }
+    } while (!schedulerWebsocket->done);
+
+    if (!schedulerWebsocket->error.empty()) {
+        DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error.c_str());
+        runLocal(schedulerWebsocket->error);
         return 0; // unreachable
     }
 
-    select.add(&schedulerWebsocket);
-    DEBUG("Starting schedulerWebsocket");
-    while (!schedulerWebsocket.done
-           && !data.watchdog->timedOut()
-           && schedulerWebsocket.state() >= SchedulerWebSocket::None
-           && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
-        select.exec();
-    }
 
-    if (data.watchdog->timedOut()) {
-        DEBUG("Have to run locally because we timed out trying to connect ro the scheduler");
-        runLocal("watchdog scheduler connect");
-        return 0; // unreachable
-    }
-
-    if (!schedulerWebsocket.error.empty()) {
-        DEBUG("Have to run locally because no server: %s", schedulerWebsocket.error.c_str());
-        runLocal(schedulerWebsocket.error);
-        return 0; // unreachable
-    }
-
-    DEBUG("Finished schedulerWebsocket");
-    if (!schedulerWebsocket.done) {
-        DEBUG("Have to run locally because no server 2");
-        runLocal("scheduler connect error 2");
-        return 0; // unreachable
-    }
-
-    if (schedulerWebsocket.needsEnvironment) {
+    if (schedulerWebsocket->needsEnvironment) {
         data.watchdog->stop();
         std::string dir;
         const std::string tarball = Client::prepareEnvironmentForUpload(&dir);
         // printf("GOT TARBALL %s\n", tarball.c_str());
         if (!tarball.empty()) {
-            select.remove(&schedulerWebsocket);
-            Client::uploadEnvironment(&schedulerWebsocket, tarball);
+            select.remove(schedulerWebsocket.get());
+            Client::uploadEnvironment(schedulerWebsocket.get(), tarball);
         }
         Client::recursiveRmdir(dir);
         runLocal("needs environment");
@@ -421,15 +418,15 @@ int main(int argc, char **argv)
     data.watchdog->transition(Watchdog::AcquiredBuilder);
     BuilderWebSocket builderWebSocket;
     select.add(&builderWebSocket);
-    headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket.jobId);
+    headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
-    if (!schedulerWebsocket.environment.empty()) {
-        DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket.environment.c_str());
-        headers["x-fisk-environments"] = schedulerWebsocket.environment;
+    if (!schedulerWebsocket->environment.empty()) {
+        DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket->environment.c_str());
+        headers["x-fisk-environments"] = schedulerWebsocket->environment;
     }
     if (!builderWebSocket.connect(Client::format("ws://%s:%d/compile",
-                                               data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
-                                               data.builderPort), headers)) {
+                                                 data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+                                                 data.builderPort), headers)) {
         DEBUG("Have to run locally because no builder connection");
         runLocal("builder connection failure");
         return 0; // unreachable
@@ -489,12 +486,12 @@ int main(int argc, char **argv)
 
     std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.builderCompiler;
-    if (!schedulerWebsocket.extraArguments.empty()) {
-        args.reserve(args.size() + schedulerWebsocket.extraArguments.size());
-        for (std::string &arg : schedulerWebsocket.extraArguments) {
+    if (!schedulerWebsocket->extraArguments.empty()) {
+        args.reserve(args.size() + schedulerWebsocket->extraArguments.size());
+        for (std::string &arg : schedulerWebsocket->extraArguments) {
             args.push_back(std::move(arg));
         }
-        schedulerWebsocket.extraArguments.clear(); // since we moved it out
+        schedulerWebsocket->extraArguments.clear(); // since we moved it out
     }
 
     const bool wait = builderWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
@@ -523,7 +520,7 @@ int main(int argc, char **argv)
                 data.watchdog->transition(Watchdog::UploadedJob);
                 data.watchdog->transition(Watchdog::Finished);
                 data.watchdog->stop();
-                schedulerWebsocket.close("cachehit");
+                schedulerWebsocket->close("cachehit");
 
                 Client::writeStatistics();
                 return data.exitCode;
@@ -605,7 +602,7 @@ int main(int argc, char **argv)
     }
     data.watchdog->transition(Watchdog::Finished);
     data.watchdog->stop();
-    schedulerWebsocket.close("builderd");
+    schedulerWebsocket->close("builderd");
 
     Client::writeStatistics();
     return data.exitCode;
