@@ -81,23 +81,23 @@ public:
                     done = true;
                     return;
                 }
-                std::string msg;
+                std::string str;
                 if (Client::data().preprocessed && Config::storePreprocessedDataOnError) {
                     std::string basename;
                     Client::parsePath(data.compilerArgs->sourceFile(), &basename, nullptr);
-                    FILE *f = fopen((basename + ".error.ii").c_str(), "w");
-                    if (f) {
-                        fwrite(Client::data().preprocessed->stdOut.c_str(), Client::data().preprocessed->stdOut.size(), 1, f);
-                        fclose(f);
-                        msg = "Wrote error to " + (basename + ".error.ii");
+                    FILE *errorFile = fopen((basename + ".error.ii").c_str(), "w");
+                    if (errorFile) {
+                        fwrite(Client::data().preprocessed->stdOut.c_str(), Client::data().preprocessed->stdOut.size(), 1, errorFile);
+                        fclose(errorFile);
+                        str = "Wrote error to " + (basename + ".error.ii");
                     } else {
-                        msg = std::string("Failed to open file ") + strerror(errno);
+                        str = std::string("Failed to open file ") + strerror(errno);
                     }
                 }
 
                 fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n%s\n",
                         data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
-                        data.objectCache ? "true" : "false", npm_version, msg.c_str());
+                        data.objectCache ? "true" : "false", npm_version, str.c_str());
 
             }
 
