@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 if (APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat -Wall -Wshadow -Weverything -Wno-c++98-compat -Wno-switch-enum -Wno-c++98-compat-pedantic -Wno-padded -Wno-format-nonliteral -Wno-float-equal -Wno-reserved-id-macro -Wno-sign-conversion -Wno-global-constructors -Wno-exit-time-destructors -Wno-format-pedantic -Wno-old-style-cast")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wformat -Wall -Wshadow -Weverything -Wno-c++98-compat -Wno-switch-enum -Wno-c++98-compat-pedantic -Wno-padded -Wno-format-nonliteral -Wno-float-equal -Wno-reserved-id-macro -Wno-sign-conversion -Wno-global-constructors -Wno-exit-time-destructors -Wno-format-pedantic -Wno-old-style-cast")
 else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif ()
