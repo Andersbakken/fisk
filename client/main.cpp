@@ -363,6 +363,9 @@ int main(int argc, char **argv)
 
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
     do {
+        if (schedulerWebsocket) {
+            select.remove(schedulerWebsocket.get());
+        }
         schedulerWebsocket.reset(new SchedulerWebSocket);
         if (!schedulerWebsocket->connect(url + "/compile", headers)) {
             DEBUG("Have to run locally because no server");
