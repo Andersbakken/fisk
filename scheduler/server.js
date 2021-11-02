@@ -107,7 +107,7 @@ class Server extends EventEmitter {
             this.server = http.createServer(this.app);
             this.ws = new WebSocket.Server({ noServer: true });
             const port = this.option.int("port", 8097);
-            this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
+            this.server.listen({ port: port, backlog: this.option.int("backlog", 1024), host: "0.0.0.0" });
 
             this.server.on("upgrade", (req, socket, head) => {
                 this.ws.handleUpgrade(req, socket, head, (ws) => {
