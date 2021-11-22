@@ -70,6 +70,7 @@ public:
                     || uncolored.find("unable to rename temporary ") != std::string::npos
                     || uncolored.find("execvp: No such file or directory") != std::string::npos
                     || uncolored.find("cannot execute ") != std::string::npos
+                    || uncolored.find("cannot open ") != std::string::npos
                     || uncolored.find("internal compiler error") != std::string::npos
                     || uncolored.find("error trying to exec") != std::string::npos) {
                     ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
