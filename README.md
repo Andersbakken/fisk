@@ -1,5 +1,5 @@
 # fisk
-Fisk, a distributed compile system
+Fisk, a nice distributed compile system
 
 If you get:
 
