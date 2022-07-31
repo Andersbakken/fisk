@@ -310,13 +310,6 @@ fi
 
 tempdir=$(mktemp -d /tmp/iceccenvXXXXXX)
 
-# for testing the environment is usable at all
-if test -x /bin/true; then
-    add_file /bin/true
-elif test -x /usr/bin/true; then
-    add_file /usr/bin/true /bin/true
-fi
-
 if test -n "$gcc"; then
     # getting compilers resolved path
     added_gcc=$(resolve_path $added_gcc)

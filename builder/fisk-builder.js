@@ -464,9 +464,6 @@ client.on("getEnvironments", message => {
             console.log("Got finish", env);
             exec("tar xf '" + file + "'", { cwd: dir }).
                 then(() => {
-                    console.log("Checking that the environment runs", path.join(dir, "bin", "true"));
-                    return exec(`"${path.join(dir, "bin", "true")}"`, { cwd: dir });
-                }).then(() => {
                     const json = path.join(dir, "environment.json");
                     console.log("Writing json file", json);
                     return fs.writeFile(json, JSON.stringify({ hash: env, created: new Date().toString() }));
