@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <openssl/bio.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 
@@ -31,6 +32,9 @@ class Preprocessed;
 namespace Client {
 struct Data
 {
+    Data();
+    ~Data();
+
     int argc { 0 };
     char **argv { nullptr };
     std::vector<std::string> originalArgs;
@@ -51,11 +55,7 @@ struct Data
 
     std::string commandLineAsString() const;
 
-    SHAstate_st sha1 = []() {
-        SHAstate_st ret;
-        SHA1_Init(&ret);
-        return ret;
-    }();
+    EVP_MD_CTX *sha1Context;
 };
 Data &data();
 

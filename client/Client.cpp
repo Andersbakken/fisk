@@ -35,6 +35,18 @@ static const char *systemName = "Linux x86_64";
 #error unsupported platform
 #endif
 
+Client::Data::Data()
+{
+    sha1Context = EVP_MD_CTX_new();
+    EVP_MD_CTX_init(sha1Context);
+    const EVP_MD *hashptr = EVP_get_digestbyname("SHA1");
+    EVP_DigestInit_ex(sha1Context, hashptr, nullptr);
+}
+Client::Data::~Data()
+{
+    EVP_MD_CTX_free(sha1Context);
+}
+
 static Client::Data sData;
 const unsigned long long Client::started = Client::mono();
 const unsigned long long Client::milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);

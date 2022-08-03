@@ -347,15 +347,16 @@ int main(int argc, char **argv)
         }
 
         VERBOSE("SHA1'ing compiler hash [%s]", data.hash.c_str());
-        SHA1_Update(&Client::data().sha1, data.hash.c_str(), data.hash.size());
+        EVP_DigestUpdate(Client::data().sha1Context, data.hash.c_str(), data.hash.size());
 
         const std::string tag = Config::objectCacheTag;
         VERBOSE("SHA1'ing object cache tag [%s]", tag.c_str());
-        SHA1_Update(&Client::data().sha1, tag.c_str(), tag.size());
+        EVP_DigestUpdate(Client::data().sha1Context, tag.c_str(), tag.size());
 
         unsigned char sha1Buf[SHA_DIGEST_LENGTH];
-        SHA1_Final(sha1Buf, &data.sha1);
-        std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
+        unsigned int len = sizeof(sha1Buf);
+        EVP_DigestFinal_ex(data.sha1Context, sha1Buf, &len);
+        std::string sha1 = Client::toHex(sha1Buf, len);
 
         WARN("Got sha1: %s", sha1.c_str());
         headers["x-fisk-sha1"] = std::move(sha1);
