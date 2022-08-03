@@ -1,36 +1,58 @@
 {
-  "name": "@andersbakken/fisk",
-  "version": "3.4.104",
-  "description": "Fisk, a distributed compile system",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Andersbakken/fisk.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/Andersbakken/fisk/issues"
-  },
-  "homepage": "https://github.com/Andersbakken/fisk#readme",
-  "dependencies": {
-    "@jhanssen/options": "^1.0.25",
-    "axios": "^0.21.1",
-    "blessed": "^0.1.81",
-    "bytes": "^3.0.0",
-    "compare-versions": "^3.4.0",
-    "express": "^4.16.3",
-    "fs-extra": "^6.0.1",
-    "humanize-duration": "^3.17.0",
-    "lowdb": "^1.0.0",
-    "minimist": "^1.2.5",
-    "mktemp": "^0.4.0",
-    "parse-duration": "^0.1.1",
-    "posix": "^4.2.0",
-    "prettysize": "^2.0.0",
-    "wake_on_lan": "^1.0.0",
-    "ws": "^7.4.6"
-  }
+    "name": "@andersbakken/fisk",
+    "version": "3.4.104",
+    "description": "Fisk, a distributed compile system",
+    "scripts": {
+        "lint": "eslint . --ext .ts",
+        "rollup": "rollup -c",
+        "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup",
+        "clean:dist": "del-cli dist/*",
+        "clean:cache": "del-cli .cache/*",
+        "clean": "run-p clean:dist clean:cache",
+        "watch": "rollup -c -w"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Andersbakken/fisk.git"
+    },
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/Andersbakken/fisk/issues"
+    },
+    "homepage": "https://github.com/Andersbakken/fisk#readme",
+    "dependencies": {
+        "@jhanssen/options": "^1.0.25",
+        "axios": "^0.21.1",
+        "blessed": "^0.1.81",
+        "bytes": "^3.0.0",
+        "compare-versions": "^3.4.0",
+        "express": "^4.16.3",
+        "fs-extra": "^6.0.1",
+        "humanize-duration": "^3.17.0",
+        "lowdb": "^1.0.0",
+        "minimist": "^1.2.5",
+        "mktemp": "^0.4.0",
+        "parse-duration": "^0.1.1",
+        "posix": "^4.2.0",
+        "prettysize": "^2.0.0",
+        "wake_on_lan": "^1.0.0",
+        "ws": "^7.4.6"
+    },
+    "devDependencies": {
+        "@rollup/plugin-commonjs": "^17.1.0",
+        "@rollup/plugin-node-resolve": "^11.1.1",
+        "@rollup/plugin-replace": "^2.3.4",
+        "@types/node": "^14.14.25",
+        "@typescript-eslint/eslint-plugin": "^4.14.2",
+        "@typescript-eslint/parser": "^4.14.2",
+        "del-cli": "^3.0.1",
+        "eslint": "^7.19.0",
+        "eslint-plugin-sort-imports-es6-autofix": "^0.5.0",
+        "npm-run-all": "^4.1.5",
+        "prettier": "^2.2.1",
+        "rollup": "^2.38.4",
+        "rollup-plugin-typescript2": "^0.27.0",
+        "typescript": "^4.3.5"
+    }
 }

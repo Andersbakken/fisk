@@ -3,8 +3,8 @@
 const option = require('@jhanssen/options')({ prefix: 'fisk/daemon',
                                               applicationPath: false,
                                               additionalFiles: [ "fisk/daemon.conf.override" ] });
-const ws = require('ws');
-const os = require('os');
+import { ws } from "ws";
+import { os } from "os";
 const assert = require('assert');
 const common = require('../common')(option);
 const Server = require('./server');
