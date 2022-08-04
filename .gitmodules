@@ -1,12 +1,12 @@
 [submodule "3rdparty/json11"]
-	path = 3rdparty/json11
-	url = https://github.com/dropbox/json11.git
+        path = 3rdparty/json11
+        url = https://github.com/dropbox/json11.git
 [submodule "3rdparty/wslay"]
-	path = 3rdparty/wslay
-	url = https://github.com/tatsuhiro-t/wslay.git
+        path = 3rdparty/wslay
+        url = https://github.com/tatsuhiro-t/wslay.git
 [submodule "LUrlParser"]
-	path = 3rdparty/LUrlParser
-	url = https://github.com/corporateshark/LUrlParser.git
+        path = 3rdparty/LUrlParser
+        url = https://github.com/corporateshark/LUrlParser.git
 [submodule "3rdparty/tiny-process-library"]
-	path = 3rdparty/tiny-process-library
-	url = https://github.com/eidheim/tiny-process-library.git
+        path = 3rdparty/tiny-process-library
+        url = https://gitlab.com/eidheim/tiny-process-library.git

@@ -66,7 +66,7 @@ std::mutex &mutex();
 bool findCompiler(const std::string &preresolved);
 std::string findInPath(const std::string &fn);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
-const char *trimSourceRoot(const std::string &str, int *len);
+const char *trimSourceRoot(const std::string &str, size_t *len);
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
     return parsePath(path.c_str(), basename, dirname);

@@ -40,6 +40,7 @@ static inline size_t random(void *data, size_t len)
 }
 
 WebSocket::WebSocket()
+    : mParsedUrl(LUrlParser::ParseURL::parseURL(std::string()))
 {
     memset(&mCallbacks, 0, sizeof(mCallbacks));
     mCallbacks.recv_callback = [](wslay_event_context *ctx,
@@ -104,20 +105,20 @@ bool WebSocket::connect(std::string &&uniformResourceLocator, const std::map<std
 {
     mUrl = std::move(uniformResourceLocator);
     mHeaders = std::move(hdrs);
-    mParsedUrl = LUrlParser::clParseURL::ParseURL(mUrl);
-    if (!mParsedUrl.IsValid()) {
+    mParsedUrl = LUrlParser::ParseURL::parseURL(mUrl);
+    if (!mParsedUrl.isValid()) {
         ERROR("Bad url %s", mUrl.c_str());
         return false;
     }
 
-    if (mParsedUrl.m_Scheme != "ws") {
-        ERROR("Bad scheme %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
+    if (mParsedUrl.scheme_ != "ws") {
+        ERROR("Bad scheme %s %s", mParsedUrl.scheme_.c_str(), mUrl.c_str());
         return false;
     }
 
-    mHost = mParsedUrl.m_Host;
-    if (!mParsedUrl.GetPort(&mPort)) {
-        ERROR("Bad port %s %s", mParsedUrl.m_Scheme.c_str(), mUrl.c_str());
+    mHost = mParsedUrl.host_;
+    if (!mParsedUrl.getPort(&mPort)) {
+        ERROR("Bad port %s %s", mParsedUrl.scheme_.c_str(), mUrl.c_str());
         return false;
     }
 
@@ -237,7 +238,7 @@ bool WebSocket::requestUpgrade()
                                               "Sec-WebSocket-Version: 13\r\n"
                                               "%s"
                                               "\r\n",
-                                              mParsedUrl.m_Path.c_str(), mHost.c_str(), mPort,
+                                              mParsedUrl.path_.c_str(), mHost.c_str(), mPort,
                                               mClientKey.c_str(), extraHeaders.c_str());
         DEBUG("Sending headers:\n%s", reqHeader);
 

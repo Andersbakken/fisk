@@ -477,10 +477,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                 }
             }
 
-            int len = 0;
+            size_t len = 0;
             const char *fn = Client::trimSourceRoot(arg, &len);
             EVP_DigestUpdate(Client::data().sha1Context, fn, len);
-            VERBOSE("SHA1'ing arg %zu [%.*s]", i, len, fn);
+            VERBOSE("SHA1'ing arg %zu [%.*s]", i, static_cast<int>(len), fn);
             continue;
         }
 

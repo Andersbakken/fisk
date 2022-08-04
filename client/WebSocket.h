@@ -67,7 +67,7 @@ private:
     void send();
     std::string mUrl, mHost, mClientKey;
     int mPort { -1 };
-    LUrlParser::clParseURL mParsedUrl;
+    LUrlParser::ParseURL mParsedUrl;
     std::map<std::string, std::string> mHeaders;
     int mFD { -1 };
     wslay_event_callbacks mCallbacks;

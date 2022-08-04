@@ -300,7 +300,7 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-const char *Client::trimSourceRoot(const std::string &str, int *len)
+const char *Client::trimSourceRoot(const std::string &str, size_t *len)
 {
     const char *cstr = str.c_str();
     char buf[PATH_MAX];

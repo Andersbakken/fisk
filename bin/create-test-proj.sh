@@ -3,7 +3,7 @@
 COUNT=$1
 [ -z "$1" ] && COUNT=1
 
-echo "cmake_minimum_required(VERSION 2.8)" > CMakeLists.txt
+echo "cmake_minimum_required(VERSION 3.0)" > CMakeLists.txt
 echo "add_library(fisktest" >> CMakeLists.txt
 for idx in `seq 1 $COUNT`; do
     echo "    ${idx}.cpp" >> CMakeLists.txt
