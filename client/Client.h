@@ -58,7 +58,7 @@ struct Data
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     EVP_MD_CTX *sha1Context;
 #else
-    SHAstate_st sha1
+    SHAstate_st sha1;
 #endif
 
     void sha1Update(const void *data, size_t len)
