@@ -96,7 +96,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                         if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
                             if (ch > last) {
                                 VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
-                                EVP_DigestUpdate(Client::data().sha1Context, last, ch - last);
+                                Client::data().sha1Update(last, ch - last);
                                 // fwrite(last, 1, ch - last, f);
                             }
                             while (*ch && *ch != '\n')
@@ -108,7 +108,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                     }
                     if (last < ch) {
                         VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
-                        EVP_DigestUpdate(Client::data().sha1Context, last, ch - last);
+                        Client::data().sha1Update(last, ch - last);
                         // fwrite(last, 1, ch - last, f);
                     }
                     // fclose(f);

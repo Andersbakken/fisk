@@ -37,14 +37,20 @@ static const char *systemName = "Linux x86_64";
 
 Client::Data::Data()
 {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
     sha1Context = EVP_MD_CTX_new();
     EVP_MD_CTX_init(sha1Context);
     const EVP_MD *hashptr = EVP_get_digestbyname("SHA1");
     EVP_DigestInit_ex(sha1Context, hashptr, nullptr);
+#else
+    SHA1_Init(&sha1);
+#endif
 }
 Client::Data::~Data()
 {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
     EVP_MD_CTX_free(sha1Context);
+#endif
 }
 
 static Client::Data sData;

@@ -55,7 +55,20 @@ struct Data
 
     std::string commandLineAsString() const;
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
     EVP_MD_CTX *sha1Context;
+#else
+    SHAstate_st sha1
+#endif
+
+    void sha1Update(const void *data, size_t len)
+    {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        EVP_DigestUpdate(sha1Context, data, len);
+#else
+        SHA1_Update(&sha1, data,  len);
+#endif
+    }
 };
 Data &data();
 

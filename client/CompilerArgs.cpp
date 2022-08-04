@@ -172,7 +172,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             for (size_t aa = i; aa < i + count; ++aa) {
                 const std::string &arg = args[aa];
                 VERBOSE("SHA1'ing arg %zu [%s]", aa, arg.c_str());
-                EVP_DigestUpdate(Client::data().sha1Context, arg.c_str(), arg.size());
+                Client::data().sha1Update(arg.c_str(), arg.size());
             }
         }
     };
@@ -479,7 +479,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
             size_t len = 0;
             const char *fn = Client::trimSourceRoot(arg, &len);
-            EVP_DigestUpdate(Client::data().sha1Context, fn, len);
+            Client::data().sha1Update(fn, len);
             VERBOSE("SHA1'ing arg %zu [%.*s]", i, static_cast<int>(len), fn);
             continue;
         }
@@ -512,8 +512,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-o");
         std::string out = ret->output();
         if (objectCache) {
-            EVP_DigestUpdate(Client::data().sha1Context, "-o", 2);
-            EVP_DigestUpdate(Client::data().sha1Context, out.c_str(), out.size());
+            Client::data().sha1Update("-o", 2);
+            Client::data().sha1Update(out.c_str(), out.size());
             VERBOSE("SHA1'ing arg [-o]");
             VERBOSE("SHA1'ing arg [%s]", out.c_str());
         }
@@ -526,8 +526,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         Client::parsePath(ret->output(), nullptr, &dir);
         dir = Client::realpath(dir);
         if (objectCache) {
-            EVP_DigestUpdate(Client::data().sha1Context, "-fprofile-dir=", 14);
-            EVP_DigestUpdate(Client::data().sha1Context, dir.c_str(), dir.size());
+            Client::data().sha1Update("-fprofile-dir=", 14);
+            Client::data().sha1Update(dir.c_str(), dir.size());
             VERBOSE("SHA1'ing arg [-fprofile-dir=%s]", dir.c_str());
         }
         ret->commandLine.push_back("-fprofile-dir=" + dir);
@@ -538,8 +538,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         ret->commandLine.push_back("-MF");
         std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
         if (objectCache) {
-            EVP_DigestUpdate(Client::data().sha1Context, "-MF", 2);
-            EVP_DigestUpdate(Client::data().sha1Context, dfile.c_str(), dfile.size());
+            Client::data().sha1Update("-MF", 2);
+            Client::data().sha1Update(dfile.c_str(), dfile.size());
             VERBOSE("SHA1'ing arg [-MF]");
             VERBOSE("SHA1'ing arg [%s]", dfile.c_str());
         }

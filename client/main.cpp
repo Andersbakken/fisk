@@ -347,11 +347,11 @@ int main(int argc, char **argv)
         }
 
         VERBOSE("SHA1'ing compiler hash [%s]", data.hash.c_str());
-        EVP_DigestUpdate(Client::data().sha1Context, data.hash.c_str(), data.hash.size());
+        Client::data().sha1Update(data.hash.c_str(), data.hash.size());
 
         const std::string tag = Config::objectCacheTag;
         VERBOSE("SHA1'ing object cache tag [%s]", tag.c_str());
-        EVP_DigestUpdate(Client::data().sha1Context, tag.c_str(), tag.size());
+        Client::data().sha1Update(tag.c_str(), tag.size());
 
         unsigned char sha1Buf[SHA_DIGEST_LENGTH];
         unsigned int len = sizeof(sha1Buf);
