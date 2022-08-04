@@ -3,9 +3,6 @@ import resolve from "@rollup/plugin-node-resolve";
 import typescript from "rollup-plugin-typescript2";
 import hashbang from "rollup-plugin-hashbang";
 
-const output = "dist/fisk-daemon.js";
-const input = "daemon/fisk-daemon.ts";
-
 const plugins = [
     resolve({
         preferBuiltins: true
@@ -24,11 +21,23 @@ const external = ["fs", "assert"];
 
 export default [
     {
-        input,
+        input: "daemon/fisk-daemon.ts",
         plugins,
         external,
         output: {
-            file: output,
+            file: "dist/fisk-daemon.js",
+            format,
+            name: "tsimport",
+            exports: "named",
+            sourcemap: true
+        }
+    },
+    {
+        input: "builder/fisk-builder.ts",
+        plugins,
+        external,
+        output: {
+            file: "dist/fisk-builder.js",
             format,
             name: "tsimport",
             exports: "named",
