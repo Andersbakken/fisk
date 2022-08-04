@@ -1,58 +1,69 @@
-const net = require('net');
-const path = require('path');
-const EventEmitter = require('events');
-const fs = require('fs-extra');
-const ClientBuffer = require('./clientbuffer');
-const Compile = require('./compile');
+import { Common } from "../common";
+import { Compile } from "./compile";
+import { Option } from "@jhanssen/options";
+import EventEmitter from "events";
+import fs from "fs-extra";
+import net, { Socket } from "net";
+import path from "path";
 
-class Server extends EventEmitter
-{
-    constructor(option, common)
-    {
+type Opts = (key: string, defaultValue?: Option) => Option;
+
+class Server extends EventEmitter {
+    private debug: boolean;
+    private server?: net.Server;
+    private option: Opts;
+    private _connections: Record<number, Socket>;
+    private _connectionId: number;
+
+    public file: string;
+
+    constructor(option: Opts, common: Common) {
         super();
-        this.debug = option("debug");
-        this.file = option("socket", path.join(common.cacheDir(option), "socket"));
+        this.debug = Boolean(option("debug"));
+        this.file = String(option("socket", path.join(common.cacheDir(), "socket")));
         this.server = undefined;
         this.option = option;
         this._connections = {};
         this._connectionId = 0;
     }
 
-    close()
-    {
-        if (this.debug)
+    close(): void {
+        if (this.debug) {
             console.log("Server::close");
-        if (this.server)
+        }
+        if (this.server) {
             this.server.close();
+        }
         try {
             fs.unlinkSync(this.file);
         } catch (err) {
+            /* */
         }
     }
 
-    listen()
-    {
+    listen(): Promise<void> {
         try {
             fs.unlinkSync(this.file); // this should be more
-                                      // complicated with attempts to
-                                      // cleanly shut down and whatnot
+            // complicated with attempts to
+            // cleanly shut down and whatnot
         } catch (err) {
+            /* */
         }
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             let connected = false;
             this.server = net.createServer(this._onConnection.bind(this)).listen(this.file, () => {
-                fs.chmodSync(this.file, '777');
+                fs.chmodSync(this.file, "777");
                 connected = true;
                 resolve();
             });
-            this.server.on('error', err => {
+            this.server.on("error", (err) => {
                 if (!connected) {
                     console.error("Got server error", err);
                     setTimeout(this.listen.bind(this), 1000);
                 }
             });
 
-            this.server.on('close', () => {
+            this.server.on("close", (err: unknown) => {
                 if (!connected) {
                     console.error("Got server error", err);
                     setTimeout(this.listen.bind(this), 1000);
@@ -60,22 +71,24 @@ class Server extends EventEmitter
             });
         });
     }
-    _onConnection(conn)
-    {
-        let compile = new Compile(conn, ++this._connectionId, this.option);
-        if (this.debug)
+    _onConnection(conn: Socket): void {
+        const compile = new Compile(conn, ++this._connectionId, this.option);
+        if (this.debug) {
             console.log("Server::_onConnection", compile.id);
-        if (this._connectionId == Math.pow(2, 31) - 1)
+        }
+        if (this._connectionId === Math.pow(2, 31) - 1) {
             this._connectionId = 0;
+        }
         this._connections[compile.id] = conn;
-        compile.on('end', () => {
-            if (this.debug)
+        compile.on("end", () => {
+            if (this.debug) {
                 console.log("Compile::end");
+            }
 
             delete this._connections[compile.id];
         });
-        this.emit('compile', compile);
+        this.emit("compile", compile);
     }
 }
 
-module.exports = Server;
+export { Server };

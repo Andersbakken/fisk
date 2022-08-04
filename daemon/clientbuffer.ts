@@ -1,37 +1,39 @@
-class ClientBuffer
-{
-    constructor()
-    {
+class ClientBuffer {
+    private buffers: Buffer[];
+    private offset: number;
+
+    constructor() {
         this.buffers = [];
         this.offset = 0;
     }
 
-    write(buffer)
-    {
+    write(buffer: Buffer): void {
         this.buffers.push(buffer);
         // console.log("write", buffer.length, this.buffers.length, this.available);
     }
 
-    peek()
-    {
-        if (!this.available)
+    peek(): number {
+        if (!this.available) {
             throw new Error("No data available");
+        }
         return this.buffers[0][this.offset];
     }
 
-    read(len)
-    {
-        if (!len)
+    read(len: number): Buffer {
+        if (!len) {
             throw new Error("Don't be a tool");
-        if (len > this.available)
+        }
+        if (len > this.available) {
             throw new Error("We don't have this many bytes available " + len + ">" + this.available);
+        }
 
         // console.log("read", len, this.available);
         let ret;
 
-        if (this.buffers[0].length - this.offset >= len) { // buffers[0] is enough
-            let buf = this.buffers[0];
-            if (buf.length - this.offset == len) {
+        if (this.buffers[0].length - this.offset >= len) {
+            // buffers[0] is enough
+            const buf = this.buffers[0];
+            if (buf.length - this.offset === len) {
                 ret = this.offset ? buf.slice(this.offset) : buf;
                 this.offset = 0;
                 this.buffers.splice(0, 1);
@@ -50,7 +52,7 @@ class ClientBuffer
         this.buffers.splice(0, 1);
         while (retOffset < len) {
             const needed = len - retOffset;
-            let buf = this.buffers[0];
+            const buf = this.buffers[0];
             if (buf.length <= needed) {
                 this.buffers[0].copy(ret, retOffset);
                 retOffset += this.buffers[0].length;
@@ -64,10 +66,9 @@ class ClientBuffer
         return ret;
     }
 
-    get available()
-    {
+    get available(): number {
         return this.buffers.reduce((total, buf) => total + buf.length, 0) - this.offset;
     }
-};
+}
 
-module.exports = ClientBuffer;
+export { ClientBuffer };

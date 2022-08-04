@@ -1,45 +1,50 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+import { Option } from "@jhanssen/options";
+import fs from "fs-extra";
+import os from "os";
+import path from "path";
 
 const Version = 5;
 
-function cacheDir(option)
-{
+type Opts = (key: string, defaultValue?: Option) => Option;
+
+function cacheDir(option: Opts): string {
     let dir = option("cache-dir");
     if (!dir) {
+        // @ts-ignore
         dir = path.join(os.homedir(), ".cache", "fisk", path.basename(option.prefix));
     }
-    return dir;
+    return String(dir);
 }
 
-function validateCache(option)
-{
+function validateCache(option: Opts) {
     const dir = cacheDir(option);
-    const file = path.join(dir, 'version');
+    const file = path.join(dir, "version");
     // console.log(dir);
     let version;
     try {
         version = fs.readFileSync(file);
-        if (version.readUInt32BE() == Version) {
+        if (version.readUInt32BE() === Version) {
             return;
         }
     } catch (err) {
+        /* */
     }
-    if (version)
+    if (version) {
         console.log(`Wrong version. Destroying cache ${dir}`);
+    }
     fs.removeSync(dir);
     fs.mkdirpSync(dir);
-    let buf = Buffer.allocUnsafe(4);
+    const buf = Buffer.allocUnsafe(4);
     buf.writeUInt32BE(Version);
     fs.writeFileSync(file, buf);
 }
 
+export type Common = { cacheDir: () => string; Version: number };
 
-module.exports = function(option) {
+export default function (option: Opts): Common {
     validateCache(option);
     return {
-        cacheDir: cacheDir.bind(this, option),
-        Version: Version
+        cacheDir: cacheDir.bind(undefined, option),
+        Version
     };
-};
+}

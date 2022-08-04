@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")({ prefix: "fisk/builder",
-                                              applicationPath: false,
-                                              additionalFiles: [ "fisk/builder.conf.override" ] });
+const option = require("@jhanssen/options")({
+    prefix: "fisk/builder",
+    applicationPath: false,
+    additionalFiles: ["fisk/builder.conf.override"]
+});
 
 const axios = require("axios");
 const ws = require("ws");
@@ -35,27 +37,22 @@ process.on("unhandledRejection", (reason, p) => {
     quitOnError();
 });
 
-process.on("uncaughtException", err => {
+process.on("uncaughtException", (err) => {
     console.error("Uncaught exception", err);
-    if (client)
-        client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
+    if (client) client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
     quitOnError();
 });
 
 let debug = option("debug");
 
 let restartOnInactivity = option("restart-on-inactivity");
-if (typeof restartOnInactivity === "string")
-    restartOnInactivity = parse_duration(restartOnInactivity);
+if (typeof restartOnInactivity === "string") restartOnInactivity = parse_duration(restartOnInactivity);
 
 let shutdownTimer;
-function restartShutdownTimer()
-{
+function restartShutdownTimer() {
     if (restartOnInactivity > 0) {
-        if (shutdownTimer)
-            clearTimeout(shutdownTimer);
-        function shutdownNow()
-        {
+        if (shutdownTimer) clearTimeout(shutdownTimer);
+        function shutdownNow() {
             console.log("shutting down now due to inactivity");
             // child_process.exec("shutdown -h now");
         }
@@ -70,18 +67,24 @@ function restartShutdownTimer()
     }
 }
 
-if (restartOnInactivity)
-    restartShutdownTimer();
+if (restartOnInactivity) restartShutdownTimer();
 
-let ports = ("" + option("ports", "")).split(",").filter(x => x).map(x => parseInt(x));
+let ports = ("" + option("ports", ""))
+    .split(",")
+    .filter((x) => x)
+    .map((x) => parseInt(x));
 if (ports.length) {
     var name = option("name") || option("hostname") || os.hostname();
-    var children = ports.map(port => {
+    var children = ports.map((port) => {
         let ret = child_process.fork(__filename, [
-            "--port", port,
-            "--name", name + "_" + port,
-            "--cache-dir", path.join(common.cacheDir(), "" + port),
-            "--slots", Math.round(os.cpus().length / ports.length)
+            "--port",
+            port,
+            "--name",
+            name + "_" + port,
+            "--cache-dir",
+            path.join(common.cacheDir(), "" + port),
+            "--slots",
+            Math.round(os.cpus().length / ports.length)
         ]);
         // ret.stdout.on("data", output => console.log(port, output));
         // ret.stderr.on("data", output => console.error(port, output));
@@ -92,13 +95,11 @@ if (ports.length) {
 
 let objectCache;
 
-function getFromCache(job, cb)
-{
+function getFromCache(job, cb) {
     // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
     // if (objectCache)
     //     console.log("objectCache", job.sha1, objectCache.state(job.sha1), objectCache.keys);
-    if (!objectCache || objectCache.state(job.sha1) != "exists")
-        return false;
+    if (!objectCache || objectCache.state(job.sha1) != "exists") return false;
     const file = path.join(objectCache.dir, job.sha1);
     if (!fs.existsSync(file)) {
         console.log("The file is not even there", file);
@@ -111,7 +112,7 @@ function getFromCache(job, cb)
     let fd;
     try {
         let item = objectCache.get(job.sha1);
-        job.send(Object.assign({objectCache: true}, item.response));
+        job.send(Object.assign({ objectCache: true }, item.response));
         job.objectcache = true;
         pointOfNoReturn = true;
         fd = fs.openSync(path.join(objectCache.dir, item.response.sha1), "r");
@@ -120,8 +121,7 @@ function getFromCache(job, cb)
         let fileIdx = 0;
         const work = () => {
             // console.log("work", job.sha1);
-            function finish(err)
-            {
+            function finish(err) {
                 fs.closeSync(fd);
                 if (err) {
                     objectCache.remove(job.sha1);
@@ -145,7 +145,12 @@ function getFromCache(job, cb)
                     if (!err) {
                         err = `Short read ${read}/${file.bytes}`;
                     }
-                    console.error(`Failed to read ${file.bytes} from ${path.join(objectCache.dir, item.response.sha1)} got ${read} ${err}`);
+                    console.error(
+                        `Failed to read ${file.bytes} from ${path.join(
+                            objectCache.dir,
+                            item.response.sha1
+                        )} got ${read} ${err}`
+                    );
                     finish(err);
                 } else {
                     // console.log("got good response from file", file);
@@ -163,10 +168,8 @@ function getFromCache(job, cb)
         work();
         return true;
     } catch (err) {
-        if (err.code != "ENOENT")
-            console.error("Got some error here", err);
-        if (fd)
-            fs.closeSync(fd);
+        if (err.code != "ENOENT") console.error("Got some error here", err);
+        if (fd) fs.closeSync(fd);
         if (pointOfNoReturn) {
             job.close();
             return true; // hehe
@@ -178,30 +181,46 @@ function getFromCache(job, cb)
 
 let environments = {};
 const client = new Client(option, common.Version);
-client.on("objectCache", enabled => {
+client.on("objectCache", (enabled) => {
     let objectCacheSize = bytes.parse(option("object-cache-size"));
     if (enabled && objectCacheSize) {
         const objectCacheDir = option("object-cache-dir") || path.join(common.cacheDir(), "objectcache");
 
-        objectCache = new ObjectCache(objectCacheDir, objectCacheSize, option.int("object-cache-purge-size") || objectCacheSize);
-        objectCache.on("added", data => {
-            client.send({ type: "objectCacheAdded", sha1: data.sha1, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
+        objectCache = new ObjectCache(
+            objectCacheDir,
+            objectCacheSize,
+            option.int("object-cache-purge-size") || objectCacheSize
+        );
+        objectCache.on("added", (data) => {
+            client.send({
+                type: "objectCacheAdded",
+                sha1: data.sha1,
+                sourceFile: data.sourceFile,
+                cacheSize: objectCache.size,
+                fileSize: data.fileSize
+            });
         });
 
-        objectCache.on("removed", data => {
-            client.send({ type: "objectCacheRemoved", sha1: data.sha1, sourceFile: data.sourceFile, cacheSize: objectCache.size, fileSize: data.fileSize });
+        objectCache.on("removed", (data) => {
+            client.send({
+                type: "objectCacheRemoved",
+                sha1: data.sha1,
+                sourceFile: data.sourceFile,
+                cacheSize: objectCache.size,
+                fileSize: data.fileSize
+            });
         });
     } else {
         objectCache = undefined;
     }
 });
 
-client.on("fetch_cache_objects", message => {
+client.on("fetch_cache_objects", (message) => {
     console.log("Fetching", message.objects.length, "objects");
     let filesReceived = 0;
     let promises = [];
     const max = Math.min(10, message.objects.length);
-    for (let idx=0; idx<max; ++idx) {
+    for (let idx = 0; idx < max; ++idx) {
         promises.push(Promise.resolve());
     }
     message.objects.forEach((operation, idx) => {
@@ -218,14 +237,13 @@ client.on("fetch_cache_objects", message => {
                     console.error("Got some error from write stream", err);
                     try {
                         fs.unlinkSync(file);
-                    } catch (e) {
-                    }
+                    } catch (e) {}
                     resolve();
                     return;
                 }
                 // response_stream.on("response", function (response) {
-                axios({ method: 'get', url: url, responseType: 'stream' })
-                    .then(response => {
+                axios({ method: "get", url: url, responseType: "stream" })
+                    .then((response) => {
                         expectedSize = parseInt(response.headers["content-length"]);
                         response.data.pipe(stream);
                         response.data.on("error", () => {
@@ -233,7 +251,8 @@ client.on("fetch_cache_objects", message => {
                             stream.destroy("http stream error");
                         });
                         // console
-                    }).catch(err => {
+                    })
+                    .catch((err) => {
                         console.error("Got some error", err);
                         stream.destroy("http error");
                     });
@@ -242,10 +261,17 @@ client.on("fetch_cache_objects", message => {
                     let stat;
                     try {
                         stat = fs.statSync(file);
-                    } catch (err) {
-                    }
+                    } catch (err) {}
                     if (!stat || stat.size != expectedSize) {
-                        console.log("Got wrong size for", file, url, "\nGot", (stat ? stat.size : -1), "expected", expectedSize);
+                        console.log(
+                            "Got wrong size for",
+                            file,
+                            url,
+                            "\nGot",
+                            stat ? stat.size : -1,
+                            "expected",
+                            expectedSize
+                        );
                         try {
                             fs.unlinkSync(file);
                         } catch (err) {
@@ -257,7 +283,7 @@ client.on("fetch_cache_objects", message => {
                     }
                     resolve();
                 });
-                stream.on("error", err => {
+                stream.on("error", (err) => {
                     console.error("Got stream error", err);
                     resolve();
                 });
@@ -275,8 +301,7 @@ client.on("fetch_cache_objects", message => {
 
 const environmentsRoot = path.join(common.cacheDir(), "environments");
 
-function exec(command, options)
-{
+function exec(command, options) {
     return new Promise((resolve, reject) => {
         child_process.exec(command, options, (err, stdout, stderr) => {
             if (stderr) {
@@ -292,42 +317,43 @@ function exec(command, options)
     });
 }
 
-function loadEnvironments()
-{
+function loadEnvironments() {
     return new Promise((resolve, reject) => {
         fs.readdir(environmentsRoot, (err, files) => {
             // console.log("GOT FILES", files);
             if (err) {
                 if (err.code == "ENOENT") {
-                    fs.mkdirp(environmentsRoot).then(() => {
-                        // let user = option("fisk-user");
-                        // let split = environmentsRoot.split("/");
-                        // if (!user) {
-                        //     if (split[0] == "home" || split[0] == "Users") {
-                        //         user = split[1];
-                        //     } else if (split[0] == "usr" && split[1] == "home") {
-                        //         user = split[2];
-                        //     }
-                        // }
-                        // if (!user) {
-                        //     user = process.env["SUDO_USER"];
-                        // }
-                        // if (user) {
-                        //     let p = "";
-                        //     split.forEach(element => {
-                        //         p += "/" + element;
-                        // });
-                        resolve();
-                    }).catch((err) => {
-                        reject(new Error("Failed to create directory " + err.message));
-                    });
+                    fs.mkdirp(environmentsRoot)
+                        .then(() => {
+                            // let user = option("fisk-user");
+                            // let split = environmentsRoot.split("/");
+                            // if (!user) {
+                            //     if (split[0] == "home" || split[0] == "Users") {
+                            //         user = split[1];
+                            //     } else if (split[0] == "usr" && split[1] == "home") {
+                            //         user = split[2];
+                            //     }
+                            // }
+                            // if (!user) {
+                            //     user = process.env["SUDO_USER"];
+                            // }
+                            // if (user) {
+                            //     let p = "";
+                            //     split.forEach(element => {
+                            //         p += "/" + element;
+                            // });
+                            resolve();
+                        })
+                        .catch((err) => {
+                            reject(new Error("Failed to create directory " + err.message));
+                        });
                     return;
                 }
                 reject(err);
             } else {
                 if (files) {
                     let pending = 0;
-                    for (let i=0; i<files.length; ++i) {
+                    for (let i = 0; i < files.length; ++i) {
                         try {
                             let dir = path.join(environmentsRoot, files[i]);
                             let stat = fs.statSync(dir);
@@ -339,8 +365,7 @@ function loadEnvironments()
                             try {
                                 file = fs.readFileSync(path.join(dir, "environment.json"));
                                 env = JSON.parse(fs.readFileSync(path.join(dir, "environment.json")));
-                            } catch (err) {
-                            }
+                            } catch (err) {}
                             if (env && env.hash) {
                                 let vm = new VM(dir, env.hash, option);
                                 ++pending;
@@ -354,8 +379,7 @@ function loadEnvironments()
                                 vm.once("ready", () => {
                                     vm.ready = true;
                                     vm.removeListener("error", errorHandler);
-                                    if (!--pending)
-                                        resolve();
+                                    if (!--pending) resolve();
                                 });
                             } else {
                                 console.log("Removing directory", dir);
@@ -365,8 +389,7 @@ function loadEnvironments()
                             console.error(`Got error loading environment ${files[i]} ${err.stack} ${err.message}`);
                         }
                     }
-                    if (!pending)
-                        resolve();
+                    if (!pending) resolve();
                 }
             }
         });
@@ -374,7 +397,7 @@ function loadEnvironments()
 }
 
 let connectInterval;
-client.on("quit", message => {
+client.on("quit", (message) => {
     console.log(`Server wants us to quit: ${message.code || 0} purge environments: ${message.purgeEnvironments}`);
     if (message.purgeEnvironments) {
         try {
@@ -386,7 +409,7 @@ client.on("quit", message => {
     process.exit(message.code || 0);
 });
 
-client.on("version_mismatch", message => {
+client.on("version_mismatch", (message) => {
     console.log(`We have the wrong version. We have ${client.npmVersion} but we need ${message.required_version}`);
     const versionFile = option("npm-version-file");
     if (versionFile) {
@@ -405,9 +428,9 @@ client.on("clearObjectCache", () => {
     }
 });
 
-client.on("dropEnvironments", message => {
+client.on("dropEnvironments", (message) => {
     console.log(`Dropping environments ${message.environments}`);
-    message.environments.forEach(env => {
+    message.environments.forEach((env) => {
         var environment = environments[env];
         if (environment) {
             const dir = path.join(environmentsRoot, env);
@@ -418,18 +441,15 @@ client.on("dropEnvironments", message => {
     });
 });
 
-client.on("getEnvironments", message => {
+client.on("getEnvironments", (message) => {
     console.log(`Getting environments ${message.environments}`);
     let base = option("scheduler", "localhost:8097");
     let idx = base.indexOf("://");
-    if (idx != -1)
-        base = base.substr(idx + 3);
+    if (idx != -1) base = base.substr(idx + 3);
     base = "http://" + base;
-    if (!/:[0-9]+$/.exec(base))
-        base += ":8097";
+    if (!/:[0-9]+$/.exec(base)) base += ":8097";
     base += "/environment/";
-    function work()
-    {
+    function work() {
         if (!message.environments.length) {
             let restart = option("restart-on-new-environments");
             if (!restart) {
@@ -450,8 +470,7 @@ client.on("getEnvironments", message => {
         const dir = path.join(environmentsRoot, env);
         try {
             fs.removeSync(dir);
-        } catch (err) {
-        }
+        } catch (err) {}
         if (!fs.mkdirpSync(dir)) {
             console.error("Can't create environment directory for builder: " + dir);
             setTimeout(work, 0);
@@ -462,19 +481,21 @@ client.on("getEnvironments", message => {
         let stream = fs.createWriteStream(file);
         stream.on("finish", () => {
             console.log("Got finish", env);
-            exec("tar xf '" + file + "'", { cwd: dir }).
-                then(() => {
+            exec("tar xf '" + file + "'", { cwd: dir })
+                .then(() => {
                     const json = path.join(dir, "environment.json");
                     console.log("Writing json file", json);
                     return fs.writeFile(json, JSON.stringify({ hash: env, created: new Date().toString() }));
-                }).then(() => {
+                })
+                .then(() => {
                     console.log(`Unlink ${file} ${env}`);
                     return fs.unlink(file);
-                }).then(() => {
+                })
+                .then(() => {
                     let vm = new VM(dir, env, option);
                     return new Promise((resolve, reject) => {
                         let done = false;
-                        vm.on("error", err => {
+                        vm.on("error", (err) => {
                             if (!done) {
                                 reject(err);
                             }
@@ -484,10 +505,12 @@ client.on("getEnvironments", message => {
                             resolve(vm);
                         });
                     });
-                }).then(vm => {
+                })
+                .then((vm) => {
                     environments[env] = vm;
                     setTimeout(work, 0);
-                }).catch((err) => {
+                })
+                .catch((err) => {
                     console.error("Got failure setting up environment", err);
                     try {
                         fs.removeSync(dir);
@@ -497,11 +520,12 @@ client.on("getEnvironments", message => {
                     setTimeout(work, 0);
                 });
         });
-        axios({ method: 'get', url: url, responseType: 'stream' })
-            .then(response => {
+        axios({ method: "get", url: url, responseType: "stream" })
+            .then((response) => {
                 response.data.pipe(stream);
                 // console
-            }).catch(error => {
+            })
+            .catch((error) => {
                 console.log("Got error from request", error);
                 if (stream.destroy instanceof Function) {
                     stream.destroy();
@@ -510,8 +534,7 @@ client.on("getEnvironments", message => {
                 }
                 try {
                     fs.removeSync(dir);
-                } catch (err) {
-                }
+                } catch (err) {}
                 if (!fs.mkdirpSync(dir)) {
                     console.error("Can't create environment directory for builder: " + dir);
                     setTimeout(work, 0);
@@ -521,7 +544,7 @@ client.on("getEnvironments", message => {
     work();
 });
 
-client.on("requestEnvironments", message => {
+client.on("requestEnvironments", (message) => {
     console.log("scheduler wants us to inform of current environments", Object.keys(environments));
     client.send("environments", { environments: Object.keys(environments) });
 });
@@ -533,22 +556,24 @@ client.on("connect", () => {
         clearInterval(connectInterval);
         connectInterval = undefined;
     }
-    if (!load.running)
-        load.start(option("loadInterval", 1000));
+    if (!load.running) load.start(option("loadInterval", 1000));
     if (objectCache)
-        client.send({ type: "objectCache", sha1s: objectCache.syncData(), maxSize: objectCache.maxSize, cacheSize: objectCache.size });
+        client.send({
+            type: "objectCache",
+            sha1s: objectCache.syncData(),
+            maxSize: objectCache.maxSize,
+            cacheSize: objectCache.size
+        });
 });
 
-client.on("error", err => {
+client.on("error", (err) => {
     console.error("client error", err);
-    if (load.running)
-        load.stop();
+    if (load.running) load.stop();
 });
 
 client.on("close", () => {
     console.log("client closed");
-    if (load.running)
-        load.stop();
+    if (load.running) load.stop();
     if (!connectInterval) {
         connectInterval = setInterval(() => {
             console.log("Reconnecting...");
@@ -557,17 +582,17 @@ client.on("close", () => {
     }
 });
 
-
 const server = new Server(option, common.Version);
 let jobQueue = [];
 
 server.on("headers", (headers, req) => {
     // console.log("request is", req.headers);
-    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) == "exists"));
+    let wait =
+        jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) === "exists");
     headers.push(`x-fisk-wait: ${wait}`);
 });
 
-server.on("listen", app => {
+server.on("listen", (app) => {
     function setDebug(enabled) {
         debug = enabled;
         for (var i in environments) {
@@ -596,7 +621,7 @@ server.on("listen", app => {
         if (urlPath == "info") {
             res.send(JSON.stringify(objectCache.info(req.query || {}), null, 4));
             return;
-        };
+        }
         let data = objectCache.get(urlPath, true);
         if (!data) {
             res.sendStatus(404);
@@ -607,7 +632,7 @@ server.on("listen", app => {
             const stat = fs.statSync(file);
             res.set("Content-Length", stat.size);
             const rstream = fs.createReadStream(file);
-            rstream.on("error", err => {
+            rstream.on("error", (err) => {
                 console.error("Got read stream error for", file, err);
                 rstream.close();
             });
@@ -619,10 +644,9 @@ server.on("listen", app => {
     });
 });
 
-function startPending()
-{
+function startPending() {
     // console.log(`startPending called ${jobQueue.length}`);
-    for (let idx=0; idx<jobQueue.length; ++idx) {
+    for (let idx = 0; idx < jobQueue.length; ++idx) {
         let jj = jobQueue[idx];
         if (!jj.op && !jj.objectCache) {
             // console.log("starting jj", jj.id);
@@ -632,7 +656,7 @@ function startPending()
     }
 }
 
-server.on("job", job => {
+server.on("job", (job) => {
     restartShutdownTimer();
     let vm = environments[job.hash];
     if (!vm) {
@@ -655,41 +679,40 @@ server.on("job", job => {
         buffers: [],
         stdout: "",
         stderr: "",
-        start: function() {
+        start: function () {
             let job = this.job;
-            if (j.aborted)
-                return;
-            if (getFromCache(job, err => {
-                if (j.aborted)
-                    return;
-                if (err) {
-                    console.error("cache failed, let the client handle doing it itself");
-                    job.close();
-                } else {
-                    // console.log("GOT STUFF", job);
-                    let info = {
-                        type: "cacheHit",
-                        client: {
-                            hostname: job.hostname,
-                            ip: job.ip,
-                            name: job.name,
-                            user: job.user
-                        },
-                        sourceFile: job.sourceFile,
-                        sha1: job.sha1,
-                        id: job.id
-                    };
-                    // console.log("sending cachehit", info);
-                    client.send(info);
+            if (j.aborted) return;
+            if (
+                getFromCache(job, (err) => {
+                    if (j.aborted) return;
+                    if (err) {
+                        console.error("cache failed, let the client handle doing it itself");
+                        job.close();
+                    } else {
+                        // console.log("GOT STUFF", job);
+                        let info = {
+                            type: "cacheHit",
+                            client: {
+                                hostname: job.hostname,
+                                ip: job.ip,
+                                name: job.name,
+                                user: job.user
+                            },
+                            sourceFile: job.sourceFile,
+                            sha1: job.sha1,
+                            id: job.id
+                        };
+                        // console.log("sending cachehit", info);
+                        client.send(info);
 
-                    console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
-                }
-                j.done = true;
-                let idx = jobQueue.indexOf(j);
-                if (idx != -1)
-                    jobQueue.splice(idx, 1);
-                startPending();
-            })) {
+                        console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
+                    }
+                    j.done = true;
+                    let idx = jobQueue.indexOf(j);
+                    if (idx != -1) jobQueue.splice(idx, 1);
+                    startPending();
+                })
+            ) {
                 j.objectCache = true;
                 return;
             }
@@ -713,20 +736,36 @@ server.on("job", job => {
 
             console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, "wait", job.wait);
             j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
-            j.buffers.forEach(data => j.op.feed(data.data, data.last));
+            j.buffers.forEach((data) => j.op.feed(data.data, data.last));
             if (job.wait) {
                 job.send("resume", {});
             }
             delete j.buffers;
-            j.op.on("stdout", data => { j.stdout += data; }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
-            j.op.on("stderr", data => { j.stderr += data; });
-            j.op.on("finished", event => {
+            j.op.on("stdout", (data) => {
+                j.stdout += data;
+            }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
+            j.op.on("stderr", (data) => {
+                j.stderr += data;
+            });
+            j.op.on("finished", (event) => {
                 j.done = true;
-                if (j.aborted)
-                    return;
+                if (j.aborted) return;
                 const end = Date.now();
                 let idx = jobQueue.indexOf(j);
-                console.log("Job finished", j.id, job.sourceFile, "for", job.ip, job.name, "exitCode", event.exitCode, "error", event.error, "in", (end - jobStartTime) + "ms");
+                console.log(
+                    "Job finished",
+                    j.id,
+                    job.sourceFile,
+                    "for",
+                    job.ip,
+                    job.name,
+                    "exitCode",
+                    event.exitCode,
+                    "error",
+                    event.error,
+                    "in",
+                    end - jobStartTime + "ms"
+                );
                 if (idx != -1) {
                     jobQueue.splice(idx, 1);
                 } else {
@@ -735,30 +774,39 @@ server.on("job", job => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
-                let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
+                let contents = event.files.map((f) => {
+                    return { contents: fs.readFileSync(f.absolute), path: f.path };
+                });
                 let response = {
                     type: "response",
-                    index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
+                    index: contents.map((item) => {
+                        return { path: item.path, bytes: item.contents.length };
+                    }),
                     success: event.success,
                     exitCode: event.exitCode,
                     sha1: job.sha1,
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
-                if (event.error)
-                    response.error = event.error;
+                if (event.error) response.error = event.error;
                 if (debug) {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }
                 job.send(response);
-                if (response.exitCode === 0 && event.success && objectCache && response.sha1 && objectCache.state(response.sha1) == "none") {
+                if (
+                    response.exitCode === 0 &&
+                    event.success &&
+                    objectCache &&
+                    response.sha1 &&
+                    objectCache.state(response.sha1) == "none"
+                ) {
                     response.sourceFile = job.sourceFile;
                     response.commandLine = job.commandLine;
                     response.environment = job.hash;
                     objectCache.add(response, contents);
                 }
 
-                for (let i=0; i<contents.length; ++i) {
+                for (let i = 0; i < contents.length; ++i) {
                     job.send(contents[i].contents);
                 }
                 // job.close();
@@ -768,24 +816,24 @@ server.on("job", job => {
                         id: j.id,
                         cppSize: event.cppSize,
                         compileDuration: event.compileDuration,
-                        compileSpeed: (event.cppSize / event.compileDuration),
+                        compileSpeed: event.cppSize / event.compileDuration,
                         uploadDuration: uploadDuration,
-                        uploadSpeed: (event.cppSize / uploadDuration)
+                        uploadSpeed: event.cppSize / uploadDuration
                     });
                 } else {
                     client.send("jobAborted", {
                         id: j.id,
                         cppSize: event.cppSize,
                         compileDuration: event.compileDuration,
-                        compileSpeed: (event.cppSize / event.compileDuration),
+                        compileSpeed: event.cppSize / event.compileDuration,
                         uploadDuration: uploadDuration,
-                        uploadSpeed: (event.cppSize / uploadDuration)
+                        uploadSpeed: event.cppSize / uploadDuration
                     });
                 }
                 startPending();
             });
         },
-        cancel: function() {
+        cancel: function () {
             if (!j.done && j.op) {
                 j.done = true;
                 j.op.cancel();
@@ -802,7 +850,7 @@ server.on("job", job => {
         }
     }, 5000);
 
-    job.on("error", err => {
+    job.on("error", (err) => {
         job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
         console.error("got error from job", job.webSocketError);
         j.done = true;
@@ -815,16 +863,14 @@ server.on("job", job => {
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
-            if (j.started)
-                client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
+            if (j.started) client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
             startPending();
         }
     });
 
-    job.on("data", data => {
+    job.on("data", (data) => {
         // console.log("got data", this.id, data.last, typeof j.op);
-        if (data.last)
-            uploadDuration = Date.now() - jobStartTime;
+        if (data.last) uploadDuration = Date.now() - jobStartTime;
         if (!j.op) {
             j.buffers.push(data);
             console.log("buffering...", j.buffers.length);
@@ -847,21 +893,22 @@ server.on("error", (err) => {
 });
 
 function start() {
-    loadEnvironments().then(() => {
-        console.log(`Loaded ${Object.keys(environments).length} environments from ${environmentsRoot}`);
-        console.log("environments", Object.keys(environments));
-        client.connect(Object.keys(environments));
-        server.listen();
-    }).catch((err) => {
-        console.error(`Failed to initialize ${err.message}`);
-        setTimeout(start, 1000);
-    });
+    loadEnvironments()
+        .then(() => {
+            console.log(`Loaded ${Object.keys(environments).length} environments from ${environmentsRoot}`);
+            console.log("environments", Object.keys(environments));
+            client.connect(Object.keys(environments));
+            server.listen();
+        })
+        .catch((err) => {
+            console.error(`Failed to initialize ${err.message}`);
+            setTimeout(start, 1000);
+        });
 }
-load.on("data", measure => {
+load.on("data", (measure) => {
     // console.log("Got load", measure);
     try {
         client.send("load", { measure: measure });
-    } catch (err) {
-    }
+    } catch (err) {}
 });
 start();

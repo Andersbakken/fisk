@@ -10,3 +10,11 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
 
 add_subdirectory(3rdparty)
 add_subdirectory(client)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/
+    COMMENT "Building typescript"
+    COMMAND npm run build)
+
+add_custom_target(graph ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js)

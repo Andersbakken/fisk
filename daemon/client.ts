@@ -1,8 +1,8 @@
-const EventEmitter = require("events");
-const WebSocket = require("ws");
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
+import EventEmitter from "events";
+import WebSocket from "ws";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 class Client extends EventEmitter {
     constructor(option, configVersion) {
@@ -10,21 +10,24 @@ class Client extends EventEmitter {
 
         this.configVersion = configVersion;
         this.scheduler = option("scheduler", "ws://localhost:8097");
-        if (this.scheduler.indexOf('://') == -1)
+        if (this.scheduler.indexOf("://") === -1) {
             this.scheduler = "ws://" + this.scheduler;
-        if (!/:[0-9]+$/.exec(this.scheduler))
+        }
+        if (!/:[0-9]+$/.exec(this.scheduler)) {
             this.scheduler += ":8097";
+        }
         this.hostname = option("hostname");
         this.name = option("name");
         try {
             this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
         } catch (err) {
+            /* */
         }
         console.log("this is our npm version", this.npmVersion);
         if (!this.name) {
             if (this.hostname) {
                 this.name = this.hostname;
-            } else  {
+            } else {
                 this.name = os.hostname();
             }
         }
@@ -34,34 +37,36 @@ class Client extends EventEmitter {
         const url = `${this.scheduler}/daemon`;
         console.log("connecting to", url);
 
-        let headers = {
+        const headers = {
             "x-fisk-port": this.serverPort,
             "x-fisk-config-version": this.configVersion,
             "x-fisk-daemon-name": this.name,
             "x-fisk-npm-version": this.npmVersion
         };
-        if (this.hostname)
+        if (this.hostname) {
             headers["x-fisk-builder-hostname"] = this.hostname;
+        }
 
         this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {
             this.emit("connect");
         });
-        this.ws.on("error", err => {
+        this.ws.on("error", (err) => {
             console.error("client websocket error", err.message);
         });
-        this.ws.on("message", msg => {
-            const error = msg => {
-                this.ws.send(`{"error": "${msg}"}`);
-                this.ws.close();
-                this.emit("error", msg);
-            };
+        this.ws.on("message", (msg) => {
+            // const error = (msg) => {
+            //     this.ws.send(`{"error": "${msg}"}`);
+            //     this.ws.close();
+            //     this.emit("error", msg);
+            // };
             console.log("Got message from scheduler", msg);
         });
         this.ws.on("close", () => {
             this.emit("close");
-            if (this.ws)
+            if (this.ws) {
                 this.ws.removeAllListeners();
+            }
             this.ws = undefined;
         });
     }
