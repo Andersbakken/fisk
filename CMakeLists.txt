@@ -12,7 +12,7 @@ add_subdirectory(3rdparty)
 add_subdirectory(client)
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js
+    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-builder.js
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/
     COMMENT "Building typescript"
     COMMAND npm run build)
