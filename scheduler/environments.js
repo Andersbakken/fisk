@@ -382,4 +382,4 @@ const environments = {
     }
 };
 
-module.exports = environments;
+export { environments };

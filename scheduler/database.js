@@ -141,4 +141,4 @@ const db = new Database("fisk.2");
 //     console.error("got err", err);
 // });
 
-module.exports = Database;
+export { Database };

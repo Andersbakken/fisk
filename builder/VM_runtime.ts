@@ -1,14 +1,19 @@
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const posix = require('posix');
-const Compile = require('./compile');
+import { Compile } from "./compile";
+import fs from "fs";
+import minimist from "minimist";
+import os from "os";
+import path from "path";
+import process from "process";
 
-const argv = require('minimist')(process.argv.slice(2));
+const argv: minimist.ParsedArgs = minimist(process.argv.slice(2));
 
-function send(message) {
+function send(message: string) {
     try {
-        process.send(message);
+        if (process.send) {
+            process.send(message);
+        } else {
+            throw new Error("No send");
+        }
     } catch (err) {
         console.error(`Couldn't send message ${message.type}. Going down`);
         process.exit();
@@ -59,26 +64,26 @@ process.on("error", error => {
     process.exit();
 });
 
-let libDirs = [];
+const libDirs: string[] = [];
 const mac = os.type() === "Darwin";
 
-function isLibrary(file)
-{
-    if (file == "ld.so.conf || file == ld.so.cache")
-        return false;
+function isLibrary(file: string) {
+    if (file === "ld.so.conf" || file === "ld.so.cache") {
+return false;
+}
     const suffix = path.extname(file);
-    if (mac)
-        return suffix == ".dylib";
-
-    // console.log("got file", suffix, file);
-    if (suffix == ".so") {
-        return true;
-    }
-    return file.indexOf(".so.") != -1;
+    if (mac) {
+return suffix === ".dylib";
 }
 
-function findLibraries(dir)
-{
+    // console.log("got file", suffix, file);
+    if (suffix === ".so") {
+        return true;
+    }
+    return file.indexOf(".so.") !== -1;
+}
+
+function findLibraries(dir) {
     const files = fs.readdirSync(dir);
     // console.log("findLibraries", dir, files.length);
     let found = false;
@@ -102,8 +107,9 @@ function findLibraries(dir)
 }
 
 findLibraries("/");
-if (argv.debug)
-    console.log("Got lib directories", argv.root, libDirs);
+if (argv.debug) {
+console.log("Got lib directories", argv.root, libDirs);
+}
 if (libDirs.length) {
     process.env[mac ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH"] = libDirs.join(":");
 }
@@ -116,7 +122,7 @@ setTimeout(() => { // hack
     }
 }, 1000);
 
-let compiles = {};
+const compiles = {};
 let destroying = false;
 
 process.on('message', msg => {
@@ -132,22 +138,24 @@ process.on('message', msg => {
         if (msg.debug) {
             argv.debug = true;
         } else {
-            delete argv["debug"];
+            delete argv.debug;
         }
         console.log("set debug to", msg.debug, "for", argv.root);
         break;
-    case 'cancel':
-        let c = compiles[msg.id];
-        if (c)
-            c.kill();
+    case 'cancel': {
+        const c = compiles[msg.id];
+        if (c) {
+c.kill();
+}
         break;
+    }
     case 'compile':
         try {
             // console.log("compiling for );
             if (argv.debug) {
                 console.log("Creating new compile", msg.commandLine, msg.argv0, msg.dir);
             }
-            let compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug);
+            const compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug);
             // console.log("running thing", msg.commandLine);
             compile.on('stdout', data => send({ type: 'compileStdOut', id: msg.id, data: data }));
             compile.on('stderr', data => send({ type: 'compileStdErr', id: msg.id, data: data }));
@@ -158,8 +166,9 @@ process.on('message', msg => {
                 } else {
                     send({type: 'compileFinished', success: true, id: msg.id, files: event.files, exitCode: event.exitCode, sourceFile: event.sourceFile });
                 }
-                if (destroying && !compiles.length)
-                    process.exit();
+                if (destroying && !compiles.length) {
+process.exit();
+}
             });
             compiles[msg.id] = compile;
         } catch (err) {

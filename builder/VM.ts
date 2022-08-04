@@ -1,19 +1,27 @@
+import { CompileJob } from "./compilejob";
+import { options } from "@jhanssen/options";
+import { quitOnError } from "./quit-on-error";
 import EventEmitter from "events";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
 
-let quitOnError: boolean;
-
 class VM extends EventEmitter {
-    constructor(root: string, hash: string, option:  ) {
+    private root: string;
+    private hash: string;
+    private compiles: Record<number, CompileJob>;
+    private destroying: boolean;
+    private keepCompiles: boolean;
+    private child: child_process.ChildProcess;
+
+    constructor(root: string, hash: string, option: typeof options) {
         super();
-        quitOnError = require("./quit-on-error")(option);
+        quitOnError(option);
         this.root = root;
         this.hash = hash;
         this.compiles = {};
         this.destroying = false;
-        this.keepCompiles = option("keep-compiles") || false;
+        this.keepCompiles = Boolean(option("keep-compiles"));
 
         fs.remove(path.join(root, "compiles"));
 
@@ -28,7 +36,7 @@ class VM extends EventEmitter {
 
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         let gotReady = false;
-        this.child.on("message", (msg) => {
+        this.child.on("message", (msg: unknown) => {
             // console.log("Got message", msg);
             switch (msg.type) {
                 case "ready":
@@ -74,7 +82,7 @@ class VM extends EventEmitter {
         });
     }
 
-    compileFinished(msg) {
+    compileFinished(msg: unknown): void {
         const compile = this.compiles[msg.id];
         if (!compile) {
             return;
@@ -103,7 +111,7 @@ class VM extends EventEmitter {
         delete this.compiles[msg.id];
     }
 
-    destroy() {
+    destroy(): void {
         this.destroying = true;
         this.child.send({ type: "destroy" }, (err) => {
             if (err) {
@@ -113,16 +121,17 @@ class VM extends EventEmitter {
         });
     }
 
-    startCompile(commandLine, argv0, id) {
+    startCompile(commandLine: string, argv0: string, id: number):void {
         const compile = new CompileJob(commandLine, argv0, id, this);
         this.compiles[compile.id] = compile;
         // console.log("startCompile " + compile.id);
         return compile;
     }
 
-    setDebug(debug) {
+    setDebug(debug: boolean): void {
         this.child.send({ type: "setDebug", debug: debug });
     }
 }
 
 export { VM };
+

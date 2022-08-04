@@ -1,23 +1,21 @@
 import { Common } from "../common";
 import { Compile } from "./compile";
-import { Option } from "@jhanssen/options";
+import { options } from "@jhanssen/options";
 import EventEmitter from "events";
 import fs from "fs-extra";
 import net, { Socket } from "net";
 import path from "path";
 
-type Opts = (key: string, defaultValue?: Option) => Option;
-
 class Server extends EventEmitter {
     private debug: boolean;
     private server?: net.Server;
-    private option: Opts;
+    private option: typeof options;
     private _connections: Record<number, Socket>;
     private _connectionId: number;
 
     public file: string;
 
-    constructor(option: Opts, common: Common) {
+    constructor(option: typeof options, common: Common) {
         super();
         this.debug = Boolean(option("debug"));
         this.file = String(option("socket", path.join(common.cacheDir(), "socket")));

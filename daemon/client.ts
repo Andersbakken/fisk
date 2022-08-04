@@ -1,15 +1,26 @@
+import { options } from "@jhanssen/options";
 import EventEmitter from "events";
 import WebSocket from "ws";
 import fs from "fs";
 import os from "os";
 import path from "path";
 
+type Message = { type: string; message: unknown };
+
 class Client extends EventEmitter {
-    constructor(option, configVersion) {
+    private configVersion: string;
+    private scheduler: string;
+    private hostname: string;
+    private name: string;
+    private npmVersion: string;
+    private serverPort?: number;
+    private ws?: WebSocket;
+
+    constructor(option: typeof options, configVersion: string) {
         super();
 
         this.configVersion = configVersion;
-        this.scheduler = option("scheduler", "ws://localhost:8097");
+        this.scheduler = String(option("scheduler", "ws://localhost:8097"));
         if (this.scheduler.indexOf("://") === -1) {
             this.scheduler = "ws://" + this.scheduler;
         }
@@ -19,9 +30,10 @@ class Client extends EventEmitter {
         this.hostname = option("hostname");
         this.name = option("name");
         try {
-            this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+            this.npmVersion =
+                JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version || "";
         } catch (err) {
-            /* */
+            this.npmVersion = "";
         }
         console.log("this is our npm version", this.npmVersion);
         if (!this.name) {
@@ -33,11 +45,11 @@ class Client extends EventEmitter {
         }
     }
 
-    connect() {
+    connect(): void {
         const url = `${this.scheduler}/daemon`;
         console.log("connecting to", url);
 
-        const headers = {
+        const headers: Record<string, string | number> = {
             "x-fisk-port": this.serverPort,
             "x-fisk-config-version": this.configVersion,
             "x-fisk-daemon-name": this.name,
@@ -71,14 +83,14 @@ class Client extends EventEmitter {
         });
     }
 
-    sendBinary(blob) {
+    sendBinary(blob: Buffer): void {
         try {
             this.ws.send(blob);
         } catch (err) {
             this.emit("err", err.toString());
         }
     }
-    send(type, msg) {
+    send(type: string | Message, msg: string | Message): void {
         if (!this.ws) {
             this.emit("error", "No connected websocket");
             return;
@@ -102,4 +114,4 @@ class Client extends EventEmitter {
     }
 }
 
-module.exports = Client;
+export { Client };

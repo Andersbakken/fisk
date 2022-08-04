@@ -1,10 +1,8 @@
 import { ClientBuffer } from "./clientbuffer";
 import { Constants } from "./constants";
-import { Option } from "@jhanssen/options";
 import { Socket } from "net";
+import { options } from "@jhanssen/options";
 import EventEmitter from "events";
-
-type Opts = (key: string, defaultValue?: Option) => Option;
 
 class Compile extends EventEmitter {
     private debug: boolean;
@@ -15,7 +13,7 @@ class Compile extends EventEmitter {
 
     public id: number;
 
-    constructor(conn: Socket, id: number, option: Opts) {
+    constructor(conn: Socket, id: number, option: typeof options) {
         super();
         this.debug = Boolean(option("debug"));
         this.id = id;

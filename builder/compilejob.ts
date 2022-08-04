@@ -2,6 +2,16 @@ import { VM } from "./VM";
 import EventEmitter from "events";
 
 class CompileJob extends EventEmitter {
+    private vm: VM;
+    private commandLine: string;
+    private argv0: string;
+    private id: number;
+    private dir: string;
+    private vmDir: string;
+    private cppSize: number;
+    private fd: number;
+    private startCompile?: number;
+
     constructor(commandLine: string, argv0: string, id: number, vm: VM) {
         super();
         this.vm = vm;
@@ -16,7 +26,7 @@ class CompileJob extends EventEmitter {
         this.startCompile = undefined;
     }
 
-    sendCallback(error) {
+    sendCallback(error?: Error): void {
         if (error) {
             console.error("Got send error for", this.vmDir, this.id, this.commandLine);
             this.vm.compileFinished({
@@ -30,7 +40,7 @@ class CompileJob extends EventEmitter {
         }
     }
 
-    feed(data, last) {
+    feed(data: Buffer, last: boolean): void {
         fs.writeSync(this.fd, data);
         this.cppSize += data.length;
         if (last) {
@@ -44,7 +54,7 @@ class CompileJob extends EventEmitter {
         }
     }
 
-    cancel() {
+    cancel(): void {
         this.vm.child.send({ type: "cancel", id: this.id }, this.sendCallback.bind(this));
     }
 }

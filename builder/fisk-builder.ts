@@ -1,60 +1,73 @@
 #!/usr/bin/env node
 
-const option = require("@jhanssen/options")({
+import { Client } from "./client";
+import { Contents } from "./Contents";
+import { Job } from "./server";
+import { Load } from "./load";
+import { ObjectCache } from "./objectcache";
+import { Response } from "./response";
+import { Server } from "./server";
+import { VM } from "./VM";
+import { quitOnError } from "./quit-on-error";
+import Common from "../common";
+import Url from "url";
+import assert from "assert";
+import axios from "axios";
+import bytes from "bytes";
+import child_process from "child_process";
+import createOptions, { options } from "@jhanssen/options";
+import fs from "fs-extra";
+import os from "os";
+import parse_duration from "parse-duration";
+import path from "path";
+import ws from "ws";
+
+const option = createOptions({
     prefix: "fisk/builder",
-    applicationPath: false,
+    noApplicationPath: true,
     additionalFiles: ["fisk/builder.conf.override"]
 });
 
-const axios = require("axios");
-const ws = require("ws");
-const Url = require("url");
-const common = require("../common")(option);
-const Server = require("./server");
-const Client = require("./client");
-const Compile = require("./compile");
-const bytes = require("bytes");
-const parse_duration = require("parse-duration");
-const fs = require("fs-extra");
-const path = require("path");
-const os = require("os");
-const child_process = require("child_process");
-const VM = require("./VM");
-const load = require("./load");
-const ObjectCache = require("./objectcache");
-const quitOnError = require("./quit-on-error")(option);
+const common = Common(options);
 
 if (process.getuid() !== 0) {
     console.error("fisk builder needs to run as root to be able to chroot");
     process.exit(1);
 }
 
-process.on("unhandledRejection", (reason, p) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
+process.on("unhandledRejection", (reason: unknown, p: Promise<unknown>) => {
+    console.log("Unhandled Rejection at: Promise", p, "reason:", reason);
     if (client) {
-        client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
+        client.send("log", { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason}` });
     }
-    quitOnError();
+    quitOnError(option);
 });
 
 process.on("uncaughtException", (err) => {
     console.error("Uncaught exception", err);
-    if (client) client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
-    quitOnError();
+    if (client) {
+        client.send("log", { message: `Uncaught exception ${err.toString()} ${err.stack}` });
+    }
+    quitOnError(option);
 });
 
 let debug = option("debug");
 
-let restartOnInactivity = option("restart-on-inactivity");
-if (typeof restartOnInactivity === "string") restartOnInactivity = parse_duration(restartOnInactivity);
+let restartOnInactivity = option.int("restart-on-inactivity");
+if (typeof restartOnInactivity === "string") {
+    restartOnInactivity = parse_duration(restartOnInactivity);
+}
 
-let shutdownTimer;
+function shutdownNow() {
+    console.log("shutting down now due to inactivity");
+    // child_process.exec("shutdown -h now");
+}
+
+let shutdownTimer: NodeJS.Timeout | undefined;
 function restartShutdownTimer() {
     if (restartOnInactivity > 0) {
-        if (shutdownTimer) clearTimeout(shutdownTimer);
-        function shutdownNow() {
-            console.log("shutting down now due to inactivity");
-            // child_process.exec("shutdown -h now");
+        if (shutdownTimer) {
+            clearTimeout(shutdownTimer);
         }
         if (restartOnInactivity <= 10000) {
             shutdownTimer = setTimeout(shutdownNow, restartOnInactivity);
@@ -67,39 +80,44 @@ function restartShutdownTimer() {
     }
 }
 
-if (restartOnInactivity) restartShutdownTimer();
+if (restartOnInactivity) {
+    restartShutdownTimer();
+}
 
-let ports = ("" + option("ports", ""))
+const ports = String(option("ports", ""))
     .split(",")
     .filter((x) => x)
     .map((x) => parseInt(x));
 if (ports.length) {
-    var name = option("name") || option("hostname") || os.hostname();
-    var children = ports.map((port) => {
-        let ret = child_process.fork(__filename, [
+    const name = option("name") || option("hostname") || os.hostname();
+    const children = ports.map((port) => {
+        const ret = child_process.fork(__filename, [
             "--port",
-            port,
+            String(port),
             "--name",
             name + "_" + port,
             "--cache-dir",
-            path.join(common.cacheDir(), "" + port),
+            path.join(common.cacheDir(), String(port)),
             "--slots",
-            Math.round(os.cpus().length / ports.length)
+            String(Math.round(os.cpus().length / ports.length))
         ]);
         // ret.stdout.on("data", output => console.log(port, output));
         // ret.stderr.on("data", output => console.error(port, output));
         return ret;
     });
+    console.log("Started", children.length, "children");
     process.exit();
 }
 
-let objectCache;
+let objectCache: ObjectCache | undefined;
 
-function getFromCache(job, cb) {
+function getFromCache(job: Job, cb: (err?: Error | string) => void) {
     // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
     // if (objectCache)
     //     console.log("objectCache", job.sha1, objectCache.state(job.sha1), objectCache.keys);
-    if (!objectCache || objectCache.state(job.sha1) != "exists") return false;
+    if (!objectCache || objectCache.state(job.sha1) !== "exists") {
+        return false;
+    }
     const file = path.join(objectCache.dir, job.sha1);
     if (!fs.existsSync(file)) {
         console.log("The file is not even there", file);
@@ -109,9 +127,12 @@ function getFromCache(job, cb) {
     // console.log("we have it cached", job.sha1);
 
     let pointOfNoReturn = false;
-    let fd;
+    let fd: number | undefined;
     try {
-        let item = objectCache.get(job.sha1);
+        const item = objectCache.get(job.sha1);
+        if (!item) {
+            throw new Error("No item");
+        }
         job.send(Object.assign({ objectCache: true }, item.response));
         job.objectcache = true;
         pointOfNoReturn = true;
@@ -121,12 +142,17 @@ function getFromCache(job, cb) {
         let fileIdx = 0;
         const work = () => {
             // console.log("work", job.sha1);
-            function finish(err) {
-                fs.closeSync(fd);
+            function finish(err?: Error | string) {
+                if (typeof fd === "number") {
+                    fs.closeSync(fd);
+                }
                 if (err) {
+                    assert(objectCache);
                     objectCache.remove(job.sha1);
+
                     job.close();
                 } else {
+                    assert(item);
                     ++item.cacheHits;
                 }
 
@@ -139,12 +165,16 @@ function getFromCache(job, cb) {
             }
             const buffer = Buffer.allocUnsafe(file.bytes);
             // console.log("reading from", file, path.join(objectCache.dir, item.response.sha1), pos);
-            fs.read(fd, buffer, 0, file.bytes, pos, (err, read) => {
+            if (fd === undefined) {
+                throw new Error("No fd?");
+            }
+            fs.read(fd, buffer, 0, file.bytes, pos, (err: string | Error | undefined, read: number) => {
                 // console.log("GOT READ RESPONSE", file, fileIdx, err, read);
-                if (err || read != file.bytes) {
+                if (err || read !== file.bytes) {
                     if (!err) {
                         err = `Short read ${read}/${file.bytes}`;
                     }
+                    assert(objectCache);
                     console.error(
                         `Failed to read ${file.bytes} from ${path.join(
                             objectCache.dir,
@@ -168,8 +198,12 @@ function getFromCache(job, cb) {
         work();
         return true;
     } catch (err) {
-        if (err.code != "ENOENT") console.error("Got some error here", err);
-        if (fd) fs.closeSync(fd);
+        if (err instanceof Error && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+            console.error("Got some error here", err);
+        }
+        if (fd) {
+            fs.closeSync(fd);
+        }
         if (pointOfNoReturn) {
             job.close();
             return true; // hehe
@@ -179,12 +213,12 @@ function getFromCache(job, cb) {
     }
 }
 
-let environments = {};
+const environments = {};
 const client = new Client(option, common.Version);
 client.on("objectCache", (enabled) => {
-    let objectCacheSize = bytes.parse(option("object-cache-size"));
+    const objectCacheSize = bytes.parse(String(option("object-cache-size")));
     if (enabled && objectCacheSize) {
-        const objectCacheDir = option("object-cache-dir") || path.join(common.cacheDir(), "objectcache");
+        const objectCacheDir = String(option("object-cache-dir")) || path.join(common.cacheDir(), "objectcache");
 
         objectCache = new ObjectCache(
             objectCacheDir,
@@ -192,6 +226,7 @@ client.on("objectCache", (enabled) => {
             option.int("object-cache-purge-size") || objectCacheSize
         );
         objectCache.on("added", (data) => {
+            assert(objectCache);
             client.send({
                 type: "objectCacheAdded",
                 sha1: data.sha1,
@@ -202,6 +237,7 @@ client.on("objectCache", (enabled) => {
         });
 
         objectCache.on("removed", (data) => {
+            assert(objectCache);
             client.send({
                 type: "objectCacheRemoved",
                 sha1: data.sha1,
@@ -218,26 +254,29 @@ client.on("objectCache", (enabled) => {
 client.on("fetch_cache_objects", (message) => {
     console.log("Fetching", message.objects.length, "objects");
     let filesReceived = 0;
-    let promises = [];
+    const promises: Promise<void>[] = [];
     const max = Math.min(10, message.objects.length);
     for (let idx = 0; idx < max; ++idx) {
         promises.push(Promise.resolve());
     }
-    message.objects.forEach((operation, idx) => {
+    message.objects.forEach((operation: Promise<void>, idx: number) => {
         promises[idx % promises.length] = promises[idx % promises.length].then(() => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
+                assert(objectCache);
                 const file = path.join(objectCache.dir, operation.sha1);
                 const url = `http://${operation.source}/objectcache/${operation.sha1}`;
                 console.log("Downloading", url, "->", file);
-                let expectedSize;
-                let stream;
+                let expectedSize: number;
+                let stream: fs.WriteStream;
                 try {
                     stream = fs.createWriteStream(file);
                 } catch (err) {
                     console.error("Got some error from write stream", err);
                     try {
                         fs.unlinkSync(file);
-                    } catch (e) {}
+                    } catch (e) {
+                        /* */
+                    }
                     resolve();
                     return;
                 }
@@ -261,8 +300,10 @@ client.on("fetch_cache_objects", (message) => {
                     let stat;
                     try {
                         stat = fs.statSync(file);
-                    } catch (err) {}
-                    if (!stat || stat.size != expectedSize) {
+                    } catch (err) {
+                        /* */
+                    }
+                    if (!stat || stat.size !== expectedSize) {
                         console.log(
                             "Got wrong size for",
                             file,
@@ -322,7 +363,7 @@ function loadEnvironments() {
         fs.readdir(environmentsRoot, (err, files) => {
             // console.log("GOT FILES", files);
             if (err) {
-                if (err.code == "ENOENT") {
+                if (err.code === "ENOENT") {
                     fs.mkdirp(environmentsRoot)
                         .then(() => {
                             // let user = option("fisk-user");
@@ -355,22 +396,23 @@ function loadEnvironments() {
                     let pending = 0;
                     for (let i = 0; i < files.length; ++i) {
                         try {
-                            let dir = path.join(environmentsRoot, files[i]);
-                            let stat = fs.statSync(dir);
+                            const dir = path.join(environmentsRoot, files[i]);
+                            const stat = fs.statSync(dir);
                             if (!stat.isDirectory()) {
                                 fs.removeSync(dir);
                                 continue;
                             }
-                            let file, env;
+                            let env;
                             try {
-                                file = fs.readFileSync(path.join(dir, "environment.json"));
                                 env = JSON.parse(fs.readFileSync(path.join(dir, "environment.json")));
-                            } catch (err) {}
+                            } catch (err) {
+                                /* */
+                            }
                             if (env && env.hash) {
-                                let vm = new VM(dir, env.hash, option);
+                                const vm = new VM(dir, env.hash, option);
                                 ++pending;
                                 environments[env.hash] = vm;
-                                let errorHandler = () => {
+                                const errorHandler = () => {
                                     if (!vm.ready && !--pending) {
                                         resolve();
                                     }
@@ -379,7 +421,9 @@ function loadEnvironments() {
                                 vm.once("ready", () => {
                                     vm.ready = true;
                                     vm.removeListener("error", errorHandler);
-                                    if (!--pending) resolve();
+                                    if (!--pending) {
+                                        resolve();
+                                    }
                                 });
                             } else {
                                 console.log("Removing directory", dir);
@@ -389,7 +433,9 @@ function loadEnvironments() {
                             console.error(`Got error loading environment ${files[i]} ${err.stack} ${err.message}`);
                         }
                     }
-                    if (!pending) resolve();
+                    if (!pending) {
+                        resolve();
+                    }
                 }
             }
         });
@@ -431,7 +477,7 @@ client.on("clearObjectCache", () => {
 client.on("dropEnvironments", (message) => {
     console.log(`Dropping environments ${message.environments}`);
     message.environments.forEach((env) => {
-        var environment = environments[env];
+        const environment = environments[env];
         if (environment) {
             const dir = path.join(environmentsRoot, env);
             console.log(`Purge environment ${env} ${dir}`);
@@ -444,14 +490,18 @@ client.on("dropEnvironments", (message) => {
 client.on("getEnvironments", (message) => {
     console.log(`Getting environments ${message.environments}`);
     let base = option("scheduler", "localhost:8097");
-    let idx = base.indexOf("://");
-    if (idx != -1) base = base.substr(idx + 3);
+    const idx = base.indexOf("://");
+    if (idx !== -1) {
+        base = base.substr(idx + 3);
+    }
     base = "http://" + base;
-    if (!/:[0-9]+$/.exec(base)) base += ":8097";
+    if (!/:[0-9]+$/.exec(base)) {
+        base += ":8097";
+    }
     base += "/environment/";
     function work() {
         if (!message.environments.length) {
-            let restart = option("restart-on-new-environments");
+            const restart = option("restart-on-new-environments");
             if (!restart) {
                 setTimeout(() => {
                     client.send("environments", { environments: Object.keys(environments) });
@@ -463,22 +513,24 @@ client.on("getEnvironments", (message) => {
             }
             return;
         }
-        let env = message.environments.splice(0, 1)[0];
+        const env = message.environments.splice(0, 1)[0];
         const url = base + env;
         console.log("Got environment url", url);
 
         const dir = path.join(environmentsRoot, env);
         try {
             fs.removeSync(dir);
-        } catch (err) {}
+        } catch (err) {
+            /* */
+        }
         if (!fs.mkdirpSync(dir)) {
             console.error("Can't create environment directory for builder: " + dir);
             setTimeout(work, 0);
             return;
         }
 
-        let file = path.join(dir, "env.tar.gz");
-        let stream = fs.createWriteStream(file);
+        const file = path.join(dir, "env.tar.gz");
+        const stream = fs.createWriteStream(file);
         stream.on("finish", () => {
             console.log("Got finish", env);
             exec("tar xf '" + file + "'", { cwd: dir })
@@ -492,7 +544,7 @@ client.on("getEnvironments", (message) => {
                     return fs.unlink(file);
                 })
                 .then(() => {
-                    let vm = new VM(dir, env, option);
+                    const vm = new VM(dir, env, option);
                     return new Promise((resolve, reject) => {
                         let done = false;
                         vm.on("error", (err) => {
@@ -534,7 +586,9 @@ client.on("getEnvironments", (message) => {
                 }
                 try {
                     fs.removeSync(dir);
-                } catch (err) {}
+                } catch (err) {
+                    /* */
+                }
                 if (!fs.mkdirpSync(dir)) {
                     console.error("Can't create environment directory for builder: " + dir);
                     setTimeout(work, 0);
@@ -544,10 +598,12 @@ client.on("getEnvironments", (message) => {
     work();
 });
 
-client.on("requestEnvironments", (message) => {
+client.on("requestEnvironments", () => {
     console.log("scheduler wants us to inform of current environments", Object.keys(environments));
     client.send("environments", { environments: Object.keys(environments) });
 });
+
+const load = new Load();
 
 client.on("connect", () => {
     restartShutdownTimer();
@@ -556,24 +612,31 @@ client.on("connect", () => {
         clearInterval(connectInterval);
         connectInterval = undefined;
     }
-    if (!load.running) load.start(option("loadInterval", 1000));
-    if (objectCache)
+    if (!load.running) {
+        load.start(option("loadInterval", 1000));
+    }
+    if (objectCache) {
         client.send({
             type: "objectCache",
             sha1s: objectCache.syncData(),
             maxSize: objectCache.maxSize,
             cacheSize: objectCache.size
         });
+    }
 });
 
 client.on("error", (err) => {
     console.error("client error", err);
-    if (load.running) load.stop();
+    if (load.running) {
+        load.stop();
+    }
 });
 
 client.on("close", () => {
     console.log("client closed");
-    if (load.running) load.stop();
+    if (load.running) {
+        load.stop();
+    }
     if (!connectInterval) {
         connectInterval = setInterval(() => {
             console.log("Reconnecting...");
@@ -583,11 +646,11 @@ client.on("close", () => {
 });
 
 const server = new Server(option, common.Version);
-let jobQueue = [];
+const jobQueue = [];
 
 server.on("headers", (headers, req) => {
     // console.log("request is", req.headers);
-    let wait =
+    const wait =
         jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) === "exists");
     headers.push(`x-fisk-wait: ${wait}`);
 });
@@ -595,8 +658,8 @@ server.on("headers", (headers, req) => {
 server.on("listen", (app) => {
     function setDebug(enabled) {
         debug = enabled;
-        for (var i in environments) {
-            var env = environments[i];
+        for (const i in environments) {
+            const env = environments[i];
             env.setDebug(debug);
         }
     }
@@ -618,16 +681,16 @@ server.on("listen", (app) => {
         const parsed = Url.parse(req.url);
 
         const urlPath = parsed.pathname.substr(13);
-        if (urlPath == "info") {
+        if (urlPath === "info") {
             res.send(JSON.stringify(objectCache.info(req.query || {}), null, 4));
             return;
         }
-        let data = objectCache.get(urlPath, true);
+        const data = objectCache.get(urlPath, true);
         if (!data) {
             res.sendStatus(404);
             return;
         }
-        let file = path.join(objectCache.dir, urlPath);
+        const file = path.join(objectCache.dir, urlPath);
         try {
             const stat = fs.statSync(file);
             res.set("Content-Length", stat.size);
@@ -647,7 +710,7 @@ server.on("listen", (app) => {
 function startPending() {
     // console.log(`startPending called ${jobQueue.length}`);
     for (let idx = 0; idx < jobQueue.length; ++idx) {
-        let jj = jobQueue[idx];
+        const jj = jobQueue[idx];
         if (!jj.op && !jj.objectCache) {
             // console.log("starting jj", jj.id);
             jj.start();
@@ -658,7 +721,7 @@ function startPending() {
 
 server.on("job", (job) => {
     restartShutdownTimer();
-    let vm = environments[job.hash];
+    const vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);
         job.close();
@@ -668,7 +731,7 @@ server.on("job", (job) => {
     let uploadDuration;
 
     // console.log("sending to server");
-    var j = {
+    const j = {
         id: job.id,
         job: job,
         op: undefined,
@@ -680,17 +743,21 @@ server.on("job", (job) => {
         stdout: "",
         stderr: "",
         start: function () {
-            let job = this.job;
-            if (j.aborted) return;
+            const job = this.job;
+            if (j.aborted) {
+                return;
+            }
             if (
                 getFromCache(job, (err) => {
-                    if (j.aborted) return;
+                    if (j.aborted) {
+                        return;
+                    }
                     if (err) {
                         console.error("cache failed, let the client handle doing it itself");
                         job.close();
                     } else {
                         // console.log("GOT STUFF", job);
-                        let info = {
+                        const info = {
                             type: "cacheHit",
                             client: {
                                 hostname: job.hostname,
@@ -708,8 +775,10 @@ server.on("job", (job) => {
                         console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
                     }
                     j.done = true;
-                    let idx = jobQueue.indexOf(j);
-                    if (idx != -1) jobQueue.splice(idx, 1);
+                    const idx = jobQueue.indexOf(j);
+                    if (idx !== -1) {
+                        jobQueue.splice(idx, 1);
+                    }
                     startPending();
                 })
             ) {
@@ -749,9 +818,11 @@ server.on("job", (job) => {
             });
             j.op.on("finished", (event) => {
                 j.done = true;
-                if (j.aborted) return;
+                if (j.aborted) {
+                    return;
+                }
                 const end = Date.now();
-                let idx = jobQueue.indexOf(j);
+                const idx = jobQueue.indexOf(j);
                 console.log(
                     "Job finished",
                     j.id,
@@ -766,7 +837,7 @@ server.on("job", (job) => {
                     "in",
                     end - jobStartTime + "ms"
                 );
-                if (idx != -1) {
+                if (idx !== -1) {
                     jobQueue.splice(idx, 1);
                 } else {
                     console.error("Can't find j?");
@@ -774,10 +845,10 @@ server.on("job", (job) => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
-                let contents = event.files.map((f) => {
+                const contents: Contents[] = event.files.map((f) => {
                     return { contents: fs.readFileSync(f.absolute), path: f.path };
                 });
-                let response = {
+                const response: Response = {
                     type: "response",
                     index: contents.map((item) => {
                         return { path: item.path, bytes: item.contents.length };
@@ -788,7 +859,9 @@ server.on("job", (job) => {
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
-                if (event.error) response.error = event.error;
+                if (event.error) {
+                    response.error = event.error;
+                }
                 if (debug) {
                     console.log("Sending response", job.ip, job.hostname, response);
                 }
@@ -798,7 +871,7 @@ server.on("job", (job) => {
                     event.success &&
                     objectCache &&
                     response.sha1 &&
-                    objectCache.state(response.sha1) == "none"
+                    objectCache.state(response.sha1) === "none"
                 ) {
                     response.sourceFile = job.sourceFile;
                     response.commandLine = job.commandLine;
@@ -858,19 +931,23 @@ server.on("job", (job) => {
     job.on("close", () => {
         job.removeAllListeners();
         job.done = true;
-        let idx = jobQueue.indexOf(j);
-        if (idx != -1) {
+        const idx = jobQueue.indexOf(j);
+        if (idx !== -1) {
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
-            if (j.started) client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
+            if (j.started) {
+                client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
+            }
             startPending();
         }
     });
 
     job.on("data", (data) => {
         // console.log("got data", this.id, data.last, typeof j.op);
-        if (data.last) uploadDuration = Date.now() - jobStartTime;
+        if (data.last) {
+            uploadDuration = Date.now() - jobStartTime;
+        }
         if (!j.op) {
             j.buffers.push(data);
             console.log("buffering...", j.buffers.length);
@@ -909,6 +986,8 @@ load.on("data", (measure) => {
     // console.log("Got load", measure);
     try {
         client.send("load", { measure: measure });
-    } catch (err) {}
+    } catch (err) {
+        /* */
+    }
 });
 start();

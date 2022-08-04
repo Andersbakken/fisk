@@ -5,10 +5,10 @@ import { Server } from "./server";
 import { Slots } from "./slots";
 import Common from "../common";
 import assert from "assert";
-import createOptions from "@jhanssen/options";
+import options from "@jhanssen/options";
 import os from "os";
 
-const option = createOptions({
+const option = options({
     prefix: "fisk/daemon",
     noApplicationPath: true,
     additionalFiles: ["fisk/daemon.conf.override"]
