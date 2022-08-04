@@ -78,3 +78,5 @@ cmake_install.cmake
 /.gdb_history
 /client/create-fisk-env.c
 /client/npm-version.c
+/.cache/
+/dist/
