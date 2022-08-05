@@ -354,10 +354,8 @@ int main(int argc, char **argv)
         Client::data().sha1Update(tag.c_str(), tag.size());
 
         unsigned char sha1Buf[SHA_DIGEST_LENGTH];
-        unsigned int len = sizeof(sha1Buf);
-        EVP_DigestFinal_ex(data.sha1Context, sha1Buf, &len);
-        std::string sha1 = Client::toHex(sha1Buf, len);
-
+        Client::data().sha1Final(sha1Buf);
+        std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
         WARN("Got sha1: %s", sha1.c_str());
         headers["x-fisk-sha1"] = std::move(sha1);
     }

@@ -69,6 +69,16 @@ struct Data
         SHA1_Update(&sha1, data,  len);
 #endif
     }
+
+    void sha1Final(void *buf)
+    {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        unsigned int len;
+        EVP_DigestFinal_ex(sha1Context, reinterpret_cast<unsigned char *>(buf), &len);
+#else
+        SHA1_Final(reinterpret_cast<unsigned char *>(buf), &sha1);
+#endif
+    }
 };
 Data &data();
 
