@@ -166,21 +166,20 @@ class Server extends EventEmitter {
                     // console.log("Got binary", msg.length, bytes);
                     if (!msg.length) {
                         // no data?
-                        console.error("No data in buffer");
+                        error("No data in buffer");
                         return;
                     }
                     if (!bytes) {
                         error("Got binary message without a preceeding json message describing the data");
                         return;
                     }
-                    if (msg.length > bytes) {
+                    if (msg.length !== bytes) {
                         // woops
-                        error(`length ${msg.length} > ${bytes}`);
+                        error(`length ${msg.length} !== ${bytes}`);
                         return;
                     }
-                    bytes -= msg.length;
-                    // console.log("Emitting", "data", { data: msg.length, last: !bytes });
-                    client.emit("data", { data: msg, last: !bytes });
+                    bytes = 0;
+                    client.emit("data", { data: msg });
                 }
                 break;
             }

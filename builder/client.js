@@ -121,18 +121,16 @@ class Client extends EventEmitter {
                         error("No data in buffer");
                         return;
                     }
-                    if (remaining) {
-                        // more data
-                        if (msg.length > remaining) {
-                            // woops
-                            error(`length ${msg.length} > ${remaining}`);
-                            return;
-                        }
-                        remaining -= msg.length;
-                        this.emit("data", { data: msg, last: !remaining });
-                    } else {
+                    if (!remaining) {
                         error(`Unexpected binary message of length: ${msg.length}`);
+                        return;
+                    } else if (msg.length !== remaining) {
+                        // woops
+                        error(`length ${msg.length} !== ${remaining}`);
+                        return;
                     }
+                    remaining = 0;
+                    this.emit("data", { data: msg });
                 } else {
                     error("Unexpected object");
                 }

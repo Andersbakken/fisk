@@ -713,7 +713,7 @@ server.on("job", job => {
 
             console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, "wait", job.wait);
             j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
-            j.buffers.forEach(data => j.op.feed(data.data, data.last));
+            j.buffers.forEach(data => j.op.feed(data.data));
             if (job.wait) {
                 job.send("resume", {});
             }
@@ -822,14 +822,13 @@ server.on("job", job => {
     });
 
     job.on("data", data => {
-        // console.log("got data", this.id, data.last, typeof j.op);
-        if (data.last)
-            uploadDuration = Date.now() - jobStartTime;
+        // console.log("got data", this.id, typeof j.op);
+        uploadDuration = Date.now() - jobStartTime;
         if (!j.op) {
             j.buffers.push(data);
             console.log("buffering...", j.buffers.length);
         } else {
-            j.op.feed(data.data, data.last);
+            j.op.feed(data.data);
         }
     });
 
