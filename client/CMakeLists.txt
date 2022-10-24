@@ -22,7 +22,7 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/client/npm-version.c
                    COMMAND ${CMAKE_COMMAND} -DOUTPUT="${CMAKE_BINARY_DIR}/client/npm-version.c" -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
 
 message(STATUS "Found openssl includes ${OPENSSL_INCLUDE_DIR}")
-include_directories(${OPENSSL_INCLUDE_DIR})
+include_directories(${OPENSSL_INCLUDE_DIR} ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/zlib)
 add_executable(fiskc
     ${CMAKE_BINARY_DIR}/client/create-fisk-env.c
     ${CMAKE_BINARY_DIR}/client/npm-version.c
@@ -38,7 +38,7 @@ add_executable(fiskc
     Watchdog.cpp
     WebSocket.cpp
     main.cpp)
-target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library dl)
+target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library dl zlib)
 
 add_custom_target(link_c++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/c++)
 add_custom_target(link_cc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/cc)
