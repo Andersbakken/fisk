@@ -1,5 +1,4 @@
 #include "Client.h"
-
 #include <unistd.h>
 #include "SchedulerWebSocket.h"
 #include "DaemonSocket.h"
@@ -24,6 +23,9 @@
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
+
+#define ZLIB_CONST
+#include <zlib.h>
 
 #ifdef __APPLE__
 static const char *systemName = "Darwin x86_64";
@@ -710,6 +712,55 @@ std::string Client::cwd()
     char buf[PATH_MAX];
     const char *ret = getcwd(buf, sizeof(buf));
     return ret ? std::string(ret) : std::string();
+}
+
+bool Client::uncompressToFile(const std::string &fileName, FILE *f, const void *bytes, size_t len)
+{
+    DEBUG("Uncompressing %zu bytes to file %s", len, fileName.c_str());
+    z_stream zctx;
+    zctx.zalloc = nullptr;
+    zctx.zfree = nullptr;
+    zctx.opaque = nullptr;
+    zctx.avail_in = 0;
+    zctx.next_in = nullptr;
+    int ret = inflateInit2(&zctx, MAX_WBITS + 16);
+    if (ret != Z_OK) {
+        ERROR("Failed to inflateInit2 -> %d", ret);
+        return false;
+    }
+
+    zctx.next_in = static_cast<const Bytef *>(bytes);
+    zctx.avail_in = len;
+
+    // temporary buffer for deflated data
+    unsigned char buffer[16384];
+
+    int zerr = 0;
+    do {
+        // point context at the output buffer
+        zctx.next_out = buffer;
+        zctx.avail_out = sizeof(buffer);
+
+        zerr = ::inflate(&zctx, Z_SYNC_FLUSH);
+        if ((zerr != Z_OK) && (zerr != Z_STREAM_END)) {
+            inflateEnd(&zctx); // don't leak the context memory
+            ERROR("uncompress failed (input %zu bytes): %d %s", len, zerr, zError(zerr));
+            return false;
+        }
+
+        // output processed data to dst std::string
+        const int processed = sizeof(buffer) - zctx.avail_out;
+        if (fwrite(buffer, 1, processed, f) != processed) {
+            ERROR("Failed to write to file %d %s", errno, strerror(errno));
+            inflateEnd(&zctx); // don't leak the context memory
+            return false;
+        }
+    } while (zerr != Z_STREAM_END);
+
+    // free context memory
+    inflateEnd(&zctx);
+
+    return true;
 }
 
 std::string Client::base64(const std::string &src)

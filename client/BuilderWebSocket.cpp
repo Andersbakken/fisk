@@ -10,7 +10,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     DEBUG("Got message %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
 
     if (messageType == WebSocket::Binary) {
-        handleResponseBinary(bytes, len);
+        handleFileContents(bytes, len);
         return;
     }
 
@@ -106,12 +106,12 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         }
 
         if (!index.empty()) {
-            files.resize(index.size());
+            files.reserve(index.size());
             for (size_t i=0; i<index.size(); ++i) {
-                File &ff = files[i];
+                File ff;
                 ff.path = index[i]["path"].string_value();
-                ff.remaining = index[i]["bytes"].int_value();
-                totalWritten += ff.remaining;
+                ff.size = index[i]["bytes"].int_value();
+                Client::data().totalWritten += ff.size;
                 if (ff.path.empty()) {
                     ERROR("No file for idx: %zu", i);
                     Client::data().watchdog->stop();
@@ -119,19 +119,22 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                     done = true;
                     return;
                 }
+                if (!ff.size) {
+                    FILE *f = fopen(ff.path.c_str(), "w");
+                    DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
+                    if (!f) {
+                        ERROR("Can't open file: %s", files[0].path.c_str());
+                        Client::data().watchdog->stop();
+                        error = "builder file open error";
+                        done = true;
+                    } else {
+                        fclose(f);
+                    }
+                } else {
+                    files.push_back(ff);
+                }
             }
-            f = fopen(files[0].path.c_str(), "w");
-            DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
-            if (!f) {
-                ERROR("Can't open file: %s", files[0].path.c_str());
-                Client::data().watchdog->stop();
-                error = "builder file open error";
-                done = true;
-                return;
-            }
-            assert(f);
-            if (files[0].remaining)
-                fill(nullptr, 0);
+            done = files.empty();
         } else {
             done = true;
         }
@@ -144,7 +147,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     done = true;
 }
 
-void BuilderWebSocket::handleResponseBinary(const void *data, size_t len)
+void BuilderWebSocket::handleFileContents(const void *data, size_t len)
 {
     DEBUG("Got binary data: %zu bytes", len);
     if (files.empty()) {
@@ -154,62 +157,40 @@ void BuilderWebSocket::handleResponseBinary(const void *data, size_t len)
         done = true;
         return;
     }
-    fill(reinterpret_cast<const unsigned char *>(data), len);
-    if (files.empty()) {
-        done = true;
-        Client::data().totalWritten = totalWritten;
-    }
-}
-
-void BuilderWebSocket::fill(const unsigned char *data, const size_t bytes)
-{
-    assert(f);
-    auto *front = &files.front();
-    size_t offset = 0;
-    do {
-        const size_t b = std::min(front->remaining, bytes);
-        assert(f);
-        if (b) {
-            if (fwrite(data + offset, 1, b, f) != b) {
-                ERROR("Failed to write to file %s (%d %s)", front->path.c_str(), errno, strerror(errno));
-                Client::data().watchdog->stop();
-                error = "builder file write error";
-                done = true;
-                return;
-            }
-            offset += b;
-            front->remaining -= b;
-        }
-        if (!front->remaining) {
-            int ret;
-            EINTRWRAP(ret, fclose(f));
-            f = nullptr;
-            files.erase(files.begin());
-            if (files.empty()) {
-                if (Config::syncFileSystem) {
-                    DEBUG("Syncing file system");
-                    sync();
-                }
-                break;
-            }
-            front = &files.front();
-            f = fopen(front->path.c_str(), "w");
-            DEBUG("Opened file [%s] -> [%s] -> %p", front->path.c_str(), Client::realpath(front->path).c_str(), f);
-            if (!f) {
-                Client::data().watchdog->stop();
-                error = "builder file open error 2";
-                done = true;
-                return;
-            }
-
-            assert(f);
-            continue;
-        }
-    } while (offset < bytes);
-    if (offset < bytes) {
-        ERROR("Extraneous bytes. Abandon ship (%zu/%zu)", offset, bytes);
+    File &front = files.front();
+    if (len != front.size) {
+        ERROR("Unexpected file data from server for file %s expected %zu, got %zu", front.path.c_str(), front.size, len);
         Client::data().watchdog->stop();
-        error = "builder protocol error 3";
+        error = "builder file data error";
         done = true;
+        return;
     }
+
+    FILE *f = fopen(front.path.c_str(), "w");
+    DEBUG("Opened file [%s] -> [%s] -> %p", front.path.c_str(), Client::realpath(front.path).c_str(), f);
+    if (!f) {
+        ERROR("Failed to open file for writing %s (%d %s)", front.path.c_str(), errno, strerror(errno));
+        Client::data().watchdog->stop();
+        error = "builder file open error";
+        done = true;
+        return;
+    }
+
+    bool ok;
+    if (Config::compress && !Client::data().objectCache) {
+        ok = Client::uncompressToFile(front.path, f, data, len);
+    } else {
+        ok = fwrite(data, 1, len, f) == len;
+    }
+    if (!ok) {
+        ERROR("Failed to write to file %s (%d %s)", front.path.c_str(), errno, strerror(errno));
+        Client::data().watchdog->stop();
+        error = "builder file write error";
+        done = true;
+        return;
+    }
+
+    files.erase(files.begin());
+    done = files.empty();
 }
+

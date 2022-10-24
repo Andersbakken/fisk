@@ -2,6 +2,7 @@
 #include "Client.h"
 #include "DaemonSocket.h"
 #include <process.hpp>
+#define ZLIB_CONST
 #include <zlib.h>
 
 Preprocessed::Preprocessed()
@@ -78,32 +79,36 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
             } else {
                 z_stream strm;
                 std::vector<unsigned char> compressed;
+                size_t compressOffset = 0;
                 if (Config::compress) {
                     strm.zalloc = Z_NULL;
                     strm.zfree = Z_NULL;
                     strm.opaque = Z_NULL;
-                    if (deflateInit(&strm, Z_DEFAULT_COMPRESSION) != Z_OK) {
-                        ptr->exitStatus = 1;
-                    }
+                    const int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 9, Z_DEFAULT_STRATEGY);
+                    assert(ret == Z_OK);
+                    static_cast<void>(ret);
+                    compressed.reserve(1024 * 1024);
                 }
                 DEBUG("Executing:\n%s", commandLine.c_str());
                 TinyProcessLib::Process proc(commandLine, std::string(),
-                                             [ptr, &strm, &compressed](const char *bytes, size_t n) {
+                                             [ptr, &strm, &compressed, &compressOffset](const char *bytes, size_t n) {
                                                  VERBOSE("Preprocess appending %zu bytes to stdout", n);
-                                                 if (Config::compress) {
-                                                     do {
-                                                         strm.avail_in = n;
-                                                         strm.next_in = reinterpret_cast<unsigned char *>(const_cast<char *>(bytes));
-                                                         unsigned char out[16384];
-                                                         strm.next_out = out;
-                                                         strm.avail_out = sizeof(out);
-                                                         deflate(&strm, Z_NO_FLUSH);
-                                                         const size_t written = sizeof(out) - strm.avail_out;
-                                                         compressed.insert(compressed.end(), out, out + written);
-                                                     } while (!strm.avail_out);
-                                                 }
                                                  ptr->stdOut.insert(ptr->stdOut.end(), reinterpret_cast<const unsigned char *>(bytes),
                                                                     reinterpret_cast<const unsigned char *>(bytes) + n);
+                                                 if (Config::compress) {
+                                                     unsigned char out[16384];
+                                                     strm.avail_in = ptr->stdOut.size() - compressOffset;
+                                                     strm.next_in = ptr->stdOut.data() + compressOffset;
+                                                     int ret;
+                                                     do {
+                                                         strm.next_out = out;
+                                                         strm.avail_out = sizeof(out);
+                                                         ret = deflate(&strm, Z_NO_FLUSH);
+                                                         const size_t written = sizeof(out) - strm.avail_out;
+                                                         compressed.insert(compressed.end(), out, out + written);
+                                                     } while (ret != Z_STREAM_END && ret != Z_BUF_ERROR);
+                                                     compressOffset = ptr->stdOut.size() - strm.avail_in;
+                                                 }
                                              }, [ptr](const char *bytes, size_t n) {
                                                  VERBOSE("Preprocess appending %zu bytes to stderr", n);
                                                  ptr->stdErr.append(bytes, n);
@@ -112,13 +117,20 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                 ptr->exitStatus = proc.get_exit_status();
                 if (Config::compress) {
                     unsigned char out[16384];
-                    strm.next_out = out;
-                    strm.avail_out = sizeof(out);
-                    strm.next_in = nullptr;
-                    strm.avail_in = 0;
-                    deflate(&strm, Z_FINISH);
-                    const size_t written = sizeof(out) - strm.avail_out;
-                    compressed.insert(compressed.end(), out, out + written);
+                    strm.avail_in = ptr->stdOut.size() - compressOffset;
+                    strm.next_in = ptr->stdOut.data() + compressOffset;
+                    int ret;
+                    do {
+                        strm.next_out = out;
+                        strm.avail_out = sizeof(out);
+                        ret = deflate(&strm, Z_FINISH);
+                        const size_t written = sizeof(out) - strm.avail_out;
+                        compressed.insert(compressed.end(), out, out + written);
+                        // printf("GOT RET %d %zu\n", ret, written);
+                    } while (ret != Z_STREAM_END && ret != Z_BUF_ERROR);
+                    compressOffset = ptr->stdOut.size() - strm.avail_in;
+                    assert(compressOffset == ptr->stdOut.size());
+                    deflateEnd(&strm);
                 }
                 DEBUG("Preprocess got status %d", ptr->exitStatus);
                 if (Config::objectCache) {

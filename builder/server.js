@@ -1,15 +1,14 @@
-
 const EventEmitter = require("events");
 const WebSocket = require("ws");
 const Url = require("url");
 const http = require("http");
 const express = require("express");
+const zlib = require("zlib");
 
 class Job extends EventEmitter {
     constructor(data) {
         super();
-        for (let key in data)
-            this[key] = data[key];
+        Object.assign(this, data);
     }
 
     send(type, msg) {
@@ -154,6 +153,7 @@ class Server extends EventEmitter {
                     return;
                 }
                 bytes = json.bytes;
+                client.compressed = json.compressed;
                 client.commandLine = json.commandLine;
                 client.argv0 = json.argv0;
                 client.connectTime = connectTime;
@@ -179,7 +179,18 @@ class Server extends EventEmitter {
                         return;
                     }
                     bytes = 0;
-                    client.emit("data", { data: msg });
+                    // console.log("GOT DATA", client.compressed, msg.length);
+                    if (client.compressed) {
+                        zlib.gunzip(msg, (err, data) => {
+                            if (err) {
+                                error(`Got error inflating data ${err}`);
+                            } else {
+                                client.emit("data", { data });
+                            }
+                        });
+                    } else {
+                        client.emit("data", { data: msg });
+                    }
                 }
                 break;
             }

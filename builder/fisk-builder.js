@@ -21,6 +21,7 @@ const VM = require("./VM");
 const load = require("./load");
 const ObjectCache = require("./objectcache");
 const quitOnError = require("./quit-on-error")(option);
+const zlib = require("zlib");
 
 if (process.getuid() !== 0) {
     console.error("fisk builder needs to run as root to be able to chroot");
@@ -652,7 +653,7 @@ server.on("job", job => {
         aborted: false,
         started: false,
         heartbeatTimer: undefined,
-        buffers: [],
+        buffer: undefined,
         stdout: "",
         stderr: "",
         start: function() {
@@ -713,11 +714,13 @@ server.on("job", job => {
 
             console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, "wait", job.wait);
             j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
-            j.buffers.forEach(data => j.op.feed(data.data));
+            if (j.buffer) {
+                j.op.feed(j.buffer);
+                j.buffer = undefined;
+            }
             if (job.wait) {
                 job.send("resume", {});
             }
-            delete j.buffers;
             j.op.on("stdout", data => { j.stdout += data; }); // ### is there ever any stdout? If there is, does the order matter for stdout vs stderr?
             j.op.on("stderr", data => { j.stderr += data; });
             j.op.on("finished", event => {
@@ -735,7 +738,11 @@ server.on("job", job => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
-                let contents = event.files.map(f => { return { contents: fs.readFileSync(f.absolute), path: f.path }; });
+                const forCache = event.files.map(f => ({ contents: fs.readFileSync(f.absolute), path: f.path }));
+                const contents = !j.job.compressed ? forCache : forCache.map(x => ({
+                    path: x.path,
+                    contents: x.contents.byteLength ? zlib.gzipSync(x.contents) : x.contents
+                }));
                 let response = {
                     type: "response",
                     index: contents.map(item => { return { path: item.path, bytes: item.contents.length }; }),
@@ -755,13 +762,14 @@ server.on("job", job => {
                     response.sourceFile = job.sourceFile;
                     response.commandLine = job.commandLine;
                     response.environment = job.hash;
-                    objectCache.add(response, contents);
+                    objectCache.add(response, forCache);
                 }
 
-                for (let i=0; i<contents.length; ++i) {
-                    job.send(contents[i].contents);
-                }
-                // job.close();
+                contents.forEach(x => {
+                    if (x.contents.byteLength) {
+                        job.send(x.contents);
+                    }
+                });
                 // console.log("GOT ID", j);
                 if (event.success) {
                     client.send("jobFinished", {
@@ -825,8 +833,8 @@ server.on("job", job => {
         // console.log("got data", this.id, typeof j.op);
         uploadDuration = Date.now() - jobStartTime;
         if (!j.op) {
-            j.buffers.push(data);
-            console.log("buffering...", j.buffers.length);
+            j.buffer = data.data;
+            console.log("buffering...", j.buffer.byteLength);
         } else {
             j.op.feed(data.data);
         }
