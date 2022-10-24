@@ -10,18 +10,12 @@ class Client extends EventEmitter {
     constructor(object) {
         super();
         this.created = new Date();
-        this.assign(object);
+        Object.assign(this, object);
         this.pingSent = undefined;
         this.ws.on("pong", () => {
             // console.log("got pong", this.name);
             this.pingSent = undefined;
         });
-    }
-
-    assign(object) {
-        for (let key in object) {
-            this[key] = object[key];
-        }
     }
 
     send(type, msg) {
@@ -188,7 +182,7 @@ class Server extends EventEmitter {
         const clientHostname = req.headers["x-fisk-client-hostname"];
         if (clientHostname)
             data.hostname = clientHostname;
-        client.assign(data);
+        Object.assign(client, data);
         this.emit("compile", client);
         let remaining = { bytes: undefined, type: undefined };
         client.ws.on("close", (status, reason) => client.emit("close", status, reason));
@@ -315,20 +309,22 @@ class Server extends EventEmitter {
             if (env)
                 environments[env] = true;
         });
-        client.assign({ port: port,
-                        name: name,
-                        labels: labels,
-                        slots: slots,
-                        jobsPerformed: 0,
-                        jobsScheduled: 0,
-                        totalCompileSpeed: 0,
-                        totalUploadSpeed: 0,
-                        lastJob: 0,
-                        load: 0,
-                        npmVersion: npmVersion,
-                        hostname: hostname,
-                        environments: environments,
-                        system: system });
+        Object.assign(client, {
+            port: port,
+            name: name,
+            labels: labels,
+            slots: slots,
+            jobsPerformed: 0,
+            jobsScheduled: 0,
+            totalCompileSpeed: 0,
+            totalUploadSpeed: 0,
+            lastJob: 0,
+            load: 0,
+            npmVersion: npmVersion,
+            hostname: hostname,
+            environments: environments,
+            system: system
+        });
         client.ws.on("message", msg => {
             // console.log("Got message from builder", typeof msg, msg.length);
             switch (typeof msg) {
@@ -375,7 +371,7 @@ class Server extends EventEmitter {
     }
 
     _handleClientVerify(req, client) {
-        client.assign({npmVersion: req.headers["x-fisk-npm-version"] });
+        Object.assign(client, {npmVersion: req.headers["x-fisk-npm-version"] });
         this.emit("clientVerify", client);
         client.ws.on("close", (code, reason) => {
             client.ws.removeAllListeners();
