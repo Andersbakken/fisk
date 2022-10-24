@@ -243,5 +243,6 @@ extern Getter<bool> verbose;
 extern Getter<bool> debug;
 extern Getter<bool> discardComments;
 extern Getter<unsigned long long> delay;
+extern Getter<bool> compress;
 }
 #endif /* CONFIG_H */

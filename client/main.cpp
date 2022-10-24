@@ -501,6 +501,7 @@ int main(int argc, char **argv)
         { "commandLine", args },
         { "argv0", data.compiler },
         { "wait", wait },
+        { "compressed", Config::compress.get() },
         { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }
     };
 
@@ -548,7 +549,7 @@ int main(int argc, char **argv)
     }
 
     assert(!builderWebSocket.wait);
-    builderWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.c_str(), data.preprocessed->stdOut.size());
+    builderWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.data(), data.preprocessed->stdOut.size());
     if (!Config::storePreprocessedDataOnError)
         data.preprocessed->stdOut.clear();
 

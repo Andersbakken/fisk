@@ -88,7 +88,7 @@ public:
                     Client::parsePath(data.compilerArgs->sourceFile(), &basename, nullptr);
                     FILE *errorFile = fopen((basename + ".error.ii").c_str(), "w");
                     if (errorFile) {
-                        fwrite(Client::data().preprocessed->stdOut.c_str(), Client::data().preprocessed->stdOut.size(), 1, errorFile);
+                        fwrite(Client::data().preprocessed->stdOut.data(), Client::data().preprocessed->stdOut.size(), 1, errorFile);
                         fclose(errorFile);
                         str = "Wrote error to " + (basename + ".error.ii");
                     } else {

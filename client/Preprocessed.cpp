@@ -2,6 +2,7 @@
 #include "Client.h"
 #include "DaemonSocket.h"
 #include <process.hpp>
+#include <zlib.h>
 
 Preprocessed::Preprocessed()
 {
@@ -75,22 +76,55 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                 DEBUG("Already preprocessed. No need to do it");
                 ptr->exitStatus = Client::readFile(args->sourceFile(), ptr->stdOut) ? 0 : 1;
             } else {
+                z_stream strm;
+                std::vector<unsigned char> compressed;
+                if (Config::compress) {
+                    strm.zalloc = Z_NULL;
+                    strm.zfree = Z_NULL;
+                    strm.opaque = Z_NULL;
+                    if (deflateInit(&strm, Z_DEFAULT_COMPRESSION) != Z_OK) {
+                        ptr->exitStatus = 1;
+                    }
+                }
                 DEBUG("Executing:\n%s", commandLine.c_str());
                 TinyProcessLib::Process proc(commandLine, std::string(),
-                                             [ptr](const char *bytes, size_t n) {
+                                             [ptr, &strm, &compressed](const char *bytes, size_t n) {
                                                  VERBOSE("Preprocess appending %zu bytes to stdout", n);
-                                                 ptr->stdOut.append(bytes, n);
+                                                 if (Config::compress) {
+                                                     do {
+                                                         strm.avail_in = n;
+                                                         strm.next_in = reinterpret_cast<unsigned char *>(const_cast<char *>(bytes));
+                                                         unsigned char out[16384];
+                                                         strm.next_out = out;
+                                                         strm.avail_out = sizeof(out);
+                                                         deflate(&strm, Z_NO_FLUSH);
+                                                         const size_t written = sizeof(out) - strm.avail_out;
+                                                         compressed.insert(compressed.end(), out, out + written);
+                                                     } while (!strm.avail_out);
+                                                 }
+                                                 ptr->stdOut.insert(ptr->stdOut.end(), reinterpret_cast<const unsigned char *>(bytes),
+                                                                    reinterpret_cast<const unsigned char *>(bytes) + n);
                                              }, [ptr](const char *bytes, size_t n) {
                                                  VERBOSE("Preprocess appending %zu bytes to stderr", n);
                                                  ptr->stdErr.append(bytes, n);
                                              });
                 VERBOSE("Preprocess calling get_status");
                 ptr->exitStatus = proc.get_exit_status();
+                if (Config::compress) {
+                    unsigned char out[16384];
+                    strm.next_out = out;
+                    strm.avail_out = sizeof(out);
+                    strm.next_in = nullptr;
+                    strm.avail_in = 0;
+                    deflate(&strm, Z_FINISH);
+                    const size_t written = sizeof(out) - strm.avail_out;
+                    compressed.insert(compressed.end(), out, out + written);
+                }
                 DEBUG("Preprocess got status %d", ptr->exitStatus);
                 if (Config::objectCache) {
                     // FILE *f = fopen("/tmp/preproc.i", "w");
-                    const char *ch = ptr->stdOut.c_str();
-                    const char *last = ch;
+                    const unsigned char *ch = ptr->stdOut.data();
+                    const unsigned char *last = ch;
                     while (*ch) {
                         // VERBOSE("GETTING CHAR [%c]", *ch);
                         if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
@@ -112,6 +146,9 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                         // fwrite(last, 1, ch - last, f);
                     }
                     // fclose(f);
+                }
+                if (Config::compress) {
+                    ptr->stdOut = std::move(compressed);
                 }
             }
         }

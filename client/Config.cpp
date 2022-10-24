@@ -89,6 +89,7 @@ Getter<bool> storePreprocessedDataOnError("store-preprocessed-data-on-error", "S
 Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", true);
 Getter<bool> verify("verify", "Only verify that the npm version is correct", false);
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);
+Getter<bool> compress("compress", "Compress preprocessed output");
 Getter<bool> discardComments("discard-comments", "Discard comments when preprocessing", true);
 Getter<std::string> nodePath("node-path", "Path to nodejs executable", "node");
 static Separator s4;

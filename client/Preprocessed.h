@@ -15,7 +15,8 @@ public:
     ~Preprocessed();
     bool done() const;
 
-    std::string stdOut, stdErr;
+    std::vector<unsigned char> stdOut;
+    std::string stdErr;
     size_t cppSize { 0 };
     int exitStatus { -1 };
     unsigned long long duration { 0 };
