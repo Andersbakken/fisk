@@ -408,6 +408,14 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    const bool objectCache = schedulerWebsocket->handshakeResponseHeader("x-fisk-object-cache") == "true";
+    if (!objectCache && Config::objectCache) {
+        const auto it = headers.find("x-fisk-sha1");
+        if (it != headers.end()) {
+            headers.erase(it);
+        }
+    }
+
     if ((data.builderHostname.empty() && data.builderIp.empty())
         || !data.builderPort) {
         DEBUG("Have to run locally because no builder");
