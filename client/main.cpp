@@ -376,8 +376,8 @@ int main(int argc, char **argv)
         DEBUG("Starting schedulerWebsocket");
         while (!schedulerWebsocket->done
                && !data.watchdog->timedOut()
-               && schedulerWebsocket->state() >= SchedulerWebSocket::None
-               && schedulerWebsocket->state() <= SchedulerWebSocket::ConnectedWebSocket) {
+               && schedulerWebsocket->state() >= WebSocket::None
+               && schedulerWebsocket->state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
 
@@ -393,7 +393,6 @@ int main(int argc, char **argv)
         runLocal(schedulerWebsocket->error);
         return 0; // unreachable
     }
-
 
     if (schedulerWebsocket->needsEnvironment) {
         data.watchdog->stop();
@@ -435,7 +434,7 @@ int main(int argc, char **argv)
     }
 
     while (!data.watchdog->timedOut()
-           && builderWebSocket.state() < SchedulerWebSocket::ConnectedWebSocket
+           && builderWebSocket.state() < WebSocket::ConnectedWebSocket
            && builderWebSocket.state() > WebSocket::None) {
         select.exec();
     }
