@@ -781,8 +781,10 @@ std::string Client::base64(const std::string &src)
 
 std::string Client::uncolor(std::string str)
 {
+    size_t last = 0;
     while (true) {
-        const size_t last = str.find("\x1b");
+        last = str.find("\x1b", last);
+        // printf("Found one at %zu (%zu)\n", last, str.size());
         if (last == std::string::npos)
             break;
         const size_t end = std::min(str.find("m", last), str.find("K", last));
