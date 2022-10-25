@@ -10,6 +10,3 @@
 [submodule "3rdparty/tiny-process-library"]
         path = 3rdparty/tiny-process-library
         url = https://gitlab.com/eidheim/tiny-process-library.git
-[submodule "3rdparty/zlib"]
-    path = 3rdparty/zlib
-    url = https://github.com/madler/zlib.git
