@@ -56,14 +56,21 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const std::string stdErr = msg["stderr"].string_value();
 
         if (data.exitCode) {
-            const std::string uncolored = Client::uncolor(stdErr);
-            if (uncolored.empty()
-                || uncolored.find("unable to rename temporary ") != std::string::npos
-                || uncolored.find("execvp: No such file or directory") != std::string::npos
-                || uncolored.find("cannot execute ") != std::string::npos
-                || uncolored.find("cannot open ") != std::string::npos
-                || uncolored.find("internal compiler error") != std::string::npos
-                || uncolored.find("error trying to exec") != std::string::npos) {
+            std::string uncolored;
+            const std::string *haystack;
+            if (stdErr.size() < 128 * 1024) {
+                uncolored = stdErr;
+                haystack = &uncolored;
+            } else {
+                haystack = &stdErr;
+            }
+            if (haystack->empty()
+                || haystack->find("unable to rename temporary ") != std::string::npos
+                || haystack->find("execvp: No such file or directory") != std::string::npos
+                || haystack->find("cannot execute ") != std::string::npos
+                || haystack->find("cannot open ") != std::string::npos
+                || haystack->find("internal compiler error") != std::string::npos
+                || haystack->find("error trying to exec") != std::string::npos) {
                 ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
                       data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
                       url().c_str(),
