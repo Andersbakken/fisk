@@ -453,7 +453,7 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+    if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because no builder connection 2");
         runLocal("builder connection failure 2");
         return 0;
@@ -519,7 +519,7 @@ int main(int argc, char **argv)
     if (wait) {
         while (!builderWebSocket.done
                && !data.watchdog->timedOut()
-               && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+               && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
             select.exec();
         }
         if (builderWebSocket.done) {
@@ -548,7 +548,7 @@ int main(int argc, char **argv)
             runLocal("watchdog");
             return 0; // unreachable
         }
-        if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+        if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the builder");
             runLocal("builder protocol error 6");
             return 0; // unreachable
@@ -562,7 +562,7 @@ int main(int argc, char **argv)
 
     while (data.watchdog->timedOut()
            && builderWebSocket.hasPendingSendData()
-           && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+           && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -572,7 +572,7 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    if (builderWebSocket.state() != SchedulerWebSocket::ConnectedWebSocket) {
+    if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the builder");
         runLocal("builder connect error 3");
         return 0; // unreachable
@@ -585,7 +585,7 @@ int main(int argc, char **argv)
 
     while (!data.watchdog->timedOut()
            && !builderWebSocket.done
-           && builderWebSocket.state() == SchedulerWebSocket::ConnectedWebSocket) {
+           && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -666,8 +666,8 @@ static int clientVerify()
 
         DEBUG("Starting schedulerWebsocket");
         while (!schedulerWebsocket.done
-               && schedulerWebsocket.state() >= SchedulerWebSocket::None
-               && schedulerWebsocket.state() <= SchedulerWebSocket::ConnectedWebSocket) {
+               && schedulerWebsocket.state() >= WebSocket::None
+               && schedulerWebsocket.state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
         DEBUG("Finished schedulerWebsocket");
