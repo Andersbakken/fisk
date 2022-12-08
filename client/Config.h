@@ -212,6 +212,7 @@ extern Getter<std::string> objectCacheTag;
 extern Getter<bool> storePreprocessedDataOnError;
 extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
+extern Getter<int> priority;
 extern Getter<bool> help;
 extern Getter<bool> syncFileSystem;
 extern Getter<bool> version;

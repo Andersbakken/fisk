@@ -564,7 +564,22 @@ let jobQueue = [];
 
 server.on("headers", (headers, req) => {
     // console.log("request is", req.headers);
-    let wait = (jobQueue.length >= client.slots || (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) == "exists"));
+    let wait = false;
+    if (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) == "exists") {
+        wait = true;
+    } else if (jobQueue.length >= client.slots) {
+        const priority = parseInt(req.headers["x-fisk-sha1"]) || 0;
+        let idx = jobQueue.length - 1;
+        while (idx >= client.slots) {
+            let job = jobQueue[idx].job;
+            if (job.priority >= priority) {
+                break;
+            }
+            --idx;
+        }
+
+        wait = idx >= client.slots;
+    }
     headers.push(`x-fisk-wait: ${wait}`);
 });
 
@@ -645,7 +660,7 @@ server.on("job", job => {
     let uploadDuration;
 
     // console.log("sending to server");
-    var j = {
+    const j = {
         id: job.id,
         job: job,
         op: undefined,
@@ -840,7 +855,17 @@ server.on("job", job => {
         }
     });
 
-    jobQueue.push(j);
+    let idx = jobQueue.length;
+    while (idx > 0) {
+        const jobJob = jobQueue[idx - 1].job;
+        if (jobJob.priority >= job.priority) {
+            // console.log("Stopping at idx", idx, "Because of", job.priority, jobJob.priority, client.slots, jobJob.length);
+            break;
+        }
+        --idx;
+    }
+    jobQueue.splice(idx, 0, j);
+
     if (jobQueue.length <= client.slots) {
         // console.log(`starting j ${j.id} because ${jobQueue.length} ${client.slots}`);
         j.start();

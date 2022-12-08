@@ -224,7 +224,6 @@ int main(int argc, char **argv)
         Client::runLocal(reason);
     };
 
-
 #if 0
     if (!Config::noDesire) {
         if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
@@ -429,6 +428,8 @@ int main(int argc, char **argv)
     select.add(&builderWebSocket);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
+
+    headers["x-fisk-priority"] = std::to_string(Config::priority);
     if (!schedulerWebsocket->environment.empty()) {
         DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket->environment.c_str());
         headers["x-fisk-environments"] = schedulerWebsocket->environment;
@@ -491,7 +492,6 @@ int main(int argc, char **argv)
             return 0; // unreachable
         }
     }
-
 
     std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.builderCompiler;
