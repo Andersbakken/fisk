@@ -703,15 +703,21 @@ server.on("builder", builder => {
     });
 
     builder.on("objectCache", msg => {
-        objectCache.addNode(builder, msg);
+        if (objectCache) {
+            objectCache.addNode(builder, msg);
+        }
     });
 
     builder.on("objectCacheAdded", msg => {
-        objectCache.insert(msg, builder);
+        if (objectCache) {
+            objectCache.insert(msg, builder);
+        }
     });
 
     builder.on("objectCacheRemoved", msg => {
-        objectCache.remove(msg, builder);
+        if (objectCache) {
+            objectCache.remove(msg, builder);
+        }
     });
 
     builder.on("close", () => {
