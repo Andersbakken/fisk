@@ -1,5 +1,6 @@
 import commonjs from "@rollup/plugin-commonjs";
 import resolve from "@rollup/plugin-node-resolve";
+import json from "@rollup/plugin-json";
 import typescript from "rollup-plugin-typescript2";
 import hashbang from "rollup-plugin-hashbang";
 
@@ -12,7 +13,8 @@ const plugins = [
         tsconfig: `tsconfig.json`,
         cacheRoot: ".cache"
     }),
-    hashbang()
+    hashbang(),
+    json()
 ];
 
 // Define forms
