@@ -57,6 +57,8 @@ function measure() {
 }
 
 class Load extends EventEmitter {
+    private _interval?: NodeJS.Timeout;
+
     constructor() {
         super();
         this._interval = undefined;
@@ -66,7 +68,7 @@ class Load extends EventEmitter {
         return this._interval !== undefined;
     }
 
-    start(interval) {
+    start(interval: number) {
         if (this._interval !== undefined) {
             throw new Error("Interval already running");
         }

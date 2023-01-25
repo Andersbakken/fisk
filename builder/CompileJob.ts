@@ -1,5 +1,8 @@
 import { VM } from "./VM";
+import { VMCompileFinished } from "./VMMessage";
 import EventEmitter from "events";
+import assert from "assert";
+import fs from "fs-extra";
 import path from "path";
 
 export class CompileJob extends EventEmitter {
@@ -11,7 +14,7 @@ export class CompileJob extends EventEmitter {
     vmDir: string;
     cppSize: number;
     startCompile?: number;
-    fd: number;
+    fd?: number;
 
     constructor(commandLine: string[], argv0: string, id: number, vm: VM) {
         super();
@@ -27,21 +30,24 @@ export class CompileJob extends EventEmitter {
         this.startCompile = undefined;
     }
 
-    sendCallback(error?: Error): void {
+    sendCallback(error?: Error | null): void {
         if (error) {
             console.error("Got send error for", this.vmDir, this.id, this.commandLine);
-            this.vm.compileFinished({
+            const compileFinished: VMCompileFinished = {
                 type: "compileFinished",
                 success: false,
                 id: this.id,
                 files: [],
                 exitCode: -1,
+                sourceFile: "",
                 error: error.toString()
-            });
+            };
+            this.vm.compileFinished(compileFinished);
         }
     }
 
     feed(data: Buffer): void {
+        assert(this.fd !== undefined, "Must have fd");
         fs.writeSync(this.fd, data);
         this.cppSize += data.length;
         this.startCompile = Date.now();

@@ -5,7 +5,7 @@ export class ObjectCacheItem {
     cacheHits: number;
     headerSize: number;
 
-    constructor(response: unknown, headerSize: number) {
+    constructor(response: Response, headerSize: number) {
         this.headerSize = headerSize;
         this.response = response;
         this.cacheHits = 0;

@@ -4,7 +4,7 @@ type IndexItem = {
 
 export type Response = {
     type: "response";
-    path: string;
+    // path: string;
     sha1: string;
     index: IndexItem[];
     error?: string;

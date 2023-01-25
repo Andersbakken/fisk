@@ -22,6 +22,7 @@ export class Job extends EventEmitter implements JobData {
     connectTime?: number;
     wait?: boolean;
     objectcache?: boolean;
+    heartbeatTimer?: NodeJS.Timeout;
 
     constructor(data: JobData) {
         super();
@@ -38,7 +39,7 @@ export class Job extends EventEmitter implements JobData {
         this.builderIp = data.builderIp;
     }
 
-    send(type: unknown, msg?: unknown): void {
+    send(type: unknown, msg?: Record<string, unknown>): void {
         if (this.ws.readyState !== WebSocket.OPEN) {
             return;
         }

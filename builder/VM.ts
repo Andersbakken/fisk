@@ -1,7 +1,7 @@
-import { CompileFinished, CompileFinishedFile } from "./CompileFinished";
 import { CompileFinishedEvent } from "./CompileFinishedEvent";
 import { CompileJob } from "./CompileJob";
 import { OptionsFunction } from "@jhanssen/options";
+import { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 import EventEmitter from "events";
 import child_process from "child_process";
 import fs from "fs-extra";
@@ -39,7 +39,7 @@ export class VM extends EventEmitter {
 
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         this.ready = false;
-        this.child.on("message", (msg) => {
+        this.child.on("message", (msg: VMMessage) => {
             // console.log("Got message", msg);
             switch (msg.type) {
                 case "ready":
@@ -85,7 +85,7 @@ export class VM extends EventEmitter {
         });
     }
 
-    compileFinished(msg: CompileFinished): void {
+    compileFinished(msg: VMCompileFinished): void {
         const compile = this.compiles[msg.id];
         if (!compile) {
             return;
@@ -101,11 +101,11 @@ export class VM extends EventEmitter {
             success: msg.success,
             error: msg.error,
             sourceFile: msg.sourceFile,
-            files: msg.files.map((file: CompileFinishedFile) => {
+            files: msg.files.map((file: VMCompileFinishedFile) => {
                 return {
                     path: file.path,
                     absolute: path.join(this.root, file.mapped ? file.mapped : file.path)
-                }
+                };
             })
         };
 
@@ -138,5 +138,3 @@ export class VM extends EventEmitter {
         this.child.send({ type: "setDebug", debug });
     }
 }
-
-

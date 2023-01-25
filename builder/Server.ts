@@ -1,8 +1,8 @@
 import { Job } from "./Job";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
-import Url from "url";
 import WebSocket from "ws";
+import assert from "assert";
 import express from "express";
 import http from "http";
 import net from "net";
@@ -35,6 +35,7 @@ export class Server extends EventEmitter {
         this.server.listen({ port: this.port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
 
         this.server.on("upgrade", (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
+            assert(this.ws, "Must have ws");
             this.ws.handleUpgrade(req, socket, head, (ws) => {
                 this._handleConnection(ws, req);
             });
@@ -52,7 +53,7 @@ export class Server extends EventEmitter {
         let bytes: number | undefined;
         let ip = req.connection.remoteAddress;
         let clientEmitted = false;
-        const error = (msg) => {
+        const error = (msg: string) => {
             ws.send(`{"error": "${msg}"}`);
             ws.close();
             if (client && clientEmitted) {
@@ -71,34 +72,38 @@ export class Server extends EventEmitter {
             ip = ip.substring(7);
         }
 
-        const url = Url.parse(req.url);
+        const url = new URL(req.url || "");
         switch (url.pathname) {
             case "/compile": {
-                const hash = req.headers["x-fisk-environments"];
+                const hash = String(req.headers["x-fisk-environments"]);
                 if (!hash) {
                     error("Bad ws request, no environments");
                     return;
                 }
-                const name = req.headers["x-fisk-client-name"];
-                const configVersion = req.headers["x-fisk-config-version"];
+                const name = String(req.headers["x-fisk-client-name"]);
+                const configVersion = parseInt(String(req.headers["x-fisk-config-version"]), 10);
                 if (configVersion !== this.configVersion) {
                     error(`Bad config version, expected ${this.configVersion}, got ${configVersion}`);
                     return;
                 }
 
                 // console.log("GOT HEADERS", req.headers);
+                let builderIp = req.headers["x-fisk-builder-ip"];
+                if (Array.isArray(builderIp)) {
+                    builderIp = String(builderIp);
+                }
                 client = new Job({
-                    ws: ws,
-                    ip: ip,
-                    hash: hash,
-                    name: name,
-                    hostname: req.headers["x-fisk-client-hostname"],
-                    user: req.headers["x-fisk-user"],
-                    sourceFile: req.headers["x-fisk-sourcefile"],
-                    priority: parseInt(req.headers["x-fisk-priority"]) || 0,
-                    sha1: req.headers["x-fisk-sha1"],
-                    id: parseInt(req.headers["x-fisk-job-id"]),
-                    builderIp: req.headers["x-fisk-builder-ip"]
+                    builderIp,
+                    hash,
+                    hostname: String(req.headers["x-fisk-client-hostname"]),
+                    id: parseInt(String(req.headers["x-fisk-job-id"])),
+                    ip,
+                    name,
+                    priority: parseInt(String(req.headers["x-fisk-priority"])),
+                    sha1: String(req.headers["x-fisk-sha1"]),
+                    sourceFile: String(req.headers["x-fisk-sourcefile"]),
+                    user: String(req.headers["x-fisk-user"]),
+                    ws
                 });
 
                 break;
@@ -129,6 +134,7 @@ export class Server extends EventEmitter {
                         return;
                     }
                     bytes = json.bytes;
+                    assert(client, "Must client");
                     client.compressed = json.compressed;
                     client.commandLine = json.commandLine;
                     client.argv0 = json.argv0;
@@ -157,11 +163,13 @@ export class Server extends EventEmitter {
                         }
                         bytes = 0;
                         // console.log("GOT DATA", client.compressed, msg.length);
+                        assert(client, "Gotta client");
                         if (client.compressed) {
                             zlib.gunzip(msg, (err, data) => {
                                 if (err) {
                                     error(`Got error inflating data ${err}`);
                                 } else {
+                                    assert(client, "Gotta client");
                                     client.emit("data", { data });
                                 }
                             });

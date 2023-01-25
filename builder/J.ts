@@ -14,6 +14,7 @@ export type J = {
     buffer?: Buffer;
     objectCache?: boolean;
     op?: CompileJob;
+    webSocketError?: string;
 
     cancel: () => void;
     start: () => void;

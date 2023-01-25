@@ -613,7 +613,7 @@ client.on("connect", () => {
         connectInterval = undefined;
     }
     if (!load.running) {
-        load.start(option("loadInterval", 1000));
+        load.start(option.int("loadInterval", 1000) || 1000);
     }
     if (objectCache) {
         client.send({
@@ -910,6 +910,7 @@ server.on("job", (job: Job) => {
                     }
                 });
                 // console.log("GOT ID", j);
+                assert(uploadDuration !== undefined, "Must have uploadDuration");
                 if (event.success) {
                     client.send("jobFinished", {
                         id: j.id,
@@ -940,9 +941,9 @@ server.on("job", (job: Job) => {
         }
     };
 
-    job.heartbeatTimer = setInterval(() => {
-        if (job.done || job.aborted || job.readyState !== ws.OPEN) {
-            clearTimeout(job.heartbeatTimer);
+    j.heartbeatTimer = setInterval(() => {
+        if (j.done || j.aborted || job.readyState !== ws.OPEN) {
+            clearTimeout(j.heartbeatTimer);
         } else {
             // console.log("sending heartbeat");
             job.send("heartbeat", {});
@@ -950,20 +951,20 @@ server.on("job", (job: Job) => {
     }, 5000);
 
     job.on("error", (err) => {
-        job.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
-        console.error("got error from job", job.webSocketError);
+        j.webSocketError = `${err} from ${job.name} ${job.hostname} ${job.ip}`;
+        console.error("got error from job", j.webSocketError);
         j.done = true;
     });
     job.on("close", () => {
         job.removeAllListeners();
-        job.done = true;
+        j.done = true;
         const idx = jobQueue.indexOf(j);
         if (idx !== -1) {
             j.aborted = true;
             jobQueue.splice(idx, 1);
             j.cancel();
             if (j.started) {
-                client.send("jobAborted", { id: j.id, webSocketError: job.webSocketError });
+                client.send("jobAborted", { id: j.id, webSocketError: j.webSocketError });
             }
             startPending();
         }
@@ -974,7 +975,7 @@ server.on("job", (job: Job) => {
         uploadDuration = Date.now() - jobStartTime;
         if (!j.op) {
             j.buffer = data.data;
-            console.log("buffering...", j.buffer.byteLength);
+            console.log("buffering...", data.data.byteLength);
         } else {
             j.op.feed(data.data);
         }
@@ -1011,8 +1012,8 @@ function start() {
             client.connect(Object.keys(environments));
             server.listen();
         })
-        .catch((err) => {
-            console.error(`Failed to initialize ${err.message}`);
+        .catch((err: unknown) => {
+            console.error(`Failed to initialize ${(err as Error).message}`);
             setTimeout(start, 1000);
         });
 }

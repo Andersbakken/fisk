@@ -8,6 +8,7 @@ export class ObjectCachePendingItem {
     remaining: number;
     endCB?: () => void;
     buffer?: Buffer[];
+    jsonLength: number;
 
     constructor(
         response: Response,

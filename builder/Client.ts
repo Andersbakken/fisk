@@ -1,6 +1,7 @@
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import WebSocket from "ws";
+import assert from "assert";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -10,11 +11,11 @@ export class Client extends EventEmitter {
     private scheduler: string;
     private serverPort: number;
     private labels?: string;
-    private ws: WebSocket;
+    private ws?: WebSocket;
 
-    npmVersion?: string;
-    name?: string;
-    hostname?: string;
+    npmVersion: string;
+    name: string;
+    hostname: string;
     slots: number;
 
     constructor(option: OptionsFunction, configVersion: number) {
@@ -29,13 +30,16 @@ export class Client extends EventEmitter {
             this.scheduler += ":8097";
         }
         this.serverPort = option.int("port", 8096);
-        this.hostname = option("hostname") as string | undefined;
-        this.name = option("name") as string | undefined;
+        this.hostname = String(option("hostname"));
+        this.name = String(option("name"));
         this.slots = option.int("slots", os.cpus().length);
         this.labels = option("labels") as string | undefined;
         try {
-            this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version;
+            this.npmVersion = String(
+                JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version
+            );
         } catch (err) {
+            this.npmVersion = "";
             /* */
         }
         console.log("this is our npm version", this.npmVersion);
@@ -53,7 +57,7 @@ export class Client extends EventEmitter {
         console.log("connecting to", url);
 
         let remaining = 0;
-        let system;
+        let system = "";
         switch (os.platform()) {
             case "darwin":
                 system = "Darwin";
@@ -76,13 +80,13 @@ export class Client extends EventEmitter {
                 console.error("Unknown architecture", os.arch());
                 break;
         }
-        const headers = {
-            "x-fisk-port": this.serverPort,
+        const headers: Record<string, string> = {
+            "x-fisk-port": String(this.serverPort),
             "x-fisk-environments": environments.join(";"),
-            "x-fisk-config-version": this.configVersion,
+            "x-fisk-config-version": String(this.configVersion),
             "x-fisk-builder-name": this.name,
             "x-fisk-system": system,
-            "x-fisk-slots": this.slots,
+            "x-fisk-slots": String(this.slots),
             "x-fisk-npm-version": this.npmVersion
         };
 
@@ -94,7 +98,7 @@ export class Client extends EventEmitter {
             headers["x-fisk-builder-hostname"] = this.hostname;
         }
 
-        this.ws = new WebSocket(url, { headers: headers });
+        this.ws = new WebSocket(url, { headers });
         this.ws.on("open", () => {
             this.emit("connect");
         });
@@ -106,17 +110,19 @@ export class Client extends EventEmitter {
         });
 
         this.ws.on("message", (msg) => {
-            const error = (msg) => {
-                this.ws.send(`{"error": "${msg}"}`);
-                this.ws.close();
-                this.emit("error", msg);
+            const error = (err: string) => {
+                if (this.ws) {
+                    this.ws.send(`{"error": "${err}"}`);
+                    this.ws.close();
+                }
+                this.emit("error", err);
             };
 
             switch (typeof msg) {
                 case "string": {
                     if (remaining) {
                         // bad, client have to send all the data in a binary message before sending JSON
-                        error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
+                        error(`Got JSON message while ${remaining} bytes remained of a binary message`);
                         return;
                     }
                     // assume JSON
@@ -168,7 +174,7 @@ export class Client extends EventEmitter {
             }
         });
         this.ws.on("close", () => {
-            if (remaining.bytes) {
+            if (remaining) {
                 this.emit("error", "Got close while reading a binary message");
             }
             this.emit("close");
@@ -181,12 +187,13 @@ export class Client extends EventEmitter {
 
     sendBinary(blob: Buffer): void {
         try {
+            assert(this.ws, "Must have ws");
             this.ws.send(blob);
         } catch (err: unknown) {
             this.emit("err", (err as Error).toString());
         }
     }
-    send(type: unknown, msg?: unknown): void {
+    send(type: unknown, msg?: Record<string, unknown>): void {
         if (!this.ws) {
             this.emit("error", "No connected websocket");
             return;
@@ -196,7 +203,7 @@ export class Client extends EventEmitter {
                 this.ws.send(JSON.stringify(type));
             } else {
                 let tosend;
-                if (typeof msg === "object") {
+                if (msg && typeof msg === "object") {
                     tosend = msg;
                     tosend.type = type;
                 } else {
@@ -204,8 +211,8 @@ export class Client extends EventEmitter {
                 }
                 this.ws.send(JSON.stringify(tosend));
             }
-        } catch (err) {
-            this.emit("err", err.toString());
+        } catch (err: unknown) {
+            this.emit("err", (err as Error).toString());
         }
     }
 }

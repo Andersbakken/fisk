@@ -74,9 +74,11 @@ export class ObjectCache extends EventEmitter {
                     }
                     return ret;
                 })
-                .sort((a, b) => a.atime - b.atime)
-                .forEach((item) => {
-                    this.loadFile(item.path, item.size);
+                .sort((a: FileType, b: FileType) => (a.atime || 0) - (b.atime || 0))
+                .forEach((item: FileType) => {
+                    if (item.size !== undefined) {
+                        this.loadFile(item.path, item.size);
+                    }
                 });
         } catch (err) {
             console.error(`Got error reading directory ${dir}:`, err);
@@ -161,7 +163,7 @@ export class ObjectCache extends EventEmitter {
         this.purge(0);
     }
 
-    add(response: Response, contents: Contents): void {
+    add(response: Response, contents: Contents[]): void {
         if (response.sha1 in this.pending) {
             console.log("Already writing this, I suppose this is possible", response);
             return;
@@ -245,14 +247,13 @@ export class ObjectCache extends EventEmitter {
             dir: this.dir,
             cacheHits: this.cacheHits,
             usage: ((this.size / this.maxSize) * 100).toFixed(1),
-            count: Object.keys(ret.cache).length,
+            count: Object.keys(this.cache).length,
             cache: this.cache,
             pending: this.pending,
             maxSize: prettysize(this.maxSize),
             size: prettysize(this.size),
             purgeSize: prettysize(this.purgeSize)
         };
-        ret.count = Object.keys(ret.cache).length;
         if (!query || !("object" in query)) {
             delete ret.cache;
         }
@@ -269,8 +270,8 @@ export class ObjectCache extends EventEmitter {
             delete this.cache[sha1];
             this.emit("removed", { sha1: sha1, sourceFile: info.response.sourceFile, fileSize: info.fileSize });
             fs.unlinkSync(path.join(this.dir, sha1));
-        } catch (err) {
-            console.error("Can't remove file", path.join(this.dir, sha1), err.toString());
+        } catch (err: unknown) {
+            console.error("Can't remove file", path.join(this.dir, sha1), err);
         }
     }
 
