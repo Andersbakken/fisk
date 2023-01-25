@@ -45,7 +45,7 @@ export default [
         }
     },
     {
-        input: "builder/VM_runtime.ts",
+        input: "builder/VM_runtime/VM_runtime.ts",
         plugins,
         external,
         output: {

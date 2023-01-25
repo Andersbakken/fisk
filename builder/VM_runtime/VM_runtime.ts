@@ -1,4 +1,5 @@
 import { Compile } from "./Compile";
+import assert from "assert";
 import fs from "fs";
 import minimist from "minimist";
 import os from "os";
@@ -7,21 +8,26 @@ import posix from "posix";
 
 const argv = minimist(process.argv.slice(2));
 
-function send(message) {
+type InitGroups = {
+    initgroups: (user: string |number, extraGroup: string | number) => void
+};
+
+function send(message: Record<string, unknown>): void {
     try {
+        assert(process.send, "Must have process.send");
         process.send(message);
-    } catch (err) {
-        console.error(`Couldn't send message ${message.type}. Going down`);
+    } catch (err: unknown) {
+        console.error(`Couldn't send message ${message.type}. Going down`, err);
         process.exit();
     }
 }
 
-process.on("unhandledRejection", (reason, p) => {
-    send({ type: "error", message: `Unhandled rejection at: Promise ${p} reason: ${reason.stack}` });
-    console.error("Unhandled rejection at: Promise", p, "reason:", reason.stack);
+process.on("unhandledRejection", (reason: Record<string, unknown>, p: Promise<unknown>) => {
+    send({ type: "error", message: `Unhandled rejection at: Promise ${p} reason: ${reason?.stack}` });
+    console.error("Unhandled rejection at: Promise", p, "reason:", reason?.stack);
 });
 
-process.on("uncaughtException", (err) => {
+process.on("uncaughtException", (err: Error) => {
     send({ type: "error", message: `Uncaught exception ${err.stack} ${err.toString()}` });
     console.error("Uncaught exception", err);
 });
@@ -36,9 +42,9 @@ if (argv.user) {
     }
 
     try {
-        process.initgroups(argv.user, pwd.gid);
-    } catch (err) {
-        throw new Error("Changing groups failed: " + err.message);
+        (process as unknown as InitGroups).initgroups(argv.user, pwd.gid);
+    } catch (err: unknown) {
+        throw new Error("Changing groups failed: " + (err as Error).message);
     }
 }
 
@@ -79,7 +85,7 @@ function isLibrary(file: string) {
     return file.indexOf(".so.") !== -1;
 }
 
-function findLibraries(dir) {
+function findLibraries(dir: string) {
     const files = fs.readdirSync(dir);
     // console.log("findLibraries", dir, files.length);
     let found = false;
@@ -118,13 +124,13 @@ setTimeout(() => {
     }
 }, 1000);
 
-const compiles: Record<number, Compile> = {};
+const compiles: Map<number, Compile> = new Map();
 let destroying = false;
 
 process.on("message", (msg) => {
     switch (msg.type) {
         case "destroy":
-            if (!compiles.length) {
+            if (!compiles.size) {
                 process.exit();
             } else {
                 destroying = true;
@@ -139,7 +145,7 @@ process.on("message", (msg) => {
             console.log("set debug to", msg.debug, "for", argv.root);
             break;
         case "cancel": {
-            const c = compiles[msg.id];
+            const c = compiles.get(msg.id);
             if (c) {
                 c.kill();
             }
@@ -156,7 +162,7 @@ process.on("message", (msg) => {
                 compile.on("stdout", (data) => send({ type: "compileStdOut", id: msg.id, data: data }));
                 compile.on("stderr", (data) => send({ type: "compileStdErr", id: msg.id, data: data }));
                 compile.on("exit", (event) => {
-                    delete compiles[msg.id];
+                    compiles.delete(msg.id);
                     if ("error" in event) {
                         send({
                             type: "compileFinished",
@@ -177,20 +183,20 @@ process.on("message", (msg) => {
                             sourceFile: event.sourceFile
                         });
                     }
-                    if (destroying && !compiles.length) {
+                    if (destroying && !compiles.size) {
                         process.exit();
                     }
                 });
-                compiles[msg.id] = compile;
-            } catch (err) {
-                delete compiles[msg.id];
+                compiles.set(msg.id, compile);
+            } catch (err: unknown) {
+                compiles.delete(msg.id);
                 send({
                     type: "compileFinished",
                     success: false,
                     id: msg.id,
                     files: [],
                     exitCode: -1,
-                    error: err.toString()
+                    error: (err as Error).toString()
                 });
             }
             break;

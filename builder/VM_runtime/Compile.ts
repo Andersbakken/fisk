@@ -1,4 +1,6 @@
+import { ExitEvent, ExitEventFile } from "./ExitEvent";
 import EventEmitter from "events";
+import assert from "assert";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
@@ -182,7 +184,7 @@ export class Compile extends EventEmitter {
 
         if (!hasDashO) {
             const suffix = path.extname(sourceFile);
-            outputFileName = output = sourceFile.substr(0, sourceFile.length - suffix) + ".o";
+            outputFileName = output = sourceFile.substring(0, sourceFile.length - suffix.length) + ".o";
             args.push("-o", outputFileName);
         }
 
@@ -213,7 +215,7 @@ export class Compile extends EventEmitter {
 
         proc.on("exit", (exitCode) => {
             // try {
-            const files: string[] = [];
+            const files: ExitEventFile[] = [];
             const addDir = (dir: string, prefix: string) => {
                 try {
                     fs.readdirSync(dir).forEach((file: string) => {
@@ -221,6 +223,7 @@ export class Compile extends EventEmitter {
                             return;
                         }
                         try {
+                            assert(output !== undefined, "Must have output");
                             const stat = fs.statSync(path.join(dir, file));
                             if (stat.isDirectory()) {
                                 addDir(path.join(dir, file), prefix ? prefix + file + "/" : file + "/");
@@ -235,7 +238,7 @@ export class Compile extends EventEmitter {
                                     });
                                 } else if (path.extname(file) === ".gcda") {
                                     files.push({
-                                        path: output.substr(0, output.length - 1) + "gcda",
+                                        path: output.substring(0, output.length - 1) + "gcda",
                                         mapped: path.join(prefix, file)
                                     });
                                 } else {
@@ -251,13 +254,17 @@ export class Compile extends EventEmitter {
                     });
                 } catch (err: unknown) {
                     console.error("Got an error processing outputs for", sourceFile, err);
-                    this.emit("exit", {
+                    assert(sourceFile !== undefined, "Must have sourceFile");
+                    const errorExitEvent: ExitEvent = {
                         exitCode: 110,
                         files: [],
                         error: (err as Error).toString(),
-                        sourceFile: sourceFile
-                    });
-                }
+                        sourceFile
+                    };
+
+                    this.emit("exit", errorExitEvent);
+                4
+}
             };
             if (exitCode === 0) {
                 addDir(dir, dir);
@@ -265,7 +272,9 @@ export class Compile extends EventEmitter {
             if (exitCode === null) {
                 exitCode = 111;
             }
-            this.emit("exit", { exitCode, files, sourceFile });
+            assert(sourceFile !== undefined, "Must have sourceFile4");
+            const exitEvent: ExitEvent = { exitCode, files, sourceFile };
+            this.emit("exit", exitEvent);
         });
     }
 
@@ -291,3 +300,5 @@ export class Compile extends EventEmitter {
 //     console.log("Got exit", event);
 // });
 module.exports = Compile;
+
+
