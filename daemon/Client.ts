@@ -1,79 +1,96 @@
-const EventEmitter = require("events");
-const WebSocket = require("ws");
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
+import { OptionsFunction } from "@jhanssen/options";
+import EventEmitter from "events";
+import WebSocket from "ws";
+import assert from "assert";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
-class Client extends EventEmitter {
-    constructor(option, configVersion) {
+export class Client extends EventEmitter {
+    configVersion: number;
+    scheduler: string;
+    hostname?: string;
+    name?: string;
+    npmVersion?: string;
+    ws?: WebSocket;
+    serverPort: number;
+
+    constructor(option: OptionsFunction, configVersion: number) {
         super();
 
         this.configVersion = configVersion;
-        this.scheduler = option("scheduler", "ws://localhost:8097");
-        if (this.scheduler.indexOf('://') == -1)
+        this.scheduler = String(option("scheduler", "ws://localhost:8097"));
+        if (this.scheduler.indexOf("://") === -1) {
             this.scheduler = "ws://" + this.scheduler;
-        if (!/:[0-9]+$/.exec(this.scheduler))
+        }
+        const match = /:([0-9]+)$/.exec(this.scheduler);
+        if (match) {
+            this.serverPort = parseInt(match[1], 10);
+        } else {
+            this.serverPort = 8097;
             this.scheduler += ":8097";
-        this.hostname = option("hostname");
-        this.name = option("name");
+        }
+        let tmp = option("hostname");
+        this.hostname = tmp === undefined ? undefined : String(tmp);
+        tmp = option("name");
+        this.name = tmp === undefined ? undefined : String(tmp);
         try {
-            this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+            this.npmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version;
         } catch (err) {
+            /* */
         }
         console.log("this is our npm version", this.npmVersion);
         if (!this.name) {
             if (this.hostname) {
                 this.name = this.hostname;
-            } else  {
+            } else {
                 this.name = os.hostname();
             }
         }
     }
 
-    connect() {
+    connect(): void {
         const url = `${this.scheduler}/daemon`;
         console.log("connecting to", url);
 
-        let headers = {
-            "x-fisk-port": this.serverPort,
+        const headers: Record<string, string> = {
+            "x-fisk-port": String(this.serverPort),
             "x-fisk-config-version": this.configVersion,
             "x-fisk-daemon-name": this.name,
             "x-fisk-npm-version": this.npmVersion
         };
-        if (this.hostname)
+        if (this.hostname) {
             headers["x-fisk-builder-hostname"] = this.hostname;
+        }
 
         this.ws = new WebSocket(url, { headers: headers });
         this.ws.on("open", () => {
             this.emit("connect");
         });
-        this.ws.on("error", err => {
+        this.ws.on("error", (err) => {
             console.error("client websocket error", err.message);
         });
-        this.ws.on("message", msg => {
-            const error = msg => {
-                this.ws.send(`{"error": "${msg}"}`);
-                this.ws.close();
-                this.emit("error", msg);
-            };
+        this.ws.on("message", (msg: unknown) => {
             console.log("Got message from scheduler", msg);
         });
         this.ws.on("close", () => {
             this.emit("close");
-            if (this.ws)
+            if (this.ws) {
                 this.ws.removeAllListeners();
+            }
             this.ws = undefined;
         });
     }
 
-    sendBinary(blob) {
+    sendBinary(blob: Buffer): void {
         try {
+            assert(this.ws, "Must have ws");
             this.ws.send(blob);
-        } catch (err) {
-            this.emit("err", err.toString());
+        } catch (err: unknown) {
+            this.emit("err", (err as Error).toString());
         }
     }
-    send(type, msg) {
+    send(type: own, msg?: Record<string, unknown>): void {
         if (!this.ws) {
             this.emit("error", "No connected websocket");
             return;
@@ -82,7 +99,7 @@ class Client extends EventEmitter {
             if (msg === undefined) {
                 this.ws.send(JSON.stringify(type));
             } else {
-                let tosend;
+                let tosend: Record<string, unknown>;
                 if (typeof msg === "object") {
                     tosend = msg;
                     tosend.type = type;
@@ -91,10 +108,8 @@ class Client extends EventEmitter {
                 }
                 this.ws.send(JSON.stringify(tosend));
             }
-        } catch (err) {
-            this.emit("err", err.toString());
+        } catch (err: unknown) {
+            this.emit("err", (err as Error).toString());
         }
     }
 }
-
-module.exports = Client;

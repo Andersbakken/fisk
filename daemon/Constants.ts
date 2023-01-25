@@ -1,13 +1,29 @@
-module.exports = {
+export const Constants = {
     // client codes
-    get AcquireCppSlot() {  return 1; },
-    get AcquireCompileSlot() { return 2; },
-    get ReleaseCppSlot() { return 3; },
-    get ReleaseCompileSlot() { return 4; },
-    get JSON() { return 5; },
+    get AcquireCppSlot(): number {
+        return 1;
+    },
+    get AcquireCompileSlot(): number {
+        return 2;
+    },
+    get ReleaseCppSlot(): number {
+        return 3;
+    },
+    get ReleaseCompileSlot(): number {
+        return 4;
+    },
+    get JSON(): number {
+        return 5;
+    },
 
     // daemon codes
-    get CppSlotAcquired() { return 10; },
-    get CompileSlotAcquired() { return 11; },
-    get JSONResponse() { return 12; }
+    get CppSlotAcquired(): number {
+        return 10;
+    },
+    get CompileSlotAcquired(): number {
+        return 11;
+    },
+    get JSONResponse(): number {
+        return 12;
+    }
 };
