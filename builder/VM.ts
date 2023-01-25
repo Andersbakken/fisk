@@ -1,4 +1,5 @@
-import { CompileFinished } from "./CompileFinished";
+import { CompileFinished, CompileFinishedFile } from "./CompileFinished";
+import { CompileFinishedEvent } from "./CompileFinishedEvent";
 import { CompileJob } from "./CompileJob";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
@@ -93,19 +94,22 @@ export class VM extends EventEmitter {
             console.error("Got some error", msg.error);
         }
         const now = Date.now();
-        compile.emit("finished", {
+        const finishedEvent: CompileFinishedEvent = {
             cppSize: compile.cppSize,
             compileDuration: now - (compile.startCompile || 0),
             exitCode: msg.exitCode,
             success: msg.success,
             error: msg.error,
             sourceFile: msg.sourceFile,
-            files: msg.files.map((file) => {
-                file.absolute = path.join(this.root, file.mapped ? file.mapped : file.path);
-                delete file.mapped;
-                return file;
+            files: msg.files.map((file: CompileFinishedFile) => {
+                return {
+                    path: file.path,
+                    absolute: path.join(this.root, file.mapped ? file.mapped : file.path)
+                }
             })
-        });
+        };
+
+        compile.emit("finished", finishedEvent);
 
         if (!this.keepCompiles) {
             fs.remove(this.compiles[msg.id].dir);
@@ -134,3 +138,5 @@ export class VM extends EventEmitter {
         this.child.send({ type: "setDebug", debug });
     }
 }
+
+

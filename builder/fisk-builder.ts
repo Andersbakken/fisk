@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import { Client } from "./Client";
+import { CompileFinishedEvent, CompileFinishedEventFile } from "./CompileFinishedEvent";
+import { Contents, ObjectCache } from "./ObjectCache";
 import { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage";
-import { FetchCacheObjectsMessage } from "../common/FetchCacheObjectsMessage";
-import { FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
+import { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
 import { J } from "./J";
 import { Job } from "./Job";
-import { ObjectCache } from "./ObjectCache";
+import { Response } from "./Response";
 import { Server } from "./Server";
 import { VM } from "./VM";
 import { common as commonFunc } from "../common-ts";
@@ -833,7 +834,7 @@ server.on("job", (job: Job) => {
             j.op.on("stderr", (data) => {
                 j.stderr += data;
             });
-            j.op.on("finished", (event) => {
+            j.op.on("finished", (event: CompileFinishedEvent) => {
                 j.done = true;
                 if (j.aborted) {
                     return;
@@ -862,14 +863,17 @@ server.on("job", (job: Job) => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
-                const forCache = event.files.map((f) => ({ contents: fs.readFileSync(f.absolute), path: f.path }));
-                const contents = !j.job.compressed
+                const forCache: Contents[] = event.files.map((f: CompileFinishedEventFile) => ({
+                    contents: fs.readFileSync(f.absolute),
+                    path: f.path
+                }));
+                const contents: Contents[] = !j.job.compressed
                     ? forCache
                     : forCache.map((x) => ({
                           path: x.path,
                           contents: x.contents.byteLength ? zlib.gzipSync(x.contents) : x.contents
                       }));
-                const response = {
+                const response: Response = {
                     type: "response",
                     index: contents.map((item) => {
                         return { path: item.path, bytes: item.contents.length };

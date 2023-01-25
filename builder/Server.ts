@@ -67,8 +67,8 @@ export class Server extends EventEmitter {
             // console.log(req.connection, ws.readyState);
             return;
         }
-        if (ip.substr(0, 7) === "::ffff:") {
-            ip = ip.substr(7);
+        if (ip.substring(0, 7) === "::ffff:") {
+            ip = ip.substring(7);
         }
 
         const url = Url.parse(req.url);

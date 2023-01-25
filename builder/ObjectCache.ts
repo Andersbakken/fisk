@@ -21,6 +21,11 @@ export type SyncData = {
     fileSize: number;
 };
 
+export type Contents = {
+    contents: Buffer;
+    path: string;
+};
+
 export type InfoType = {
     cacheHits: number;
     usage: string;
@@ -123,7 +128,12 @@ export class ObjectCache extends EventEmitter {
             if (fd) {
                 fs.closeSync(fd);
             }
-            console.error("got failure", filePath, err, jsonBuffer ? jsonBuffer.toString().substr(0, 100) : undefined);
+            console.error(
+                "got failure",
+                filePath,
+                err,
+                jsonBuffer ? jsonBuffer.toString().substring(0, 100) : undefined
+            );
             try {
                 fs.removeSync(filePath);
             } catch (doubleError) {
@@ -151,7 +161,7 @@ export class ObjectCache extends EventEmitter {
         this.purge(0);
     }
 
-    add(response: Response, contents: Buffer): void {
+    add(response: Response, contents: Contents): void {
         if (response.sha1 in this.pending) {
             console.log("Already writing this, I suppose this is possible", response);
             return;
