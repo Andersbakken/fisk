@@ -265,7 +265,7 @@ export class Compile extends EventEmitter {
             if (exitCode === null) {
                 exitCode = 111;
             }
-            this.emit("exit", { exitCode: exitCode, files: files, sourceFile: sourceFile });
+            this.emit("exit", { exitCode, files, sourceFile });
         });
     }
 
