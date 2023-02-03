@@ -84,9 +84,9 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                     strm.zalloc = Z_NULL;
                     strm.zfree = Z_NULL;
                     strm.opaque = Z_NULL;
-                    const int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 9, Z_DEFAULT_STRATEGY);
-                    assert(ret == Z_OK);
-                    static_cast<void>(ret);
+                    const int r = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 9, Z_DEFAULT_STRATEGY);
+                    assert(r == Z_OK);
+                    static_cast<void>(r);
                     compressed.reserve(1024 * 1024);
                 }
                 DEBUG("Executing:\n%s", commandLine.c_str());
@@ -96,17 +96,17 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                                                  ptr->stdOut.insert(ptr->stdOut.end(), reinterpret_cast<const unsigned char *>(bytes),
                                                                     reinterpret_cast<const unsigned char *>(bytes) + n);
                                                  if (Config::compress) {
-                                                     unsigned char out[16384];
-                                                     strm.avail_in = ptr->stdOut.size() - compressOffset;
+                                                     unsigned char outBuf[16384];
+                                                     strm.avail_in = static_cast<uint32_t>(ptr->stdOut.size() - compressOffset);
                                                      strm.next_in = ptr->stdOut.data() + compressOffset;
-                                                     int ret;
+                                                     int r;
                                                      do {
-                                                         strm.next_out = out;
-                                                         strm.avail_out = sizeof(out);
-                                                         ret = deflate(&strm, Z_NO_FLUSH);
-                                                         const size_t written = sizeof(out) - strm.avail_out;
-                                                         compressed.insert(compressed.end(), out, out + written);
-                                                     } while (ret != Z_STREAM_END && ret != Z_BUF_ERROR);
+                                                         strm.next_out = outBuf;
+                                                         strm.avail_out = sizeof(outBuf);
+                                                         r = deflate(&strm, Z_NO_FLUSH);
+                                                         const size_t written = sizeof(outBuf) - strm.avail_out;
+                                                         compressed.insert(compressed.end(), outBuf, outBuf + written);
+                                                     } while (r != Z_STREAM_END && r != Z_BUF_ERROR);
                                                      compressOffset = ptr->stdOut.size() - strm.avail_in;
                                                  }
                                              }, [ptr](const char *bytes, size_t n) {
@@ -116,18 +116,18 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                 VERBOSE("Preprocess calling get_status");
                 ptr->exitStatus = proc.get_exit_status();
                 if (Config::compress) {
-                    unsigned char out[16384];
-                    strm.avail_in = ptr->stdOut.size() - compressOffset;
+                    unsigned char outBuf[16384];
+                    strm.avail_in = static_cast<uint32_t>(ptr->stdOut.size() - compressOffset);
                     strm.next_in = ptr->stdOut.data() + compressOffset;
-                    int ret;
+                    int r;
                     do {
-                        strm.next_out = out;
-                        strm.avail_out = sizeof(out);
-                        ret = deflate(&strm, Z_FINISH);
-                        const size_t written = sizeof(out) - strm.avail_out;
-                        compressed.insert(compressed.end(), out, out + written);
+                        strm.next_out = outBuf;
+                        strm.avail_out = sizeof(outBuf);
+                        r = deflate(&strm, Z_FINISH);
+                        const size_t written = sizeof(outBuf) - strm.avail_out;
+                        compressed.insert(compressed.end(), outBuf, outBuf + written);
                         // printf("GOT RET %d %zu\n", ret, written);
-                    } while (ret != Z_STREAM_END && ret != Z_BUF_ERROR);
+                    } while (r != Z_STREAM_END && r != Z_BUF_ERROR);
                     compressOffset = ptr->stdOut.size() - strm.avail_in;
                     assert(compressOffset == ptr->stdOut.size());
                     deflateEnd(&strm);

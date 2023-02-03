@@ -730,7 +730,7 @@ bool Client::uncompressToFile(const std::string &fileName, FILE *f, const void *
     }
 
     zctx.next_in = static_cast<const Bytef *>(bytes);
-    zctx.avail_in = len;
+    zctx.avail_in = static_cast<uint32_t>(len);
 
     // temporary buffer for deflated data
     unsigned char buffer[16384];
@@ -749,7 +749,7 @@ bool Client::uncompressToFile(const std::string &fileName, FILE *f, const void *
         }
 
         // output processed data to dst std::string
-        const int processed = sizeof(buffer) - zctx.avail_out;
+        const size_t processed = sizeof(buffer) - zctx.avail_out;
         if (fwrite(buffer, 1, processed, f) != processed) {
             ERROR("Failed to write to file %d %s", errno, strerror(errno));
             inflateEnd(&zctx); // don't leak the context memory
