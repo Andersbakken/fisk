@@ -1,5 +1,3 @@
-import { CompileFinished } from "./CompileFinished";
-
 export type VMReadyMessage = {
     type: "ready";
 };
@@ -35,4 +33,4 @@ export type VMCompileFinished = {
     error?: string;
 };
 
-export type VMMessage = VMReadyMessage | VMErrorMessage | VMCompileStdOut | VMCompileStdErr | CompileFinished;
+export type VMMessage = VMReadyMessage | VMErrorMessage | VMCompileStdOut | VMCompileStdErr | VMCompileFinished;

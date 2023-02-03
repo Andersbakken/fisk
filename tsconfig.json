@@ -15,8 +15,6 @@
         "incremental": true,
         "lib": ["es6"],
         "baseUrl": ".",
-        "paths": {
-            "~/*": ["*"]
-        }
+        "outDir": "dist/"
     }
 }

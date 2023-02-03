@@ -5,6 +5,7 @@
     "scripts": {
         "lint": "eslint . --ext .ts",
         "rollup": "rollup -c",
+        "tsc": "tsc -p .",
         "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup",
         "clean:dist": "del-cli dist/*",
         "clean:cache": "del-cli .cache/*",
@@ -25,6 +26,7 @@
         "@jhanssen/options": "^1.0.34",
         "axios": "^0.21.1",
         "blessed": "^0.1.81",
+        "bufferutil": "^4.0.7",
         "bytes": "^3.0.0",
         "compare-versions": "^3.4.0",
         "express": "^4.16.3",
@@ -37,6 +39,7 @@
         "posix": "^4.2.0",
         "pretty-bytes": "^6.0.0",
         "prettysize": "^2.0.0",
+        "utf-8-validate": "^5.0.10",
         "wake_on_lan": "^1.0.0",
         "ws": "^7.4.6"
     },

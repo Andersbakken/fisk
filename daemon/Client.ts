@@ -55,9 +55,9 @@ export class Client extends EventEmitter {
 
         const headers: Record<string, string> = {
             "x-fisk-port": String(this.serverPort),
-            "x-fisk-config-version": this.configVersion,
-            "x-fisk-daemon-name": this.name,
-            "x-fisk-npm-version": this.npmVersion
+            "x-fisk-config-version": String(this.configVersion),
+            "x-fisk-daemon-name": String(this.name),
+            "x-fisk-npm-version": String(this.npmVersion)
         };
         if (this.hostname) {
             headers["x-fisk-builder-hostname"] = this.hostname;
@@ -90,7 +90,7 @@ export class Client extends EventEmitter {
             this.emit("err", (err as Error).toString());
         }
     }
-    send(type: own, msg?: Record<string, unknown>): void {
+    send(type: unknown, msg?: Record<string, unknown>): void {
         if (!this.ws) {
             this.emit("error", "No connected websocket");
             return;
