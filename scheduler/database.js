@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require("fs");
 
 class Database {
     constructor(path) {
@@ -12,13 +12,15 @@ class Database {
             // console.log("Reader promise", record, this.busy, this.queue);
             const perform = () => {
                 // console.log("perform called for read");
-                return this._read().then(records => {
-                    this.finishedOperation();
-                    resolve(records ? records[record] : undefined);
-                }).catch(err => {
-                    reject(err);
-                    this.finishedOperation();
-                });
+                return this._read()
+                    .then((records) => {
+                        this.finishedOperation();
+                        resolve(records ? records[record] : undefined);
+                    })
+                    .catch((err) => {
+                        reject(err);
+                        this.finishedOperation();
+                    });
             };
             if (this.busy) {
                 this.queue.push(perform);
@@ -32,30 +34,31 @@ class Database {
     set(...keyValuePairs) {
         return new Promise((resolve, reject) => {
             const perform = () => {
-                return this._read().then(records => {
-                    if (!records)
-                        records = {};
-                    for (let i=0; i<keyValuePairs.length; i+=2)
-                        records[keyValuePairs[i]] = keyValuePairs[i + 1];
+                return this._read()
+                    .then((records) => {
+                        if (!records) records = {};
+                        for (let i = 0; i < keyValuePairs.length; i += 2)
+                            records[keyValuePairs[i]] = keyValuePairs[i + 1];
 
-                    fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", err => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            fs.rename(this.path + ".tmp", this.path, (err) => {
-                                if (err) {
-                                    reject(new Error(`Failed to rename ${this.path}.tmp to ${this.path} ${err}`));
-                                } else {
-                                    resolve();
-                                }
-                            });
-                        }
+                        fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", (err) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                fs.rename(this.path + ".tmp", this.path, (err) => {
+                                    if (err) {
+                                        reject(new Error(`Failed to rename ${this.path}.tmp to ${this.path} ${err}`));
+                                    } else {
+                                        resolve();
+                                    }
+                                });
+                            }
+                            this.finishedOperation();
+                        });
+                    })
+                    .catch((err) => {
+                        reject(err);
                         this.finishedOperation();
                     });
-                }).catch(err => {
-                    reject(err);
-                    this.finishedOperation();
-                });
             };
 
             if (this.busy) {

@@ -2,9 +2,11 @@
 
 const path = require("path");
 const os = require("os");
-const option = require("@jhanssen/options")({ prefix: "fisk/scheduler",
-                                              applicationPath: false,
-                                              additionalFiles: [ "fisk/scheduler.conf.override" ] });
+const option = require("@jhanssen/options")({
+    prefix: "fisk/scheduler",
+    applicationPath: false,
+    additionalFiles: ["fisk/scheduler.conf.override"]
+});
 const posix = require("posix");
 const Server = require("./server");
 const common = require("../common")(option);
@@ -20,13 +22,17 @@ const compareVersions = require("compare-versions");
 const humanizeDuration = require("humanize-duration");
 const wol = require("wake_on_lan");
 let wolBuilders = {};
-(option("wake-on-lan-builders") || []).forEach(builder => {
+(option("wake-on-lan-builders") || []).forEach((builder) => {
     if (!builder.name || !builder.mac) {
         console.error("Bad wol, missing name or mac address");
     } else if (builder.name in wolBuilders) {
         console.error(`Duplicate name for wol-builder ${JSON.stringify(builder)}`);
     } else {
-        wolBuilders[builder.name] = { mac: builder.mac, connected: false, address: builder.address || "255.255.255.255" };
+        wolBuilders[builder.name] = {
+            mac: builder.mac,
+            connected: false,
+            address: builder.address || "255.255.255.255"
+        };
     }
 });
 
@@ -39,7 +45,7 @@ process.on("unhandledRejection", (reason, p) => {
     });
 });
 
-process.on("uncaughtException", err => {
+process.on("uncaughtException", (err) => {
     console.error("Uncaught exception", err);
     addLogFile({ source: "no source file", ip: "self", contents: err.toString() + err.stack + "\n" }, () => {
         process.exit();
@@ -48,8 +54,8 @@ process.on("uncaughtException", err => {
 
 const monitorsLog = option("monitor-log");
 
-server.on("error", error => {
-    throw new error;
+server.on("error", (error) => {
+    throw new error();
 });
 
 let schedulerNpmVersion;
@@ -62,29 +68,25 @@ try {
 
 const builders = {};
 let lastWol = 0;
-function sendWols()
-{
+function sendWols() {
     const now = Date.now();
     // console.log("sendWols", now, lastWol, now - lastWol);
-    if (now - lastWol < 60000)
-        return;
+    if (now - lastWol < 60000) return;
 
     lastWol = now;
     let byName;
     for (let name in wolBuilders) {
         const wolBuilder = wolBuilders[name];
-        if (wolBuilder.connected)
-            continue;
+        if (wolBuilder.connected) continue;
         if (!byName) {
             byName = {};
             for (let key in builders) {
                 const builder = builders[key];
-                if (builder.name)
-                    byName[builder.name] = builder;
+                if (builder.name) byName[builder.name] = builder;
             }
         }
         if (!(name in byName)) {
-            wol.wake(wolBuilder.mac, error => {
+            wol.wake(wolBuilder.mac, (error) => {
                 console.log("sending wol", JSON.stringify(wolBuilder));
                 if (error) {
                     console.error(`Failed to wol builder: ${JSON.stringify(wolBuilder)}: ${error}`);
@@ -110,8 +112,7 @@ let objectCache;
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
-} catch (err) {
-}
+} catch (err) {}
 
 const peaks = [
     new Peak(60 * 60 * 1000, "Last hour"),
@@ -121,15 +122,13 @@ const peaks = [
     new Peak(undefined, "Forever")
 ];
 
-function peakData()
-{
+function peakData() {
     let ret = {};
-    peaks.forEach(peak => ret[peak.name] = peak.toObject());
+    peaks.forEach((peak) => (ret[peak.name] = peak.toObject()));
     return ret;
 }
 
-function statsMessage()
-{
+function statsMessage() {
     let info = peakData();
     info.type = "stats";
     const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
@@ -144,16 +143,13 @@ function statsMessage()
 
 const pendingUsers = {};
 
-function nextJobId()
-{
+function nextJobId() {
     let id = ++jobId;
-    if (id == 2147483647)
-        id = 1;
+    if (id == 2147483647) id = 1;
     return id;
 }
 
-function jobStartedOrScheduled(type, job)
-{
+function jobStartedOrScheduled(type, job) {
     if (monitors.length) {
         // console.log("GOT STUFF", job);
         let info = {
@@ -174,19 +170,15 @@ function jobStartedOrScheduled(type, job)
             },
             id: job.id
         };
-        if (job.builder.hostname)
-            info.builder.hostname = job.builder.hostname;
+        if (job.builder.hostname) info.builder.hostname = job.builder.hostname;
 
-        if (monitorsLog)
-            console.log("send to monitors", info);
-        monitors.forEach(monitor => monitor.send(info));
+        if (monitorsLog) console.log("send to monitors", info);
+        monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
-function cacheHit(builder, job)
-{
-    if (objectCache)
-        objectCache.hit(job.sha1);
+function cacheHit(builder, job) {
+    if (objectCache) objectCache.hit(job.sha1);
     if (monitors.length) {
         let info = {
             type: "cacheHit",
@@ -212,17 +204,14 @@ function cacheHit(builder, job)
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        if (builder.hostname)
-            info.builder.hostname = builder.hostname;
-        if (monitorsLog)
-            console.log("send to monitors", info);
+        if (builder.hostname) info.builder.hostname = builder.hostname;
+        if (monitorsLog) console.log("send to monitors", info);
         // console.log("sending info", info);
-        monitors.forEach(monitor => monitor.send(info));
+        monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
-function jobFinished(builder, job)
-{
+function jobFinished(builder, job) {
     ++jobsFinished;
     ++builder.jobsPerformed;
     builder.totalCompileSpeed += job.compileSpeed;
@@ -243,9 +232,8 @@ function jobFinished(builder, job)
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        if (monitorsLog)
-            console.log("send to monitors", info);
-        monitors.forEach(monitor => monitor.send(info));
+        if (monitorsLog) console.log("send to monitors", info);
+        monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
@@ -257,8 +245,7 @@ function builderKey() {
     }
 }
 
-function builderToMonitorInfo(builder, type)
-{
+function builderToMonitorInfo(builder, type) {
     return {
         type: type,
         ip: builder.ip,
@@ -286,9 +273,8 @@ function insertBuilder(builder) {
     capacity += builder.slots;
     if (monitors.length) {
         const info = builderToMonitorInfo(builder, "builderAdded");
-        if (monitorsLog)
-            console.log("send to monitors", info);
-        monitors.forEach(monitor => {
+        if (monitorsLog) console.log("send to monitors", info);
+        monitors.forEach((monitor) => {
             monitor.send(info);
         });
     }
@@ -300,20 +286,18 @@ function forEachBuilder(cb) {
     }
 }
 
-function onObjectCacheCleared()
-{
+function onObjectCacheCleared() {
     jobsFailed = 0;
     jobsStarted = 0;
     jobsScheduled = 0;
     jobsFinished = 0;
     const msg = { type: "clearObjectCache" };
-    forEachBuilder(builder => builder.send(msg));
+    forEachBuilder((builder) => builder.send(msg));
     let info = statsMessage();
-    monitors.forEach(monitor => monitor.send(info));
+    monitors.forEach((monitor) => monitor.send(info));
 }
 
-function setObjectCacheEnabled(on)
-{
+function setObjectCacheEnabled(on) {
     if (on && !objectCache) {
         objectCache = new ObjectCacheManager(option);
         objectCache.on("cleared", onObjectCacheCleared);
@@ -340,17 +324,14 @@ function removeBuilder(builder) {
 
     if (monitors.length) {
         const info = builderToMonitorInfo(builder, "builderRemoved");
-        if (monitorsLog)
-            console.log("send to monitors", info);
-        monitors.forEach(monitor => {
+        if (monitorsLog) console.log("send to monitors", info);
+        monitors.forEach((monitor) => {
             monitor.send(info);
         });
     }
-
 }
 
-function purgeEnvironmentsToMaxSize()
-{
+function purgeEnvironmentsToMaxSize() {
     return new Promise((resolve, reject) => {
         let maxSize = bytes.parse(option("max-environment-size"));
         if (!maxSize) {
@@ -360,44 +341,46 @@ function purgeEnvironmentsToMaxSize()
         const p = Environments._path;
         try {
             let purged = false;
-            fs.readdirSync(p).map(file => {
-                // console.log("got file", file);
-                const abs = path.join(p, file);
-                if (file.length != 47 || file.indexOf(".tar.gz", 40) != 40) {
-                    try {
-                        console.log("Removing unexpected file", abs);
-                        fs.removeSync(abs);
-                    } catch (err) {
-                        console.error("Failed to remove file", abs, err);
+            fs.readdirSync(p)
+                .map((file) => {
+                    // console.log("got file", file);
+                    const abs = path.join(p, file);
+                    if (file.length != 47 || file.indexOf(".tar.gz", 40) != 40) {
+                        try {
+                            console.log("Removing unexpected file", abs);
+                            fs.removeSync(abs);
+                        } catch (err) {
+                            console.error("Failed to remove file", abs, err);
+                        }
+                        return undefined;
                     }
-                    return undefined;
-                }
-                let stat;
-                try {
-                    stat = fs.statSync(abs);
-                } catch (err) {
-                    return undefined;
-                }
-                return {
-                    path: abs,
-                    hash: file.substr(0, 40),
-                    size: stat.size,
-                    created: stat.birthtimeMs
-                };
-            }).sort((a, b) => {
-                // console.log(`comparing ${a.path} ${a.created} to ${b.path} ${b.created}`);
-                return b.created - a.created;
-            }).forEach(env => {
-                if (!env)
-                    return;
-                if (maxSize >= env.size) {
-                    maxSize -= env.size;
-                    return;
-                }
-                purged = true;
-                Environments.remove(env.hash);
-                console.log("Should purge env", env.hash, maxSize, env.size);
-            });
+                    let stat;
+                    try {
+                        stat = fs.statSync(abs);
+                    } catch (err) {
+                        return undefined;
+                    }
+                    return {
+                        path: abs,
+                        hash: file.substr(0, 40),
+                        size: stat.size,
+                        created: stat.birthtimeMs
+                    };
+                })
+                .sort((a, b) => {
+                    // console.log(`comparing ${a.path} ${a.created} to ${b.path} ${b.created}`);
+                    return b.created - a.created;
+                })
+                .forEach((env) => {
+                    if (!env) return;
+                    if (maxSize >= env.size) {
+                        maxSize -= env.size;
+                        return;
+                    }
+                    purged = true;
+                    Environments.remove(env.hash);
+                    console.log("Should purge env", env.hash, maxSize, env.size);
+                });
             resolve(purged);
         } catch (err) {
             resolve(false);
@@ -406,8 +389,7 @@ function purgeEnvironmentsToMaxSize()
     });
 }
 
-function syncEnvironments(builder)
-{
+function syncEnvironments(builder) {
     if (!builder) {
         forEachBuilder(syncEnvironments);
         return;
@@ -441,23 +423,21 @@ function syncEnvironments(builder)
     }
 }
 
-function environmentsInfo()
-{
+function environmentsInfo() {
     let ret = Object.assign({}, Environments.environments);
     ret.maxSize = option("max-environment-size") || 0;
     ret.maxSizeBytes = bytes.parse(option("max-environment-size")) || 0;
     ret.usedSizeBytes = 0;
     for (let hash in Environments.environments) {
         let env = Environments.environments[hash];
-        if (env.size)
-            ret.usedSizeBytes += env.size;
+        if (env.size) ret.usedSizeBytes += env.size;
     }
     ret.usedSize = bytes.format(ret.usedSizeBytes);
     ret.links = Environments.linksInfo();
     return ret;
 }
 
-server.on("listen", app => {
+server.on("listen", (app) => {
     app.get("/environments", (req, res, next) => {
         const pretty = req.query && req.query.unpretty ? undefined : 4;
         res.send(JSON.stringify(environmentsInfo(), null, pretty) + "\n");
@@ -492,7 +472,7 @@ server.on("listen", app => {
                 load: s.load,
                 uptime: now - s.created.valueOf(),
                 npmVersion: s.npmVersion,
-                environments: Object.keys(s.environments),
+                environments: Object.keys(s.environments)
             });
         }
         const pretty = req.query && req.query.unpretty ? undefined : 4;
@@ -502,9 +482,8 @@ server.on("listen", app => {
     app.get("/info", (req, res, next) => {
         const now = Date.now();
         const jobs = jobsFailed + jobsStarted + (objectCache ? objectCache.hits : 0);
-        function percentage(count)
-        {
-            return { count: count, percentage: (count ? count * 100 / jobs : 0).toFixed(1) + "%" };
+        function percentage(count) {
+            return { count: count, percentage: (count ? (count * 100) / jobs : 0).toFixed(1) + "%" };
         }
 
         let obj = {
@@ -577,7 +556,7 @@ server.on("listen", app => {
         }
     });
 
-    app.get("/environment/*", function(req, res) {
+    app.get("/environment/*", function (req, res) {
         const hash = req.path.substr(13);
         const env = Environments.environment(hash);
         console.log("got env request", hash, env);
@@ -587,7 +566,7 @@ server.on("listen", app => {
         }
 
         const rstream = fs.createReadStream(env.path);
-        rstream.on("error", err => {
+        rstream.on("error", (err) => {
             console.error("Got read stream error for", env.path, err);
             rstream.close();
         });
@@ -599,29 +578,25 @@ server.on("listen", app => {
         if ("purge_environments" in req.query) {
             try {
                 fs.removeSync(path.join(common.cacheDir(), "environments"));
-            } catch (err) {
-            }
+            } catch (err) {}
         }
         res.sendStatus(200);
         setTimeout(() => process.exit(), 100);
     });
 });
 
-function updateLogFilesToMonitors()
-{
+function updateLogFilesToMonitors() {
     if (monitors.length) {
         fs.readdir(logFileDir, (err, files) => {
-            if (files)
-                files = files.reverse();
+            if (files) files = files.reverse();
             const msg = { type: "logFiles", files: files || [] };
             // console.log("sending files", msg);
-            monitors.forEach(monitor => monitor.send(msg));
+            monitors.forEach((monitor) => monitor.send(msg));
         });
     }
 }
 
-function clearLogFiles()
-{
+function clearLogFiles() {
     fs.readdir(logFileDir, (err, files) => {
         if (err) {
             console.log("Got error removing log files", err);
@@ -629,9 +604,8 @@ function clearLogFiles()
         }
 
         for (const file of files) {
-            fs.unlink(path.join(logFileDir, file), err => {
-                if (err)
-                    console.log("failed to remove file", path.join(logFileDir, file), err);
+            fs.unlink(path.join(logFileDir, file), (err) => {
+                if (err) console.log("failed to remove file", path.join(logFileDir, file), err);
             });
         }
         updateLogFilesToMonitors();
@@ -644,11 +618,9 @@ try {
             updateLogFilesToMonitors();
         }
     });
-} catch (err) {
-}
+} catch (err) {}
 
-function formatDate(date)
-{
+function formatDate(date) {
     let year = date.getFullYear(),
         month = date.getMonth() + 1, // months are zero indexed
         day = date.getDate(),
@@ -656,16 +628,11 @@ function formatDate(date)
         minute = date.getMinutes(),
         second = date.getSeconds();
 
-    if (month < 10)
-        month = "0" + month;
-    if (day < 10)
-        day = "0" + day;
-    if (hour < 10)
-        hour = "0" + hour;
-    if (minute < 10)
-        minute = "0" + minute;
-    if (second < 10)
-        second = "0" + second;
+    if (month < 10) month = "0" + month;
+    if (day < 10) day = "0" + day;
+    if (hour < 10) hour = "0" + hour;
+    if (minute < 10) minute = "0" + minute;
+    if (second < 10) second = "0" + second;
     return `${year}_${month}_${day}_${hour}:${minute}:${second}`;
 }
 
@@ -677,44 +644,55 @@ function addLogFile(log, cb) {
     }
 }
 
-server.on("builder", builder => {
+server.on("builder", (builder) => {
     if (compareVersions(schedulerNpmVersion, builder.npmVersion) >= 1) {
-        console.log(`builder ${builder.ip} has bad npm version: ${builder.npmVersion} should have been at least: ${schedulerNpmVersion}`);
+        console.log(
+            `builder ${builder.ip} has bad npm version: ${builder.npmVersion} should have been at least: ${schedulerNpmVersion}`
+        );
         builder.send({ type: "version_mismatch", required_version: schedulerNpmVersion, code: 1 });
         return;
     }
     builder.activeClients = 0;
     insertBuilder(builder);
-    console.log("builder connected", builder.npmVersion, builder.ip, builder.name || "", builder.hostname || "", Object.keys(builder.environments), "builderCount is", builderCount);
+    console.log(
+        "builder connected",
+        builder.npmVersion,
+        builder.ip,
+        builder.name || "",
+        builder.hostname || "",
+        Object.keys(builder.environments),
+        "builderCount is",
+        builderCount
+    );
     syncEnvironments(builder);
 
-    builder.on("environments", message => {
+    builder.on("environments", (message) => {
         builder.environments = {};
-        message.environments.forEach(env => builder.environments[env] = true);
+        message.environments.forEach((env) => (builder.environments[env] = true));
         syncEnvironments(builder);
     });
 
-    builder.on("log", event => {
+    builder.on("log", (event) => {
         addLogFile({ source: "builder", ip: builder.ip, contents: event.message });
     });
 
-    builder.on("error", msg => {
+    builder.on("error", (msg) => {
         console.error(`builder error '${msg}' from ${builder.ip}`);
     });
 
-    builder.on("objectCache", msg => {
+    builder.on("objectCache", (msg) => {
         if (objectCache) {
             objectCache.addNode(builder, msg);
         }
     });
 
-    builder.on("objectCacheAdded", msg => {
+    builder.on("objectCacheAdded", (msg) => {
         if (objectCache) {
             objectCache.insert(msg, builder);
         }
     });
 
-    builder.on("objectCacheRemoved", msg => {
+    builder.on("objectCacheRemoved", (msg) => {
         if (objectCache) {
             objectCache.remove(msg, builder);
         }
@@ -722,25 +700,26 @@ server.on("builder", builder => {
 
     builder.on("close", () => {
         removeBuilder(builder);
-        if (objectCache)
-            objectCache.removeNode(builder);
-        console.log(`builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builderCount}`);
+        if (objectCache) objectCache.removeNode(builder);
+        console.log(
+            `builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builderCount}`
+        );
         builder.removeAllListeners();
     });
 
-    builder.on("load", message => {
+    builder.on("load", (message) => {
         builder.load = message.measure;
         // console.log(message);
     });
 
-    builder.on("jobStarted", job => {
+    builder.on("jobStarted", (job) => {
         ++jobsStarted;
         jobStartedOrScheduled("jobStarted", job);
     });
-    builder.on("jobFinished", job => jobFinished(builder, job));
-    builder.on("cacheHit", job => cacheHit(builder, job));
+    builder.on("jobFinished", (job) => jobFinished(builder, job));
+    builder.on("cacheHit", (job) => cacheHit(builder, job));
 
-    builder.on("jobAborted", job => {
+    builder.on("jobAborted", (job) => {
         console.log(`builder: ${builder.ip}:${builder.port} aborted a job`, job);
         if (monitors.length) {
             const info = {
@@ -748,16 +727,14 @@ server.on("builder", builder => {
                 id: job.id
             };
 
-            monitors.forEach(monitor => monitor.send(info));
+            monitors.forEach((monitor) => monitor.send(info));
         }
     });
 });
 
 let pendingEnvironments = {};
-function requestEnvironment(compile)
-{
-    if (compile.environment in pendingEnvironments)
-        return false;
+function requestEnvironment(compile) {
+    if (compile.environment in pendingEnvironments) return false;
     pendingEnvironments[compile.environment] = true;
 
     console.log(`Asking ${compile.name} ${compile.ip} to upload ${compile.environment}`);
@@ -765,7 +742,7 @@ function requestEnvironment(compile)
 
     let file;
     let gotLast = false;
-    compile.on("uploadEnvironment", environment => {
+    compile.on("uploadEnvironment", (environment) => {
         file = Environments.prepare(environment);
         console.log("Got environment message", environment, typeof file);
         if (!file) {
@@ -776,7 +753,7 @@ function requestEnvironment(compile)
             return;
         }
         let hash = environment.hash;
-        compile.on("uploadEnvironmentData", environment => {
+        compile.on("uploadEnvironmentData", (environment) => {
             if (!file) {
                 console.error("no pending file");
                 compile.send({ error: "no pending file" });
@@ -787,32 +764,36 @@ function requestEnvironment(compile)
                 gotLast = true;
                 console.log("Got environmentdata message", environment.data.length, environment.last);
             }
-            file.save(environment.data).then(() => {
-                if (environment.last) {
-                    file.close();
-                    compile.close();
-                    return Environments.complete(file);
-                }
-                return undefined;
-            }).then(() => {
-                if (environment.last) {
+            file.save(environment.data)
+                .then(() => {
+                    if (environment.last) {
+                        file.close();
+                        compile.close();
+                        return Environments.complete(file);
+                    }
+                    return undefined;
+                })
+                .then(() => {
+                    if (environment.last) {
+                        file = undefined;
+                        // send any new environments to builders
+                        delete pendingEnvironments[hash];
+                        return purgeEnvironmentsToMaxSize();
+                    }
+                    return undefined;
+                })
+                .then(() => {
+                    if (environment.last) {
+                        syncEnvironments();
+                    }
+                })
+                .catch((error) => {
+                    console.error("Got some error here", error);
                     file = undefined;
-                    // send any new environments to builders
-                    delete pendingEnvironments[hash];
-                    return purgeEnvironmentsToMaxSize();
-                }
-                return undefined;
-            }).then(() => {
-                if (environment.last) {
-                    syncEnvironments();
-                }
-            }).catch(error => {
-                console.error("Got some error here", error);
-                file = undefined;
-            });
+                });
         });
     });
-    compile.on("error", msg => {
+    compile.on("error", (msg) => {
         console.error(`upload error '${msg}' from ${compile.ip}`);
         if (file) {
             file.discard();
@@ -831,7 +812,7 @@ function requestEnvironment(compile)
     return true;
 }
 
-server.on("clientVerify", clientVerify => {
+server.on("clientVerify", (clientVerify) => {
     if (compareVersions(clientMinimumVersion, clientVerify.npmVersion) >= 1) {
         clientVerify.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
     } else {
@@ -839,9 +820,9 @@ server.on("clientVerify", clientVerify => {
     }
 });
 
-server.on("compile", compile => {
+server.on("compile", (compile) => {
     sendWols();
-    compile.on("log", event => {
+    compile.on("log", (event) => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
 
@@ -880,13 +861,11 @@ server.on("compile", compile => {
     // ### should have a function match(s) that checks for env, score and compile.builder etc
     let foundInCache = false;
 
-    function filterBuilder(s)
-    {
-        if (compile.builder && compile.builder != s.ip && compile.builder != s.name)
-            return false;
+    function filterBuilder(s) {
+        if (compile.builder && compile.builder != s.ip && compile.builder != s.name) return false;
 
         if (compile.labels) {
-            for (let i=0; i<compile.labels.length; ++i) {
+            for (let i = 0; i < compile.labels.length; ++i) {
                 if (!s.labels || s.labels.indexOf(compile.labels[i]) === -1) {
                     return false;
                 }
@@ -898,11 +877,14 @@ server.on("compile", compile => {
     if (objectCache) {
         let data = objectCache.get(compile.sha1);
         if (data) {
-            data.nodes.forEach(s => {
-                if (!filterBuilder(s))
-                    return;
+            data.nodes.forEach((s) => {
+                if (!filterBuilder(s)) return;
                 const builderScore = score(s);
-                if (!builder || builderScore > bestScore || (builderScore == bestScore && builder.lastJob < s.lastJob)) {
+                if (
+                    !builder ||
+                    builderScore > bestScore ||
+                    (builderScore == bestScore && builder.lastJob < s.lastJob)
+                ) {
                     bestScore = builderScore;
                     builder = s;
                     foundInCache = true;
@@ -911,17 +893,21 @@ server.on("compile", compile => {
         }
     }
     if (!builder) {
-        forEachBuilder(s => {
+        forEachBuilder((s) => {
             if (!filterBuilder(s)) {
                 return;
             }
 
-            for (let i=0; i<usableEnvs.length; ++i) {
+            for (let i = 0; i < usableEnvs.length; ++i) {
                 // console.log("checking builder", s.name, s.environments);
                 if (usableEnvs[i] in s.environments) {
                     const builderScore = score(s);
                     // console.log("comparing", builderScore, bestScore);
-                    if (!builder || builderScore > bestScore || (builderScore == bestScore && s.lastJob < builder.lastJob)) {
+                    if (
+                        !builder ||
+                        builderScore > bestScore ||
+                        (builderScore == bestScore && s.lastJob < builder.lastJob)
+                    ) {
                         bestScore = builderScore;
                         builder = s;
                         env = usableEnvs[i];
@@ -934,14 +920,18 @@ server.on("compile", compile => {
     if (!builder) {
         if (compile.builder) {
             ++jobsFailed;
-            console.log(`Specific builder "${compile.builder}" was requested and we couldn't find a builder with that ${compile.environment}`);
+            console.log(
+                `Specific builder "${compile.builder}" was requested and we couldn't find a builder with that ${compile.environment}`
+            );
             compile.send("builder", {});
             return;
         }
 
         if (compile.labels) {
             ++jobsFailed;
-            console.log(`Specific labels "${compile.labels}" were specified we couldn't match ${compile.environment} with any builder with those labels`);
+            console.log(
+                `Specific labels "${compile.labels}" were specified we couldn't match ${compile.environment} with any builder with those labels`
+            );
             compile.send("builder", {});
             return;
         }
@@ -957,22 +947,23 @@ server.on("compile", compile => {
         data.extraArgs = Environments.extraArgs(compile.environment, env);
     }
     ++activeJobs;
-    let utilization = (activeJobs / capacity);
+    let utilization = activeJobs / capacity;
     let peakInfo = false;
     const now = Date.now();
-    peaks.forEach(peak => {
-        if (peak.record(now, activeJobs, utilization))
-            peakInfo = true;
+    peaks.forEach((peak) => {
+        if (peak.record(now, activeJobs, utilization)) peakInfo = true;
     });
     if (peakInfo && monitors.length) {
         let info = statsMessage();
-        monitors.forEach(monitor => monitor.send(info));
+        monitors.forEach((monitor) => monitor.send(info));
     }
     let sendTime = Date.now();
     ++builder.activeClients;
     ++builder.jobsScheduled;
-    console.log(`${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. `
-                + `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`);
+    console.log(
+        `${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
+            `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
+    );
     builder.lastJob = Date.now();
     let id = nextJobId();
     data.id = id;
@@ -980,9 +971,14 @@ server.on("compile", compile => {
     data.hostname = builder.hostname;
     data.port = builder.port;
     compile.send("builder", data);
-    jobStartedOrScheduled("jobScheduled", { client: compile, builder: builder, id: id, sourceFile: compile.sourceFile });
+    jobStartedOrScheduled("jobScheduled", {
+        client: compile,
+        builder: builder,
+        id: id,
+        sourceFile: compile.sourceFile
+    });
     ++jobsScheduled;
-    compile.on("error", msg => {
+    compile.on("error", (msg) => {
         if (builder) {
             --builder.activeClients;
             --activeJobs;
@@ -990,7 +986,7 @@ server.on("compile", compile => {
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
-    compile.on("close", event => {
+    compile.on("close", (event) => {
         // console.log("Client disappeared");
         compile.removeAllListeners();
         if (builder) {
@@ -1001,13 +997,9 @@ server.on("compile", compile => {
     });
 });
 
-function writeConfiguration(change)
-{
+function writeConfiguration(change) {}
 
-}
-
-function hash(password, salt)
-{
+function hash(password, salt) {
     return new Promise((resolve, reject) => {
         crypto.pbkdf2(password, salt, 12000, 256, "sha512", (err, hash) => {
             if (err) {
@@ -1017,10 +1009,9 @@ function hash(password, salt)
             }
         });
     });
-};
+}
 
-function randomBytes(bytes)
-{
+function randomBytes(bytes) {
     return new Promise((resolve, reject) => {
         crypto.randomBytes(bytes, (err, result) => {
             if (err) {
@@ -1032,17 +1023,14 @@ function randomBytes(bytes)
     });
 }
 
-function sendInfoToClient(client)
-{
-    forEachBuilder(builder => {
+function sendInfoToClient(client) {
+    forEachBuilder((builder) => {
         const info = builderToMonitorInfo(builder, "builderAdded");
-        if (monitorsLog)
-            console.log("sending to monitor", info);
+        if (monitorsLog) console.log("sending to monitor", info);
         client.send(info);
     });
     let info = statsMessage();
-    if (monitorsLog)
-        console.log("sending info to monitor", info);
+    if (monitorsLog) console.log("sending info to monitor", info);
 
     client.send(info);
 
@@ -1050,12 +1038,10 @@ function sendInfoToClient(client)
     client.send(scheduler);
 }
 
-server.on("monitor", client => {
-    if (monitorsLog)
-        console.log("Got monitor", client.ip, client.hostname);
+server.on("monitor", (client) => {
+    if (monitorsLog) console.log("Got monitor", client.ip, client.hostname);
     monitors.push(client);
-    function remove()
-    {
+    function remove() {
         let idx = monitors.indexOf(client);
         if (idx != -1) {
             monitors.splice(idx, 1);
@@ -1063,9 +1049,8 @@ server.on("monitor", client => {
         client.removeAllListeners();
     }
     let user;
-    client.on("message", messageText => {
-        if (monitorsLog)
-            console.log("Got message from monitor", client.ip, client.hostname, messageText);
+    client.on("message", (messageText) => {
+        if (monitorsLog) console.log("Got message from monitor", client.ip, client.hostname, messageText);
         let message;
         try {
             message = JSON.parse(messageText);
@@ -1076,229 +1061,279 @@ server.on("monitor", client => {
             return;
         }
         switch (message.type) {
-        case "sendInfo":
-            sendInfoToClient(client);
-            break;
-        case "clearLogFiles":
-            clearLogFiles();
-            updateLogFilesToMonitors();
-            break;
-        case "logFiles":
-            // console.log("logFiles:", message);
-            fs.readdir(logFileDir, (err, files) => {
-                if (files)
-                    files = files.reverse();
-                console.log("sending files", files);
-                client.send({ type: "logFiles", files: files || [] });
-            });
-            break;
-        case "logFile":
-            // console.log("logFile:", message);
-            if (message.file.indexOf("../") != -1 || message.file.indexOf("/..") != -1) {
-                client.close();
-                return;
-            }
-            const f = path.join(logFileDir, message.file);
-            fs.readFile(f, "utf8", (err, contents) => {
-                // console.log("sending file", f, contents.length);
-                client.send({ type: "logFile", file: f, contents: contents || ""});
-            });
-            break;
-        case "readConfiguration":
-            break;
-        case "writeConfiguration":
-            if (!user) {
-                client.send({ type: "writeConfiguration", success: false, "error": `Unauthenticated message: ${message.type}` });
-                return;
-            }
-            writeConfiguration(message);
-            break;
-        case "listEnvironments":
-            client.send({ type: "listEnvironments", environments: environmentsInfo() });
-            break;
-        case "linkEnvironments":
-            Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist).then(() => {
-                const info = { type: "listEnvironments", environments: environmentsInfo() };
-                monitors.forEach(monitor => monitor.send(info));
-            });
-            break;
-        case "unlinkEnvironments":
-            Environments.unlink(message.srcHash, message.targetHash).then(() => {
-                const info = { type: "listEnvironments", environments: environmentsInfo() };
-                monitors.forEach(monitor => monitor.send(info));
-            });
-            break;
-        case "listUsers": {
-            if (!user) {
-                client.send({ type: "listUsers", success: false, "error": `Unauthenticated message: ${message.type}` });
-                return;
-            }
-            db.get("users").then(users => {
-                if (!users)
-                    users = {};
-                client.send({ type: "listUsers", success: true, users: Object.keys(users) });
-            }).catch(err => {
-                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
-                client.send({ type: "listUsers", success: false, error: err.toString() });
-            });
-            break; }
-        case "removeUser": {
-            if (!user) {
-                client.send({ type: "removeUser", success: false, "error": `Unauthenticated message: ${message.type}` });
-                return;
-            }
-            if (!message.user) {
-                client.send({ type: "removeUser", success: false, error: "Bad removeUser message" });
-                return;
-            }
-
-            if (pendingUsers[message.user]) {
-                client.send({ type: "removeUser", success: false, error: "Someone's here already" });
-                return;
-            }
-            pendingUsers[message.user] = true;
-            let users;
-            db.get("users").then(users => {
-                if (!users || !users[message.user]) {
-                    throw new Error(`user ${message.user} doesn't exist`);
+            case "sendInfo":
+                sendInfoToClient(client);
+                break;
+            case "clearLogFiles":
+                clearLogFiles();
+                updateLogFilesToMonitors();
+                break;
+            case "logFiles":
+                // console.log("logFiles:", message);
+                fs.readdir(logFileDir, (err, files) => {
+                    if (files) files = files.reverse();
+                    console.log("sending files", files);
+                    client.send({ type: "logFiles", files: files || [] });
+                });
+                break;
+            case "logFile":
+                // console.log("logFile:", message);
+                if (message.file.indexOf("../") != -1 || message.file.indexOf("/..") != -1) {
+                    client.close();
+                    return;
                 }
-                delete users[message.user];
-                return db.set("users", users);
-            }).then(() => {
-                client.send({ type: "removeUser", success: true, user: message.user });
-            }).catch(err => {
-                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
-                client.send({ type: "removeUser", success: false, error: err.toString() });
-            }).finally(() => {
-                delete pendingUsers[message.user];
-            });
-
-            // console.log("gotta remove user", message);
-            break; }
-        case "login": {
-            user = undefined;
-            if (!message.user || (!message.password && !message.hmac)) {
-                client.send({ type: "login", success: false, error: "Bad login message" });
-                return;
-            }
-            let users;
-            db.get("users").then(u => {
-                users = u || {};
-                if (!users[message.user]) {
-                    throw new Error(`User: ${message.user} does not seem to exist`);
-                }
-                if (message.hmac) {
-                    if (!users[message.user].cookie) {
-                        throw new Error("No cookie");
-                    } else if (users[message.user].cookieIp != client.ip) {
-                        throw new Error("Wrong ip address");
-                    } else if (users[message.user].cookieExpiration <= Date.now()) {
-                        throw new Error("Cookie expired");
-                    } else {
-                        const hmac = crypto.createHmac("sha512", Buffer.from(users[message.user].cookie, "base64"));
-                        hmac.write(client.nonce);
-                        hmac.end();
-                        const hmacString = hmac.read().toString("base64");
-                        if (hmacString != message.hmac) {
-                            throw new Error(`Wrong password ${message.user}`);
-                        };
-                        return undefined;
-                    }
-                } else {
-                    return hash(message.password, Buffer.from(users[message.user].salt, "base64")).then(hash => {
-                        if (users[message.user].hash != hash.toString("base64")) {
-                            throw new Error(`Wrong password ${message.user}`);
-                        }
+                const f = path.join(logFileDir, message.file);
+                fs.readFile(f, "utf8", (err, contents) => {
+                    // console.log("sending file", f, contents.length);
+                    client.send({ type: "logFile", file: f, contents: contents || "" });
+                });
+                break;
+            case "readConfiguration":
+                break;
+            case "writeConfiguration":
+                if (!user) {
+                    client.send({
+                        type: "writeConfiguration",
+                        success: false,
+                        error: `Unauthenticated message: ${message.type}`
                     });
+                    return;
                 }
-            }).then(() => {
-                return randomBytes(256);
-            }).then(cookie => {
-                user = message.user;
-                const expiration = new Date(Date.now() + 12096e5);
-                users[message.user].cookie = cookie.toString("base64");
-                users[message.user].cookieIp = client.ip;
-                users[message.user].cookieExpiration = expiration.valueOf();
-                return db.set("users", users);
-            }).then(() => {
-                client.send({ type: "login", success: true, user: message.user, cookie: users[message.user].cookie });
-            }).catch(err => {
-                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
-                client.send({ type: "login", success: false, error: err.toString() });
-            });
-            break; }
-        case "addUser": {
-            if (!message.user || !message.password) {
-                client.send({ type: "addUser", success: false, error: "Bad addUser message" });
-                return;
-            }
-            if (pendingUsers[message.user]) {
-                client.send({ type: "addUser", success: false, error: "Someone's here already" });
-                return;
-            }
-            pendingUsers[message.user] = true;
-            let users;
-            db.get("users").then(u => {
-                users = u || {};
-                if (users[message.user]) {
-                    throw new Error(`user ${message.user} already exists`);
+                writeConfiguration(message);
+                break;
+            case "listEnvironments":
+                client.send({ type: "listEnvironments", environments: environmentsInfo() });
+                break;
+            case "linkEnvironments":
+                Environments.link(message.srcHash, message.targetHash, message.arguments, message.blacklist).then(
+                    () => {
+                        const info = { type: "listEnvironments", environments: environmentsInfo() };
+                        monitors.forEach((monitor) => monitor.send(info));
+                    }
+                );
+                break;
+            case "unlinkEnvironments":
+                Environments.unlink(message.srcHash, message.targetHash).then(() => {
+                    const info = { type: "listEnvironments", environments: environmentsInfo() };
+                    monitors.forEach((monitor) => monitor.send(info));
+                });
+                break;
+            case "listUsers": {
+                if (!user) {
+                    client.send({
+                        type: "listUsers",
+                        success: false,
+                        error: `Unauthenticated message: ${message.type}`
+                    });
+                    return;
                 }
-                return randomBytes(256);
-            }).then(salt => {
-                users[message.user] = { salt: salt.toString("base64") };
-                return hash(message.password, salt);
-            }).then(hash => {
-                users[message.user].hash = hash.toString("base64");
-                return randomBytes(256);
-            }).then(cookie => {
-                users[message.user].cookie = cookie.toString("base64");
-                users[message.user].cookieExpiration = (Date.now() + 12096e5);
-                users[message.user].cookieIp = client.ip;
-                return db.set("users", users);
-            }).then(() => {
-                // console.log("here", values);
-                // values = [1,2];
-                client.send({ type: "addUser",
-                              success: true,
-                              user: message.user,
-                              cookie: users[message.user].cookie });
-            }).catch(err => {
-                console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
-                client.send({ type: "addUser", success: false, error: err.toString() });
-            }).finally(() => {
-                delete pendingUsers[message.user];
-            });
+                db.get("users")
+                    .then((users) => {
+                        if (!users) users = {};
+                        client.send({ type: "listUsers", success: true, users: Object.keys(users) });
+                    })
+                    .catch((err) => {
+                        console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                        client.send({ type: "listUsers", success: false, error: err.toString() });
+                    });
+                break;
+            }
+            case "removeUser": {
+                if (!user) {
+                    client.send({
+                        type: "removeUser",
+                        success: false,
+                        error: `Unauthenticated message: ${message.type}`
+                    });
+                    return;
+                }
+                if (!message.user) {
+                    client.send({ type: "removeUser", success: false, error: "Bad removeUser message" });
+                    return;
+                }
 
-            // console.log("gotta add user", message);
-            break; }
+                if (pendingUsers[message.user]) {
+                    client.send({ type: "removeUser", success: false, error: "Someone's here already" });
+                    return;
+                }
+                pendingUsers[message.user] = true;
+                let users;
+                db.get("users")
+                    .then((users) => {
+                        if (!users || !users[message.user]) {
+                            throw new Error(`user ${message.user} doesn't exist`);
+                        }
+                        delete users[message.user];
+                        return db.set("users", users);
+                    })
+                    .then(() => {
+                        client.send({ type: "removeUser", success: true, user: message.user });
+                    })
+                    .catch((err) => {
+                        console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                        client.send({ type: "removeUser", success: false, error: err.toString() });
+                    })
+                    .finally(() => {
+                        delete pendingUsers[message.user];
+                    });
+
+                // console.log("gotta remove user", message);
+                break;
+            }
+            case "login": {
+                user = undefined;
+                if (!message.user || (!message.password && !message.hmac)) {
+                    client.send({ type: "login", success: false, error: "Bad login message" });
+                    return;
+                }
+                let users;
+                db.get("users")
+                    .then((u) => {
+                        users = u || {};
+                        if (!users[message.user]) {
+                            throw new Error(`User: ${message.user} does not seem to exist`);
+                        }
+                        if (message.hmac) {
+                            if (!users[message.user].cookie) {
+                                throw new Error("No cookie");
+                            } else if (users[message.user].cookieIp != client.ip) {
+                                throw new Error("Wrong ip address");
+                            } else if (users[message.user].cookieExpiration <= Date.now()) {
+                                throw new Error("Cookie expired");
+                            } else {
+                                const hmac = crypto.createHmac(
+                                    "sha512",
+                                    Buffer.from(users[message.user].cookie, "base64")
+                                );
+                                hmac.write(client.nonce);
+                                hmac.end();
+                                const hmacString = hmac.read().toString("base64");
+                                if (hmacString != message.hmac) {
+                                    throw new Error(`Wrong password ${message.user}`);
+                                }
+                                return undefined;
+                            }
+                        } else {
+                            return hash(message.password, Buffer.from(users[message.user].salt, "base64")).then(
+                                (hash) => {
+                                    if (users[message.user].hash != hash.toString("base64")) {
+                                        throw new Error(`Wrong password ${message.user}`);
+                                    }
+                                }
+                            );
+                        }
+                    })
+                    .then(() => {
+                        return randomBytes(256);
+                    })
+                    .then((cookie) => {
+                        user = message.user;
+                        const expiration = new Date(Date.now() + 12096e5);
+                        users[message.user].cookie = cookie.toString("base64");
+                        users[message.user].cookieIp = client.ip;
+                        users[message.user].cookieExpiration = expiration.valueOf();
+                        return db.set("users", users);
+                    })
+                    .then(() => {
+                        client.send({
+                            type: "login",
+                            success: true,
+                            user: message.user,
+                            cookie: users[message.user].cookie
+                        });
+                    })
+                    .catch((err) => {
+                        console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                        client.send({ type: "login", success: false, error: err.toString() });
+                    });
+                break;
+            }
+            case "addUser": {
+                if (!message.user || !message.password) {
+                    client.send({ type: "addUser", success: false, error: "Bad addUser message" });
+                    return;
+                }
+                if (pendingUsers[message.user]) {
+                    client.send({ type: "addUser", success: false, error: "Someone's here already" });
+                    return;
+                }
+                pendingUsers[message.user] = true;
+                let users;
+                db.get("users")
+                    .then((u) => {
+                        users = u || {};
+                        if (users[message.user]) {
+                            throw new Error(`user ${message.user} already exists`);
+                        }
+                        return randomBytes(256);
+                    })
+                    .then((salt) => {
+                        users[message.user] = { salt: salt.toString("base64") };
+                        return hash(message.password, salt);
+                    })
+                    .then((hash) => {
+                        users[message.user].hash = hash.toString("base64");
+                        return randomBytes(256);
+                    })
+                    .then((cookie) => {
+                        users[message.user].cookie = cookie.toString("base64");
+                        users[message.user].cookieExpiration = Date.now() + 12096e5;
+                        users[message.user].cookieIp = client.ip;
+                        return db.set("users", users);
+                    })
+                    .then(() => {
+                        // console.log("here", values);
+                        // values = [1,2];
+                        client.send({
+                            type: "addUser",
+                            success: true,
+                            user: message.user,
+                            cookie: users[message.user].cookie
+                        });
+                    })
+                    .catch((err) => {
+                        console.error(`Something went wrong ${message.type} ${err.toString()} ${err.stack}`);
+                        client.send({ type: "addUser", success: false, error: err.toString() });
+                    })
+                    .finally(() => {
+                        delete pendingUsers[message.user];
+                    });
+
+                // console.log("gotta add user", message);
+                break;
+            }
         }
     });
     client.on("close", remove);
     client.on("error", remove);
 });
 
-server.on("error", err => {
+server.on("error", (err) => {
     console.error(`error '${err.message}' from ${err.ip}`);
 });
 
-function simulate(count)
-{
+function simulate(count) {
     let usedIps = {};
-    function randomIp(transient)
-    {
+    function randomIp(transient) {
         let ip;
         do {
-            ip = [ parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256), parseInt(Math.random() * 256) ].join(".");
+            ip = [
+                parseInt(Math.random() * 256),
+                parseInt(Math.random() * 256),
+                parseInt(Math.random() * 256),
+                parseInt(Math.random() * 256)
+            ].join(".");
         } while (ip in usedIps);
-        if (!transient)
-            usedIps[ip] = true;
+        if (!transient) usedIps[ip] = true;
         return ip;
     }
 
-    function randomWord()
-    {
+    function randomWord() {
         if (!words) {
-            words = fs.readFileSync("/etc/dictionaries-common/words", "utf8").split("\n").filter(x => x);
+            words = fs
+                .readFileSync("/etc/dictionaries-common/words", "utf8")
+                .split("\n")
+                .filter((x) => x);
         }
         const idx = Math.floor(Math.random() * words.length);
         return words[idx];
@@ -1306,7 +1341,7 @@ function simulate(count)
 
     let fakeBuilders = [];
     let jobs = [];
-    for (let i=0; i<count; ++i) {
+    for (let i = 0; i < count; ++i) {
         const ip = randomIp();
         const fakeBuilder = {
             ip: ip,
@@ -1322,7 +1357,7 @@ function simulate(count)
             npmVersion: schedulerNpmVersion,
             environments: Object.keys(Environments.environments)
         };
-        for (let j=0; j<fakeBuilder.slots; ++j) {
+        for (let j = 0; j < fakeBuilder.slots; ++j) {
             jobs.push({ builder: fakeBuilder });
         }
         fakeBuilders.push(fakeBuilder);
@@ -1330,12 +1365,11 @@ function simulate(count)
     }
     const clients = [];
     const clientCount = count / 2 || 1;
-    for (let i=0; i<clientCount; ++i) {
+    for (let i = 0; i < clientCount; ++i) {
         clients[i] = { hostname: randomWord(), ip: randomIp(true), name: randomWord() };
     }
-    function tick()
-    {
-        for (let i=0; i<jobs.length; ++i) {
+    function tick() {
+        for (let i = 0; i < jobs.length; ++i) {
             const percentage = Math.random() * 100;
             if (jobs[i].builder.gone) {
                 if (percentage <= 10) {
@@ -1356,15 +1390,27 @@ function simulate(count)
                 if (!jobs[i].client) {
                     jobs[i].client = clients[parseInt(Math.random() * clientCount)];
                     jobs[i].id = nextJobId();
-                    jobStartedOrScheduled("jobScheduled", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomWord() + ".cpp" });
-                    jobStartedOrScheduled("jobStarted", { client: jobs[i].client, builder: jobs[i].builder, id: jobs[i].id, sourceFile: randomWord() + ".cpp" });
+                    jobStartedOrScheduled("jobScheduled", {
+                        client: jobs[i].client,
+                        builder: jobs[i].builder,
+                        id: jobs[i].id,
+                        sourceFile: randomWord() + ".cpp"
+                    });
+                    jobStartedOrScheduled("jobStarted", {
+                        client: jobs[i].client,
+                        builder: jobs[i].builder,
+                        id: jobs[i].id,
+                        sourceFile: randomWord() + ".cpp"
+                    });
                 } else {
                     // const client = jobs[i].client;
                     // const id = jobs[i].id;
-                    jobFinished(jobs[i].builder, { id: jobs[i].id,
-                                                 cppSize: parseInt(Math.random() * 1024 * 1024 * 4),
-                                                 compileDuration: parseInt(Math.random() * 5000),
-                                                 uploadDuration: parseInt(Math.random() * 500) });
+                    jobFinished(jobs[i].builder, {
+                        id: jobs[i].id,
+                        cppSize: parseInt(Math.random() * 1024 * 1024 * 4),
+                        compileDuration: parseInt(Math.random() * 5000),
+                        uploadDuration: parseInt(Math.random() * 500)
+                    });
                     delete jobs[i].client;
                     delete jobs[i].id;
                 }
@@ -1403,9 +1449,9 @@ Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environmen
                     builder.ping();
                 }
             }, option.int("ping-interval", 20000));
-
         }
-    }).catch(e => {
+    })
+    .catch((e) => {
         console.error(e);
         process.exit();
     });

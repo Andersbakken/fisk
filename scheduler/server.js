@@ -37,9 +37,7 @@ class Client extends EventEmitter {
                 }
                 this.ws.send(JSON.stringify(tosend));
             }
-        } catch (err) {
-
-        }
+        } catch (err) {}
     }
 
     ping() {
@@ -60,14 +58,13 @@ class Client extends EventEmitter {
             this.ws.send(`{"error": "${message}"}`);
             this.ws.close();
             this.emit("error", message);
-        } catch (err) {
-        }
+        } catch (err) {}
     }
 
     close() {
         this.ws.close();
     }
-};
+}
 
 Client.Type = {
     Builder: 0,
@@ -94,7 +91,7 @@ class Server extends EventEmitter {
 
             let ui = this.option("ui");
             if (ui) {
-                this.app.all("/*", function(req, res, next) {
+                this.app.all("/*", function (req, res, next) {
                     res.redirect(ui);
                 });
             }
@@ -127,11 +124,11 @@ class Server extends EventEmitter {
                 }
             });
 
-            this.server.on("error", error => {
+            this.server.on("error", (error) => {
                 if (error.code == "EADDRINUSE") {
                     console.log(`Port ${port} is in use...`);
                     setTimeout(() => {
-                        this.server.listen({ port, backlog, host: "0.0.0.0" });
+                        this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
                     }, 1000);
                 } else {
                     console.error("Got server error", error.toString());
@@ -145,7 +142,9 @@ class Server extends EventEmitter {
         });
     }
 
-    get express() { return this.app; }
+    get express() {
+        return this.app;
+    }
 
     _handleCompile(req, client) {
         // look at headers
@@ -172,101 +171,93 @@ class Server extends EventEmitter {
             return;
         }
         const npmVersion = req.headers["x-fisk-npm-version"];
-        if (npmVersion)
-            data.npmVersion = npmVersion;
+        if (npmVersion) data.npmVersion = npmVersion;
         const preferredBuilder = req.headers["x-fisk-builder"];
-        if (preferredBuilder)
-            data.builder = preferredBuilder;
+        if (preferredBuilder) data.builder = preferredBuilder;
         const labels = req.headers["x-fisk-builder-labels"];
         if (labels) {
-            data.labels = labels.split(/ +/).filter(x => x);
+            data.labels = labels.split(/ +/).filter((x) => x);
         }
         const clientName = req.headers["x-fisk-client-name"];
-        if (clientName)
-            data.name = clientName;
+        if (clientName) data.name = clientName;
         const user = req.headers["x-fisk-user"];
-        if (user)
-            data.user = user;
+        if (user) data.user = user;
         const clientHostname = req.headers["x-fisk-client-hostname"];
-        if (clientHostname)
-            data.hostname = clientHostname;
+        if (clientHostname) data.hostname = clientHostname;
         Object.assign(client, data);
         this.emit("compile", client);
         let remaining = { bytes: undefined, type: undefined };
         client.ws.on("close", (status, reason) => client.emit("close", status, reason));
-        client.ws.on("error", err => client.emit("error", err));
+        client.ws.on("error", (err) => client.emit("error", err));
         client.ws.on("close", (code, reason) => {
-            if (remaining.bytes)
-                client.emit("error", "Got close while reading a binary message");
-            if (client)
-                client.emit("close", { code: code, reason: reason });
+            if (remaining.bytes) client.emit("error", "Got close while reading a binary message");
+            if (client) client.emit("close", { code: code, reason: reason });
             client.ws.removeAllListeners();
         });
 
-        client.ws.on("message", msg => {
+        client.ws.on("message", (msg) => {
             switch (typeof msg) {
-            case "string":
-                if (remaining.bytes) {
-                    // bad, client have to send all the data in a binary message before sending JSON
-                    client.error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
-                    return;
-                }
-                // assume JSON
-                let json;
-                try {
-                    json = JSON.parse(msg);
-                } catch (e) {
-                }
-                if (json === undefined) {
-                    client.error("Unable to parse string message as JSON");
-                    return;
-                }
-
-                if (json.type == "log") {
-                    client.emit("log", json);
-                    return;
-                }
-                if (json.type != "uploadEnvironment") {
-                    client.error("Expected type: \"uploadEnvironment\"");
-                    return;
-                }
-
-                if (!("hash" in json)) {
-                    console.log(json);
-                    client.error("Need a hash property");
-                    return;
-                }
-                if (!("bytes" in json)) {
-                    console.log(json);
-                    client.error("Need a bytes property");
-                    return;
-                }
-
-                remaining.type = "uploadEnvironmentData";
-                remaining.bytes = json.bytes;
-
-                client.emit("uploadEnvironment", json);
-                break;
-            case "object":
-                if (msg instanceof Buffer) {
-                    if (!msg.length) {
-                        // no data?
-                        client.error("No data in buffer");
+                case "string":
+                    if (remaining.bytes) {
+                        // bad, client have to send all the data in a binary message before sending JSON
+                        client.error(`Got JSON message while ${remaining.bytes} bytes remained of a binary message`);
                         return;
                     }
-                    if (!remaining.bytes) {
-                        client.error("Got binary message without a preceeding json message describing the data");
+                    // assume JSON
+                    let json;
+                    try {
+                        json = JSON.parse(msg);
+                    } catch (e) {}
+                    if (json === undefined) {
+                        client.error("Unable to parse string message as JSON");
                         return;
                     }
-                    if (msg.length > remaining.bytes) {
-                        // woops
-                        client.error(`length ${msg.length} > ${remaining.bytes}`);
+
+                    if (json.type == "log") {
+                        client.emit("log", json);
                         return;
                     }
-                    remaining.bytes -= msg.length;
-                    client.emit(remaining.type, { data: msg, last: !remaining.bytes });
-                }
-                break;
+                    if (json.type != "uploadEnvironment") {
+                        client.error('Expected type: "uploadEnvironment"');
+                        return;
+                    }
+
+                    if (!("hash" in json)) {
+                        console.log(json);
+                        client.error("Need a hash property");
+                        return;
+                    }
+                    if (!("bytes" in json)) {
+                        console.log(json);
+                        client.error("Need a bytes property");
+                        return;
+                    }
+
+                    remaining.type = "uploadEnvironmentData";
+                    remaining.bytes = json.bytes;
+
+                    client.emit("uploadEnvironment", json);
+                    break;
+                case "object":
+                    if (msg instanceof Buffer) {
+                        if (!msg.length) {
+                            // no data?
+                            client.error("No data in buffer");
+                            return;
+                        }
+                        if (!remaining.bytes) {
+                            client.error("Got binary message without a preceeding json message describing the data");
+                            return;
+                        }
+                        if (msg.length > remaining.bytes) {
+                            // woops
+                            client.error(`length ${msg.length} > ${remaining.bytes}`);
+                            return;
+                        }
+                        remaining.bytes -= msg.length;
+                        client.emit(remaining.type, { data: msg, last: !remaining.bytes });
+                    }
+                    break;
             }
         });
     }
@@ -307,16 +298,17 @@ class Server extends EventEmitter {
         const name = req.headers["x-fisk-builder-name"];
         const hostname = req.headers["x-fisk-builder-hostname"];
         let labels = req.headers["x-fisk-builder-labels"];
-        if (labels)
-            labels = labels.split(/ +/).filter(x => x);
+        if (labels) labels = labels.split(/ +/).filter((x) => x);
         const system = req.headers["x-fisk-system"];
         const slots = parseInt(req.headers["x-fisk-slots"]);
         const npmVersion = req.headers["x-fisk-npm-version"];
         let environments = {};
-        req.headers["x-fisk-environments"].replace(/\s+/g, "").split(";").forEach(env => {
-            if (env)
-                environments[env] = true;
-        });
+        req.headers["x-fisk-environments"]
+            .replace(/\s+/g, "")
+            .split(";")
+            .forEach((env) => {
+                if (env) environments[env] = true;
+            });
         Object.assign(client, {
             port: port,
             name: name,
@@ -333,32 +325,31 @@ class Server extends EventEmitter {
             environments: environments,
             system: system
         });
-        client.ws.on("message", msg => {
+        client.ws.on("message", (msg) => {
             // console.log("Got message from builder", typeof msg, msg.length);
             switch (typeof msg) {
-            case "string":
-                // assume JSON
-                let json;
-                try {
-                    json = JSON.parse(msg);
-                } catch (e) {
-                }
+                case "string":
+                    // assume JSON
+                    let json;
+                    try {
+                        json = JSON.parse(msg);
+                    } catch (e) {}
 
-                if (json === undefined) {
-                    client.error("Unable to parse string message as JSON");
-                    return;
-                }
-                // console.log("Got message", json);
-                if ("type" in json) {
-                    client.emit(json.type, json);
-                } else {
-                    console.error("Bad message without type", json);
-                }
-            case "object":
-                if (msg instanceof Buffer) {
-                    client.emit("data", msg);
-                }
-                break;
+                    if (json === undefined) {
+                        client.error("Unable to parse string message as JSON");
+                        return;
+                    }
+                    // console.log("Got message", json);
+                    if ("type" in json) {
+                        client.emit(json.type, json);
+                    } else {
+                        console.error("Bad message without type", json);
+                    }
+                case "object":
+                    if (msg instanceof Buffer) {
+                        client.emit("data", msg);
+                    }
+                    break;
             }
         });
         // console.log("Got dude", envs);
@@ -368,25 +359,25 @@ class Server extends EventEmitter {
     _handleMonitor(req, client) {
         client.nonce = req.nonce;
         // console.log("Got nonce", req.nonce);
-        client.ws.on("message", message => client.emit("message", message));
+        client.ws.on("message", (message) => client.emit("message", message));
         this.emit("monitor", client);
         client.ws.on("close", (code, reason) => {
             client.ws.removeAllListeners();
             client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on("error", err => client.emit("error", err));
+        client.ws.on("error", (err) => client.emit("error", err));
     }
 
     _handleClientVerify(req, client) {
-        Object.assign(client, {npmVersion: req.headers["x-fisk-npm-version"] });
+        Object.assign(client, { npmVersion: req.headers["x-fisk-npm-version"] });
         this.emit("clientVerify", client);
         client.ws.on("close", (code, reason) => {
             client.ws.removeAllListeners();
             client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on("error", err => client.emit("error", err));
+        client.ws.on("error", (err) => client.emit("error", err));
     }
 
     _handleConnection(ws, req) {
@@ -395,7 +386,7 @@ class Server extends EventEmitter {
         // console.log("_handleConnection", ip);
 
         if (!ip) {
-            ws.send("{\"error\": \"no ip for some reason\"}");
+            ws.send('{"error": "no ip for some reason"}');
             ws.close();
             return;
         }
@@ -405,26 +396,26 @@ class Server extends EventEmitter {
 
         const url = Url.parse(req.url);
         switch (url.pathname) {
-        case "/compile":
-            client = new Client({ type: Client.Compile, ws: ws, ip: ip });
-            this._handleCompile(req, client);
-            break;
-        case "/builder":
-            client = new Client({ type: Client.Builder, ws: ws, ip: ip, option: this.option });
-            this._handleBuilder(req, client);
-            break;
-        case "/monitor":
-            client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });
-            this._handleMonitor(req, client);
-            break;
-        case "/client_verify":
-            client = new Client({ type: Client.Type.ClientVerify, ws: ws, ip: ip });
-            this._handleClientVerify(req, client);
-            break;
-        default:
-            console.error(`Invalid pathname ${url.pathname} from: ${ip}`);
-            ws.close();
-            return;
+            case "/compile":
+                client = new Client({ type: Client.Compile, ws: ws, ip: ip });
+                this._handleCompile(req, client);
+                break;
+            case "/builder":
+                client = new Client({ type: Client.Builder, ws: ws, ip: ip, option: this.option });
+                this._handleBuilder(req, client);
+                break;
+            case "/monitor":
+                client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });
+                this._handleMonitor(req, client);
+                break;
+            case "/client_verify":
+                client = new Client({ type: Client.Type.ClientVerify, ws: ws, ip: ip });
+                this._handleClientVerify(req, client);
+                break;
+            default:
+                console.error(`Invalid pathname ${url.pathname} from: ${ip}`);
+                ws.close();
+                return;
         }
     }
 }

@@ -1,6 +1,5 @@
 class Peak {
-    constructor(interval, name)
-    {
+    constructor(interval, name) {
         this.interval = interval;
         this.name = name;
         this.peakActiveJobs = 0;
@@ -13,8 +12,7 @@ class Peak {
         }
     }
 
-    record(now, activeJobs, utilization)
-    {
+    record(now, activeJobs, utilization) {
         let ret = false;
         if (!this.interval) {
             if (activeJobs > this.peakActiveJobs) {
@@ -69,35 +67,32 @@ class Peak {
         return ret;
     }
 
-    toObject()
-    {
+    toObject() {
         if (this.interval) {
             const cutoff = Date.now() - this.interval;
             let peakActiveJobs = 0;
             {
                 let splice = 0;
-                for (let idx=0; idx<this.actives.length; ++idx) {
+                for (let idx = 0; idx < this.actives.length; ++idx) {
                     if (this.actives[idx][0] < cutoff) {
                         splice = idx + 1;
                     } else {
                         peakActiveJobs = Math.max(peakActiveJobs, this.actives[idx][1]);
                     }
                 }
-                if (splice)
-                    this.actives.splice(0, splice);
+                if (splice) this.actives.splice(0, splice);
             }
             let peakUtilization = 0;
             {
                 let splice = 0;
-                for (let idx=0; idx<this.utilizations.length; ++idx) {
+                for (let idx = 0; idx < this.utilizations.length; ++idx) {
                     if (this.utilizations[idx][0] < cutoff) {
                         splice = idx + 1;
                     } else {
                         peakUtilization = Math.max(peakUtilization, this.utilizations[idx][1]);
                     }
                 }
-                if (splice)
-                    this.utilizations.splice(0, splice);
+                if (splice) this.utilizations.splice(0, splice);
             }
             return { activeJobs: peakActiveJobs, utilizations: peakUtilization };
         }
@@ -107,6 +102,6 @@ class Peak {
             utilization: this.peakUtilization
         };
     }
-};
+}
 
 module.exports = Peak;
