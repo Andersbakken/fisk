@@ -76,6 +76,9 @@ export class Client extends EventEmitter {
             case "x64":
                 system += " x86_64";
                 break;
+            case "arm64":
+                system += " arm64";
+                break;
             default:
                 console.error("Unknown architecture", os.arch());
                 break;

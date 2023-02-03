@@ -58,6 +58,8 @@ class Environment {
                 return !!/^Linux /.exec(this.system);
             case "Darwin x86_64":
                 return !!/^Darwin /.exec(this.system);
+            case "Darwin arm64":
+                return Boolean(/^Darwin /.exec(this.system));
             default:
                 console.error("Unknown system", system);
                 return false;
