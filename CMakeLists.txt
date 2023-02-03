@@ -12,7 +12,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(client)
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-builder.js
+    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-builder.js ${CMAKE_CURRENT_LIST_DIR}/dist/VM_runtime.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-scheduler.js
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/
     COMMENT "Building typescript"
     COMMAND npm run build)

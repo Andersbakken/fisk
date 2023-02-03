@@ -6,7 +6,7 @@ import fs from "fs-extra";
 import path from "path";
 import prettybytes from "pretty-bytes";
 
-function prettysize(bytes: number): string {
+function prettySize(bytes: number): string {
     return bytes >= 1024 ? prettybytes(bytes) : String(bytes);
 }
 
@@ -87,9 +87,9 @@ export class ObjectCache extends EventEmitter {
             "initializing object cache with",
             this.dir,
             "maxSize",
-            prettysize(maxSize),
+            prettySize(maxSize),
             "size",
-            prettysize(this.size)
+            prettySize(this.size)
         );
     }
 
@@ -250,9 +250,9 @@ export class ObjectCache extends EventEmitter {
             count: Object.keys(this.cache).length,
             cache: this.cache,
             pending: this.pending,
-            maxSize: prettysize(this.maxSize),
-            size: prettysize(this.size),
-            purgeSize: prettysize(this.purgeSize)
+            maxSize: prettySize(this.maxSize),
+            size: prettySize(this.size),
+            purgeSize: prettySize(this.purgeSize)
         };
         if (!query || !("object" in query)) {
             delete ret.cache;

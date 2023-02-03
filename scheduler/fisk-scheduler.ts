@@ -1,40 +1,28 @@
 #!/usr/bin/env node
+import { Database } from "./Database";
+import { Environments } from "./Environments";
+import { ObjectCacheManager } from "./ObjectCacheManager";
+import { Peak } from "./Peak";
+import { Server } from "./Server";
+import { common as commonFunc } from "../common-ts/index";
+import bytes from "bytes";
+import compareVersions from "compare-versions";
+import crypto from "crypto";
+import express from "express";
+import fs from "fs-extra";
+import http from "http";
+import humanizeDuration from "humanize-duration";
+import options, { OptionsFunction } from "@jhanssen/options";
+import path from "path";
+import posix from "posix";
 
-const path = require("path");
-const os = require("os");
-const option = require("@jhanssen/options")({
-    prefix: "fisk/scheduler",
-    applicationPath: false,
-    additionalFiles: ["fisk/scheduler.conf.override"]
+const option: OptionsFunction = options({
+    prefix: "fisk/builder",
+    noApplicationPath: true,
+    additionalFiles: ["fisk/builder.conf.override"]
 });
-const posix = require("posix");
-const Server = require("./server");
-const common = require("../common")(option);
-const Environments = require("./environments");
+const common = commonFunc(option);
 const server = new Server(option, common.Version);
-const fs = require("fs-extra");
-const bytes = require("bytes");
-const crypto = require("crypto");
-const Database = require("./database");
-const Peak = require("./peak");
-const ObjectCacheManager = require("./objectcachemanager");
-const compareVersions = require("compare-versions");
-const humanizeDuration = require("humanize-duration");
-const wol = require("wake_on_lan");
-let wolBuilders = {};
-(option("wake-on-lan-builders") || []).forEach((builder) => {
-    if (!builder.name || !builder.mac) {
-        console.error("Bad wol, missing name or mac address");
-    } else if (builder.name in wolBuilders) {
-        console.error(`Duplicate name for wol-builder ${JSON.stringify(builder)}`);
-    } else {
-        wolBuilders[builder.name] = {
-            mac: builder.mac,
-            connected: false,
-            address: builder.address || "255.255.255.255"
-        };
-    }
-});
 
 const clientMinimumVersion = "3.4.96";
 const serverStartTime = Date.now();
@@ -71,18 +59,24 @@ let lastWol = 0;
 function sendWols() {
     const now = Date.now();
     // console.log("sendWols", now, lastWol, now - lastWol);
-    if (now - lastWol < 60000) return;
+    if (now - lastWol < 60000) {
+        return;
+    }
 
     lastWol = now;
     let byName;
-    for (let name in wolBuilders) {
+    for (const name in wolBuilders) {
         const wolBuilder = wolBuilders[name];
-        if (wolBuilder.connected) continue;
+        if (wolBuilder.connected) {
+            continue;
+        }
         if (!byName) {
             byName = {};
-            for (let key in builders) {
+            for (const key in builders) {
                 const builder = builders[key];
-                if (builder.name) byName[builder.name] = builder;
+                if (builder.name) {
+                    byName[builder.name] = builder;
+                }
             }
         }
         if (!(name in byName)) {
@@ -112,7 +106,9 @@ let objectCache;
 const logFileDir = path.join(common.cacheDir(), "logs");
 try {
     fs.mkdirSync(logFileDir);
-} catch (err) {}
+} catch (err) {
+    /* */
+}
 
 const peaks = [
     new Peak(60 * 60 * 1000, "Last hour"),
@@ -123,13 +119,13 @@ const peaks = [
 ];
 
 function peakData() {
-    let ret = {};
+    const ret = {};
     peaks.forEach((peak) => (ret[peak.name] = peak.toObject()));
     return ret;
 }
 
 function statsMessage() {
-    let info = peakData();
+    const info = peakData();
     info.type = "stats";
     const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
     info.jobs = jobs;
@@ -145,14 +141,16 @@ const pendingUsers = {};
 
 function nextJobId() {
     let id = ++jobId;
-    if (id == 2147483647) id = 1;
+    if (id === 2147483647) {
+        id = 1;
+    }
     return id;
 }
 
 function jobStartedOrScheduled(type, job) {
     if (monitors.length) {
         // console.log("GOT STUFF", job);
-        let info = {
+        const info = {
             type: type,
             client: {
                 hostname: job.client.hostname,
@@ -170,17 +168,23 @@ function jobStartedOrScheduled(type, job) {
             },
             id: job.id
         };
-        if (job.builder.hostname) info.builder.hostname = job.builder.hostname;
+        if (job.builder.hostname) {
+            info.builder.hostname = job.builder.hostname;
+        }
 
-        if (monitorsLog) console.log("send to monitors", info);
+        if (monitorsLog) {
+            console.log("send to monitors", info);
+        }
         monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
 function cacheHit(builder, job) {
-    if (objectCache) objectCache.hit(job.sha1);
+    if (objectCache) {
+        objectCache.hit(job.sha1);
+    }
     if (monitors.length) {
-        let info = {
+        const info = {
             type: "cacheHit",
             client: {
                 hostname: job.client.hostname,
@@ -204,14 +208,18 @@ function cacheHit(builder, job) {
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        if (builder.hostname) info.builder.hostname = builder.hostname;
-        if (monitorsLog) console.log("send to monitors", info);
+        if (builder.hostname) {
+            info.builder.hostname = builder.hostname;
+        }
+        if (monitorsLog) {
+            console.log("send to monitors", info);
+        }
         // console.log("sending info", info);
         monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
-function jobFinished(builder, job) {
+function jobFinished(builder: Client, job: Job) {
     ++jobsFinished;
     ++builder.jobsPerformed;
     builder.totalCompileSpeed += job.compileSpeed;
@@ -232,17 +240,18 @@ function jobFinished(builder, job) {
             jobsScheduled: jobsScheduled,
             cacheHits: objectCache ? objectCache.hits : 0
         };
-        if (monitorsLog) console.log("send to monitors", info);
+        if (monitorsLog) {
+            console.log("send to monitors", info);
+        }
         monitors.forEach((monitor) => monitor.send(info));
     }
 }
 
-function builderKey() {
-    if (arguments.length == 1) {
-        return arguments[0].ip + " " + arguments[0].port;
-    } else {
-        return arguments[0] + " " + arguments[1];
+function builderKey(ip: string | Client, port?: number): string {
+    if (typeof ip === "object") {
+        return ip.ip + " " + ip.port;
     }
+    return ip + " " + port;
 }
 
 function builderToMonitorInfo(builder, type) {
@@ -273,7 +282,9 @@ function insertBuilder(builder) {
     capacity += builder.slots;
     if (monitors.length) {
         const info = builderToMonitorInfo(builder, "builderAdded");
-        if (monitorsLog) console.log("send to monitors", info);
+        if (monitorsLog) {
+            console.log("send to monitors", info);
+        }
         monitors.forEach((monitor) => {
             monitor.send(info);
         });
@@ -281,7 +292,7 @@ function insertBuilder(builder) {
 }
 
 function forEachBuilder(cb) {
-    for (let key in builders) {
+    for (const key in builders) {
         cb(builders[key]);
     }
 }
@@ -293,7 +304,7 @@ function onObjectCacheCleared() {
     jobsFinished = 0;
     const msg = { type: "clearObjectCache" };
     forEachBuilder((builder) => builder.send(msg));
-    let info = statsMessage();
+    const info = statsMessage();
     monitors.forEach((monitor) => monitor.send(info));
 }
 
@@ -324,7 +335,9 @@ function removeBuilder(builder) {
 
     if (monitors.length) {
         const info = builderToMonitorInfo(builder, "builderRemoved");
-        if (monitorsLog) console.log("send to monitors", info);
+        if (monitorsLog) {
+            console.log("send to monitors", info);
+        }
         monitors.forEach((monitor) => {
             monitor.send(info);
         });
@@ -332,9 +345,12 @@ function removeBuilder(builder) {
 }
 
 function purgeEnvironmentsToMaxSize() {
-    return new Promise((resolve, reject) => {
-        let maxSize = bytes.parse(option("max-environment-size"));
-        if (!maxSize) {
+    return new Promise((resolve) => {
+        let maxSize = option("max-environment-size") || 0;
+        if (typeof maxSize === "string") {
+            maxSize = bytes.parse(maxSize);
+        }
+        if (!max) {
             resolve(false);
             return;
         }
@@ -345,7 +361,7 @@ function purgeEnvironmentsToMaxSize() {
                 .map((file) => {
                     // console.log("got file", file);
                     const abs = path.join(p, file);
-                    if (file.length != 47 || file.indexOf(".tar.gz", 40) != 40) {
+                    if (file.length !== 47 || file.indexOf(".tar.gz", 40) !== 40) {
                         try {
                             console.log("Removing unexpected file", abs);
                             fs.removeSync(abs);
@@ -372,7 +388,9 @@ function purgeEnvironmentsToMaxSize() {
                     return b.created - a.created;
                 })
                 .forEach((env) => {
-                    if (!env) return;
+                    if (!env) {
+                        return;
+                    }
                     if (maxSize >= env.size) {
                         maxSize -= env.size;
                         return;
@@ -384,7 +402,6 @@ function purgeEnvironmentsToMaxSize() {
             resolve(purged);
         } catch (err) {
             resolve(false);
-            return;
         }
     });
 }
@@ -394,19 +411,19 @@ function syncEnvironments(builder) {
         forEachBuilder(syncEnvironments);
         return;
     }
-    let needs = [];
-    let unwanted = [];
+    const needs = [];
+    const unwanted = [];
     console.log("scheduler has", Object.keys(Environments.environments).sort());
     console.log("builder has", builder.ip, Object.keys(builder.environments).sort());
-    for (let env in Environments.environments) {
+    for (const env in Environments.environments) {
         if (env in builder.environments) {
             builder.environments[env] = -1;
         } else if (Environments.environments[env].canRun(builder.system)) {
             needs.push(env);
         }
     }
-    for (let env in builder.environments) {
-        if (builder.environments[env] != -1) {
+    for (const env in builder.environments) {
+        if (builder.environments[env] !== -1) {
             unwanted.push(env);
             delete builder.environments[env];
         } else {
@@ -424,13 +441,15 @@ function syncEnvironments(builder) {
 }
 
 function environmentsInfo() {
-    let ret = Object.assign({}, Environments.environments);
+    const ret = Object.assign({}, Environments.environments);
     ret.maxSize = option("max-environment-size") || 0;
     ret.maxSizeBytes = bytes.parse(option("max-environment-size")) || 0;
     ret.usedSizeBytes = 0;
-    for (let hash in Environments.environments) {
-        let env = Environments.environments[hash];
-        if (env.size) ret.usedSizeBytes += env.size;
+    for (const hash in Environments.environments) {
+        const env = Environments.environments[hash];
+        if (env.size) {
+            ret.usedSizeBytes += env.size;
+        }
     }
     ret.usedSize = bytes.format(ret.usedSizeBytes);
     ret.links = Environments.linksInfo();
@@ -438,21 +457,21 @@ function environmentsInfo() {
 }
 
 server.on("listen", (app) => {
-    app.get("/environments", (req, res, next) => {
+    app.get("/environments", (req: http.IncomingMessage, res: express.Response) => {
         const pretty = req.query && req.query.unpretty ? undefined : 4;
         res.send(JSON.stringify(environmentsInfo(), null, pretty) + "\n");
     });
 
-    app.get("/clear-log-files", (req, res, next) => {
+    app.get("/clear-log-files", (req: http.IncomingMessage, res: express.Response) => {
         clearLogFiles();
         res.sendStatus(200);
     });
 
-    app.get("/builders", (req, res, next) => {
-        let ret = [];
+    app.get("/builders", (req: http.IncomingMessage, res: express.Response) => {
+        const ret = [];
         const now = Date.now();
-        for (let builderKey in builders) {
-            let s = builders[builderKey];
+        for (const builderKey in builders) {
+            const s = builders[builderKey];
             ret.push({
                 ip: s.ip,
                 name: s.name,
@@ -479,14 +498,14 @@ server.on("listen", (app) => {
         res.send(JSON.stringify(ret, null, pretty) + "\n");
     });
 
-    app.get("/info", (req, res, next) => {
+    app.get("/info", (req: http.IncomingMessage, res: express.Response) => {
         const now = Date.now();
         const jobs = jobsFailed + jobsStarted + (objectCache ? objectCache.hits : 0);
         function percentage(count) {
             return { count: count, percentage: (count ? (count * 100) / jobs : 0).toFixed(1) + "%" };
         }
 
-        let obj = {
+        const obj = {
             builderCount: Object.keys(builders).length,
             npmVersion: schedulerNpmVersion,
             environments: environmentsInfo(),
@@ -551,7 +570,7 @@ server.on("listen", (app) => {
             purgeEnvironments: "purge_environments" in req.query
         };
         console.log("Sending quit message to builders", msg, Object.keys(builders));
-        for (let ip in builders) {
+        for (const ip in builders) {
             builders[ip].send(msg);
         }
     });
@@ -578,7 +597,9 @@ server.on("listen", (app) => {
         if ("purge_environments" in req.query) {
             try {
                 fs.removeSync(path.join(common.cacheDir(), "environments"));
-            } catch (err) {}
+            } catch (err) {
+                /* */
+            }
         }
         res.sendStatus(200);
         setTimeout(() => process.exit(), 100);
@@ -588,7 +609,9 @@ server.on("listen", (app) => {
 function updateLogFilesToMonitors() {
     if (monitors.length) {
         fs.readdir(logFileDir, (err, files) => {
-            if (files) files = files.reverse();
+            if (files) {
+                files = files.reverse();
+            }
             const msg = { type: "logFiles", files: files || [] };
             // console.log("sending files", msg);
             monitors.forEach((monitor) => monitor.send(msg));
@@ -605,7 +628,9 @@ function clearLogFiles() {
 
         for (const file of files) {
             fs.unlink(path.join(logFileDir, file), (err) => {
-                if (err) console.log("failed to remove file", path.join(logFileDir, file), err);
+                if (err) {
+                    console.log("failed to remove file", path.join(logFileDir, file), err);
+                }
             });
         }
         updateLogFilesToMonitors();
@@ -613,26 +638,38 @@ function clearLogFiles() {
 }
 
 try {
-    fs.watch(logFileDir, (type, filename) => {
-        if (type == "rename") {
+    fs.watch(logFileDir, (type: string) => {
+        if (type === "rename") {
             updateLogFilesToMonitors();
         }
     });
-} catch (err) {}
+} catch (err) {
+    /* */
+}
 
-function formatDate(date) {
-    let year = date.getFullYear(),
-        month = date.getMonth() + 1, // months are zero indexed
-        day = date.getDate(),
-        hour = date.getHours(),
-        minute = date.getMinutes(),
-        second = date.getSeconds();
+function formatDate(date: Date): string {
+    const year = date.getFullYear();
+    let month: string | number = date.getMonth() + 1; // months are zero indexed
+    let day: string | number = date.getDate();
+    let hour: string | number = date.getHours();
+    let minute: string | number = date.getMinutes();
+    let second: string | number = date.getSeconds();
 
-    if (month < 10) month = "0" + month;
-    if (day < 10) day = "0" + day;
-    if (hour < 10) hour = "0" + hour;
-    if (minute < 10) minute = "0" + minute;
-    if (second < 10) second = "0" + second;
+    if (month < 10) {
+        month = "0" + month;
+    }
+    if (day < 10) {
+        day = "0" + day;
+    }
+    if (hour < 10) {
+        hour = "0" + hour;
+    }
+    if (minute < 10) {
+        minute = "0" + minute;
+    }
+    if (second < 10) {
+        second = "0" + second;
+    }
     return `${year}_${month}_${day}_${hour}:${minute}:${second}`;
 }
 
@@ -700,7 +737,9 @@ server.on("builder", (builder) => {
 
     builder.on("close", () => {
         removeBuilder(builder);
-        if (objectCache) objectCache.removeNode(builder);
+        if (objectCache) {
+            objectCache.removeNode(builder);
+        }
         console.log(
             `builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builderCount}`
         );
@@ -732,9 +771,11 @@ server.on("builder", (builder) => {
     });
 });
 
-let pendingEnvironments = {};
+const pendingEnvironments = {};
 function requestEnvironment(compile) {
-    if (compile.environment in pendingEnvironments) return false;
+    if (compile.environment in pendingEnvironments) {
+        return false;
+    }
     pendingEnvironments[compile.environment] = true;
 
     console.log(`Asking ${compile.name} ${compile.ip} to upload ${compile.environment}`);
@@ -752,7 +793,7 @@ function requestEnvironment(compile) {
             compile.close();
             return;
         }
-        let hash = environment.hash;
+        const hash = environment.hash;
         compile.on("uploadEnvironmentData", (environment) => {
             if (!file) {
                 console.error("no pending file");
@@ -848,7 +889,7 @@ server.on("compile", (compile) => {
     }
 
     function score(s) {
-        let available = Math.min(4, s.slots - s.activeClients);
+        const available = Math.min(4, s.slots - s.activeClients);
         return available * (1 - s.load);
     }
     let file;
@@ -862,7 +903,9 @@ server.on("compile", (compile) => {
     let foundInCache = false;
 
     function filterBuilder(s) {
-        if (compile.builder && compile.builder != s.ip && compile.builder != s.name) return false;
+        if (compile.builder && compile.builder !== s.ip && compile.builder !== s.name) {
+            return false;
+        }
 
         if (compile.labels) {
             for (let i = 0; i < compile.labels.length; ++i) {
@@ -875,10 +918,12 @@ server.on("compile", (compile) => {
     }
 
     if (objectCache) {
-        let data = objectCache.get(compile.sha1);
+        const data = objectCache.get(compile.sha1);
         if (data) {
             data.nodes.forEach((s) => {
-                if (!filterBuilder(s)) return;
+                if (!filterBuilder(s)) {
+                    return;
+                }
                 const builderScore = score(s);
                 if (
                     !builder ||
@@ -941,23 +986,25 @@ server.on("compile", (compile) => {
         return;
     }
 
-    let data = {};
-    if (env != compile.environment) {
+    const data = {};
+    if (env !== compile.environment) {
         data.environment = env;
         data.extraArgs = Environments.extraArgs(compile.environment, env);
     }
     ++activeJobs;
-    let utilization = activeJobs / capacity;
+    const utilization = activeJobs / capacity;
     let peakInfo = false;
     const now = Date.now();
     peaks.forEach((peak) => {
-        if (peak.record(now, activeJobs, utilization)) peakInfo = true;
+        if (peak.record(now, activeJobs, utilization)) {
+            peakInfo = true;
+        }
     });
     if (peakInfo && monitors.length) {
-        let info = statsMessage();
+        const info = statsMessage();
         monitors.forEach((monitor) => monitor.send(info));
     }
-    let sendTime = Date.now();
+    const sendTime = Date.now();
     ++builder.activeClients;
     ++builder.jobsScheduled;
     console.log(
@@ -965,7 +1012,7 @@ server.on("compile", (compile) => {
             `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
     );
     builder.lastJob = Date.now();
-    let id = nextJobId();
+    const id = nextJobId();
     data.id = id;
     data.ip = builder.ip;
     data.hostname = builder.hostname;
@@ -1026,31 +1073,39 @@ function randomBytes(bytes) {
 function sendInfoToClient(client) {
     forEachBuilder((builder) => {
         const info = builderToMonitorInfo(builder, "builderAdded");
-        if (monitorsLog) console.log("sending to monitor", info);
+        if (monitorsLog) {
+            console.log("sending to monitor", info);
+        }
         client.send(info);
     });
-    let info = statsMessage();
-    if (monitorsLog) console.log("sending info to monitor", info);
+    const info = statsMessage();
+    if (monitorsLog) {
+        console.log("sending info to monitor", info);
+    }
 
     client.send(info);
 
-    let scheduler = { version: schedulerNpmVersion, type: "schedulerInfo" };
+    const scheduler = { version: schedulerNpmVersion, type: "schedulerInfo" };
     client.send(scheduler);
 }
 
 server.on("monitor", (client) => {
-    if (monitorsLog) console.log("Got monitor", client.ip, client.hostname);
+    if (monitorsLog) {
+        console.log("Got monitor", client.ip, client.hostname);
+    }
     monitors.push(client);
     function remove() {
-        let idx = monitors.indexOf(client);
-        if (idx != -1) {
+        const idx = monitors.indexOf(client);
+        if (idx !== -1) {
             monitors.splice(idx, 1);
         }
         client.removeAllListeners();
     }
     let user;
     client.on("message", (messageText) => {
-        if (monitorsLog) console.log("Got message from monitor", client.ip, client.hostname, messageText);
+        if (monitorsLog) {
+            console.log("Got message from monitor", client.ip, client.hostname, messageText);
+        }
         let message;
         try {
             message = JSON.parse(messageText);
@@ -1071,14 +1126,16 @@ server.on("monitor", (client) => {
             case "logFiles":
                 // console.log("logFiles:", message);
                 fs.readdir(logFileDir, (err, files) => {
-                    if (files) files = files.reverse();
+                    if (files) {
+                        files = files.reverse();
+                    }
                     console.log("sending files", files);
                     client.send({ type: "logFiles", files: files || [] });
                 });
                 break;
             case "logFile":
                 // console.log("logFile:", message);
-                if (message.file.indexOf("../") != -1 || message.file.indexOf("/..") != -1) {
+                if (message.file.indexOf("../") !== -1 || message.file.indexOf("/..") !== -1) {
                     client.close();
                     return;
                 }
@@ -1129,7 +1186,9 @@ server.on("monitor", (client) => {
                 }
                 db.get("users")
                     .then((users) => {
-                        if (!users) users = {};
+                        if (!users) {
+                            users = {};
+                        }
                         client.send({ type: "listUsers", success: true, users: Object.keys(users) });
                     })
                     .catch((err) => {
@@ -1196,7 +1255,7 @@ server.on("monitor", (client) => {
                         if (message.hmac) {
                             if (!users[message.user].cookie) {
                                 throw new Error("No cookie");
-                            } else if (users[message.user].cookieIp != client.ip) {
+                            } else if (users[message.user].cookieIp !== client.ip) {
                                 throw new Error("Wrong ip address");
                             } else if (users[message.user].cookieExpiration <= Date.now()) {
                                 throw new Error("Cookie expired");
@@ -1208,7 +1267,7 @@ server.on("monitor", (client) => {
                                 hmac.write(client.nonce);
                                 hmac.end();
                                 const hmacString = hmac.read().toString("base64");
-                                if (hmacString != message.hmac) {
+                                if (hmacString !== message.hmac) {
                                     throw new Error(`Wrong password ${message.user}`);
                                 }
                                 return undefined;
@@ -1216,7 +1275,7 @@ server.on("monitor", (client) => {
                         } else {
                             return hash(message.password, Buffer.from(users[message.user].salt, "base64")).then(
                                 (hash) => {
-                                    if (users[message.user].hash != hash.toString("base64")) {
+                                    if (users[message.user].hash !== hash.toString("base64")) {
                                         throw new Error(`Wrong password ${message.user}`);
                                     }
                                 }
@@ -1313,7 +1372,7 @@ server.on("error", (err) => {
 });
 
 function simulate(count) {
-    let usedIps = {};
+    const usedIps = {};
     function randomIp(transient) {
         let ip;
         do {
@@ -1324,7 +1383,9 @@ function simulate(count) {
                 parseInt(Math.random() * 256)
             ].join(".");
         } while (ip in usedIps);
-        if (!transient) usedIps[ip] = true;
+        if (!transient) {
+            usedIps[ip] = true;
+        }
         return ip;
     }
 
@@ -1339,8 +1400,8 @@ function simulate(count) {
         return words[idx];
     }
 
-    let fakeBuilders = [];
-    let jobs = [];
+    const fakeBuilders = [];
+    const jobs = [];
     for (let i = 0; i < count; ++i) {
         const ip = randomIp();
         const fakeBuilder = {
@@ -1444,7 +1505,7 @@ Environments.load(db, option("env-dir", path.join(common.cacheDir(), "environmen
         } else {
             setInterval(() => {
                 // console.log("sending pings");
-                for (let key in builders) {
+                for (const key in builders) {
                     const builder = builders[key];
                     builder.ping();
                 }

@@ -57,6 +57,17 @@ export default [
             exports: "named",
             sourcemap: true
         }
+    },
+    {
+        input: "scheduler/fisk-scheduler.ts",
+        plugins,
+        external,
+        output: {
+            file: "dist/fisk-scheduler.js",
+            format,
+            name: "fisk-scheduler",
+            exports: "named",
+            sourcemap: true
+        }
     }
-
 ];

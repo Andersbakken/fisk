@@ -196,6 +196,7 @@ export class Client extends EventEmitter {
             this.emit("err", (err as Error).toString());
         }
     }
+
     send(type: unknown, msg?: Record<string, unknown>): void {
         if (!this.ws) {
             this.emit("error", "No connected websocket");

@@ -1,23 +1,32 @@
-const fs = require("fs");
+import { DatabaseRecord } from "./DatabaseRecord";
+import fs from "fs";
 
-class Database {
-    constructor(path) {
+type Operation = () => void;
+
+export class Database {
+    private path: string;
+    private busy: boolean;
+    private queue: Operation[];
+
+    static instance: Database = new Database("fisk.2");
+
+    constructor(path: string) {
         this.path = path;
         this.busy = false;
         this.queue = [];
     }
 
-    get(record) {
-        return new Promise((resolve, reject) => {
+    get(record: string): Promise<DatabaseRecord | undefined> {
+        return new Promise<DatabaseRecord | undefined>((resolve, reject) => {
             // console.log("Reader promise", record, this.busy, this.queue);
             const perform = () => {
                 // console.log("perform called for read");
                 return this._read()
-                    .then((records) => {
+                    .then((records?: Record<string, DatabaseRecord>) => {
                         this.finishedOperation();
                         resolve(records ? records[record] : undefined);
                     })
-                    .catch((err) => {
+                    .catch((err: unknown) => {
                         reject(err);
                         this.finishedOperation();
                     });
@@ -31,14 +40,17 @@ class Database {
         });
     }
 
-    set(...keyValuePairs) {
+    set(...keyValuePairs: unknown[]): Promise<void> {
         return new Promise((resolve, reject) => {
             const perform = () => {
                 return this._read()
                     .then((records) => {
-                        if (!records) records = {};
-                        for (let i = 0; i < keyValuePairs.length; i += 2)
+                        if (!records) {
+                            records = {};
+                        }
+                        for (let i = 0; i < keyValuePairs.length; i += 2) {
                             records[keyValuePairs[i]] = keyValuePairs[i + 1];
+                        }
 
                         fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", (err) => {
                             if (err) {
@@ -70,12 +82,12 @@ class Database {
         });
     }
 
-    _read() {
-        return new Promise((resolve, reject) => {
-            fs.readFile(this.path, (err, data) => {
+    _read(): Promise<Record<string, DatabaseRecord>> {
+        return new Promise<Record<string, DatabaseRecord>>((resolve, reject) => {
+            fs.readFile(this.path, "utf8", (err: NodeJS.ErrnoException, data: string) => {
                 // console.log("got read", err, data);
                 if (err) {
-                    if (err.code == "ENOENT") {
+                    if (err.code === "ENOENT") {
                         resolve({});
                     } else {
                         reject(err);
@@ -96,7 +108,7 @@ class Database {
         });
     }
 
-    finishedOperation() {
+    finishedOperation(): void {
         // console.log("finishedOperation", this.queue.length);
         if (this.queue.length) {
             const func = this.queue.splice(0, 1)[0];
@@ -107,7 +119,6 @@ class Database {
     }
 }
 
-const db = new Database("fisk.2");
 // db.get("ball").
 //     then(result => {
 //         console.log("read ball", result);
@@ -143,5 +154,3 @@ const db = new Database("fisk.2");
 // db.get("a").then(a => console.log("read a", a)).catch(err => {
 //     console.error("got err", err);
 // });
-
-module.exports = Database;
