@@ -1,5 +1,21 @@
-class Peak {
-    constructor(interval, name) {
+import assert from "assert";
+
+interface PeakData {
+    activeJobs: number;
+    utilization: number;
+}
+
+export class Peak {
+    readonly interval: number;
+    readonly name: string;
+    peakActiveJobs: number;
+    peakActiveJobsTime: number;
+    peakUtilization: number;
+    peakUtilizationTime: number;
+    actives?: Array<[number, number]>;
+    utilizations?: Array<[number, number]>;
+
+    constructor(interval: number, name: string) {
         this.interval = interval;
         this.name = name;
         this.peakActiveJobs = 0;
@@ -12,7 +28,7 @@ class Peak {
         }
     }
 
-    record(now, activeJobs, utilization) {
+    record(now: number, activeJobs: number, utilization: number): boolean {
         let ret = false;
         if (!this.interval) {
             if (activeJobs > this.peakActiveJobs) {
@@ -40,6 +56,7 @@ class Peak {
                 this.peakActiveJobsTime = now;
                 this.actives = [];
             } else if (idx) {
+                assert(this.actives, "Must have actives");
                 this.actives.splice(0, idx);
             }
             this.actives.push([now, activeJobs]);
@@ -63,7 +80,7 @@ class Peak {
         return ret;
     }
 
-    toObject() {
+    toObject(): PeakData {
         if (this.interval) {
             const cutoff = Date.now() - this.interval;
             let peakActiveJobs = 0;
@@ -80,6 +97,7 @@ class Peak {
             }
             let peakUtilization = 0;
             splice = 0;
+            assert(this.utilizations, "Must have utilizations");
             for (let idx = 0; idx < this.utilizations.length; ++idx) {
                 if (this.utilizations[idx][0] < cutoff) {
                     splice = idx + 1;
@@ -99,5 +117,3 @@ class Peak {
         };
     }
 }
-
-module.exports = Peak;

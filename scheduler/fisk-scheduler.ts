@@ -26,14 +26,14 @@ const server = new Server(option, common.Version);
 
 const clientMinimumVersion = "3.4.96";
 const serverStartTime = Date.now();
-process.on("unhandledRejection", (reason, p) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
+process.on("unhandledRejection", (reason: Error, p: Promise<unknown>) => {
+    console.log("Unhandled Rejection at: Promise", p, "reason:", reason?.stack);
     addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}\n` }, () => {
         process.exit();
     });
 });
 
-process.on("uncaughtException", (err) => {
+process.on("uncaughtException", (err: Error) => {
     console.error("Uncaught exception", err);
     addLogFile({ source: "no source file", ip: "self", contents: err.toString() + err.stack + "\n" }, () => {
         process.exit();
@@ -46,51 +46,15 @@ server.on("error", (error) => {
     throw new error();
 });
 
-let schedulerNpmVersion;
+let schedulerNpmVersion: string | undefined;
 try {
-    schedulerNpmVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"))).version;
+    schedulerNpmVersion = String(JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version);
 } catch (err) {
     console.log("Couldn't parse package json", err);
     process.exit();
 }
 
 const builders = {};
-let lastWol = 0;
-function sendWols() {
-    const now = Date.now();
-    // console.log("sendWols", now, lastWol, now - lastWol);
-    if (now - lastWol < 60000) {
-        return;
-    }
-
-    lastWol = now;
-    let byName;
-    for (const name in wolBuilders) {
-        const wolBuilder = wolBuilders[name];
-        if (wolBuilder.connected) {
-            continue;
-        }
-        if (!byName) {
-            byName = {};
-            for (const key in builders) {
-                const builder = builders[key];
-                if (builder.name) {
-                    byName[builder.name] = builder;
-                }
-            }
-        }
-        if (!(name in byName)) {
-            wol.wake(wolBuilder.mac, (error) => {
-                console.log("sending wol", JSON.stringify(wolBuilder));
-                if (error) {
-                    console.error(`Failed to wol builder: ${JSON.stringify(wolBuilder)}: ${error}`);
-                }
-            });
-        } else {
-            console.log(wolBuilder, "is already connected");
-        }
-    }
-}
 
 const monitors = [];
 let builderCount = 0;
@@ -275,9 +239,6 @@ function builderToMonitorInfo(builder, type) {
 
 function insertBuilder(builder) {
     builders[builderKey(builder)] = builder;
-    if (builder.name && builder.name in wolBuilders) {
-        wolBuilders[builder.name].connected = true;
-    }
     ++builderCount;
     capacity += builder.slots;
     if (monitors.length) {
@@ -486,7 +447,6 @@ server.on("listen", (app) => {
                 uploadSpeed: s.jobsPerformed / s.totalUploadSpeed || 0,
                 hostname: s.hostname,
                 system: s.system,
-                name: s.name,
                 created: s.created,
                 load: s.load,
                 uptime: now - s.created.valueOf(),
@@ -892,12 +852,9 @@ server.on("compile", (compile) => {
         const available = Math.min(4, s.slots - s.activeClients);
         return available * (1 - s.load);
     }
-    let file;
     let builder;
     let bestScore;
     let env;
-    let extraArgs;
-    let blacklistedArgs;
     // console.log("got usableEnvs", usableEnvs);
     // ### should have a function match(s) that checks for env, score and compile.builder etc
     let foundInCache = false;
@@ -928,7 +885,7 @@ server.on("compile", (compile) => {
                 if (
                     !builder ||
                     builderScore > bestScore ||
-                    (builderScore == bestScore && builder.lastJob < s.lastJob)
+                    (builderScore === bestScore && builder.lastJob < s.lastJob)
                 ) {
                     bestScore = builderScore;
                     builder = s;
@@ -951,7 +908,7 @@ server.on("compile", (compile) => {
                     if (
                         !builder ||
                         builderScore > bestScore ||
-                        (builderScore == bestScore && s.lastJob < builder.lastJob)
+                        (builderScore === bestScore && s.lastJob < builder.lastJob)
                     ) {
                         bestScore = builderScore;
                         builder = s;
@@ -1004,7 +961,6 @@ server.on("compile", (compile) => {
         const info = statsMessage();
         monitors.forEach((monitor) => monitor.send(info));
     }
-    const sendTime = Date.now();
     ++builder.activeClients;
     ++builder.jobsScheduled;
     console.log(
@@ -1033,7 +989,7 @@ server.on("compile", (compile) => {
         }
         console.error(`compile error '${msg}' from ${compile.ip}`);
     });
-    compile.on("close", (event) => {
+    compile.on("close", () => {
         // console.log("Client disappeared");
         compile.removeAllListeners();
         if (builder) {
@@ -1044,7 +1000,9 @@ server.on("compile", (compile) => {
     });
 });
 
-function writeConfiguration(change) {}
+function writeConfiguration(change) {
+    console.log(writeConfiguration, change);
+}
 
 function hash(password, salt) {
     return new Promise((resolve, reject) => {
@@ -1133,7 +1091,7 @@ server.on("monitor", (client) => {
                     client.send({ type: "logFiles", files: files || [] });
                 });
                 break;
-            case "logFile":
+            case "logFile": {
                 // console.log("logFile:", message);
                 if (message.file.indexOf("../") !== -1 || message.file.indexOf("/..") !== -1) {
                     client.close();
@@ -1145,6 +1103,7 @@ server.on("monitor", (client) => {
                     client.send({ type: "logFile", file: f, contents: contents || "" });
                 });
                 break;
+            }
             case "readConfiguration":
                 break;
             case "writeConfiguration":
@@ -1216,7 +1175,6 @@ server.on("monitor", (client) => {
                     return;
                 }
                 pendingUsers[message.user] = true;
-                let users;
                 db.get("users")
                     .then((users) => {
                         if (!users || !users[message.user]) {
@@ -1442,7 +1400,7 @@ function simulate(count) {
             } else if (percentage <= 1) {
                 jobs[i].builder.gone = true;
                 removeBuilder(jobs[i].builder);
-                while (jobs[i + 1] && jobs[i + 1].builder == jobs[i].builder) {
+                while (jobs[i + 1] && jobs[i + 1].builder === jobs[i].builder) {
                     ++i;
                 }
                 continue;
