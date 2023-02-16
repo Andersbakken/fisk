@@ -1,4 +1,4 @@
-import { Common } from "../common-ts/index";
+import { Common } from "../common";
 import { Compile } from "./Compile";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";

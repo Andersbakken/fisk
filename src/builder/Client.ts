@@ -1,5 +1,5 @@
 import { OptionsFunction } from "@jhanssen/options";
-import { stringOrUndefined } from "../common-ts/index";
+import { stringOrUndefined } from "../common";
 import EventEmitter from "events";
 import WebSocket from "ws";
 import assert from "assert";

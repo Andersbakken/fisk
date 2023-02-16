@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Builder } from "./Builder";
-import { BuilderAddedMessage, BuilderRemovedMessage } from "../common-ts/BuilderAddedOrRemovedMessage";
+import { BuilderAddedMessage, BuilderRemovedMessage } from "../common/BuilderAddedOrRemovedMessage";
 import { CacheHitMessage } from "./CacheHitMessage";
 import { Client } from "./Client";
 import { Compile } from "./Compile";
@@ -9,7 +9,7 @@ import { Database } from "./Database";
 import { Environments } from "./Environments";
 import { File } from "./File";
 import { JobFinishedMessage } from "./JobFinishedMessage";
-import { JobMonitorMessage } from "../common-ts/JobMonitorMessage";
+import { JobMonitorMessage } from "../common/JobMonitorMessage";
 import { JobScheduledMessage } from "./JobScheduledMessage";
 import { JobStartedMessage } from "./JobStartedMessage";
 import { MonitorMessage } from "./MonitorMessage";
@@ -17,7 +17,7 @@ import { ObjectCacheManager } from "./ObjectCacheManager";
 import { Peak } from "./Peak";
 import { PeakData } from "./PeakData";
 import { Server } from "./Server";
-import { common as commonFunc } from "../common-ts/index";
+import { common as commonFunc } from "../common";
 import assert from "assert";
 import bytes from "bytes";
 import compareVersions from "compare-versions";

@@ -6,9 +6,9 @@ import {
     BuilderAddedMessage,
     BuilderAddedOrRemovedBase,
     BuilderRemovedMessage
-} from "../common-ts/BuilderAddedOrRemovedMessage";
-import { JobMonitorMessage, JobMonitorMessageClient } from "../common-ts/JobMonitorMessage";
-import { JobMonitorMessageBase } from "../common-ts/JobMonitorMessage";
+} from "../common/BuilderAddedOrRemovedMessage";
+import { JobMonitorMessage, JobMonitorMessageClient } from "../common/JobMonitorMessage";
+import { JobMonitorMessageBase } from "../common/JobMonitorMessage";
 import WebSocket from "ws";
 import assert from "assert";
 import humanize, { Unit } from "humanize-duration";

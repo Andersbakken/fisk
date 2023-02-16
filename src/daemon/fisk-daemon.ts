@@ -5,7 +5,7 @@ import options, { OptionsFunction } from "@jhanssen/options";
 import { Constants } from "./Constants";
 import { Server } from "./Server";
 import { Slots } from "./Slots";
-import { common as commonFunc } from "../common-ts";
+import { common as commonFunc } from "../common";
 import assert from "assert";
 import os from "os";
 
