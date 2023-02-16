@@ -692,7 +692,7 @@ server.on("listen", (app: express.Express) => {
             return;
         }
 
-        const parsed = new URL(req.url || "");
+        const parsed = new URL(req.url || "", server.baseUrl);
 
         const urlPath = parsed.pathname.substring(13);
         if (urlPath === "info") {

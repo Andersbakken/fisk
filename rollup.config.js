@@ -9,7 +9,7 @@ const plugins = [
         preferBuiltins: true
     }),
     commonjs({
-        dynamicRequireRoot: "/tmp/balls"
+        ignoreDynamicRequires: true
     }),
     typescript({
         tsconfig: `tsconfig.json`,

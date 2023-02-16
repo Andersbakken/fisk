@@ -16,6 +16,7 @@ export class Server extends EventEmitter {
     private server?: net.Server;
     private ws?: WebSocket.Server;
 
+    readonly baseUrl: string;
     port?: number;
 
     constructor(option: OptionsFunction, configVersion: number) {
@@ -23,6 +24,7 @@ export class Server extends EventEmitter {
         this.option = option;
         this.configVersion = configVersion;
         this.app = undefined;
+        this.baseUrl = `http://localhost:${this.option.int("port", 8096)}`;
     }
 
     listen(): void {
@@ -72,7 +74,7 @@ export class Server extends EventEmitter {
             ip = ip.substring(7);
         }
 
-        const url = new URL(req.url || "");
+        const url = new URL(req.url || "", this.baseUrl);
         switch (url.pathname) {
             case "/compile": {
                 const hash = String(req.headers["x-fisk-environments"]);

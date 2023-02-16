@@ -27,6 +27,7 @@ export class Server extends EventEmitter {
     private ws?: WebSocket.Server;
     private server?: http.Server;
     private nonces: WeakMap<express.Request, string>;
+    private readonly baseUrl: string;
 
     objectCache: boolean;
 
@@ -37,6 +38,7 @@ export class Server extends EventEmitter {
         this.id = 0;
         this.objectCache = false;
         this.nonces = new WeakMap();
+        this.baseUrl = `http://localhost:${this.option.int("port", 8097)}`;
     }
 
     listen(): Promise<void> {
@@ -72,7 +74,7 @@ export class Server extends EventEmitter {
             });
 
             this.ws.on("headers", (headers: string[], request: express.Request) => {
-                const url = new URL(request.url || "");
+                const url = new URL(request.url, this.baseUrl);
                 headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
                 if (url.pathname === "/monitor") {
                     const nonce = crypto.randomBytes(256).toString("base64");
@@ -373,7 +375,7 @@ export class Server extends EventEmitter {
             ip = ip.substr(7);
         }
 
-        const url = new URL(req.url || "");
+        const url = new URL(req.url, this.baseUrl);
         switch (url.pathname) {
             case "/compile":
                 this._handleCompile(req, ws, ip);
