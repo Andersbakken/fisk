@@ -104,7 +104,7 @@ class Server extends EventEmitter {
             let defaultBacklog = 128;
             try {
                 defaultBacklog = parseInt(fs.readFileSync("/proc/sys/net/core/somaxconn", "utf8")) || 128;
-            } catch () {
+            } catch (err) {
             }
 
             let backlog = this.option.int("backlog", defaultBacklog);
