@@ -22,7 +22,7 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/src/client/create-fisk-env.c
                    COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/src/client/create-fisk-env.c" -DVARIABLE=create_fisk_env -P ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake)
 
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/src/client/npm-version.c
-                   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../package.json
+                   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../../package.json
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake
                    COMMAND ${CMAKE_COMMAND} -DOUTPUT="${CMAKE_BINARY_DIR}/src/client/npm-version.c" -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
 
