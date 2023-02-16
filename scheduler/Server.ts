@@ -49,7 +49,9 @@ export class Server extends EventEmitter {
             let defaultBacklog = 128;
             try {
                 defaultBacklog = parseInt(fs.readFileSync("/proc/sys/net/core/somaxconn", "utf8")) || 128;
-            } catch (err) {}
+            } catch (err: unknown) {
+                /* */
+            }
 
             const backlog = this.option.int("backlog", defaultBacklog);
             this.server.listen({ port, backlog, host: "0.0.0.0" });
@@ -71,11 +73,12 @@ export class Server extends EventEmitter {
                 }
             });
 
-            this.server.on("error", (error) => {
-                if (error.code === "EADDRINUSE") {
+            this.server.on("error", (error: Error) => {
+                if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
                     console.log(`Port ${port} is in use...`);
                     setTimeout(() => {
-                        this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
+                        assert(this.server);
+                        this.server.listen({ port, backlog, host: "0.0.0.0" });
                     }, 1000);
                 } else {
                     console.error("Got server error", error.toString());

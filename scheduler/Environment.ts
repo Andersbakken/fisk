@@ -1,10 +1,10 @@
 export class Environment {
-    public path: string;
-    public hash: string;
-    public system: string;
-    public originalPath: string;
-    public info?: string;
-    public size?: number;
+    path: string;
+    hash: string;
+    system: string;
+    originalPath: string;
+    info?: string;
+    size?: number;
 
     constructor(path: string, hash: string, system: string, originalPath: string) {
         this.path = path;

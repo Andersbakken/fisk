@@ -58,6 +58,7 @@ export class Peak {
             }
             this.actives.push([now, activeJobs]);
             idx = 0;
+            assert(this.utilizations);
             while (idx < this.utilizations.length) {
                 if (this.utilizations[idx][0] > cutoff && this.utilizations[idx][1] > utilization) {
                     break;
@@ -68,7 +69,7 @@ export class Peak {
                 ret = true;
                 this.peakUtilization = utilization;
                 this.peakUtilizationTime = now;
-                this.utilization = [];
+                this.utilizations = [];
             } else if (idx) {
                 this.utilizations.splice(0, idx);
             }
@@ -82,6 +83,7 @@ export class Peak {
             const cutoff = Date.now() - this.interval;
             let peakActiveJobs = 0;
             let splice = 0;
+            assert(this.actives);
             for (let idx = 0; idx < this.actives.length; ++idx) {
                 if (this.actives[idx][0] < cutoff) {
                     splice = idx + 1;
@@ -105,7 +107,7 @@ export class Peak {
             if (splice) {
                 this.utilizations.splice(0, splice);
             }
-            return { activeJobs: peakActiveJobs, utilizations: peakUtilization };
+            return { activeJobs: peakActiveJobs, utilization: peakUtilization };
         }
 
         return {

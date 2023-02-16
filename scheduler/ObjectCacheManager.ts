@@ -1,10 +1,12 @@
 import { Builder } from "./Builder";
+import { NodeData } from "./NodeData";
 import { ObjectCacheManagerMessage } from "./ObjectCacheManagerMessage";
 import { ObjectCacheMessage } from "../common/ObjectCacheMessage";
 import { OptionsFunction } from "@jhanssen/options";
 import { SHA1Data } from "./SHA1Data";
 import { prettySize } from "./prettySize";
 import EventEmitter from "events";
+import assert from "assert";
 import express from "express";
 
 function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder) {
@@ -41,7 +43,7 @@ type CommandType = {
 
 export class ObjectCacheManager extends EventEmitter {
     private bySHA1: Map<string, SHA1Data>;
-    private byNode: Map<Builder, Builder>;
+    private byNode: Map<Builder, NodeData>;
     private distributeOnInsertion: boolean;
     private distributeOnCacheHit: boolean;
     private redundancy: number;
@@ -133,7 +135,7 @@ export class ObjectCacheManager extends EventEmitter {
             "maxSize",
             prettySize(data.maxSize),
             "cacheSize",
-            prettySize(data.size),
+            prettySize(data.cacheSize),
             "sha1s",
             data.sha1s.length
         );
@@ -142,7 +144,7 @@ export class ObjectCacheManager extends EventEmitter {
             return;
         }
         const sha1s = data.sha1s.map((item) => item.sha1);
-        this.byNode.set(node, new Builder(data.size, data.maxSize, sha1s));
+        this.byNode.set(node, new NodeData(data.cacheSize, data.maxSize, sha1s));
         data.sha1s.forEach((item) => {
             addToSHA1Map(this.bySHA1, item.sha1, item.fileSize, node);
         });
@@ -163,15 +165,15 @@ export class ObjectCacheManager extends EventEmitter {
         if ("clear" in query) {
             this.clear();
         }
-        const ret = {
+        const ret: Record<string, unknown> = {
             hits: this.hits
         };
 
         if ("nodes" in query) {
-            ret.nodes = {};
+            const nodes: Record<string, unknown> = {};
             const verbose = "verbose" in query;
             this.byNode.forEach((value, key) => {
-                const data = {
+                const data: Record<string, unknown> = {
                     sha1s: verbose ? value.sha1s : value.sha1s.length,
                     maxSize: prettySize(value.maxSize),
                     size: prettySize(value.size)
@@ -182,19 +184,21 @@ export class ObjectCacheManager extends EventEmitter {
                 if (key.hostname) {
                     data.name = key.hostname;
                 }
-                ret.nodes[key.ip + ":" + key.port] = data;
+                nodes[key.ip + ":" + key.port] = data;
             });
+            ret.nodes = nodes;
         }
 
         if ("objects" in query) {
-            ret.sha1 = {};
+            const sha1: Record<string, unknown> = {};
             this.bySHA1.forEach((value, key) => {
                 // console.log(key, value);
-                ret.sha1[key] = {
+                sha1[key] = {
                     fileSize: prettySize(value.fileSize),
                     nodes: value.nodes.map((node) => node.ip + ":" + node.port)
                 };
             });
+            ret.sha1 = sha1;
         }
 
         return ret;
@@ -202,17 +206,17 @@ export class ObjectCacheManager extends EventEmitter {
 
     distribute(query: Record<string, unknown>, res?: express.Response): void {
         const dry = "dry" in query;
-        let redundancy = parseInt(query.redundancy);
+        let redundancy: number = parseInt(String(query.redundancy));
         if (isNaN(redundancy) || redundancy <= 0) {
             redundancy = 1;
         }
-        let max = parseInt(query.max);
+        let max: number | undefined = parseInt(String(query.max));
         if (isNaN(max) || max <= 0) {
             max = undefined;
         }
-        const sha1 = query.sha1;
+        const sha1 = String(query.sha1);
 
-        let ret: unknown;
+        let ret: Record<string, unknown> | undefined;
         if (res) {
             ret = { type: "fetch_cache_objects", dry: dry, commands: {} };
             console.log(
@@ -229,9 +233,9 @@ export class ObjectCacheManager extends EventEmitter {
 
         const nodes = Array.from(this.byNode.keys());
         let nodeIdx = 0;
-        const commands = new Map<string, CommandType>();
+        const commands = new Map<Builder, CommandType>();
         if (!sha1) {
-            this.byNode.forEach((value, key) => {
+            this.byNode.forEach((value: NodeData, key: Builder) => {
                 commands.set(key, { objects: [], available: value.maxSize - value.size });
             });
         }
@@ -241,7 +245,7 @@ export class ObjectCacheManager extends EventEmitter {
         if (this.byNode.size >= 2) {
             // let max = 1;
             let roundRobinIndex = 0;
-            const processObject = (sha1, value) => {
+            const processObject = (sha1: string, value: SHA1Data) => {
                 if (max !== undefined && max <= 0) {
                     return;
                 }
@@ -270,7 +274,8 @@ export class ObjectCacheManager extends EventEmitter {
                         if (data) {
                             available = data.available;
                         } else {
-                            const nodeData = this.byNode[node];
+                            const nodeData = this.byNode.get(node);
+                            assert(nodeData);
                             available = nodeData.maxSize - nodeData.size;
                         }
                         if (available < value.fileSize) {

@@ -58,6 +58,8 @@ export class Environments {
                                                         info.system,
                                                         info.originalPath
                                                     );
+                                                    env.info = data.substr(idx + 1);
+
                                                     this._data[hash] = env;
                                                 })
                                                 .catch((err: unknown) => {
@@ -111,11 +113,9 @@ export class Environments {
     complete(file: File): Promise<void> {
         return new Promise<void>((resolve) => {
             untarFile(file.path, "etc/compiler_info").then((data) => {
-                const env = new Environment(file.path, file.hash);
                 const idx = data.indexOf("\n");
                 const info = JSON.parse(data.substr(0, idx));
-                env.system = info.system;
-                env.originalPath = info.originalPath;
+                const env = new Environment(file.path, file.hash, info.system, info.originalPath);
                 env.info = data.substr(idx + 1);
                 this._data[file.hash] = env;
                 resolve();
@@ -159,11 +159,13 @@ export class Environments {
 
     unlink(srcHash?: string, targetHash?: string): Promise<void> {
         if (!srcHash) {
-            for (const src in this._links) {
-                const targets = this._links[src];
-                targets.unset(targetHash);
-                if (!targets.size) {
-                    delete this._links[src];
+            if (targetHash) {
+                for (const src in this._links) {
+                    const targets = this._links[src];
+                    targets.unset(targetHash);
+                    if (!targets.size) {
+                        delete this._links[src];
+                    }
                 }
             }
         } else if (!targetHash) {
@@ -190,7 +192,7 @@ export class Environments {
         if (!(hash in this._data)) {
             return undefined;
         }
-        return this.environments._data[hash];
+        return this._data[hash];
     }
 
     linksInfo(): Record<string, Record<string, LinkProperties>> {
@@ -211,8 +213,8 @@ export class Environments {
     remove(hash: string): void {
         // ### this should be promisified
         try {
-            fs.removeSync(this.environments._data[hash].path);
-            delete this.environments._data[hash];
+            fs.removeSync(this._data[hash].path);
+            delete this._data[hash];
             this.unlink(hash);
             this.unlink(undefined, hash);
             this.syncLinks();
