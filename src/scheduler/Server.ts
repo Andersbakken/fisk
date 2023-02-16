@@ -333,7 +333,7 @@ export class Server extends EventEmitter {
                     break;
             }
         });
-        // console.log("Got dude", envs);
+        // console.log("Got dude", client);
         this.emit("builder", client);
     }
 

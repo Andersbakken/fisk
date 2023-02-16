@@ -15,69 +15,74 @@ const plugins = [
     json()
 ];
 
+function onwarn(warning) {
+    if (warning.code === "CIRCULAR_DEPENDENCY" && warning.importer.startsWith("node_modules/blessed/")) {
+        return;
+    }
+
+    console.warn(warning.message);
+}
+
 // Define forms
 const format = "cjs";
-const external = ["fs", "assert"];
 
 export default [
     {
         input: "src/daemon/fisk-daemon.ts",
         plugins,
-        external,
         output: {
             file: "daemon/fisk-daemon.js",
             format,
             name: "fisk-daemon",
             exports: "named",
-            sourcemap: false
+            sourcemap: true
         }
     },
     {
         input: "src/builder/fisk-builder.ts",
         plugins,
-        external,
         output: {
             file: "builder/fisk-builder.js",
             format,
             name: "fisk-builder",
             exports: "named",
-            sourcemap: false
+            sourcemap: true
         }
     },
     {
         input: "src/builder/VM_runtime/VM_runtime.ts",
         plugins,
-        external,
+        external: ["posix"],
         output: {
             file: "builder/VM_runtime.js",
             format,
             name: "fisk-builder-VM_runtime",
             exports: "named",
-            sourcemap: false
+            sourcemap: true
         }
     },
     {
         input: "src/scheduler/fisk-scheduler.ts",
         plugins,
-        external,
+        external: ["posix"],
         output: {
             file: "scheduler/fisk-scheduler.js",
             format,
             name: "fisk-scheduler",
             exports: "named",
-            sourcemap: false
+            sourcemap: true
         }
     },
     {
         input: "src/monitor/fisk-monitor.ts",
+        onwarn,
         plugins,
-        external,
         output: {
             file: "monitor/fisk-monitor.js",
             format,
             name: "fisk-monitor",
             exports: "named",
-            sourcemap: false
+            sourcemap: true
         }
     }
 ];

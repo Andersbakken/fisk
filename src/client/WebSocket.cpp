@@ -101,10 +101,10 @@ WebSocket::~WebSocket()
     }
 }
 
-bool WebSocket::connect(std::string &&uniformResourceLocator, const std::map<std::string, std::string> &hdrs)
+bool WebSocket::connect(const std::string &uniformResourceLocator, const std::map<std::string, std::string> &hdrs)
 {
-    mUrl = std::move(uniformResourceLocator);
-    mHeaders = std::move(hdrs);
+    mUrl = uniformResourceLocator;
+    mHeaders = hdrs;
     mParsedUrl = LUrlParser::ParseURL::parseURL(mUrl);
     if (!mParsedUrl.isValid()) {
         ERROR("Bad url %s", mUrl.c_str());

@@ -434,9 +434,11 @@ int main(int argc, char **argv)
         DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket->environment.c_str());
         headers["x-fisk-environments"] = schedulerWebsocket->environment;
     }
-    if (!builderWebSocket.connect(Client::format("ws://%s:%d/compile",
-                                                 data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
-                                                 data.builderPort), headers)) {
+    const std::string builderUrl = Client::format("ws://%s:%d/compile",
+                                                  data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+                                                  data.builderPort);
+    DEBUG("Connecting to builder %s", builderUrl.c_str());
+    if (!builderWebSocket.connect(builderUrl, headers)) {
         DEBUG("Have to run locally because no builder connection");
         runLocal("builder connection failure");
         return 0; // unreachable

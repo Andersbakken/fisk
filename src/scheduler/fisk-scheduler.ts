@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Builder } from "./Builder";
+import { BuilderAddedMessage, BuilderRemovedMessage } from "../common-ts/BuilderAddedOrRemovedMessage";
 import { CacheHitMessage } from "./CacheHitMessage";
 import { Client } from "./Client";
 import { Compile } from "./Compile";
@@ -8,6 +9,7 @@ import { Database } from "./Database";
 import { Environments } from "./Environments";
 import { File } from "./File";
 import { JobFinishedMessage } from "./JobFinishedMessage";
+import { JobMonitorMessage } from "../common-ts/JobMonitorMessage";
 import { JobScheduledMessage } from "./JobScheduledMessage";
 import { JobStartedMessage } from "./JobStartedMessage";
 import { MonitorMessage } from "./MonitorMessage";
@@ -121,33 +123,10 @@ function nextJobId() {
     return id;
 }
 
-interface JobInfoClient {
-    hostname?: string;
-    ip: string;
-    name?: string;
-    user?: string;
-    labels?: string[];
-    port?: number;
-}
-
-interface JobInfo {
-    type: "jobStarted" | "jobScheduled" | "cacheHit";
-    client: JobInfoClient;
-    sourceFile: string;
-    builder: JobInfoClient;
-    id: number;
-    jobs?: number;
-    jobsFailed?: number;
-    jobsStarted?: number;
-    jobsFinished?: number;
-    jobsScheduled?: number;
-    cacheHits?: number;
-}
-
 function jobStartedOrScheduled(type: "jobStarted" | "jobScheduled", job: JobStartedMessage | JobScheduledMessage) {
     if (monitors.length) {
         // console.log("GOT STUFF", job);
-        const info: JobInfo = {
+        const info: JobMonitorMessage = {
             type: type,
             client: {
                 hostname: job.client.hostname,
@@ -179,7 +158,7 @@ function cacheHit(builder: Builder, message: CacheHitMessage) {
         objectCache.hit(message.sha1);
     }
     if (monitors.length) {
-        const info: JobInfo = {
+        const info: JobMonitorMessage = {
             type: "cacheHit",
             client: {
                 hostname: message.client.hostname,
@@ -248,7 +227,10 @@ function builderKey(ip: string | Builder, port?: number): string {
     return ip + " " + port;
 }
 
-function builderToMonitorInfo(builder: Builder, type: "builderAdded" | "builderRemoved"): unknown {
+function builderToMonitorInfo(
+    builder: Builder,
+    type: "builderAdded" | "builderRemoved"
+): BuilderAddedMessage | BuilderRemovedMessage {
     return {
         type: type,
         ip: builder.ip,
@@ -260,7 +242,7 @@ function builderToMonitorInfo(builder: Builder, type: "builderAdded" | "builderR
         compileSpeed: builder.jobsPerformed / builder.totalCompileSpeed || 0,
         uploadSpeed: builder.jobsPerformed / builder.totalUploadSpeed || 0,
         system: builder.system,
-        created: builder.created,
+        created: builder.created.toString(),
         npmVersion: builder.npmVersion,
         environments: builder.environments ? Object.keys(builder.environments) : [],
         labels: builder.labels

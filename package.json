@@ -6,8 +6,7 @@
         "lint": "eslint . --ext .ts",
         "rollup": "rollup -c",
         "tsc": "tsc -p .",
-        "hack-posix-rollup": "./scripts/hack-posix-rollup.js",
-        "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup && npm run hack-posix-rollup",
+        "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup",
         "clean:dist": "del-cli dist/*",
         "clean:cache": "del-cli .cache/*",
         "clean": "run-p clean:dist clean:cache"
@@ -33,7 +32,7 @@
         "@jhanssen/options": "^1.0.34",
         "@josh_stern/mktemp": "^1.0.5",
         "axios": "^0.21.1",
-        "blessed": "^0.1.81",
+        "blessed": "Andersbakken/blessed#master",
         "bufferutil": "^4.0.7",
         "bytes": "^3.0.0",
         "compare-versions": "^3.4.0",

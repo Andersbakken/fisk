@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 
-import blessed from "blessed";
+import blessed, { Widgets } from "blessed";
 // import fs from "fs";
+import {
+    BuilderAddedMessage,
+    BuilderAddedOrRemovedBase,
+    BuilderRemovedMessage
+} from "../common-ts/BuilderAddedOrRemovedMessage";
+import { JobMonitorMessage, JobMonitorMessageClient } from "../common-ts/JobMonitorMessage";
+import { JobMonitorMessageBase } from "../common-ts/JobMonitorMessage";
+import WebSocket from "ws";
+import assert from "assert";
 import humanize, { Unit } from "humanize-duration";
 import options, { OptionsFunction } from "@jhanssen/options";
 
@@ -113,10 +122,19 @@ const builderBox = blessed.list({
         });
     }
 });
+
+let selectedBuilder: string | undefined;
+
 const headerBoxes = new WeakMap<Widgets.ListElement, Widgets.BoxElement>();
 
 function setHeaderBox(box: Widgets.ListElement, header: Widgets.BoxElement): void {
     headerBoxes.set(box, header);
+}
+
+function getHeaderBox(box: Widgets.ListElement): Widgets.BoxElement {
+    const ret = headerBoxes.get(box);
+    assert(ret);
+    return ret;
 }
 setHeaderBox(builderBox, builderHeader);
 
@@ -157,7 +175,9 @@ const clientBox = blessed.list({
     vi: true,
     style: {}
 });
-clientBox.headerBox = clientHeader;
+setHeaderBox(clientBox, clientHeader);
+
+let selectedClient: string | undefined;
 
 const notificationBox = blessed.box({
     top: "100%-3",
@@ -185,7 +205,8 @@ screen.append(builderContainer);
 screen.append(clientContainer);
 screen.append(notificationBox);
 
-let builderDialogBox, clientDialogBox;
+let builderDialogBox: Widgets.BoxElement | undefined;
+let clientDialogBox: Widgets.BoxElement | undefined;
 
 function hideDialogBoxes() {
     let ret = false;
@@ -203,14 +224,16 @@ function hideDialogBoxes() {
     return ret;
 }
 
-builderBox.on("select", (ev) => {
+builderBox.on("select", (ev: Widgets.BoxElement) => {
     let render = hideDialogBoxes();
     activate(builderBox);
     if (ev) {
-        const builderKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        const match = /^ *([^ ]*)/.exec(ev.content);
+        assert(match && match[1]);
+        const builderKey = match[1];
         const builder = builders.get(builderKey);
         if (builder) {
-            builderBox.current = builderKey;
+            // builderBox.current = builderKey;
             let str = "";
             for (const key in builder) {
                 const value = builder[key];
@@ -256,13 +279,15 @@ clientBox.on("select", (ev) => {
     activate(clientBox);
     if (ev) {
         // log("got ev", Object.keys(ev), ev.index, ev.$, ev.data);
-        const clientKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        const match = /^ *([^ ]*)/.exec(ev.content);
+        assert(match && match[1]);
+        const clientKey = match[1];
         const jobs = jobsForClient.get(clientKey);
         // let client = clients.get(clientKey);
         if (jobs) {
-            clientBox.current = clientKey;
+            // clientBox.current = clientKey;
             let str = "";
-            const data = [["Source file", "Builder", "Start time"]];
+            const data: Array<[string, string, string]> = [["Source file", "Builder", "Start time"]];
             const widest = [data[0][0].length + 1, data[0][1].length + 1];
             const now = Date.now();
             for (const [jobKey, jobValue] of jobs) {
@@ -278,7 +303,7 @@ clientBox.on("select", (ev) => {
                 widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
             }
 
-            data.sort((a, b) => a[2] - b[2]);
+            data.sort((a: [string, string, string], b: [string, string, string]) => parseInt(a[2]) - parseInt(b[2]));
 
             data.forEach((line, idx) => {
                 if (!idx) {
@@ -316,8 +341,8 @@ clientBox.on("select", (ev) => {
     }
 });
 
-let currentFocus = undefined;
-function activate(box) {
+let currentFocus: Widgets.ListElement | undefined;
+function activate(box: Widgets.ListElement) {
     if (currentFocus === box) {
         return;
     }
@@ -340,8 +365,9 @@ function activate(box) {
                 bg: "#770000"
             }
         };
-        currentFocus.headerBox.style.fg = "white";
-        currentFocus.headerBox.style.bg = "#004400";
+        const oldHeader = getHeaderBox(currentFocus);
+        oldHeader.style.fg = "white";
+        oldHeader.style.bg = "#004400";
     }
 
     currentFocus = box;
@@ -362,8 +388,9 @@ function activate(box) {
             bg: "red"
         }
     };
-    currentFocus.headerBox.style.fg = "white";
-    currentFocus.headerBox.style.bg = "#00ff00";
+    const newHeader = getHeaderBox(currentFocus);
+    newHeader.style.fg = "white";
+    newHeader.style.bg = "#00ff00";
     currentFocus.focus();
     screen.render();
 }
@@ -410,10 +437,10 @@ clientBox.on("click", () => {
 
 screen.render();
 
-let notificationInterval;
-const notifications = [];
+let notificationInterval: NodeJS.Timeout | undefined;
+const notifications: string[] = [];
 
-function notify(msg) {
+function notify(msg: string): void {
     if (notificationInterval) {
         if (notifications.length === 5) {
             notifications.splice(0, 1);
@@ -422,8 +449,8 @@ function notify(msg) {
         return;
     }
 
-    const notifyNow = (msg) => {
-        notificationBox.setContent(msg);
+    const notifyNow = (msg?: string) => {
+        notificationBox.setContent(msg || "");
         screen.render();
     };
 
@@ -441,7 +468,7 @@ function notify(msg) {
     notifyNow(msg);
 }
 
-let scheduler = option("scheduler", "ws://localhost:8097");
+let scheduler = String(option("scheduler", "ws://localhost:8097"));
 if (scheduler.indexOf("://") === -1) {
     scheduler = "ws://" + scheduler;
 }
@@ -470,15 +497,15 @@ function clearData() {
     update();
 }
 
-function formatCell(str, num, prefix, suffix) {
+function formatCell(str: string, num: number, prefix?: string, suffix?: string): string {
     return (prefix || "") + (" " + str).padEnd(num, " ").substr(0, num) + (suffix || "");
 }
 
-let updateTimer;
+let updateTimer: NodeJS.Timeout | undefined;
 let timeout = 0;
 
-function updateBuilderBox() {
-    const builderWidth = builderContainer.width - 3;
+function updateBuilderBox(): void {
+    const builderWidth = (builderContainer.width as number) - 3;
 
     const data = [];
     const maxWidth = [6, 8, 7, 7, 12, 20];
@@ -535,14 +562,16 @@ function updateBuilderBox() {
 
     builderHeader.setContent(header);
 
-    const item = builderBox.getItem(builderBox.selected);
-    let selectedBuilder;
+    const item = builderBox.getItem(selectedBuilder || "");
+    let selected: string | undefined;
     if (item) {
-        selectedBuilder = /^ *([^ ]*)/.exec(item.content)[1];
+        const match = /^ *([^ ]*)/.exec(item.content);
+        assert(match && match[1]);
+        selected = match[1];
     }
     let current;
     const items = data.map((item, idx) => {
-        if (item[0] === selectedBuilder) {
+        if (item[0] === selected) {
             current = idx;
         }
         return (
@@ -556,7 +585,7 @@ function updateBuilderBox() {
     });
     builderBox.setItems(items);
     if (current !== undefined) {
-        builderBox.selected = current;
+        selectedBuilder = current;
     }
     if (currentFocus !== builderBox) {
         builderBox.scrollTo(0);
@@ -570,7 +599,7 @@ function updateBuilderBox() {
 }
 
 function updateClientBox() {
-    const clientWidth = clientContainer.width - 3;
+    const clientWidth = (clientContainer.width as number) - 3;
 
     const data = [];
     const maxWidth = [6, 6, 7];
@@ -599,14 +628,16 @@ function updateClientBox() {
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     clientHeader.setContent(header);
 
-    const item = clientBox.getItem(clientBox.selected);
-    let selectedClient;
+    const item = clientBox.getItem(selectedClient || "");
+    let selected: string | undefined;
     if (item) {
-        selectedClient = /^ *([^ ]*)/.exec(item.content)[1];
+        const match = /^ *([^ ]*)/.exec(item.content);
+        assert(match && match[1]);
+        selected = match[1];
     }
     let current;
     const items = data.map((item, idx) => {
-        if (item[0] === selectedClient) {
+        if (item[0] === selected) {
             current = idx;
         }
         return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]);
@@ -614,7 +645,7 @@ function updateClientBox() {
 
     clientBox.setItems(items);
     if (current !== undefined) {
-        clientBox.selected = current;
+        selectedClient = current;
     }
     if (currentFocus !== clientBox) {
         clientBox.scrollTo(0);
@@ -637,7 +668,13 @@ function update() {
     }, timeout);
 }
 
-function builderAdded(msg) {
+interface BuilderInfo extends BuilderAddedOrRemovedBase {
+    type?: string;
+    active?: number;
+}
+
+function builderAdded(removed: BuilderAddedMessage) {
+    const msg = removed as BuilderInfo;
     msg.active = 0;
     delete msg.type;
     builders.set(msg.ip + ":" + msg.port, msg);
@@ -645,7 +682,7 @@ function builderAdded(msg) {
     update();
 }
 
-function builderRemoved(msg) {
+function builderRemoved(msg: BuilderRemovedMessage) {
     const builderKey = msg.ip + ":" + msg.port;
 
     jobs.forEach((jobValue) => {
@@ -661,28 +698,34 @@ function builderRemoved(msg) {
     update();
 }
 
-function clientName(client) {
-    if ("name" in client) {
+function clientName(client: JobMonitorMessageClient) {
+    if (client.name) {
         if (client.name === client.hostname) {
             return "dev:" + (client.user || "nobody") + "@" + client.hostname;
         }
-        if (client.name.length > 0 && client.name[0] === "-") {
+        if (client.name[0] === "-") {
             return "dev:" + (client.user || "nobody") + client.name;
         }
-        try {
-            const o = JSON.parse(client.name);
-            if (typeof o === "object" && "name" in o) {
-                return o.name;
-            }
-        } catch (e) {
-            /* */
-        }
+        // try {
+        //     const o = JSON.parse(client.name);
+        //     if (typeof o === "object" && "name" in o) {
+        //         return o.name;
+        //     }
+        // } catch (e) {
+        //     /* */
+        // }
         return client.name;
     }
     return client.ip;
 }
 
-function jobStarted(job) {
+interface JobData extends JobMonitorMessageBase {
+    type?: string;
+    time: number;
+}
+
+function jobStarted(j: JobMonitorMessage) {
+    const job = j as JobData;
     // log(job);
     const builderKey = `${job.builder.ip}:${job.builder.port}`;
     const builder = builders.get(builderKey);
@@ -709,7 +752,7 @@ function jobStarted(job) {
     update();
 }
 
-function deleteJob(job) {
+function deleteJob(job: JobMonitorMessage) {
     const clientKey = clientName(job.client);
     const client = jobsForClient.get(clientKey);
     if (client) {
@@ -720,7 +763,7 @@ function deleteJob(job) {
     }
 }
 
-function jobFinished(job) {
+function jobFinished(job: JobMonitorMessage) {
     const activejob = jobs.get(job.id);
     if (!activejob) {
         return;
@@ -738,15 +781,7 @@ function jobFinished(job) {
     update();
 }
 
-let ws;
-
-function send(msg) {
-    if (typeof msg !== "string") {
-        ws.send(JSON.stringify(msg));
-    } else {
-        ws.send(msg);
-    }
-}
+let ws: WebSocket | undefined;
 
 function connect() {
     const url = `${scheduler}/monitor`;
@@ -754,16 +789,17 @@ function connect() {
     ws = new WebSocket(url);
     ws.on("open", () => {
         notify("open");
-        send({ type: "sendInfo" });
+        assert(ws);
+        ws.send(JSON.stringify({ type: "sendInfo" }));
     });
     ws.on("error", (err) => {
         notify(`client websocket error ${err.message}`);
     });
-    ws.on("message", (msg) => {
+    ws.on("message", (msg: Buffer) => {
         //notify(`msg ${msg}`);
         let obj;
         try {
-            obj = JSON.parse(msg);
+            obj = JSON.parse(msg.toString());
         } catch (e) {
             notify(`msg parse error: ${msg}, ${e}`);
         }

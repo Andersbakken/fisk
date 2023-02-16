@@ -1,4 +1,4 @@
-import { OptionsFunction } from "@jhanssen/options";
+import { Option, OptionsFunction } from "@jhanssen/options";
 import fs from "fs-extra";
 import os from "os";
 import path from "path";
@@ -47,4 +47,8 @@ export function common(option: OptionsFunction): Common {
         cacheDir: cacheDir.bind(undefined, option),
         Version
     };
+}
+
+export function stringOrUndefined(value: Option): string | undefined {
+    return value === undefined ? undefined : String(value);
 }

@@ -19,7 +19,7 @@ public:
         Text,
         Binary
     };
-    bool connect(std::string &&url, const std::map<std::string, std::string> &headers);
+    bool connect(const std::string &url, const std::map<std::string, std::string> &headers);
     bool send(MessageType mode, const void *data, size_t len);
     void close(const char *reason);
     bool hasPendingSendData() const { return !mSendBuffer.empty(); }

@@ -85,3 +85,8 @@ builder/fisk-builder.js
 builder/VM_runtime.js
 scheduler/fisk-scheduler.js
 
+/builder/*.map
+/daemon/fisk-daemon.js.map
+/monitor/fisk-monitor.js
+/monitor/fisk-monitor.js.map
+/scheduler/fisk-scheduler.js.map

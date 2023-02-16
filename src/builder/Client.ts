@@ -1,4 +1,5 @@
 import { OptionsFunction } from "@jhanssen/options";
+import { stringOrUndefined } from "../common-ts/index";
 import EventEmitter from "events";
 import WebSocket from "ws";
 import assert from "assert";
@@ -14,8 +15,8 @@ export class Client extends EventEmitter {
     private ws?: WebSocket;
 
     npmVersion: string;
-    name: string;
-    hostname: string;
+    name?: string;
+    hostname?: string;
     slots: number;
 
     constructor(option: OptionsFunction, configVersion: number) {
@@ -30,8 +31,8 @@ export class Client extends EventEmitter {
             this.scheduler += ":8097";
         }
         this.serverPort = option.int("port", 8096);
-        this.hostname = String(option("hostname"));
-        this.name = String(option("name"));
+        this.hostname = stringOrUndefined(option("hostname"));
+        this.name = stringOrUndefined(option("name"));
         this.slots = option.int("slots", os.cpus().length);
         this.labels = option("labels") as string | undefined;
         try {
@@ -87,11 +88,14 @@ export class Client extends EventEmitter {
             "x-fisk-port": String(this.serverPort),
             "x-fisk-environments": environments.join(";"),
             "x-fisk-config-version": String(this.configVersion),
-            "x-fisk-builder-name": this.name,
             "x-fisk-system": system,
             "x-fisk-slots": String(this.slots),
             "x-fisk-npm-version": this.npmVersion
         };
+
+        if (this.name) {
+            headers["x-fisk-builder-name"] = this.name;
+        }
 
         if (this.labels) {
             headers["x-fisk-builder-labels"] = this.labels;

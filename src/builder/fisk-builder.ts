@@ -13,6 +13,7 @@ import { VM } from "./VM";
 import { common as commonFunc } from "../common-ts";
 import { load } from "./load";
 import { quitOnError } from "./quitOnError";
+import { stringOrUndefined } from "../common-ts/index";
 import assert from "assert";
 import axios from "axios";
 import bytes from "bytes";
@@ -86,30 +87,6 @@ function restartShutdownTimer() {
 
 if (restartOnInactivity) {
     restartShutdownTimer();
-}
-
-const ports = String(option("ports", ""))
-    .split(",")
-    .filter((x) => x)
-    .map((x) => parseInt(x));
-if (ports.length) {
-    const name = option("name") || option("hostname") || os.hostname();
-    ports.forEach((port) => {
-        child_process.fork(__filename, [
-            "--port",
-            String(port),
-            "--name",
-            name + "_" + port,
-            "--cache-dir",
-            path.join(common.cacheDir(), String(port)),
-            "--slots",
-            String(Math.round(os.cpus().length / ports.length))
-        ]);
-        // ret.stdout.on("data", output => console.log(port, output));
-        // ret.stderr.on("data", output => console.error(port, output));
-        // return ret;
-    });
-    process.exit();
 }
 
 let objectCache: ObjectCache | undefined;
@@ -217,7 +194,8 @@ const client = new Client(option, common.Version);
 client.on("objectCache", (enabled) => {
     const objectCacheSize = bytes.parse(Number(option("object-cache-size")));
     if (enabled && objectCacheSize) {
-        const objectCacheDir = String(option("object-cache-dir")) || path.join(common.cacheDir(), "objectcache");
+        const objectCacheDir =
+            stringOrUndefined(option("object-cache-dir")) || path.join(common.cacheDir(), "objectcache");
 
         objectCache = new ObjectCache(
             objectCacheDir,
@@ -807,13 +785,13 @@ server.on("job", (job: Job) => {
                     name: job.name,
                     hostname: job.hostname,
                     ip: job.ip,
-                    user: job.user,
+                    user: job.user
                 },
                 builder: {
                     ip: job.builderIp,
                     name: option("name"),
                     hostname: option("hostname") || os.hostname(),
-                    port: server.port,
+                    port: server.port
                 }
             });
 

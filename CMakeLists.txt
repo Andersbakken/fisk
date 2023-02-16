@@ -12,7 +12,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(src/client)
 
 set(TS_DEPS
-    scripts/hack-posix-rollup.js
     src/common-ts/index.ts
     src/scheduler/Database.ts
     src/scheduler/Environments.ts
