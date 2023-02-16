@@ -24,8 +24,7 @@
     "homepage": "https://github.com/Andersbakken/fisk#readme",
     "files": [
         "dist/*.js",
-        "dist/*.js.map",
-        "node_modules/posix/*"
+        "dist/*.js.map"
     ],
     "dependencies": {
         "@jhanssen/options": "^1.0.34",
