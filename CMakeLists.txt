@@ -73,6 +73,7 @@ set(TS_DEPS
     src/builder/Client.ts
     src/builder/ObjectCacheItem.ts
     src/builder/ObjectCachePendingItem.ts
+    src/monitor/fisk-monitor.ts
     package.json
     package-lock.json
     rollup.config.js

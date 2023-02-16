@@ -1,42 +1,54 @@
 #!/usr/bin/env node
 
-const option = require('@jhanssen/options')({ prefix: 'fisk/monitor',
-                                              applicationPath: false,
-                                              additionalFiles: [ "fisk/monitor.conf.override" ] });
-const WebSocket = require('ws');
-const fs = require('fs');
-const blessed = require('blessed');
-const humanize = require('humanize-duration');
+import blessed from "blessed";
+// import fs from "fs";
+import humanize, { Unit } from "humanize-duration";
+import options, { OptionsFunction } from "@jhanssen/options";
 
-function humanizeDuration(age)
-{
-    let units;
+const option: OptionsFunction = options({
+    prefix: "fisk/monitor",
+    noApplicationPath: true,
+    additionalFiles: ["fisk/monitor.conf.override"]
+});
+
+function humanizeDuration(age: number): string {
+    let units: Unit[] = [];
     if (age < 60000) {
-        units = [ "s" ];
+        units = ["s"];
     } else if (age < 60 * 60000) {
-        units = [ "m", "s" ];
+        units = ["m", "s"];
     } else if (age < 24 * 60 * 60000) {
-        units = [ "h", "m" ];
+        units = ["h", "m"];
     } else if (age < 7 * 24 * 60 * 60000) {
-        units = [ "d", "h" ];
+        units = ["d", "h"];
     } else {
-        units = [ "y", "mo", "w", "d" ];
+        units = ["y", "mo", "w", "d"];
     }
-    const options = { units: units, round: true };
+    const options = { units, round: true };
     return humanize(age, options);
 }
+
+const scrollbar = {
+    ch: " ",
+    track: {
+        bg: "cyan"
+    },
+    style: {
+        inverse: true
+    }
+};
 
 const screen = blessed.screen({
     smartCSR: true
 });
 
 const builderContainer = blessed.box({
-    top: '0%',
-    left: '0%',
-    width: '50%',
-    height: '100%-3',
+    top: "0%",
+    left: "0%",
+    width: "50%",
+    height: "100%-3",
     border: {
-        type: 'line'
+        type: "line"
     }
 });
 
@@ -50,24 +62,24 @@ screen.on("resize", () => {
 });
 
 const builderHeader = blessed.box({
-    top: '0%',
-    left: '0%',
-    width: '100%-2',
-    height: '0%+1',
+    top: "0%",
+    left: "0%",
+    width: "100%-2",
+    height: "0%+1",
     tags: true,
     style: {
         border: {
-            fg: '#f0f0f0'
+            fg: "#f0f0f0"
         }
     }
 });
 
-var prompt = blessed.prompt({
+const prompt = blessed.prompt({
     parent: screen,
-    top: 'center',
-    left: 'center',
-    height: 'shrink',
-    width: 'shrink',
+    top: "center",
+    left: "center",
+    height: "shrink",
+    width: "shrink",
     keys: true,
     style: {
         fg: "white"
@@ -75,64 +87,70 @@ var prompt = blessed.prompt({
     vi: true,
     mouse: true,
     tags: true,
-    border: 'line',
+    border: "line",
     hidden: true
 });
 
 const builderBox = blessed.list({
-    top: '0%+1',
-    left: '0%',
-    width: '100%-2',
-    height: '100%-3',
+    top: "0%+1",
+    left: "0%",
+    width: "100%-2",
+    height: "100%-3",
     tags: true,
     scrollable: true,
-    scrollbar: true,
+    scrollbar,
     alwaysScroll: true,
     mouse: true,
     keys: true,
     vi: true,
     style: {},
-    search: callback => {
-        prompt.input('Search:', '', (err, value) => {
-            if (err)
+    search: (callback) => {
+        prompt.input("Search:", "", (err, value) => {
+            if (err) {
                 return undefined;
+            }
             return callback(null, value);
         });
     }
 });
-builderBox.headerBox = builderHeader;
+const headerBoxes = new WeakMap<Widgets.ListElement, Widgets.BoxElement>();
+
+function setHeaderBox(box: Widgets.ListElement, header: Widgets.BoxElement): void {
+    headerBoxes.set(box, header);
+}
+setHeaderBox(builderBox, builderHeader);
 
 const clientContainer = blessed.box({
-    top: '0%',
-    left: '50%',
-    width: '50%',
-    height: '100%-3',
+    top: "0%",
+    left: "50%",
+    width: "50%",
+    height: "100%-3",
     border: {
-        type: 'line'
+        type: "line"
     }
 });
 
 const clientHeader = blessed.box({
-    top: '0%',
-    left: '0%',
-    width: '100%-2',
-    height: '0%+1',
+    top: "0%",
+    left: "0%",
+    width: "100%-2",
+    height: "0%+1",
     tags: true,
     style: {
         border: {
-            fg: '#f0f0f0'
+            fg: "#f0f0f0"
         }
     }
 });
 
 const clientBox = blessed.list({
-    top: '0%+1',
-    left: '0%',
-    width: '100%-2',
-    height: '100%-3',
+    top: "0%+1",
+    left: "0%",
+    width: "100%-2",
+    height: "100%-3",
     tags: true,
     scrollable: true,
-    scrollbar: true,
+    scrollbar,
     mouse: true,
     alwaysScroll: true,
     keys: true,
@@ -142,19 +160,19 @@ const clientBox = blessed.list({
 clientBox.headerBox = clientHeader;
 
 const notificationBox = blessed.box({
-    top: '100%-3',
-    left: '0%',
-    width: '100%',
-    height: '0%+3',
+    top: "100%-3",
+    left: "0%",
+    width: "100%",
+    height: "0%+3",
     tags: true,
     border: {
-        type: 'line'
+        type: "line"
     },
     style: {
-        fg: 'white',
-        bg: 'cyan',
+        fg: "white",
+        bg: "cyan",
         border: {
-            fg: '#f0f0f0'
+            fg: "#f0f0f0"
         }
     }
 });
@@ -169,8 +187,7 @@ screen.append(notificationBox);
 
 let builderDialogBox, clientDialogBox;
 
-function hideDialogBoxes()
-{
+function hideDialogBoxes() {
     let ret = false;
     if (builderDialogBox) {
         builderDialogBox.detach();
@@ -186,42 +203,42 @@ function hideDialogBoxes()
     return ret;
 }
 
-builderBox.on("select", ev => {
+builderBox.on("select", (ev) => {
     let render = hideDialogBoxes();
     activate(builderBox);
     if (ev) {
-        let builderKey = /^ *([^ ]*)/.exec(ev.content)[1];
-        let builder = builders.get(builderKey);
+        const builderKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        const builder = builders.get(builderKey);
         if (builder) {
             builderBox.current = builderKey;
             let str = "";
-            for (let key in builder) {
-                let value = builder[key];
+            for (const key in builder) {
+                const value = builder[key];
                 if (Array.isArray(value)) {
                     str += `{bold}${key}{/bold}: ${value[0]}\n`;
-                    for (let i=1; i<value.length; ++i) {
-                        let pad = "".padStart(key.length + 2, ' ');
-                        str += pad + value[i].padStart(key.length + 2, ' ') + "\n";
+                    for (let i = 1; i < value.length; ++i) {
+                        const pad = "".padStart(key.length + 2, " ");
+                        str += pad + value[i].padStart(key.length + 2, " ") + "\n";
                     }
                 } else {
                     str += `{bold}${key}{/bold}: ${value}\n`;
                 }
             }
             builderDialogBox = blessed.box({
-                top: 'center',
-                left: 'center',
-                width: '80%',
-                height: '50%',
+                top: "center",
+                left: "center",
+                width: "80%",
+                height: "50%",
                 content: str,
                 tags: true,
                 border: {
-                    type: 'line'
+                    type: "line"
                 },
                 style: {
-                    fg: 'white',
-                    bg: '#0f0f0f',
+                    fg: "white",
+                    bg: "#0f0f0f",
                     border: {
-                        fg: '#f0f0f0'
+                        fg: "#f0f0f0"
                     }
                 }
             });
@@ -229,56 +246,64 @@ builderBox.on("select", ev => {
             render = true;
         }
     }
-    if (render)
+    if (render) {
         screen.render();
+    }
 });
 
-clientBox.on("select", ev => {
+clientBox.on("select", (ev) => {
     let render = hideDialogBoxes();
     activate(clientBox);
     if (ev) {
         // log("got ev", Object.keys(ev), ev.index, ev.$, ev.data);
-        let clientKey = /^ *([^ ]*)/.exec(ev.content)[1];
-        let jobs = jobsForClient.get(clientKey);
+        const clientKey = /^ *([^ ]*)/.exec(ev.content)[1];
+        const jobs = jobsForClient.get(clientKey);
         // let client = clients.get(clientKey);
         if (jobs) {
             clientBox.current = clientKey;
             let str = "";
-            let data = [ [ "Source file", "Builder", "Start time" ] ];
-            let widest = [ data[0][0].length + 1, data[0][1].length + 1 ];
+            const data = [["Source file", "Builder", "Start time"]];
+            const widest = [data[0][0].length + 1, data[0][1].length + 1];
             const now = Date.now();
-            for (let [jobKey, jobValue] of jobs) {
-                if (jobKey == "total")
+            for (const [jobKey, jobValue] of jobs) {
+                if (jobKey === "total") {
                     continue;
+                }
                 widest[0] = Math.max(jobValue.sourceFile.length + 1, widest[0]);
-                data.push([ jobValue.sourceFile, jobValue.builder.ip + ":" + jobValue.builder.port, humanizeDuration(now - jobValue.time)]);
+                data.push([
+                    jobValue.sourceFile,
+                    jobValue.builder.ip + ":" + jobValue.builder.port,
+                    humanizeDuration(now - jobValue.time)
+                ]);
                 widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
             }
 
             data.sort((a, b) => a[2] - b[2]);
 
             data.forEach((line, idx) => {
-                if (!idx)
+                if (!idx) {
                     str += "{bold}";
+                }
                 str += line[0].padEnd(widest[0]) + "  " + line[1].padEnd(widest[1]) + "  " + line[2] + " ago\n";
-                if (!idx)
+                if (!idx) {
                     str += "{/bold}";
+                }
             });
             clientDialogBox = blessed.box({
-                top: 'center',
-                left: 'center',
-                width: '80%',
-                height: '50%',
+                top: "center",
+                left: "center",
+                width: "80%",
+                height: "50%",
                 content: str,
                 tags: true,
                 border: {
-                    type: 'line'
+                    type: "line"
                 },
                 style: {
-                    fg: 'white',
-                    bg: '#0f0f0f',
+                    fg: "white",
+                    bg: "#0f0f0f",
                     border: {
-                        fg: '#f0f0f0'
+                        fg: "#f0f0f0"
                     }
                 }
             });
@@ -286,58 +311,59 @@ clientBox.on("select", ev => {
             render = true;
         }
     }
-    if (render)
+    if (render) {
         screen.render();
+    }
 });
 
 let currentFocus = undefined;
-function activate(box)
-{
-    if (currentFocus == box)
+function activate(box) {
+    if (currentFocus === box) {
         return;
+    }
 
     if (currentFocus) {
         currentFocus.style = {
             selected: {
-                bg: '#606060',
+                bg: "#606060",
                 bold: true
             },
             item: {
-                bg: '#404040'
+                bg: "#404040"
             },
-            fg: 'white',
-            bg: '#404040',
+            fg: "white",
+            bg: "#404040",
             border: {
-                fg: '#f0f0f0'
+                fg: "#f0f0f0"
             },
             scrollbar: {
-                bg: '#770000'
+                bg: "#770000"
             }
         };
-        currentFocus.headerBox.style.fg = 'white';
-        currentFocus.headerBox.style.bg = '#004400';
+        currentFocus.headerBox.style.fg = "white";
+        currentFocus.headerBox.style.bg = "#004400";
     }
 
     currentFocus = box;
     currentFocus.style = {
         selected: {
-            bg: 'blue',
+            bg: "blue",
             bold: true
         },
         item: {
             bg: "black"
         },
-        fg: 'white',
-        bg: 'black',
+        fg: "white",
+        bg: "black",
         border: {
-            fg: '#f0f0f0'
+            fg: "#f0f0f0"
         },
         scrollbar: {
-            bg: 'red'
+            bg: "red"
         }
     };
-    currentFocus.headerBox.style.fg = 'white';
-    currentFocus.headerBox.style.bg = '#00ff00';
+    currentFocus.headerBox.style.fg = "white";
+    currentFocus.headerBox.style.bg = "#00ff00";
     currentFocus.focus();
     screen.render();
 }
@@ -345,25 +371,21 @@ function activate(box)
 activate(builderBox);
 activate(clientBox);
 
-function focusRight()
-{
-    if (currentFocus == builderBox) {
+function focusRight() {
+    if (currentFocus === builderBox) {
         activate(clientBox);
     }
 }
 
-function focusLeft()
-{
-    if (currentFocus == clientBox) {
+function focusLeft() {
+    if (currentFocus === clientBox) {
         activate(builderBox);
     }
 }
 
 // Quit on Escape, q, or Control-C.
-screen.key(['C-c'], (ch, key) => {
-    return process.exit();
-});
-screen.key(['escape', 'q'], (ch, key) => {
+screen.key(["C-c"], () => process.exit());
+screen.key(["escape", "q"], () => {
     if (builderDialogBox) {
         builderDialogBox.detach();
         builderDialogBox = undefined;
@@ -376,41 +398,37 @@ screen.key(['escape', 'q'], (ch, key) => {
         process.exit();
     }
 });
-screen.key(['right', 'l'], (ch, key) => {
-    focusRight();
-});
-screen.key(['left', 'h'], (ch, key) => {
-    focusLeft();
-});
+screen.key(["right", "l"], () => focusRight());
+screen.key(["left", "h"], () => focusLeft());
 
-builderBox.on('click', () => {
+builderBox.on("click", () => {
     activate(builderBox);
 });
-clientBox.on('click', () => {
+clientBox.on("click", () => {
     activate(clientBox);
 });
 
 screen.render();
 
 let notificationInterval;
-let notifications = [];
+const notifications = [];
 
-function notify(msg)
-{
+function notify(msg) {
     if (notificationInterval) {
-        if (notifications.length == 5)
+        if (notifications.length === 5) {
             notifications.splice(0, 1);
+        }
         notifications.push(msg);
         return;
     }
 
-    const notifyNow = msg => {
+    const notifyNow = (msg) => {
         notificationBox.setContent(msg);
         screen.render();
     };
 
     notificationInterval = setInterval(() => {
-        if (notifications.length == 0) {
+        if (notifications.length === 0) {
             clearInterval(notificationInterval);
             notificationInterval = undefined;
             notifyNow();
@@ -424,28 +442,27 @@ function notify(msg)
 }
 
 let scheduler = option("scheduler", "ws://localhost:8097");
-if (scheduler.indexOf('://') == -1)
+if (scheduler.indexOf("://") === -1) {
     scheduler = "ws://" + scheduler;
-if (!/:[0-9]+$/.exec(scheduler))
+}
+if (!/:[0-9]+$/.exec(scheduler)) {
     scheduler += ":8097";
-
-function log(...args)
-{
-    const str = args.map(elem => typeof elem === "object" ? JSON.stringify(elem) : elem).join(" ");
-    fs.appendFileSync("/tmp/fisk-monitor.log", str + "\n");
 }
 
-try {
-    // fs.unlinkSync("/tmp/fisk-monitor.log");
-} catch (e) {
-}
+// function log(...args) {
+//     const str = args.map((elem) => (typeof elem === "object" ? JSON.stringify(elem) : elem)).join(" ");
+//     fs.appendFileSync("/tmp/fisk-monitor.log", str + "\n");
+// }
+
+// try {
+// fs.unlinkSync("/tmp/fisk-monitor.log");
+// } catch (e) {}
 
 const builders = new Map();
 const jobs = new Map();
 const jobsForClient = new Map();
 
-function clearData()
-{
+function clearData() {
     builders.clear();
     jobs.clear();
     jobsForClient.clear();
@@ -453,52 +470,59 @@ function clearData()
     update();
 }
 
-function formatCell(str, num, prefix, suffix)
-{
+function formatCell(str, num, prefix, suffix) {
     return (prefix || "") + (" " + str).padEnd(num, " ").substr(0, num) + (suffix || "");
 }
 
 let updateTimer;
 let timeout = 0;
 
-function updateBuilderBox()
-{
+function updateBuilderBox() {
     const builderWidth = builderContainer.width - 3;
 
-    let data = [];
-    let maxWidth = [6, 8, 7, 7, 12, 20];
+    const data = [];
+    const maxWidth = [6, 8, 7, 7, 12, 20];
     let newest = Number.MAX_SAFE_INTEGER;
     const now = Date.now();
-    let f = true;
-    for (let [key, value] of builders) {
+    for (const [key, value] of builders) {
         const added = new Date(value.created).valueOf();
         const age = now - added;
         newest = Math.min(newest, age);
         const name = value.name || value.hostname || key;
         const labels = value.labels ? value.labels.join(" ") : "";
-        const line = [ name, `${value.active}`, `${value.jobsPerformed}`, `${value.slots}`, `${humanizeDuration(age)}`, labels ];
+        const line = [
+            name,
+            `${value.active}`,
+            `${value.jobsPerformed}`,
+            `${value.slots}`,
+            `${humanizeDuration(age)}`,
+            labels
+        ];
         data.push(line);
 
-        for (let i=0; i<line.length; ++i) {
+        for (let i = 0; i < line.length; ++i) {
             maxWidth[i] = Math.max(maxWidth[i], line[i].length + 2);
         }
     }
     data.sort((a, b) => {
         let an = parseInt(a[1]);
         let bn = parseInt(b[1]);
-        if (an != bn)
+        if (an !== bn) {
             return bn - an;
+        }
         an = parseInt(a[2]);
         bn = parseInt(b[2]);
-        if (an != bn)
+        if (an !== bn) {
             return bn - an;
+        }
         return a[0].localeCompare(b[0]);
     });
 
     let used = 0;
     for (let i = 0; i < maxWidth.length; ++i) {
-        if (used + maxWidth[i] > builderWidth)
+        if (used + maxWidth[i] > builderWidth) {
             maxWidth[i] = builderWidth - used;
+        }
         used += maxWidth[i];
     }
     let header = "";
@@ -511,23 +535,30 @@ function updateBuilderBox()
 
     builderHeader.setContent(header);
 
-    let item = builderBox.getItem(builderBox.selected);
+    const item = builderBox.getItem(builderBox.selected);
     let selectedBuilder;
     if (item) {
         selectedBuilder = /^ *([^ ]*)/.exec(item.content)[1];
     }
     let current;
-    let items = data.map((item, idx) => {
-        if (item[0] == selectedBuilder) {
+    const items = data.map((item, idx) => {
+        if (item[0] === selectedBuilder) {
             current = idx;
         }
-        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]) + formatCell(item[3], maxWidth[3]) + formatCell(item[4], maxWidth[4]) + formatCell(item[5], maxWidth[5]);
+        return (
+            formatCell(item[0], maxWidth[0]) +
+            formatCell(item[1], maxWidth[1]) +
+            formatCell(item[2], maxWidth[2]) +
+            formatCell(item[3], maxWidth[3]) +
+            formatCell(item[4], maxWidth[4]) +
+            formatCell(item[5], maxWidth[5])
+        );
     });
     builderBox.setItems(items);
-    if (current != undefined) {
+    if (current !== undefined) {
         builderBox.selected = current;
     }
-    if (currentFocus != builderBox) {
+    if (currentFocus !== builderBox) {
         builderBox.scrollTo(0);
     }
 
@@ -536,16 +567,14 @@ function updateBuilderBox()
     } else {
         setTimeout(update, 60000);
     }
-
 }
 
-function updateClientBox()
-{
+function updateClientBox() {
     const clientWidth = clientContainer.width - 3;
 
-    let data = [];
-    let maxWidth = [6, 6, 7];
-    for (let [key, value] of jobsForClient) {
+    const data = [];
+    const maxWidth = [6, 6, 7];
+    for (const [key, value] of jobsForClient) {
         const line = [key, `${value.size - 1}`, `${value.get("total")}`];
         data.push(line);
 
@@ -557,9 +586,10 @@ function updateClientBox()
     data.sort((a, b) => a[0].localeCompare(b[0]));
 
     let used = 0;
-    for (let i of [1, 2, 0]) {
-        if (used + maxWidth[i] > clientWidth)
+    for (const i of [1, 2, 0]) {
+        if (used + maxWidth[i] > clientWidth) {
             maxWidth[i] = clientWidth - used;
+        }
         used += maxWidth[i];
     }
 
@@ -569,33 +599,33 @@ function updateClientBox()
     header += formatCell("Total", maxWidth[2], "{bold}", "{/bold}");
     clientHeader.setContent(header);
 
-    let item = clientBox.getItem(clientBox.selected);
+    const item = clientBox.getItem(clientBox.selected);
     let selectedClient;
     if (item) {
         selectedClient = /^ *([^ ]*)/.exec(item.content)[1];
     }
     let current;
-    let items = data.map((item, idx) => {
-        if (item[0] == selectedClient) {
+    const items = data.map((item, idx) => {
+        if (item[0] === selectedClient) {
             current = idx;
         }
         return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]);
     });
 
     clientBox.setItems(items);
-    if (current != undefined) {
+    if (current !== undefined) {
         clientBox.selected = current;
     }
-    if (currentFocus != clientBox) {
+    if (currentFocus !== clientBox) {
         clientBox.scrollTo(0);
     }
 }
 
-function update()
-{
+function update() {
     //let data = [];
-    if (updateTimer)
+    if (updateTimer) {
         return;
+    }
     updateTimer = setTimeout(() => {
         updateTimer = undefined;
         timeout = 500;
@@ -607,58 +637,58 @@ function update()
     }, timeout);
 }
 
-function builderAdded(msg)
-{
+function builderAdded(msg) {
     msg.active = 0;
     delete msg.type;
     builders.set(msg.ip + ":" + msg.port, msg);
-   // console.log("Got builder", msg);
+    // console.log("Got builder", msg);
     update();
 }
 
-function builderRemoved(msg)
-{
+function builderRemoved(msg) {
     const builderKey = msg.ip + ":" + msg.port;
 
-    for (let [jobKey, jobValue] of jobs) {
+    jobs.forEach((jobValue) => {
         if (jobValue.builder) {
             const jobBuilderKey = `${jobValue.builder.ip}:${jobValue.builder.port}`;
             if (builderKey === jobBuilderKey) {
                 deleteJob(jobValue);
             }
         }
-    }
+    });
 
     builders.delete(builderKey);
     update();
 }
 
-function clientName(client)
-{
+function clientName(client) {
     if ("name" in client) {
         if (client.name === client.hostname) {
             return "dev:" + (client.user || "nobody") + "@" + client.hostname;
-        } else if (client.name.length > 0 && client.name[0] === '-') {
+        }
+        if (client.name.length > 0 && client.name[0] === "-") {
             return "dev:" + (client.user || "nobody") + client.name;
         }
         try {
             const o = JSON.parse(client.name);
-            if (typeof o === "object" && "name" in o)
+            if (typeof o === "object" && "name" in o) {
                 return o.name;
+            }
         } catch (e) {
+            /* */
         }
         return client.name;
     }
     return client.ip;
 }
 
-function jobStarted(job)
-{
+function jobStarted(job) {
     // log(job);
     const builderKey = `${job.builder.ip}:${job.builder.port}`;
     const builder = builders.get(builderKey);
-    if (!builder)
+    if (!builder) {
         return;
+    }
 
     const clientKey = clientName(job.client);
     let client = jobsForClient.get(clientKey);
@@ -679,48 +709,46 @@ function jobStarted(job)
     update();
 }
 
-function deleteJob(job)
-{
+function deleteJob(job) {
     const clientKey = clientName(job.client);
-    let client = jobsForClient.get(clientKey);
+    const client = jobsForClient.get(clientKey);
     if (client) {
         client.delete(job.id);
-        if (client.size == 1) {
+        if (client.size === 1) {
             jobsForClient.delete(clientKey);
         }
     }
 }
 
-function jobFinished(job)
-{
+function jobFinished(job) {
     const activejob = jobs.get(job.id);
-    if (!activejob)
+    if (!activejob) {
         return;
+    }
     jobs.delete(job.id);
 
     deleteJob(activejob);
 
     const key = `${activejob.builder.ip}:${activejob.builder.port}`;
     const builder = builders.get(key);
-    if (!builder)
+    if (!builder) {
         return;
+    }
     --builder.active;
     update();
 }
 
 let ws;
 
-function send(msg)
-{
-    if (typeof msg != "string") {
+function send(msg) {
+    if (typeof msg !== "string") {
         ws.send(JSON.stringify(msg));
     } else {
         ws.send(msg);
     }
 }
 
-function connect()
-{
+function connect() {
     const url = `${scheduler}/monitor`;
     notify(`connect ${url}`);
     ws = new WebSocket(url);
@@ -728,10 +756,10 @@ function connect()
         notify("open");
         send({ type: "sendInfo" });
     });
-    ws.on("error", err => {
+    ws.on("error", (err) => {
         notify(`client websocket error ${err.message}`);
     });
-    ws.on("message", msg => {
+    ws.on("message", (msg) => {
         //notify(`msg ${msg}`);
         let obj;
         try {
@@ -740,22 +768,22 @@ function connect()
             notify(`msg parse error: ${msg}, ${e}`);
         }
         switch (obj.type) {
-        case "builderAdded":
-            builderAdded(obj);
-            break;
-        case "builderRemoved":
-            builderRemoved(obj);
-            break;
-        case "jobStarted":
-            jobStarted(obj);
-            break;
-        case "jobFinished":
-        case "jobAborted":
-            jobFinished(obj);
-            break;
-        default:
-            //log(obj);
-            break;
+            case "builderAdded":
+                builderAdded(obj);
+                break;
+            case "builderRemoved":
+                builderRemoved(obj);
+                break;
+            case "jobStarted":
+                jobStarted(obj);
+                break;
+            case "jobFinished":
+            case "jobAborted":
+                jobFinished(obj);
+                break;
+            default:
+                //log(obj);
+                break;
         }
     });
     ws.on("close", () => {

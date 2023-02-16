@@ -67,5 +67,17 @@ export default [
             exports: "named",
             sourcemap: false
         }
+    },
+    {
+        input: "src/monitor/fisk-monitor.ts",
+        plugins,
+        external,
+        output: {
+            file: "monitor/fisk-monitor.js",
+            format,
+            name: "fisk-monitor",
+            exports: "named",
+            sourcemap: false
+        }
     }
 ];
