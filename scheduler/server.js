@@ -130,7 +130,7 @@ class Server extends EventEmitter {
                 if (error.code == "EADDRINUSE") {
                     console.log(`Port ${port} is in use...`);
                     setTimeout(() => {
-                        this.server.listen({ port: port, backlog: this.option.int("backlog", 50), host: "0.0.0.0"});
+                        this.server.listen({ port, backlog, host: "0.0.0.0" });
                     }, 1000);
                 } else {
                     console.error("Got server error", error.toString());
