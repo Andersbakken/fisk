@@ -8,7 +8,9 @@ const plugins = [
     resolve({
         preferBuiltins: true
     }),
-    commonjs(),
+    commonjs({
+        dynamicRequireRoot: "/tmp/balls"
+    }),
     typescript({
         tsconfig: `tsconfig.json`,
         cacheRoot: ".cache"
