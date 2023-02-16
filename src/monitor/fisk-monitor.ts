@@ -37,16 +37,6 @@ function humanizeDuration(age: number): string {
     return humanize(age, options);
 }
 
-const scrollbar = {
-    ch: " ",
-    track: {
-        bg: "cyan"
-    },
-    style: {
-        inverse: true
-    }
-};
-
 const screen = blessed.screen({
     smartCSR: true
 });
@@ -107,7 +97,6 @@ const builderBox = blessed.list({
     height: "100%-3",
     tags: true,
     scrollable: true,
-    scrollbar,
     alwaysScroll: true,
     mouse: true,
     keys: true,
@@ -168,7 +157,6 @@ const clientBox = blessed.list({
     height: "100%-3",
     tags: true,
     scrollable: true,
-    scrollbar,
     mouse: true,
     alwaysScroll: true,
     keys: true,

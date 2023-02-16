@@ -77,6 +77,7 @@ export default [
         input: "src/monitor/fisk-monitor.ts",
         onwarn,
         plugins,
+        external: ["@andersbakken/blessed"],
         output: {
             file: "monitor/fisk-monitor.js",
             format,
