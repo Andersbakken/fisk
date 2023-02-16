@@ -8,9 +8,7 @@ const plugins = [
     resolve({
         preferBuiltins: true
     }),
-    commonjs({
-        ignoreDynamicRequires: true
-    }),
+    commonjs(),
     typescript({
         tsconfig: `tsconfig.json`,
         cacheRoot: ".cache"
