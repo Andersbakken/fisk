@@ -1,4 +1,3 @@
-import { DatabaseRecord } from "./DatabaseRecord";
 import fs from "fs";
 
 type Operation = () => void;
@@ -16,13 +15,13 @@ export class Database {
         this.queue = [];
     }
 
-    get(record: string): Promise<DatabaseRecord | undefined> {
-        return new Promise<DatabaseRecord | undefined>((resolve, reject) => {
+    get(record: string): Promise<Record<string, unknown> | undefined> {
+        return new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
             // console.log("Reader promise", record, this.busy, this.queue);
             const perform = () => {
                 // console.log("perform called for read");
                 return this._read()
-                    .then((records?: Record<string, DatabaseRecord>) => {
+                    .then((records?: Record<string, Record<string, unknown>>) => {
                         this.finishedOperation();
                         resolve(records ? records[record] : undefined);
                     })
@@ -40,17 +39,15 @@ export class Database {
         });
     }
 
-    set(...keyValuePairs: unknown[]): Promise<void> {
+    set(key: string, value: unknown): Promise<void> {
         return new Promise((resolve, reject) => {
             const perform = () => {
                 return this._read()
-                    .then((records) => {
+                    .then((records: Record<string, unknown> | undefined) => {
                         if (!records) {
                             records = {};
                         }
-                        for (let i = 0; i < keyValuePairs.length; i += 2) {
-                            records[keyValuePairs[i]] = keyValuePairs[i + 1];
-                        }
+                        records[key] = value;
 
                         fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", (err) => {
                             if (err) {
@@ -82,9 +79,9 @@ export class Database {
         });
     }
 
-    _read(): Promise<Record<string, DatabaseRecord>> {
-        return new Promise<Record<string, DatabaseRecord>>((resolve, reject) => {
-            fs.readFile(this.path, "utf8", (err: NodeJS.ErrnoException, data: string) => {
+    _read(): Promise<Record<string, Record<string, unknown>>> {
+        return new Promise<Record<string, Record<string, unknown>>>((resolve, reject) => {
+            fs.readFile(this.path, "utf8", (err: NodeJS.ErrnoException | null, data: string) => {
                 // console.log("got read", err, data);
                 if (err) {
                     if (err.code === "ENOENT") {

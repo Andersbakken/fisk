@@ -1,4 +1,6 @@
+import { Builder } from "./Builder";
 import { Client, ClientType } from "./Client";
+import { Compile } from "./Compile";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import WebSocket from "ws";
@@ -16,7 +18,7 @@ export class Server extends EventEmitter {
     private app?: express.Express;
     private ws?: WebSocket.Server;
     private server?: http.Server;
-    private nonces: WeakMap<http.IncomingMessage, string>;
+    private nonces: WeakMap<express.Request, string>;
 
     objectCache: boolean;
 
@@ -36,7 +38,7 @@ export class Server extends EventEmitter {
 
             const ui = this.option("ui");
             if (ui) {
-                this.app.all("/*", (_: http.IncomingMessage, res: express.Response) => {
+                this.app.all("/*", (_: express.Request, res: express.Response) => {
                     res.redirect(String(ui));
                 });
             }
@@ -52,14 +54,14 @@ export class Server extends EventEmitter {
             const backlog = this.option.int("backlog", defaultBacklog);
             this.server.listen({ port, backlog, host: "0.0.0.0" });
 
-            this.server.on("upgrade", (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
+            this.server.on("upgrade", (req: express.Request, socket: stream.Duplex, head: Buffer) => {
                 assert(this.ws);
                 this.ws.handleUpgrade(req, socket, head, (ws) => {
                     this._handleConnection(ws, req);
                 });
             });
 
-            this.ws.on("headers", (headers: string[], request: http.IncomingMessage) => {
+            this.ws.on("headers", (headers: string[], request: express.Request) => {
                 const url = new URL(request.url || "");
                 headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
                 if (url.pathname === "/monitor") {
@@ -91,7 +93,7 @@ export class Server extends EventEmitter {
         return this.app;
     }
 
-    _handleCompile(req: http.IncomingMessage, client: Client): void {
+    _handleCompile(req: express.Request, client: Client): void {
         // look at headers
         if (!("x-fisk-environments" in req.headers)) {
             client.error("No x-fisk-environments header");
@@ -224,7 +226,7 @@ export class Server extends EventEmitter {
         });
     }
 
-    _handleBuilder(req: http.IncomingMessage, client: Client): void {
+    _handleBuilder(req: express.Request, client: Client): void {
         client.ws.on("close", (code, reason) => {
             client.emit("close", { code: code, reason: reason });
             client.ws.removeAllListeners();
@@ -326,7 +328,7 @@ export class Server extends EventEmitter {
         this.emit("builder", client);
     }
 
-    _handleMonitor(req: http.IncomingMessage, client: Client): void {
+    _handleMonitor(req: express.Request, client: Client): void {
         client.nonce = req.nonce;
         // console.log("Got nonce", req.nonce);
         client.ws.on("message", (message) => client.emit("message", message));
@@ -339,7 +341,7 @@ export class Server extends EventEmitter {
         client.ws.on("error", (err) => client.emit("error", err));
     }
 
-    _handleClientVerify(req: http.IncomingMessage, client: Client): void {
+    _handleClientVerify(req: express.Request, client: Client): void {
         Object.assign(client, { npmVersion: req.headers["x-fisk-npm-version"] });
         this.emit("clientVerify", client);
         client.ws.on("close", (code, reason) => {
@@ -350,7 +352,7 @@ export class Server extends EventEmitter {
         client.ws.on("error", (err) => client.emit("error", err));
     }
 
-    _handleConnection(ws: WebSocket, req: http.IncomingMessage): void {
+    _handleConnection(ws: WebSocket, req: express.Request): void {
         let client = undefined;
         let ip = req.connection.remoteAddress;
         // console.log("_handleConnection", ip);
@@ -367,19 +369,19 @@ export class Server extends EventEmitter {
         const url = new URL(req.url || "");
         switch (url.pathname) {
             case "/compile":
-                client = new Client(ClientType.Compile, ws, ip);
+                client = new Compile(ws, ip);
                 this._handleCompile(req, client);
                 break;
             case "/builder":
-                client = new Client({ type: Client.Builder, ws: ws, ip: ip, option: this.option });
+                client = new Builder(ws, ip, this.option);
                 this._handleBuilder(req, client);
                 break;
             case "/monitor":
-                client = new Client({ type: Client.Type.Monitor, ws: ws, ip: ip });
+                client = new Client(ClientType.Monitor, ws, ip);
                 this._handleMonitor(req, client);
                 break;
             case "/client_verify":
-                client = new Client({ type: Client.Type.ClientVerify, ws: ws, ip: ip });
+                client = new Client(ClientType.ClientVerify, ws, ip);
                 this._handleClientVerify(req, client);
                 break;
             default:

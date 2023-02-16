@@ -1,9 +1,5 @@
+import { PeakData } from "./PeakData";
 import assert from "assert";
-
-interface PeakData {
-    activeJobs: number;
-    utilization: number;
-}
 
 export class Peak {
     readonly interval: number;
@@ -44,6 +40,7 @@ export class Peak {
         } else {
             const cutoff = now - this.interval;
             let idx = 0;
+            assert(this.actives);
             while (idx < this.actives.length) {
                 if (this.actives[idx][0] > cutoff && this.actives[idx][1] > activeJobs) {
                     break;

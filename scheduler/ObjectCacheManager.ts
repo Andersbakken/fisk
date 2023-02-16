@@ -1,13 +1,13 @@
 import { Builder } from "./Builder";
-import { NodeData } from "./NodeData";
 import { ObjectCacheManagerMessage } from "./ObjectCacheManagerMessage";
 import { ObjectCacheMessage } from "../common/ObjectCacheMessage";
 import { OptionsFunction } from "@jhanssen/options";
 import { SHA1Data } from "./SHA1Data";
 import { prettySize } from "./prettySize";
 import EventEmitter from "events";
+import express from "express";
 
-function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: NodeData) {
+function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder) {
     const data = bySHA1.get(sha1);
     if (data) {
         data.nodes.push(node);
@@ -17,7 +17,7 @@ function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: num
     return 1;
 }
 
-function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: NodeData) {
+function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Builder) {
     const data = bySHA1.get(sha1);
     if (data) {
         const idx = data.nodes.indexOf(node);
@@ -40,12 +40,13 @@ type CommandType = {
 };
 
 export class ObjectCacheManager extends EventEmitter {
-    private hits: number;
     private bySHA1: Map<string, SHA1Data>;
-    private byNode: Map<Builder, NodeData>;
+    private byNode: Map<Builder, Builder>;
     private distributeOnInsertion: boolean;
     private distributeOnCacheHit: boolean;
     private redundancy: number;
+
+    hits: number;
 
     constructor(option: OptionsFunction) {
         super();
@@ -56,8 +57,8 @@ export class ObjectCacheManager extends EventEmitter {
         if (this.redundancy <= 0) {
             this.redundancy = 1;
         }
-        this.distributeOnInsertion = option("distribute-object-cache-on-insertion") || false;
-        this.distributeOnCacheHit = option("distribute-object-cache-on-cache-hit") || false;
+        this.distributeOnInsertion = Boolean(option("distribute-object-cache-on-insertion"));
+        this.distributeOnCacheHit = Boolean(option("distribute-object-cache-on-cache-hit"));
     }
 
     clear(): void {
@@ -77,7 +78,7 @@ export class ObjectCacheManager extends EventEmitter {
         return this.bySHA1.get(sha1);
     }
 
-    insert(msg: ObjectCacheManagerMessage, node: NodeData): void {
+    insert(msg: ObjectCacheManagerMessage, node: Builder): void {
         const nodeData = this.byNode.get(node);
         console.log(
             "adding",
@@ -99,7 +100,7 @@ export class ObjectCacheManager extends EventEmitter {
         }
     }
 
-    remove(msg: ObjectCacheManagerMessage, node: NodeData): void {
+    remove(msg: ObjectCacheManagerMessage, node: Builder): void {
         const nodeData = this.byNode.get(node);
         console.log(
             "removing",
@@ -141,7 +142,7 @@ export class ObjectCacheManager extends EventEmitter {
             return;
         }
         const sha1s = data.sha1s.map((item) => item.sha1);
-        this.byNode.set(node, new NodeData(data.size, data.maxSize, sha1s));
+        this.byNode.set(node, new Builder(data.size, data.maxSize, sha1s));
         data.sha1s.forEach((item) => {
             addToSHA1Map(this.bySHA1, item.sha1, item.fileSize, node);
         });
@@ -199,7 +200,7 @@ export class ObjectCacheManager extends EventEmitter {
         return ret;
     }
 
-    distribute(query: Record<string, unknown>, res?: boolean): void {
+    distribute(query: Record<string, unknown>, res?: express.Response): void {
         const dry = "dry" in query;
         let redundancy = parseInt(query.redundancy);
         if (isNaN(redundancy) || redundancy <= 0) {

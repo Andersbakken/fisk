@@ -34,7 +34,7 @@ export class Links {
     }
 
     set(targetHash: string, args: string[], blacklist?: string[]): void {
-        this._targets[targetHash] = new LinkProperties(args, blacklist);
+        this._targets[targetHash] = { arguments: args, blacklist: blacklist || [] };
     }
 
     unset(targetHash: string): void {

@@ -1,4 +1,5 @@
 import { OptionsFunction } from "@jhanssen/options";
+import EventEmitter from "events";
 import WebSocket from "ws";
 
 export const enum ClientType {
@@ -17,6 +18,12 @@ export class Client extends EventEmitter {
     ip: string;
     option?: OptionsFunction;
     nonce?: string;
+    hostname: string;
+    port: number;
+    name: string;
+    user: string;
+    labels: string;
+    npmVersion: string;
 
     constructor(type: ClientType, ws: WebSocket, ip: string, option?: OptionsFunction) {
         super();
@@ -25,6 +32,13 @@ export class Client extends EventEmitter {
         this.ws = ws;
         this.ip = ip;
         this.option = option;
+        this.hostname = "";
+        this.name = "";
+        this.npmVersion = "";
+        this.user = "";
+        this.labels = "";
+        this.port = 0;
+
         this.ws.on("pong", () => {
             // console.log("got pong", this.name);
             this.pingSent = undefined;

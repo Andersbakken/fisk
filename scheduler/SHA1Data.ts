@@ -1,10 +1,10 @@
-import { NodeData } from "./NodeData";
+import { Builder } from "./Builder";
 
 export class SHA1Data {
     fileSize: number;
-    nodes: NodeData[];
+    nodes: Builder[];
 
-    constructor(fileSize: number, node: NodeData) {
+    constructor(fileSize: number, node: Builder) {
         this.fileSize = fileSize;
         this.nodes = [node];
     }

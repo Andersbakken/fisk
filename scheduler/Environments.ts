@@ -4,6 +4,7 @@ import { File } from "./File";
 import { LinkProperties } from "./LinkProperties";
 import { Links } from "./Links";
 import { untarFile } from "./untarFile";
+import assert from "assert";
 import fs from "fs-extra";
 import path from "path";
 
@@ -22,11 +23,12 @@ export class Environments {
 
     load(db: Database, p: string): Promise<void> {
         this._db = db;
-        return db.get("links").then((links) => {
-            if (links) {
+        return db.get("links").then((l: Record<string, unknown> | undefined) => {
+            if (l) {
+                const links = l as Record<string, Record<string, LinkProperties>>;
                 for (const srcHash in links) {
                     const targets = links[srcHash];
-                    const data = (environments._links[srcHash] = new Links());
+                    const data = (this._links[srcHash] = new Links());
                     for (const target in targets) {
                         const obj = targets[target];
                         data.set(target, obj.arguments, obj.blacklist);
@@ -45,15 +47,17 @@ export class Environments {
                                     if (e.length === 47 && e.indexOf(".tar.gz", 40) === 40) {
                                         const tarFile = path.join(p, e);
                                         const hash = e.substr(0, 40);
-                                        const env = new Environment(tarFile);
                                         promises.push(
                                             untarFile(tarFile, "etc/compiler_info")
                                                 .then((data: string) => {
                                                     const idx = data.indexOf("\n");
                                                     const info = JSON.parse(data.substr(0, idx));
-                                                    env.system = info.system;
-                                                    env.originalPath = info.originalPath;
-                                                    env.info = data.substr(idx + 1);
+                                                    const env = new Environment(
+                                                        tarFile,
+                                                        hash,
+                                                        info.system,
+                                                        info.originalPath
+                                                    );
                                                     this._data[hash] = env;
                                                 })
                                                 .catch((err: unknown) => {
@@ -99,6 +103,7 @@ export class Environments {
         if (environment.hash in this._data) {
             return undefined;
         }
+        assert(this._path);
         fs.mkdirpSync(this._path);
         return new File(path.join(this._path, `${environment.hash}.tar.gz`), environment.hash);
     }
@@ -175,6 +180,10 @@ export class Environments {
 
     get environments(): Record<string, Environment> {
         return this._data;
+    }
+
+    get path(): string {
+        return this._path || "";
     }
 
     environment(hash: string): Environment | undefined {

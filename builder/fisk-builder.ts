@@ -807,13 +807,13 @@ server.on("job", (job: Job) => {
                     name: job.name,
                     hostname: job.hostname,
                     ip: job.ip,
-                    user: job.user
+                    user: job.user,
                 },
                 builder: {
                     ip: job.builderIp,
                     name: option("name"),
                     hostname: option("hostname") || os.hostname(),
-                    port: server.port
+                    port: server.port,
                 }
             });
 
