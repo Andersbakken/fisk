@@ -23,11 +23,11 @@ const external = ["fs", "assert"];
 
 export default [
     {
-        input: "daemon/fisk-daemon.ts",
+        input: "src/daemon/fisk-daemon.ts",
         plugins,
         external,
         output: {
-            file: "dist/fisk-daemon.js",
+            file: "daemon/fisk-daemon.js",
             format,
             name: "fisk-daemon",
             exports: "named",
@@ -35,11 +35,11 @@ export default [
         }
     },
     {
-        input: "builder/fisk-builder.ts",
+        input: "src/builder/fisk-builder.ts",
         plugins,
         external,
         output: {
-            file: "dist/fisk-builder.js",
+            file: "builder/fisk-builder.js",
             format,
             name: "fisk-builder",
             exports: "named",
@@ -47,11 +47,11 @@ export default [
         }
     },
     {
-        input: "builder/VM_runtime/VM_runtime.ts",
+        input: "src/builder/VM_runtime/VM_runtime.ts",
         plugins,
         external,
         output: {
-            file: "dist/VM_runtime.js",
+            file: "builder/VM_runtime.js",
             format,
             name: "fisk-builder-VM_runtime",
             exports: "named",
@@ -59,11 +59,11 @@ export default [
         }
     },
     {
-        input: "scheduler/fisk-scheduler.ts",
+        input: "src/scheduler/fisk-scheduler.ts",
         plugins,
         external,
         output: {
-            file: "dist/fisk-scheduler.js",
+            file: "scheduler/fisk-scheduler.js",
             format,
             name: "fisk-scheduler",
             exports: "named",

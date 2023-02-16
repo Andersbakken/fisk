@@ -76,7 +76,12 @@ cmake_install.cmake
 /bin/clang
 /bin/clang++
 /.gdb_history
-/client/create-fisk-env.c
-/client/npm-version.c
+src/client/create-fisk-env.c
+src/client/npm-version.c
 /.cache/
-/dist/
+/scheduler/fisk-scheduler.js
+daemon/fisk-daemon.js
+builder/fisk-builder.js
+builder/VM_runtime.js
+scheduler/fisk-scheduler.js
+

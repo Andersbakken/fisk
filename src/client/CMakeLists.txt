@@ -16,21 +16,21 @@ if (NOT ZLIB_INCLUDE_DIR OR NOT ZLIB_LIBRARIES)
 endif ()
 
 add_custom_target(create-create-fisk-env ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake COMMENT "Generating create-fisk-env.c")
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/client/create-fisk-env.c
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/src/client/create-fisk-env.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-fisk-env
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake
-                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/client/create-fisk-env.c" -DVARIABLE=create_fisk_env -P ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake)
+                   COMMAND ${CMAKE_COMMAND} -DINPUT="${CMAKE_CURRENT_LIST_DIR}/create-fisk-env" -DOUTPUT="${CMAKE_BINARY_DIR}/src/client/create-fisk-env.c" -DVARIABLE=create_fisk_env -P ${CMAKE_CURRENT_LIST_DIR}/create-create-fisk-env.cmake)
 
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/client/npm-version.c
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/src/client/npm-version.c
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../package.json
                    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake
-                   COMMAND ${CMAKE_COMMAND} -DOUTPUT="${CMAKE_BINARY_DIR}/client/npm-version.c" -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
+                   COMMAND ${CMAKE_COMMAND} -DOUTPUT="${CMAKE_BINARY_DIR}/src/client/npm-version.c" -P ${CMAKE_CURRENT_LIST_DIR}/create-npm-version.cmake)
 
 message(STATUS "Found openssl includes ${OPENSSL_INCLUDE_DIR}")
 include_directories(${OPENSSL_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 add_executable(fiskc
-    ${CMAKE_BINARY_DIR}/client/create-fisk-env.c
-    ${CMAKE_BINARY_DIR}/client/npm-version.c
+    ${CMAKE_BINARY_DIR}/src/client/create-fisk-env.c
+    ${CMAKE_BINARY_DIR}/src/client/npm-version.c
     Client.cpp
     CompilerArgs.cpp
     Config.cpp
