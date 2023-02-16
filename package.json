@@ -1,6 +1,6 @@
 {
     "name": "@andersbakken/fisk",
-    "version": "3.6.0",
+    "version": "3.6.1",
     "description": "Fisk, a distributed compile system",
     "scripts": {
         "lint": "eslint . --ext .ts",
@@ -22,7 +22,11 @@
         "url": "https://github.com/Andersbakken/fisk/issues"
     },
     "homepage": "https://github.com/Andersbakken/fisk#readme",
-    "files": ["dist/*.js", "dist/*.js.map", "node_modules/posix/*"],
+    "files": [
+        "dist/*.js",
+        "dist/*.js.map",
+        "node_modules/posix/*"
+    ],
     "dependencies": {
         "@jhanssen/options": "^1.0.34",
         "@josh_stern/mktemp": "^1.0.5",
