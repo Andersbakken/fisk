@@ -5,10 +5,8 @@ import typescript from "rollup-plugin-typescript2";
 import hashbang from "rollup-plugin-hashbang";
 
 const plugins = [
-    resolve({
-        preferBuiltins: true
-    }),
-    commonjs(),
+    resolve({ preferBuiltins: true }),
+    commonjs({ ignoreDynamicRequires: true }),
     typescript({
         tsconfig: `tsconfig.json`,
         cacheRoot: ".cache"

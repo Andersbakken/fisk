@@ -17,4 +17,4 @@ async function hack(file)
     }
 }
 
-(async () => Promise.all((await fs.readdir("dist")).map(x => hack(path.join("dist", x)))))();
+Promise.all(["scheduler/fisk-scheduler.js", "builder/VM_runtime.js" ].map(hack));
