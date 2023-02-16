@@ -23,7 +23,11 @@
     },
     "homepage": "https://github.com/Andersbakken/fisk#readme",
     "files": [
-        "dist/*.js"
+        "scheduler/fisk-scheduler.js",
+        "daemon/fisk-daemon.js",
+        "monitor/fisk-monitor.js",
+        "builder/fisk-builder.js",
+        "builder/VM_runtime.js"
     ],
     "dependencies": {
         "@jhanssen/options": "^1.0.34",
