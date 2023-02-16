@@ -126,7 +126,7 @@ interface JobInfoClient {
     ip: string;
     name?: string;
     user?: string;
-    labels?: string;
+    labels?: string[];
     port?: number;
 }
 

@@ -8,9 +8,17 @@ export class Compile extends Client {
     sha1?: string;
     sourceFile: string;
 
-    constructor(ws: WebSocket, ip: string, option?: OptionsFunction) {
+    constructor(
+        ws: WebSocket,
+        ip: string,
+        environment: string,
+        sourceFile: string,
+        sha1?: string,
+        option?: OptionsFunction
+    ) {
         super(ClientType.Compile, ws, ip, option);
-        this.environment = "";
-        this.sourceFile = "";
+        this.environment = environment;
+        this.sourceFile = sourceFile;
+        this.sha1 = sha1;
     }
 }

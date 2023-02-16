@@ -22,7 +22,7 @@ export class Client extends EventEmitter {
     port: number;
     name: string;
     user: string;
-    labels: string;
+    labels?: string[];
     npmVersion: string;
 
     constructor(type: ClientType, ws: WebSocket, ip: string, option?: OptionsFunction) {
@@ -36,7 +36,6 @@ export class Client extends EventEmitter {
         this.name = "";
         this.npmVersion = "";
         this.user = "";
-        this.labels = "";
         this.port = 0;
 
         this.ws.on("pong", () => {

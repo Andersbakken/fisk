@@ -1,3 +1,5 @@
+import fs from "fs";
+
 export class Environment {
     path: string;
     hash: string;

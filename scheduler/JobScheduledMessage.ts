@@ -4,7 +4,7 @@ export interface JobScheduledMessage {
         hostname: string;
         ip: string;
         user: string;
-        labels?: string;
+        labels?: string[];
     };
     builder: {
         name: string;
@@ -12,7 +12,7 @@ export interface JobScheduledMessage {
         ip: string;
         user: string;
         port: number;
-        labels?: string;
+        labels?: string[];
     };
     id: number;
     sourceFile: string;

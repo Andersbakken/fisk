@@ -322,9 +322,9 @@ export class ObjectCacheManager extends EventEmitter {
                 }
             }
         });
-        if (ret) {
+        if (ret && res) {
             ret.count = count;
-            res.send(JSON.stringify(ret, null, 4));
+            res.send(JSON.stringify(ret, null, 4) + "\n");
             // } else if (res) {
         }
     }
