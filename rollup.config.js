@@ -16,7 +16,7 @@ const plugins = [
 ];
 
 function onwarn(warning) {
-    if (warning.code === "CIRCULAR_DEPENDENCY" && warning.importer.startsWith("node_modules/blessed/")) {
+    if (warning.code === "CIRCULAR_DEPENDENCY" && warning.importer.startsWith("node_modules/@andersbakken/blessed/")) {
         return;
     }
 

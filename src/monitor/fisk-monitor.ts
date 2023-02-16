@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import blessed, { Widgets } from "blessed";
+import blessed, { Widgets } from "@andersbakken/blessed";
 // import fs from "fs";
 import {
     BuilderAddedMessage,

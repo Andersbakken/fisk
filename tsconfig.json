@@ -4,6 +4,7 @@
         "newLine": "LF",
         "module": "es6",
         "moduleResolution": "node",
+        "typeRoots": ["./src/typings"],
         "pretty": true,
         "noImplicitAny": true,
         "esModuleInterop": true,
