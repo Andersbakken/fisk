@@ -6,11 +6,11 @@
         "lint": "eslint . --ext .ts",
         "rollup": "rollup -c",
         "tsc": "tsc -p .",
-        "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup",
+        "hack-posix-rollup": "./scripts/hack-posix-rollup.js",
+        "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup && npm run hack-posix-rollup",
         "clean:dist": "del-cli dist/*",
         "clean:cache": "del-cli .cache/*",
-        "clean": "run-p clean:dist clean:cache",
-        "watch": "rollup -c -w"
+        "clean": "run-p clean:dist clean:cache"
     },
     "repository": {
         "type": "git",
@@ -22,10 +22,7 @@
         "url": "https://github.com/Andersbakken/fisk/issues"
     },
     "homepage": "https://github.com/Andersbakken/fisk#readme",
-    "files": [
-        "dist/*.js",
-        "dist/*.js.map"
-    ],
+    "files": ["dist/*.js"],
     "dependencies": {
         "@jhanssen/options": "^1.0.34",
         "@josh_stern/mktemp": "^1.0.5",

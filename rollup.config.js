@@ -31,7 +31,7 @@ export default [
             format,
             name: "fisk-daemon",
             exports: "named",
-            sourcemap: true
+            sourcemap: false
         }
     },
     {
@@ -43,7 +43,7 @@ export default [
             format,
             name: "fisk-builder",
             exports: "named",
-            sourcemap: true
+            sourcemap: false
         }
     },
     {
@@ -55,7 +55,7 @@ export default [
             format,
             name: "fisk-builder-VM_runtime",
             exports: "named",
-            sourcemap: true
+            sourcemap: false
         }
     },
     {
@@ -67,7 +67,7 @@ export default [
             format,
             name: "fisk-scheduler",
             exports: "named",
-            sourcemap: true
+            sourcemap: false
         }
     }
 ];

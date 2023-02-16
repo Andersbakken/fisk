@@ -11,7 +11,7 @@
         "strictPropertyInitialization": true,
         "downlevelIteration": true,
         "strict": true,
-        "sourceMap": true,
+        "sourceMap": false,
         "incremental": true,
         "lib": ["es6"],
         "baseUrl": ".",
