@@ -5,6 +5,7 @@ const http = require("http");
 const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
+const fs = require("fs");
 
 class Client extends EventEmitter {
     constructor(object) {
