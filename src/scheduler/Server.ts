@@ -3,6 +3,7 @@ import { Client, ClientType } from "./Client";
 import { Compile } from "./Compile";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
+import Url from "url-parse";
 import WebSocket from "ws";
 import assert from "assert";
 import crypto from "crypto";
@@ -74,7 +75,7 @@ export class Server extends EventEmitter {
             });
 
             this.ws.on("headers", (headers: string[], request: express.Request) => {
-                const url = new URL(request.url, this.baseUrl);
+                const url = new Url(request.url, this.baseUrl);
                 headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
                 if (url.pathname === "/monitor") {
                     const nonce = crypto.randomBytes(256).toString("base64");
@@ -375,7 +376,7 @@ export class Server extends EventEmitter {
             ip = ip.substr(7);
         }
 
-        const url = new URL(req.url, this.baseUrl);
+        const url = new Url(req.url, this.baseUrl);
         switch (url.pathname) {
             case "/compile":
                 this._handleCompile(req, ws, ip);

@@ -242,7 +242,7 @@ export class ObjectCache extends EventEmitter {
         return ret;
     }
 
-    info(query?: URLSearchParams): InfoType {
+    info(query?: string): InfoType {
         const ret: InfoType = {
             dir: this.dir,
             cacheHits: this.cacheHits,
@@ -254,10 +254,10 @@ export class ObjectCache extends EventEmitter {
             size: prettySize(this.size),
             purgeSize: prettySize(this.purgeSize)
         };
-        if (!query || !("object" in query)) {
+        if (!query || !/<object>/.exec(query)) {
             delete ret.cache;
         }
-        if (!query || !("pending" in query)) {
+        if (!query || !/<pending>/.exec(query)) {
             delete ret.pending;
         }
         return ret;

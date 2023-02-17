@@ -13,6 +13,7 @@ import { VM } from "./VM";
 import { common as commonFunc, stringOrUndefined } from "../common";
 import { load } from "./load";
 import { quitOnError } from "./quitOnError";
+import Url from "url-parse";
 import assert from "assert";
 import axios from "axios";
 import bytes from "bytes";
@@ -669,11 +670,11 @@ server.on("listen", (app: express.Express) => {
             return;
         }
 
-        const parsed = new URL(req.url || "", server.baseUrl);
+        const parsed = new Url(req.url || "", server.baseUrl);
 
         const urlPath = parsed.pathname.substring(13);
         if (urlPath === "info") {
-            res.send(JSON.stringify(objectCache.info(parsed.searchParams), null, 4));
+            res.send(JSON.stringify(objectCache.info(parsed.query), null, 4));
             return;
         }
         const data = objectCache.get(urlPath, true);

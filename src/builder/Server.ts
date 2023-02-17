@@ -1,6 +1,7 @@
 import { Job } from "./Job";
 import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
+import Url from "url-parse";
 import WebSocket from "ws";
 import assert from "assert";
 import express from "express";
@@ -74,7 +75,7 @@ export class Server extends EventEmitter {
             ip = ip.substring(7);
         }
 
-        const url = new URL(req.url || "", this.baseUrl);
+        const url = new Url(req.url || "", this.baseUrl);
         switch (url.pathname) {
             case "/compile": {
                 const hash = String(req.headers["x-fisk-environments"]);
