@@ -23,7 +23,6 @@ import fs from "fs-extra";
 import http from "http";
 import options, { OptionsFunction } from "@jhanssen/options";
 import os from "os";
-import parse_duration from "parse-duration";
 import path from "path";
 import ws from "ws";
 import zlib from "zlib";
@@ -58,36 +57,6 @@ process.on("uncaughtException", (err) => {
 });
 
 let debug = option("debug");
-
-let restartOnInactivity = Number(option("restart-on-inactivity"));
-if (typeof restartOnInactivity === "string") {
-    restartOnInactivity = parse_duration(restartOnInactivity);
-}
-
-let shutdownTimer: NodeJS.Timeout | undefined;
-function restartShutdownTimer() {
-    if (restartOnInactivity > 0) {
-        if (shutdownTimer) {
-            clearTimeout(shutdownTimer);
-        }
-        const shutdownNow = () => {
-            console.log("shutting down now due to inactivity");
-            // child_process.exec("shutdown -h now");
-        };
-        if (restartOnInactivity <= 10000) {
-            shutdownTimer = setTimeout(shutdownNow, restartOnInactivity);
-        } else {
-            shutdownTimer = setTimeout(() => {
-                console.log("shutting down in 10 seconds due to inactivity");
-                shutdownTimer = setTimeout(shutdownNow, 10000);
-            }, restartOnInactivity - 10000);
-        }
-    }
-}
-
-if (restartOnInactivity) {
-    restartShutdownTimer();
-}
 
 let objectCache: ObjectCache | undefined;
 
@@ -584,7 +553,6 @@ client.on("requestEnvironments", () => {
 });
 
 client.on("connect", () => {
-    restartShutdownTimer();
     console.log("connected");
     if (connectInterval) {
         clearInterval(connectInterval);
@@ -712,7 +680,6 @@ function startPending() {
 }
 
 server.on("job", (job: Job) => {
-    restartShutdownTimer();
     const vm = environments[job.hash];
     if (!vm) {
         console.error("No vm for this hash", job.hash);
