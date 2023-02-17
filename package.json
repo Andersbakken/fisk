@@ -1,6 +1,6 @@
 {
     "name": "@andersbakken/fisk",
-    "version": "4.0.2",
+    "version": "4.0.3",
     "description": "Fisk, a distributed compile system",
     "scripts": {
         "lint": "eslint . --ext .ts",
