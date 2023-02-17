@@ -31,7 +31,6 @@
     "dependencies": {
         "@andersbakken/blessed": "^0.1.82",
         "@jhanssen/options": "^1.0.34",
-        "@josh_stern/mktemp": "^1.0.5",
         "axios": "^0.21.1",
         "bufferutil": "^4.0.7",
         "bytes": "^3.0.0",
@@ -41,6 +40,7 @@
         "humanize-duration": "^3.17.0",
         "lowdb": "^1.0.0",
         "minimist": "^1.2.5",
+        "mktemp": "^0.4.0",
         "posix": "^4.2.0",
         "pretty-bytes": "^6.0.0",
         "typescript": "^4.3.5",
