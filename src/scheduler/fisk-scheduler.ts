@@ -30,9 +30,9 @@ import path from "path";
 import posix from "posix";
 
 const option: OptionsFunction = options({
-    prefix: "fisk/builder",
+    prefix: "fisk/scheduler",
     noApplicationPath: true,
-    additionalFiles: ["fisk/builder.conf.override"]
+    additionalFiles: ["fisk/scheduler.conf.override"]
 });
 const common = commonFunc(option);
 
