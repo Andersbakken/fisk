@@ -61,7 +61,7 @@ export class ObjectCache extends EventEmitter {
             fs.readdirSync(this.dir)
                 .map((fileName) => {
                     const ret: FileType = { path: path.join(this.dir, fileName) };
-                    if (fileName.length === 32) {
+                    if (fileName.length === 40) {
                         try {
                             const stat = fs.statSync(ret.path);
                             if (stat.isFile()) {
@@ -95,11 +95,11 @@ export class ObjectCache extends EventEmitter {
 
     loadFile(filePath: string, fileSize: number): void {
         const fileName = path.basename(filePath);
-        // console.log("got file", file);
+        // console.log("got file", filePath, fileSize);
         let fd;
         let jsonBuffer;
         try {
-            if (fileName.length === 32) {
+            if (fileName.length === 40) {
                 const headerSizeBuffer = Buffer.allocUnsafe(4);
                 fd = fs.openSync(filePath, "r");
                 const stat = fs.statSync(filePath);
