@@ -62,7 +62,7 @@
         "@types/posix": "^4.2.0",
         "@types/url-parse": "^1.4.8",
         "@types/ws": "^8.5.3",
-        "@typescript-eslint/eslint-plugin": "^4.14.2",
+        "@typescript-eslint/eslint-plugin": "^4.33.0",
         "@typescript-eslint/parser": "^4.14.2",
         "eslint": "^7.19.0",
         "eslint-plugin-sort-imports-es6-autofix": "^0.5.0",
