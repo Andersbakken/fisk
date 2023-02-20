@@ -161,7 +161,9 @@ function getFromCache(job: Job, cb: (err?: Error) => void) {
 const environments: Record<string, VM> = {};
 const client = new Client(option, common.Version);
 client.on("objectCache", (enabled) => {
-    const objectCacheSize = bytes.parse(Number(option("object-cache-size")));
+    const size = option("object-cache-size");
+    const objectCacheSize = typeof size === "number" ? size : bytes.parse(String(size));
+    // console.log("got object cache", enabled, objectCacheSize, option("object-cache-size"));
     if (enabled && objectCacheSize) {
         const objectCacheDir =
             stringOrUndefined(option("object-cache-dir")) || path.join(common.cacheDir(), "objectcache");
