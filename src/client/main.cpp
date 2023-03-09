@@ -267,7 +267,8 @@ int main(int argc, char **argv)
     daemonSocket.send(DaemonSocket::AcquireCppSlot);
     data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, select, daemonSocket);
     assert(data.preprocessed);
-    data.hash = Client::environmentHash(data.resolvedCompiler);
+    Client::CompilerInfo info = Client::compilerInfo(data.resolvedCompiler);
+    data.hash = info.hash;
     std::map<std::string, std::string> headers;
     {
         char buf[1024];

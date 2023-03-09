@@ -294,7 +294,26 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
     return true;
 }
 
-std::string environmentHash(const std::string &compiler);
+enum class CompilerType {
+    Unknown,
+    GCC,
+    Clang
+};
+
+const char *compilerTypeToString(CompilerType type);
+
+struct CompilerInfo
+{
+    std::string hash;
+    CompilerType type { CompilerType::Unknown };
+    struct Version {
+        int major { 0 };
+        int minor { 0 };
+        int patch { 0 };
+    } version;
+};
+
+CompilerInfo compilerInfo(const std::string &compiler);
 bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();

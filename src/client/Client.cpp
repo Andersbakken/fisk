@@ -74,7 +74,8 @@ enum CheckResult {
     Continue
 };
 
-static void filter(const std::string &needle, std::string &output)
+namespace {
+void filter(const std::string &needle, std::string &output)
 {
     size_t i=0;
     while ((i = output.find(needle, i)) != std::string::npos) {
@@ -91,7 +92,7 @@ static void filter(const std::string &needle, std::string &output)
     }
 }
 
-static void filter(std::string &output)
+void filter(std::string &output)
 {
     filter("COLLECT_", output);
     filter("InstalledDir: ", output);
@@ -99,7 +100,7 @@ static void filter(std::string &output)
     filter("Selected GCC installation: ", output);
 }
 
-static std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
+std::string resolveSymlink(const std::string &link, const std::function<CheckResult(const std::string &)> &check)
 {
     errno = 0;
     std::string l = link;
@@ -128,6 +129,47 @@ static std::string resolveSymlink(const std::string &link, const std::function<C
     }
     return l;
 }
+
+Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::string &version)
+{
+    Client::CompilerInfo info {};
+    info.hash = Client::toHex(Client::sha1(version));
+    size_t idx = std::string::npos;
+    if (exec.find("clang") != std::string::npos
+        || exec.find("CLANG") != std::string::npos
+        || exec.find("Clang") != std::string::npos
+        || version.find("clang") != std::string::npos
+        || version.find("CLANG") != std::string::npos
+        || version.find("Clang") != std::string::npos) {
+        info.type = Client::CompilerType::Clang;
+        idx = version.find("clang version ");
+    } else if (exec.find("gcc") != std::string::npos
+               || exec.find("GCC") != std::string::npos
+               || version.find("gcc") != std::string::npos
+               || version.find("GCC") != std::string::npos) {
+        info.type = Client::CompilerType::GCC;
+        idx = version.find("gcc version ");
+    }
+
+    if (idx != std::string::npos) {
+        while (idx != version.size() && !std::isdigit(version[idx])) {
+            ++idx;
+        }
+        const char *str = version.c_str() + idx;
+        char *endPtr;
+        info.version.major = static_cast<int>(strtoul(str, &endPtr, 10));
+        if (*endPtr == '.') {
+            str = endPtr + 1;
+            info.version.minor = static_cast<int>(strtoul(str, &endPtr, 10));
+            if (*endPtr == '.') {
+                str = endPtr + 1;
+                info.version.patch = static_cast<int>(strtoul(str, &endPtr, 10));
+            }
+        }
+    }
+    return info;
+}
+} // anonymous namespace
 
 std::string Client::findInPath(const std::string &fn)
 {
@@ -583,12 +625,23 @@ unsigned long long Client::mono()
     return 0;
 }
 
-enum { EnvironmentCacheVersion = 2 };
-std::string Client::environmentHash(const std::string &compiler)
+const char *Client::compilerTypeToString(CompilerType type)
+{
+    switch (type) {
+    case CompilerType::Unknown: return "unknown";
+    case CompilerType::GCC: return "gcc";
+    case CompilerType::Clang: return "clang";
+    }
+    assert(0 && "Impossible impossibility");
+    return "";
+}
+
+enum { EnvironmentCacheVersion = 3 };
+Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
 {
     struct stat st;
     if (::stat(compiler.c_str(), &st)) {
-        return std::string();
+        return {};
     }
 
     auto readSignature = [&compiler]() -> std::string {
@@ -608,11 +661,12 @@ std::string Client::environmentHash(const std::string &compiler)
         out += err;
         filter(out);
         VERBOSE("Signature created from %s", out.c_str());
-        return Client::toHex(Client::sha1(out));
+        return out;
     };
     const std::string cache = Config::envCache();
-    if (cache.empty())
-        return readSignature();
+    if (cache.empty()) {
+        return createCompilerInfo(compiler, readSignature());
+    }
 
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
     json11::Json::object json;
@@ -647,9 +701,39 @@ std::string Client::environmentHash(const std::string &compiler)
                             json["version"] = json11::Json(EnvironmentCacheVersion);
                         } else {
                             json11::Json value = obj[key];
-                            if (value.is_string()) {
+                            if (value.is_object()) {
                                 DEBUG("Cache hit for compiler %s", key.c_str());
-                                return value.string_value();
+                                CompilerInfo cacheHit;
+                                const json11::Json hash = value["hash"];
+                                if (hash.is_string()) {
+                                    cacheHit.hash = hash.string_value();
+                                }
+
+                                const json11::Json type = value["type"];
+                                if (type.is_string()) {
+                                    const std::string &t = type.string_value();
+                                    if (t == "clang") {
+                                        cacheHit.type = CompilerType::Clang;
+                                    } else if (t == "gcc") {
+                                        cacheHit.type = CompilerType::GCC;
+                                    }
+                                }
+                                const json11::Json version = value["version"];
+                                if (version.is_object()) {
+                                    const json11::Json major = version["major"];
+                                    if (major.is_number()) {
+                                        cacheHit.version.major = static_cast<int>(major.number_value());
+                                    }
+                                    const json11::Json minor = version["minor"];
+                                    if (minor.is_number()) {
+                                        cacheHit.version.minor = static_cast<int>(minor.number_value());
+                                    }
+                                    const json11::Json patch = version["patch"];
+                                    if (patch.is_number()) {
+                                        cacheHit.version.patch = static_cast<int>(patch.number_value());
+                                    }
+                                }
+                                return cacheHit;
                             }
                             json = obj.object_items();
                             auto it = json.begin();
@@ -668,9 +752,18 @@ std::string Client::environmentHash(const std::string &compiler)
     } else {
         DEBUG("Can't open %s for reading (%d %s)", cache.c_str(), errno, strerror(errno));
     }
-    const std::string ret = readSignature();
-    if (!ret.empty()) {
-        json[key] = ret;
+    const CompilerInfo ret = createCompilerInfo(compiler, readSignature());
+    if (!ret.hash.empty()) {
+        auto compilerJson = json11::Json::object();
+        compilerJson["hash"] = ret.hash;
+        compilerJson["type"] = compilerTypeToString(ret.type);
+        auto versionJSON = json11::Json::object();
+        versionJSON["major"] = ret.version.major;
+        versionJSON["minor"] = ret.version.minor;
+        versionJSON["patch"] = ret.version.patch;
+        compilerJson["version"] = std::move(versionJSON);
+        json[key] = std::move(compilerJson);
+
         std::string dirname;
         parsePath(cache.c_str(), nullptr, &dirname);
         recursiveMkdir(dirname);
