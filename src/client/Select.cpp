@@ -2,6 +2,9 @@
 
 Socket::~Socket()
 {
+    if (mSelect) {
+        mSelect->remove(this);
+    }
 }
 
 int Select::exec(int timeoutMs) const
