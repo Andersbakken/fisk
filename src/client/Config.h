@@ -131,6 +131,7 @@ private:
         dest = static_cast<Value>(v);
         return true;
     }
+
     template <typename Value>
     static bool applyValue(const std::string &input, Value &dest,
                            typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
@@ -175,6 +176,7 @@ private:
         }
         return false;
     }
+
     template <typename Value>
     static bool applyJsonValue(const json11::Json &input, Value &dest,
                                typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
