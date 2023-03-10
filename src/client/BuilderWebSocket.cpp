@@ -58,8 +58,8 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         if (data.exitCode) {
             std::string uncolored;
             const std::string *haystack;
-            if (stdErr.size() < 128 * 1024) {
-                uncolored = stdErr;
+            if (stdErr.size() < 128 * 1024 && !hasJSONDiagnostics) {
+                uncolored = Client::uncolor(stdErr);
                 haystack = &uncolored;
             } else {
                 haystack = &stdErr;
