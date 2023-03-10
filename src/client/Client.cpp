@@ -762,13 +762,14 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
         versionJSON["minor"] = ret.version.minor;
         versionJSON["patch"] = ret.version.patch;
         compilerJson["version"] = std::move(versionJSON);
+        json["version"] = json11::Json(EnvironmentCacheVersion);
         json[key] = std::move(compilerJson);
 
         std::string dirname;
         parsePath(cache.c_str(), nullptr, &dirname);
         recursiveMkdir(dirname);
         if ((fd = open(cache.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH)) != -1) {
-            std::string str = json11::Json(json).dump();
+            std::string str = json11::Json(json).dump() + '\n';
             if (flock(fd, LOCK_EX|LOCK_NB)) {
                 DEBUG("Failed to flock exclusive %s (%d %s)", cache.c_str(), errno, strerror(errno));
                 ::close(fd);
