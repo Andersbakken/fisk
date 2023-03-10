@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <vector>
+#include <unordered_map>
 
 #define EINTRWRAP(VAR, BLOCK) do { VAR = BLOCK; } while (VAR == -1 && errno == EINTR)
 
@@ -52,6 +53,16 @@ struct Data
     std::shared_ptr<CompilerArgs> compilerArgs;
     Watchdog *watchdog { nullptr };
     CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
+
+    struct CachedFile {
+        std::string contents;
+        std::vector<std::string> lines;
+        size_t parsedIdx = 0;
+
+        std::string line(size_t l);
+    };
+
+    std::unordered_map<std::string, CachedFile> fileCache;
 
     std::string commandLineAsString() const;
 
@@ -197,6 +208,9 @@ inline std::vector<std::string> split(const std::string &str, const std::string 
         start = end + delim.length();
         end = str.find(delim, start);
     }
+    if (start < str.size()) {
+        ret.push_back(str.substr(start));
+    }
     return ret;
 }
 
@@ -317,6 +331,7 @@ CompilerInfo compilerInfo(const std::string &compiler);
 bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();
-}
+std::string formatJSONDiagnostics(const std::string &json);
+} // namespace Client
 
 #endif /* CLIENT_H */

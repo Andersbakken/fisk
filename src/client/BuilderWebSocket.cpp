@@ -97,14 +97,31 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
             fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n%s\n",
                     data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
                     data.objectCache ? "true" : "false", npm_version, str.c_str());
+        }
 
+        if (!data.preprocessed->stdErr.empty()) {
+            if (hasJSONDiagnostics) {
+                const std::string formatted = Client::formatJSONDiagnostics(data.preprocessed->stdErr);
+                if (!formatted.empty()) {
+                    fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
+                }
+            } else {
+                fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+            }
         }
 
         if (!stdOut.empty()) {
             fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
         }
         if (!stdErr.empty()) {
-            fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
+            if (hasJSONDiagnostics) {
+                const std::string formatted = Client::formatJSONDiagnostics(stdErr);
+                if (!formatted.empty()) {
+                    fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
+                }
+            } else {
+                fwrite(stdErr.c_str(), 1, stdErr.size(), stderr);
+            }
         }
 
         const auto objectCache = msg["objectCache"];

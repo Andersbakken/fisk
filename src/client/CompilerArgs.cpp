@@ -148,37 +148,57 @@ static inline size_t hasArg(const std::string &arg, bool &sha1)
     return 0;
 }
 
-std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string> &args, LocalReason *localReason)
+std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &info,
+                                                   std::vector<std::string> &&arguments,
+                                                   LocalReason *localReason)
 {
     const bool objectCache = Config::objectCache;
     std::shared_ptr<CompilerArgs> ret(new CompilerArgs);
-    ret->commandLine = args;
+    ret->commandLine = std::move(arguments);
     ret->flags = None;
     ret->objectFileIndex = -1;
     bool hasDashC = false;
     bool hasArch = false;
     bool hasProfileDir = false;
     bool hasProfiling = false;
-    if (Log::minLogLevel <= Log::Verbose) {
-        for (size_t i=0; i<args.size(); ++i) {
-            VERBOSE("%zu/%zu: %s", i+1, args.size(), args[i].c_str());
+    const bool hasJSONDiagnostics = (Config::jsonDiagnostics
+                                     && info.type == Client::CompilerType::GCC
+                                     && info.version.major >= 10);
+
+    size_t i;
+    if (Log::minLogLevel <= Log::Verbose || !Config::color || hasJSONDiagnostics) {
+        size_t i = 0;
+        while (i < ret->commandLine.size()) {
+            std::string &arg = ret->commandLine[i];
+            VERBOSE("%zu/%zu: %s", i+1, ret->commandLine.size(), arg.c_str());
+            if (!Config::color) {
+                if (arg == "-fcolor-diagnostics") {
+                    arg = "-fno-color-diagnostics";
+                } else if (arg == "-fdiagnostics-color=always" || arg == "-fdiagnostics-color=auto") {
+                    arg = "-fdiagnostics-color=never";
+                }
+            }
+
+            if (hasJSONDiagnostics && arg == "-fdiagnostics-parseable-fixits") {
+                ret->commandLine.erase(ret->commandLine.begin() + i);
+            } else {
+                ++i;
+            }
         }
     }
 
-    size_t i;
-
-    auto sha1 = [&i, &args, objectCache](size_t count = 1) {
+    auto sha1 = [&i, &ret, objectCache](size_t count = 1) {
         if (objectCache) {
             for (size_t aa = i; aa < i + count; ++aa) {
-                const std::string &arg = args[aa];
+                const std::string &arg = ret->commandLine[aa];
                 VERBOSE("SHA1'ing arg %zu [%s]", aa, arg.c_str());
                 Client::data().sha1Update(arg.c_str(), arg.size());
             }
         }
     };
 
-    for (i=1; i<args.size(); ++i) {
-        const std::string &arg = args[i];
+    for (i=1; i<ret->commandLine.size(); ++i) {
+        const std::string &arg = ret->commandLine[i];
 
         if (arg == "-S") {
             DEBUG("-S, running local");
@@ -234,8 +254,9 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             continue;
         }
 
+
         if (arg == "-o") {
-            if (i + 1 < args.size() && args[i + 1] == "-") {
+            if (i + 1 < ret->commandLine.size() && ret->commandLine[i + 1] == "-") {
                 DEBUG("-o - This means different things for different compilers. Run local");
                 *localReason = Local_StdOutOutput;
                 return nullptr;
@@ -343,7 +364,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         }
 
         if (arg == "-Xclang") {
-            if (i + 1 < args.size() && args[i] == "-load") {
+            if (i + 1 < ret->commandLine.size() && ret->commandLine[i] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
                 *localReason = Local_ExtraFiles;
                 return nullptr;
@@ -367,9 +388,9 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
 
         if (arg == "-x") {
             ret->flags |= HasDashX;
-            if (i + 1 == args.size())
+            if (i + 1 == ret->commandLine.size())
                 return std::shared_ptr<CompilerArgs>();
-            const std::string lang = args.at(i);
+            const std::string lang = ret->commandLine.at(i);
             const CompilerArgs::Flag languages[] = {
                 CPlusPlus,
                 C,
@@ -421,8 +442,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
         if (arg[0] != '-') {
             if (ret->sourceFileIndex != std::numeric_limits<size_t>::max()) {
                 if (!hasDashC) {
-                    while (i < args.size()) {
-                        if (args[i] == "-c") {
+                    while (i < ret->commandLine.size()) {
+                        if (ret->commandLine[i] == "-c") {
                             hasDashC = true;
                             break;
                         }
@@ -433,7 +454,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
                     DEBUG("link job, building local");
                     *localReason = Local_Link;
                 } else {
-                    DEBUG("Multiple source files %s and %s", args[ret->sourceFileIndex].c_str(), arg.c_str());
+                    DEBUG("Multiple source files %s and %s", ret->commandLine[ret->sourceFileIndex].c_str(), arg.c_str());
                     *localReason = Local_MultiSource;
                 }
                 return nullptr;
@@ -544,6 +565,13 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const std::vector<std::string
             VERBOSE("SHA1'ing arg [%s]", dfile.c_str());
         }
         ret->commandLine.push_back(std::move(dfile));
+    }
+
+    if (hasJSONDiagnostics) {
+        const std::string arg = "-fdiagnostics-format=json";
+        Client::data().sha1Update(arg.c_str(), arg.size());
+        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
+        ret->commandLine.push_back(std::move(arg));
     }
 
     *localReason = Remote;

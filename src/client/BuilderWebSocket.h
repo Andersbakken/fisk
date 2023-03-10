@@ -12,6 +12,7 @@ class BuilderWebSocket : public WebSocket
 {
 public:
     bool wait { false };
+    bool hasJSONDiagnostics { false };
     virtual void onConnected() override;
     virtual void onMessage(MessageType messageType, const void *bytes, size_t len) override;
     void handleFileContents(const void *data, size_t len);

@@ -167,12 +167,12 @@ int main(int argc, char **argv)
             FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
             return 107;
         }
+
         DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
               data.argv[0], preresolved.c_str(),
               data.compiler.c_str(), data.resolvedCompiler.c_str(),
               data.builderCompiler.c_str());
     }
-
     DaemonSocket daemonSocket;
     if (!daemonSocket.connect()) {
         ERROR("Failed to connect to daemon");
@@ -239,6 +239,7 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
+    Client::CompilerInfo info;
     {
         std::vector<std::string> args(data.argc);
         for (int i=0; i<data.argc; ++i) {
@@ -246,17 +247,9 @@ int main(int argc, char **argv)
             args[i] = data.argv[i];
         }
 
-        if (!Config::color) {
-            for (std::string &arg : args) {
-                if (arg == "-fcolor-diagnostics") {
-                    arg = "-fno-color-diagnostics";
-                } else if (arg == "-fdiagnostics-color=always" || arg == "-fdiagnostics-color=auto") {
-                    arg = "-fdiagnostics-color=never";
-                }
-            }
-        }
-
-        data.compilerArgs = CompilerArgs::create(args, &data.localReason);
+        info = Client::compilerInfo(data.resolvedCompiler);
+        data.hash = info.hash;
+        data.compilerArgs = CompilerArgs::create(info, std::move(args), &data.localReason);
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
@@ -267,8 +260,7 @@ int main(int argc, char **argv)
     daemonSocket.send(DaemonSocket::AcquireCppSlot);
     data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, select, daemonSocket);
     assert(data.preprocessed);
-    Client::CompilerInfo info = Client::compilerInfo(data.resolvedCompiler);
-    data.hash = info.hash;
+
     std::map<std::string, std::string> headers;
     {
         char buf[1024];
@@ -426,6 +418,9 @@ int main(int argc, char **argv)
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredBuilder);
     BuilderWebSocket builderWebSocket;
+    builderWebSocket.hasJSONDiagnostics = (Config::jsonDiagnostics
+                                           && info.type == Client::CompilerType::GCC
+                                           && info.version.major >= 10);
     select.add(&builderWebSocket);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
@@ -528,7 +523,14 @@ int main(int argc, char **argv)
         if (builderWebSocket.done) {
             if (builderWebSocket.error.empty()) {
                 if (!data.preprocessed->stdErr.empty()) {
-                    fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+                    if (builderWebSocket.hasJSONDiagnostics) {
+                        const std::string formatted = Client::formatJSONDiagnostics(data.preprocessed->stdErr);
+                        if (!formatted.empty()) {
+                            fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
+                        }
+                    } else {
+                        fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
+                    }
                 }
                 data.watchdog->transition(Watchdog::UploadedJob);
                 data.watchdog->transition(Watchdog::Finished);
@@ -610,9 +612,6 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    if (!data.preprocessed->stdErr.empty()) {
-        fwrite(data.preprocessed->stdErr.c_str(), sizeof(char), data.preprocessed->stdErr.size(), stderr);
-    }
     data.watchdog->transition(Watchdog::Finished);
     data.watchdog->stop();
     schedulerWebsocket->close("builderd");

@@ -209,6 +209,7 @@ extern Getter<std::string> cacheDir;
 extern Getter<std::string> builder;
 extern Getter<std::string> labels;
 extern Getter<bool> color;
+extern Getter<bool> jsonDiagnostics;
 extern Getter<bool> objectCache;
 extern Getter<std::string> objectCacheTag;
 extern Getter<bool> storePreprocessedDataOnError;

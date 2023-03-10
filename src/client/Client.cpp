@@ -63,6 +63,27 @@ Client::Data &Client::data()
     return sData;
 }
 
+std::string Client::Data::CachedFile::line(size_t l)
+{
+    while (lines.size() < l && parsedIdx < contents.size()) {
+        assert(parsedIdx == 0 || contents[parsedIdx - 1] == '\n');
+        size_t newline = contents.find('\n', parsedIdx);
+        std::string line;
+        if (newline == std::string::npos) {
+            line = contents.substr(parsedIdx);
+            parsedIdx = newline = contents.size();
+        } else {
+            line = contents.substr(parsedIdx, newline - parsedIdx);
+            parsedIdx = newline + 1;
+        }
+        // printf("Adding line %lu - %s\n", lines.size() + 1, line.c_str());
+        lines.push_back(std::move(line));
+    }
+    assert(l > 0);
+    --l; // 0 indexed here, 1-indexed in the diagnostics
+    return l < lines.size() ? lines[l] : std::string();
+}
+
 static std::mutex sMutex;
 std::mutex &Client::mutex()
 {
@@ -75,6 +96,74 @@ enum CheckResult {
 };
 
 namespace {
+enum class Color {
+    None,
+    Red,
+    Purple
+};
+std::string colorize(const std::string &str, Color color,
+                     size_t start = 0, size_t length = std::string::npos)
+{
+    if (color == Color::None || !Config::color)
+        return str;
+    if (length == std::string::npos)
+        length = str.size() - start;
+    return (str.substr(0, start)
+            + (color == Color::Red ? "\033[1;31m" : "\033[1;35m")
+            + str.substr(start, length)
+            + "\033[0m"
+            + str.substr(start + length));
+}
+
+const std::string lineFromFile(const std::string &file, int line)
+{
+    const bool exists = Client::data().fileCache.find(file) != Client::data().fileCache.end();
+    Client::Data::CachedFile &ref = Client::data().fileCache[file];
+    if (!exists) {
+        Client::readFile(file, ref.contents);
+    }
+    return ref.line(line);
+}
+
+json11::Json resolve(json11::Json value, const std::vector<std::string> &children)
+{
+    for (size_t i=0; i<children.size(); ++i) {
+        if (value.is_object()) {
+            value = value[children[i]];
+        } else {
+            value = json11::Json();
+            break;
+        }
+    }
+    return value;
+}
+
+std::string string(json11::Json value, const std::vector<std::string> &children)
+{
+    value = resolve(value, children);
+    if (value.is_string())
+        return value.string_value();
+    return std::string();
+}
+
+std::string string(const json11::Json &value, const std::string &child = std::string())
+{
+    return string(value, Client::split(child, "."));
+}
+
+int integer(json11::Json value, const std::vector<std::string> &children)
+{
+    value = resolve(value, children);
+    if (value.is_number())
+        return value.number_value();
+    return 0;
+}
+
+int integer(const json11::Json &value, const std::string &child = std::string())
+{
+    return integer(value, Client::split(child, "."));
+}
+
 void filter(const std::string &needle, std::string &output)
 {
     size_t i=0;
@@ -704,37 +793,22 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                             if (value.is_object()) {
                                 DEBUG("Cache hit for compiler %s", key.c_str());
                                 CompilerInfo cacheHit;
-                                const json11::Json hash = value["hash"];
-                                if (hash.is_string()) {
-                                    cacheHit.hash = hash.string_value();
-                                }
-
-                                const json11::Json type = value["type"];
-                                if (type.is_string()) {
-                                    const std::string &t = type.string_value();
-                                    if (t == "clang") {
-                                        cacheHit.type = CompilerType::Clang;
-                                    } else if (t == "gcc") {
-                                        cacheHit.type = CompilerType::GCC;
-                                    }
+                                cacheHit.hash = string(value, "hash");
+                                const std::string type = string(value, "type");
+                                if (type == "clang") {
+                                    cacheHit.type = CompilerType::Clang;
+                                } else if (type == "gcc") {
+                                    cacheHit.type = CompilerType::GCC;
                                 }
                                 const json11::Json version = value["version"];
                                 if (version.is_object()) {
-                                    const json11::Json major = version["major"];
-                                    if (major.is_number()) {
-                                        cacheHit.version.major = static_cast<int>(major.number_value());
-                                    }
-                                    const json11::Json minor = version["minor"];
-                                    if (minor.is_number()) {
-                                        cacheHit.version.minor = static_cast<int>(minor.number_value());
-                                    }
-                                    const json11::Json patch = version["patch"];
-                                    if (patch.is_number()) {
-                                        cacheHit.version.patch = static_cast<int>(patch.number_value());
-                                    }
+                                    cacheHit.version.major = integer(version, "major");
+                                    cacheHit.version.minor = integer(version, "minor");
+                                    cacheHit.version.patch = integer(version, "patch");
                                 }
-                                return cacheHit;
+                                // return cacheHit;
                             }
+
                             json = obj.object_items();
                             auto it = json.begin();
                             while (it != json.end()) {
@@ -1052,5 +1126,83 @@ std::string Client::Data::commandLineAsString() const
     } else {
         ret = "none";
     }
+    return ret;
+}
+
+std::string Client::formatJSONDiagnostics(const std::string &str)
+{
+    std::string err;
+    const json11::Json parsed = json11::Json::parse(str, err);
+    if (!parsed.is_array()) {
+        return str;
+    }
+
+    const std::vector<json11::Json> array = parsed.array_items();
+    if (array.empty())
+        return std::string();
+
+    std::string ret;
+    ret.reserve(array.size() * 256);
+
+    for (const json11::Json &item : array) {
+        const std::string kind = string(item, "kind");
+        Color color;
+        if (Config::color) {
+            color = kind == "error" ? Color::Red : Color::Purple;
+        }
+        std::vector<json11::Json> locations, fixits;
+        {
+            json11::Json tmp = item["locations"];
+            if (tmp.is_array())
+                locations = tmp.array_items();
+            tmp = item["fixits"];
+            if (tmp.is_array())
+                fixits = tmp.array_items();
+        }
+        if (!locations.empty()) {
+            const json11::Json loc = locations[0];
+            const std::string file = string(loc, "caret.file");
+            const int caretLine = integer(loc, "caret.line");
+            const int caretColumn = integer(loc, "caret.column");
+            int finishCol = integer(loc, "finish.column");
+            int startCol = 0;
+            if (loc["start"].is_object()) {
+                startCol = integer(loc, "start.column");
+            }
+            if (!startCol) {
+                startCol = caretColumn;
+            }
+            if (!finishCol) {
+                finishCol = startCol;
+            }
+            const std::string message = string(item, "message");
+            std::string option = string(item, "option");
+            if (!option.empty()) {
+                option = " [" + option + ']';
+            }
+
+            ret += Client::format("%s:%d:%d: %s: %s%s\n", file.c_str(), caretLine, caretColumn,
+                                  colorize(kind, color).c_str(), message.c_str(), option.c_str());
+            std::string srcLine = lineFromFile(file, caretLine);
+            ret += colorize(srcLine, color, startCol - 1, finishCol - startCol + 1) + '\n';
+            std::string caret(startCol - 1, ' ');
+            std::string tmp;
+            for (int i=startCol; i<finishCol + 1; ++i) {
+                tmp += i == caretColumn ? '^' : '~';
+            }
+            caret += colorize(tmp, color);
+            caret += "\n";
+            ret += caret;
+            if (!fixits.empty()) {
+                const int fixitStart = integer(fixits[0], "start.column");
+                const int fixitEnd = integer(fixits[0], "next.column"); // weird
+                const std::string replacement = string(fixits[0], "string");
+                if (!replacement.empty() && fixitStart != 0 && fixitEnd != 0) {
+                    ret += std::string(fixitStart - 1, ' ') + colorize(replacement, color) + '\n';
+                }
+            }
+        }
+    }
+
     return ret;
 }

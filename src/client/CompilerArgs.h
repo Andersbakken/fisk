@@ -23,6 +23,10 @@
 #include <assert.h>
 #include <limits>
 
+namespace Client {
+struct CompilerInfo;
+};
+
 struct CompilerArgs
 {
     std::vector<std::string> commandLine;
@@ -74,7 +78,9 @@ struct CompilerArgs
         Local_NoIntegratedAs
     };
     static const char *localReasonToString(LocalReason reason);
-    static std::shared_ptr<CompilerArgs> create(const std::vector<std::string> &args, LocalReason *reason);
+    static std::shared_ptr<CompilerArgs> create(const Client::CompilerInfo &info,
+                                                std::vector<std::string> &&args,
+                                                LocalReason *reason);
 
     std::string sourceFile() const
     {
