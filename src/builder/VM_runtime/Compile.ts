@@ -124,55 +124,51 @@ export class Compile extends EventEmitter {
         }
 
         if (!hasDashX) {
-            if (compiler.indexOf("g++") !== -1 || compiler.indexOf("c++") !== -1) {
-                args.unshift(isClang ? "c++" : "c++-cpp-output");
-            } else {
-                switch (path.extname(sourceFile)) {
-                    case ".C":
-                    case ".cc":
-                    case ".cpp":
-                    case ".CPP":
-                    case ".c++":
-                    case ".cp":
-                    case ".cxx":
-                        args.unshift(isClang ? "c++" : "c++-cpp-output");
-                        break;
-                    case ".ii":
-                        args.unshift("c++-cpp-output");
-                        break;
-                    case ".hh":
-                    case ".hpp":
-                    case ".H":
-                        args.unshift("c++-header");
-                        break;
-                    case ".h":
-                        args.unshift("c-header");
-                        break;
-                    case ".c":
-                        args.unshift(isClang ? "c" : "cpp-output");
-                        break;
-                    case ".i":
-                        args.unshift("cpp-output");
-                        break;
-                    case ".m":
-                    case ".mi":
-                        args.unshift(isClang ? "objective-c" : "objective-c-cpp-output");
-                        break;
-                    case ".s":
-                        args.unshift("assembler");
-                        break;
-                    case ".sx":
-                    case ".S":
-                        args.unshift("assembler-with-cpp");
-                        break;
-                    case ".mm":
-                    case ".M":
-                    case ".mii":
-                        args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
-                        break;
-                    default:
-                        throw new Error(`Can't determine source language for file: ${sourceFile}`);
-                }
+            switch (path.extname(sourceFile)) {
+                case ".C":
+                case ".cc":
+                case ".cpp":
+                case ".CPP":
+                case ".c++":
+                case ".cp":
+                case ".cxx":
+                    args.unshift(isClang ? "c++" : "c++-cpp-output");
+                    break;
+                case ".ii":
+                    args.unshift("c++-cpp-output");
+                    break;
+                case ".hh":
+                case ".hpp":
+                case ".H":
+                    args.unshift("c++-header");
+                    break;
+                case ".h":
+                    args.unshift("c-header");
+                    break;
+                case ".c":
+                    args.unshift(isClang ? "c" : "cpp-output");
+                    break;
+                case ".i":
+                    args.unshift("cpp-output");
+                    break;
+                case ".m":
+                case ".mi":
+                    args.unshift(isClang ? "objective-c" : "objective-c-cpp-output");
+                    break;
+                case ".s":
+                    args.unshift("assembler");
+                    break;
+                case ".sx":
+                case ".S":
+                    args.unshift("assembler-with-cpp");
+                    break;
+                case ".mm":
+                case ".M":
+                case ".mii":
+                    args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
+                    break;
+                default:
+                    throw new Error(`Can't determine source language for file: ${sourceFile}`);
             }
             args.unshift("-x");
         }
@@ -195,6 +191,7 @@ export class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
+        console.log("going for it", compiler, args);
         // const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
         const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, args, {
             /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
@@ -263,8 +260,8 @@ export class Compile extends EventEmitter {
                     };
 
                     this.emit("exit", errorExitEvent);
-                4
-}
+                    4;
+                }
             };
             if (exitCode === 0) {
                 addDir(dir, dir);
@@ -300,5 +297,3 @@ export class Compile extends EventEmitter {
 //     console.log("Got exit", event);
 // });
 module.exports = Compile;
-
-
