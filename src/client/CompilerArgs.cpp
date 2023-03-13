@@ -158,7 +158,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     ret->flags = None;
     ret->objectFileIndex = -1;
     bool hasDashC = false;
-    bool hasArch = false;
+    std::string hasArch;
     bool hasProfileDir = false;
     bool hasProfiling = false;
     const bool hasJSONDiagnostics = (Config::jsonDiagnostics
@@ -375,12 +375,13 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-arch") {
-            if (hasArch) {
+            const std::string arch = ret->commandLine[i + 1];
+            if (!hasArch.empty() && hasArch != arch) {
                 DEBUG("multiple -arch options, building locally");
                 *localReason = Local_MultiArch;
                 return nullptr;
             }
-            hasArch = true;
+            hasArch = arch;
             sha1(2);
             ++i;
             continue;
