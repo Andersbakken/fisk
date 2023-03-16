@@ -569,9 +569,16 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     }
 
     if (hasJSONDiagnostics) {
-        const std::string arg = "-fdiagnostics-format=json";
+        std::string arg = "-fdiagnostics-format=json";
         Client::data().sha1Update(arg.c_str(), arg.size());
         VERBOSE("SHA1'ing arg [%s]", arg.c_str());
+        ret->commandLine.push_back(std::move(arg));
+    }
+
+    if (info.type == Client::CompilerType::Clang && info.version.major >= 15) {
+        const std::string arg = "-Wno-gnu-line-marker";
+        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
+        Client::data().sha1Update(arg.c_str(), arg.size());
         ret->commandLine.push_back(std::move(arg));
     }
 
