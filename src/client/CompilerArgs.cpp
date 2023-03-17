@@ -161,7 +161,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     std::string hasArch;
     bool hasProfileDir = false;
     bool hasProfiling = false;
-    const bool hasJSONDiagnostics = (Config::jsonDiagnostics
+    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
                                      && info.type == Client::CompilerType::GCC
                                      && info.version.major >= 10);
 

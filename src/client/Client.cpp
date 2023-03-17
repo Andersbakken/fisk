@@ -1201,6 +1201,9 @@ int kindScore(const std::string &kind)
 
 std::string Client::formatJSONDiagnostics(const std::string &str)
 {
+    if (Config::jsonDiagnosticsRaw) {
+        return str;
+    }
     std::string err;
     const json11::Json parsed = json11::Json::parse(str, err);
     if (!parsed.is_array()) {

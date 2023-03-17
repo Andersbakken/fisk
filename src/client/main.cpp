@@ -418,7 +418,7 @@ int main(int argc, char **argv)
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredBuilder);
     BuilderWebSocket builderWebSocket;
-    builderWebSocket.hasJSONDiagnostics = (Config::jsonDiagnostics
+    builderWebSocket.hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
                                            && info.type == Client::CompilerType::GCC
                                            && info.version.major >= 10);
     select.add(&builderWebSocket);
