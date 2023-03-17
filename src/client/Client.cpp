@@ -100,12 +100,68 @@ enum CheckResult {
     Continue
 };
 
+/*
+  export COLOR_NC='\e[0m' # No Color
+  export COLOR_BLACK='\e[0;30m'
+  export COLOR_GRAY='\e[1;30m'
+  export COLOR_RED='\e[0;31m'
+  export COLOR_LIGHT_RED='\e[1;31m'
+  export COLOR_GREEN='\e[0;32m'
+  export COLOR_LIGHT_GREEN='\e[1;32m'
+  export COLOR_BROWN='\e[0;33m'
+  export COLOR_YELLOW='\e[1;33m'
+  export COLOR_BLUE='\e[0;34m'
+  export COLOR_LIGHT_BLUE='\e[1;34m'
+  export COLOR_PURPLE='\e[0;35m'
+  export COLOR_LIGHT_PURPLE='\e[1;35m'
+  export COLOR_CYAN='\e[0;36m'
+  export COLOR_LIGHT_CYAN='\e[1;36m'
+  export COLOR_LIGHT_GRAY='\e[0;37m'
+  export COLOR_WHITE='\e[1;37m'
+*/
+
+
 namespace {
 enum class Color {
     None,
+    Black,
+    Gray,
     Red,
-    Purple
+    LightRed,
+    Green,
+    LightGreen,
+    Brown,
+    Yellow,
+    Blue,
+    LightBlue,
+    Purple,
+    LightPurple,
+    Cyan,
+    LightCyan,
+    LightGray,
+    White
 };
+
+const char *colors[] = {
+    "\e[0m", // None
+    "\e[0;30m", // Black
+    "\e[1;30m", // Gray
+    "\e[0;31m", // Red
+    "\e[1;31m", // LightRed
+    "\e[0;32m", // Green
+    "\e[1;32m", // LightGreen
+    "\e[0;33m", // Brown
+    "\e[1;33m", // Yellow
+    "\e[0;34m", // Blue
+    "\e[1;34m", // LightBlue
+    "\e[0;35m", // Purple
+    "\e[1;35m", // LightPurple
+    "\e[0;36m", // Cyan
+    "\e[1;36m", // LightCyan
+    "\e[0;37m", // LightGray
+    "\e[1;37m" // White
+};
+
 std::string colorize(const std::string &str, Color color,
                      size_t start = 0, size_t length = std::string::npos)
 {
@@ -114,9 +170,9 @@ std::string colorize(const std::string &str, Color color,
     if (length == std::string::npos)
         length = str.size() - start;
     return (str.substr(0, start)
-            + (color == Color::Red ? "\033[1;31m" : "\033[1;35m")
+            + colors[static_cast<int>(color)]
             + str.substr(start, length)
-            + "\033[0m"
+            + colors[static_cast<int>(Color::None)]
             + str.substr(start + length));
 }
 
@@ -1134,6 +1190,15 @@ std::string Client::Data::commandLineAsString() const
     return ret;
 }
 
+namespace {
+int kindScore(const std::string &kind)
+{
+    if (kind == "error")
+        return 1;
+    return 0;
+}
+} // anonymous namespace
+
 std::string Client::formatJSONDiagnostics(const std::string &str)
 {
     std::string err;
@@ -1149,13 +1214,20 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
     std::string ret;
     ret.reserve(array.size() * 256);
 
-    for (const json11::Json &item : array) {
+    std::function<void(const json11::Json)> print = [&print, &ret](const json11::Json &item) {
         const std::string kind = string(item, "kind");
         Color color;
         if (Config::color) {
-            color = kind == "error" ? Color::Red : Color::Purple;
+            if (kind == "error") {
+                color = Color::LightRed;
+            } else if (kind == "note") {
+                color = Color::LightCyan;
+            } else {
+                color = Color::LightPurple;
+            }
+            color = kind == "error" ? Color::LightRed : Color::LightPurple;
         }
-        std::vector<json11::Json> locations, fixits;
+        std::vector<json11::Json> locations, fixits, children;
         {
             json11::Json tmp = item["locations"];
             if (tmp.is_array())
@@ -1163,8 +1235,15 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
             tmp = item["fixits"];
             if (tmp.is_array())
                 fixits = tmp.array_items();
+            tmp = item["children"];
+            if (tmp.is_array()) {
+                children = tmp.array_items();
+                std::sort(children.begin(), children.end(), [](const json11::Json &l, const json11::Json &r) -> bool {
+                    return kindScore(string(l, "kind")) > kindScore(string(r, "kind"));
+                });
+            }
         }
-        if (!locations.empty()) {
+        if (children.empty() && !locations.empty()) {
             const json11::Json loc = locations[0];
             const std::string file = string(loc, "caret.file");
             const int caretLine = integer(loc, "caret.line");
@@ -1207,6 +1286,13 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
                 }
             }
         }
+        for (const json11::Json &child : children) {
+            print(child);
+        }
+    };
+
+    for (const json11::Json &item : array) {
+        print(item);
     }
 
     return ret;
