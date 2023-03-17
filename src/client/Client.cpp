@@ -76,6 +76,11 @@ std::string Client::Data::CachedFile::line(size_t l)
             line = contents.substr(parsedIdx, newline - parsedIdx);
             parsedIdx = newline + 1;
         }
+        for (int i=line.size() - 1; i>=0; --i) {
+            if (line[i] == '\t') {
+                line[i] = ' ';
+            }
+        }
         // printf("Adding line %lu - %s\n", lines.size() + 1, line.c_str());
         lines.push_back(std::move(line));
     }
