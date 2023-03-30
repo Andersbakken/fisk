@@ -1228,7 +1228,6 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
             } else {
                 color = Color::LightPurple;
             }
-            color = kind == "error" ? Color::LightRed : Color::LightPurple;
         }
         std::vector<json11::Json> locations, fixits, children;
         {
@@ -1246,7 +1245,7 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
                 });
             }
         }
-        if (children.empty() && !locations.empty()) {
+        if (!locations.empty()) {
             const json11::Json loc = locations[0];
             const std::string file = string(loc, "caret.file");
             const int caretLine = integer(loc, "caret.line");
