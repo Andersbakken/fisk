@@ -1270,7 +1270,9 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
             ret += Client::format("%s:%d:%d: %s: %s%s\n", file.c_str(), caretLine, caretColumn,
                                   colorize(kind, color).c_str(), message.c_str(), option.c_str());
             std::string srcLine = lineFromFile(file, caretLine);
-            ret += colorize(srcLine, color, startCol - 1, finishCol - startCol + 1) + '\n';
+            if (!srcLine.empty()) {
+                ret += colorize(srcLine, color, startCol - 1, finishCol - startCol + 1) + '\n';
+            }
             std::string caret(startCol - 1, ' ');
             std::string tmp;
             for (int i=startCol; i<finishCol + 1; ++i) {
