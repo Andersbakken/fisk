@@ -81,7 +81,7 @@ static Separator s3("Options:");
 Getter<bool> color("color", "Set to false to disable colorized output", true);
 Getter<bool> jsonDiagnostics("json-diagnostics",
                              "Use json-diagnostics (-fdignostics-format=json) when possible to print proper carets for warnings and errors",
-                             true);
+                             false);
 Getter<bool> jsonDiagnosticsRaw("json-diagnostics-raw",
                                 "Use json-diagnostics (-fdignostics-format=json) when possible but print the json directly without transforming it",
                                 false);
