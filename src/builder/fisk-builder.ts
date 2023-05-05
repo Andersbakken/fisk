@@ -229,7 +229,6 @@ client.on("fetch_cache_objects", (msg: unknown) => {
                     resolve();
                     return;
                 }
-                // response_stream.on("response", function (response) {
                 axios({ method: "get", url: url, responseType: "stream" })
                     .then((response) => {
                         expectedSize = parseInt(response.headers["content-length"]);

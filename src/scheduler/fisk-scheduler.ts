@@ -561,7 +561,7 @@ server.on("listen", (app: express.Application) => {
         }
     });
 
-    app.get("/environment/*", function (req, res) {
+    app.get("/environment/*", (req, res) => {
         const hash = req.path.substr(13);
         const env = Environments.instance.environment(hash);
         console.log("got env request", hash, env);
