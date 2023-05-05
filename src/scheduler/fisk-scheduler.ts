@@ -35,6 +35,7 @@ const option: OptionsFunction = options({
     additionalFiles: ["fisk/scheduler.conf.override"]
 });
 const common = commonFunc(option);
+let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
 
@@ -589,6 +590,72 @@ server.on("listen", (app: express.Application) => {
         }
         res.sendStatus(200);
         setTimeout(() => process.exit(), 100);
+    });
+
+    app.post("/builder-command", (req, res) => {
+        if (!req.body || !req.body.builder || !req.body.command) {
+            res.sendStatus(404);
+            return;
+        }
+        let found: Builder | undefined;
+
+        for (const key in builders) {
+            const builder = builders[key];
+            console.log(builder.ip, builder.name, builder.hostname, req.body.builder);
+            if (
+                builder.ip === req.body.builder ||
+                builder.name === req.body.builder ||
+                builder.hostname === req.body.builder
+            ) {
+                found = builder;
+                break;
+            }
+        }
+        if (!found) {
+            res.sendStatus(404);
+            return;
+        }
+
+        let timedOut = false;
+
+        const id = ++nextCommandId;
+        found.send({ type: "command", command: req.body.command, id });
+
+        const onCommand = (message: unknown) => {
+            if (timedOut || !found) {
+                return;
+            }
+            console.log("Got message from builder", found.ip, found.name, "\n", message);
+            if (message && typeof message === "object") {
+                const msg = message as Record<string, unknown>;
+                if (msg.id === id) {
+                    found.off("command", onCommand);
+                    clearTimeout(timeOut);
+                    if (req.body.json) {
+                        res.send(JSON.stringify(message, null, 4));
+                    } else {
+                        res.send(`Builder: ${found.ip} (${found.name})
+Command: ${req.body.command}
+${msg.stdout ? "stdout:\n" + msg.stdout + "\n" : ""}${msg.stderr ? "stderr:\n" + msg.stderr : ""}
+`);
+                    }
+                }
+            }
+        };
+
+        found.on("command", onCommand);
+
+        const timeOut = setTimeout(() => {
+            timedOut = true;
+            if (found) {
+                found.off("command", onCommand);
+            }
+            res.sendStatus(408);
+        }, parseInt(req.body.timeout) || 30000);
+
+        console.log("Got builder command", req.body);
+
+        // res.sendStatus(200);
     });
 });
 

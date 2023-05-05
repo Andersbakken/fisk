@@ -6,6 +6,7 @@ import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
 import assert from "assert";
+import bodyParser from "body-parser";
 import crypto from "crypto";
 import express from "express";
 import fs from "fs";
@@ -45,6 +46,8 @@ export class Server extends EventEmitter {
     listen(): Promise<void> {
         return new Promise<void>((resolve: () => void) => {
             this.app = express();
+            this.app.use(bodyParser.urlencoded({ extended: true }));
+
             this.emit("listen", this.app);
 
             const ui = this.option("ui");

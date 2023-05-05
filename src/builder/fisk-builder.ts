@@ -592,11 +592,28 @@ client.on("close", () => {
     }
 });
 
+client.on("command", (command) => {
+    console.log("Got command", command);
+    child_process.exec(
+        command.command,
+        { encoding: "utf8" },
+        (err: child_process.ExecException | null, stdout: string, stderr: string) => {
+            if (stdout) {
+                console.log("Got stdout from", command, stdout);
+            }
+            if (stderr) {
+                console.error("Got stderr from", command, stderr);
+            }
+            client.send({ type: "command", id: command.id, command: command.command, stdout, stderr });
+        }
+    );
+});
+
 const server = new Server(option, common.Version);
 const jobQueue: J[] = [];
 
 server.on("headers", (headers, req) => {
-    // console.log("request is", req.headers);
+    // console.log("request is", req.url);
     let wait = false;
     if (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) === "exists") {
         wait = true;
