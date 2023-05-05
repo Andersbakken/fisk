@@ -635,7 +635,7 @@ server.on("listen", (app: express.Application) => {
             if (message && typeof message === "object") {
                 const msg = message as Record<string, unknown>;
                 if (msg.id === id) {
-                    found.off("command", onCommand);
+                    found.removeListener("command", onCommand);
                     clearTimeout(timeOut);
                     if (req.body.json) {
                         res.send(JSON.stringify(message, null, 4));
@@ -649,12 +649,12 @@ ${msg.stdout ? "stdout:\n" + msg.stdout + "\n" : ""}${msg.stderr ? "stderr:\n" +
             }
         };
 
-        found.on("command", onCommand);
+        found.addListener("command", onCommand);
 
         const timeOut = setTimeout(() => {
             timedOut = true;
             if (found) {
-                found.off("command", onCommand);
+                found.removeListener("command", onCommand);
             }
             res.sendStatus(408);
         }, parseInt(req.body.timeout) || 30000);
