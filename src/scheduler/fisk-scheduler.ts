@@ -593,6 +593,7 @@ server.on("listen", (app: express.Application) => {
     });
 
     app.post("/builder-command", (req, res) => {
+        console.log("Got builder command", req.body);
         if (!req.body || !req.body.builder || !req.body.command) {
             res.sendStatus(404);
             return;
@@ -612,6 +613,7 @@ server.on("listen", (app: express.Application) => {
             }
         }
         if (!found) {
+            console.log("Didn't find builder", req.body);
             res.sendStatus(404);
             return;
         }
@@ -619,10 +621,14 @@ server.on("listen", (app: express.Application) => {
         let timedOut = false;
 
         const id = ++nextCommandId;
-        found.send({ type: "command", command: req.body.command, id });
+        const cmd = { type: "command", command: req.body.command, id };
+        console.log("Sending command to builder", found.ip, found.name, cmd);
+        found.send(cmd);
 
         const onCommand = (message: unknown) => {
-            if (timedOut || !found) {
+            assert(found);
+            if (timedOut) {
+                console.log("Timed out already");
                 return;
             }
             console.log("Got message from builder", found.ip, found.name, "\n", message);
