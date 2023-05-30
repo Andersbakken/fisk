@@ -3,6 +3,7 @@ import { CompileJob } from "./CompileJob";
 import { OptionsFunction } from "@jhanssen/options";
 import { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 import EventEmitter from "events";
+import bytes from "bytes";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
@@ -30,13 +31,28 @@ export class VM extends EventEmitter {
 
         const args = [`--root=${root}`, `--hash=${hash}`];
         const user = option("vm-user");
+
         if (user) {
             args.push(`--user=${user}`);
         }
+
         if (option("debug")) {
             args.push("--debug");
         }
 
+        const rlimitData = option("rlimit-data");
+        if (rlimitData) {
+            const limit = typeof rlimitData === "number" ? rlimitData : bytes.parse(String(rlimitData));
+            args.push(`--rlimit-data=${limit}`);
+        }
+
+        const rlimitAS = option("rlimit-as");
+        if (rlimitAS) {
+            const limit = typeof rlimitAS === "number" ? rlimitAS : bytes.parse(String(rlimitAS));
+            args.push(`--rlimit-as=${limit}`);
+        }
+
+        console.log("Starting vm", args);
         this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         this.ready = false;
         this.child.on("message", (msg: VMMessage) => {

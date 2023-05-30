@@ -9,7 +9,7 @@ import posix from "posix";
 const argv = minimist(process.argv.slice(2));
 
 type InitGroups = {
-    initgroups: (user: string |number, extraGroup: string | number) => void
+    initgroups: (user: string | number, extraGroup: string | number) => void;
 };
 
 function send(message: Record<string, unknown>): void {
@@ -54,6 +54,14 @@ try {
 } catch (err) {
     console.error("Changing root or user failed", err);
     process.exit(1);
+}
+
+if (argv["rlimit-data"]) {
+    posix.setrlimit("data", { soft: parseInt(argv["rlimit-data"]), hard: parseInt(argv["rlimit-data"]) });
+}
+
+if (argv["rlimit-as"]) {
+    posix.setrlimit("as", { soft: parseInt(argv["rlimit-as"]), hard: parseInt(argv["rlimit-as"]) });
 }
 
 if (pwd) {
