@@ -13,6 +13,7 @@ class Preprocessed
 {
 public:
     ~Preprocessed();
+    void wait();
     bool done() const;
 
     std::vector<unsigned char> stdOut;
@@ -24,8 +25,8 @@ public:
 
     static std::unique_ptr<Preprocessed> create(const std::string &compiler,
                                                 const std::shared_ptr<CompilerArgs> &args,
-                                                Select &select,
-                                                DaemonSocket &daemonSocket);
+                                                Select *select,
+                                                DaemonSocket *daemonSocket);
 private:
     Preprocessed();
     mutable std::mutex mMutex;

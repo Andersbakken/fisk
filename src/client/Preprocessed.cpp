@@ -11,6 +11,11 @@ Preprocessed::Preprocessed()
 
 Preprocessed::~Preprocessed()
 {
+    wait();
+}
+
+void Preprocessed::wait()
+{
     {
         std::unique_lock<std::mutex> lock(mMutex);
         if (mJoined)
@@ -31,13 +36,13 @@ bool Preprocessed::done() const
 
 std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                                                    const std::shared_ptr<CompilerArgs> &args,
-                                                   Select &select,
-                                                   DaemonSocket &daemonSocket)
+                                                   Select *select,
+                                                   DaemonSocket *daemonSocket)
 {
     const unsigned long long started = Client::mono();
     Preprocessed *ptr = new Preprocessed;
     std::unique_ptr<Preprocessed> ret(ptr);
-    ret->mThread = std::thread([ptr, args, compiler, started, &daemonSocket, &select] {
+    ret->mThread = std::thread([ptr, args, compiler, started, daemonSocket, select] {
         std::string out, err;
         ptr->stdOut.reserve(1024 * 1024);
         std::string commandLine = compiler;
@@ -65,7 +70,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
 
         DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
 
-        if (!daemonSocket.waitForCppSlot()) {
+        if (daemonSocket && !daemonSocket->waitForCppSlot()) {
             ptr->exitStatus = 2;
         } else {
             ptr->slotDuration = Client::mono() - started;
@@ -133,7 +138,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                     deflateEnd(&strm);
                 }
                 DEBUG("Preprocess got status %d", ptr->exitStatus);
-                if (Config::objectCache) {
+                if (Config::objectCache || Config::dumpSha1) {
                     // FILE *f = fopen("/tmp/preproc.i", "w");
                     const unsigned char *ch = ptr->stdOut.data();
                     const unsigned char *last = ch;
@@ -171,7 +176,9 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
             ptr->duration = Client::mono() - started;
             ptr->mCond.notify_one();
         }
-        select.wakeup();
+        if (select) {
+            select->wakeup();
+        }
     });
     return ret;
 }

@@ -1301,3 +1301,34 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
 
     return ret;
 }
+
+int Client::dumpSha1()
+{
+    Client::Data &data = Client::data();
+    Client::CompilerInfo info;
+    {
+        std::vector<std::string> args(data.argc);
+        for (int i=0; i<data.argc; ++i) {
+            // printf("%zu: %s\n", i, argv[i]);
+            args[i] = data.argv[i];
+        }
+
+        info = Client::compilerInfo(data.resolvedCompiler);
+        data.hash = info.hash;
+        data.compilerArgs = CompilerArgs::create(info, std::move(args), &data.localReason);
+    }
+    if (!data.compilerArgs) {
+        ERROR("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason));
+        return 1;
+    }
+
+    data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, nullptr, nullptr);
+    assert(data.preprocessed);
+    data.preprocessed->wait();
+    unsigned char sha1Buf[SHA_DIGEST_LENGTH];
+    Client::data().sha1Final(sha1Buf);
+    std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
+    printf("%s\n", sha1.c_str());
+    return 0;
+}
+

@@ -71,6 +71,7 @@ static std::string defaultObjectCacheTag()
 
 Getter<bool> help("help", "Display this help", false);
 Getter<bool> version("version", "Display fisk version and exit", false);
+Getter<bool> dumpSha1("dump-sha1", "Only dump sha1 of file", false);
 static Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
 Getter<std::string> socket("socket", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");

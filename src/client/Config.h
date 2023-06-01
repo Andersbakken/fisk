@@ -220,6 +220,7 @@ extern Getter<int> priority;
 extern Getter<bool> help;
 extern Getter<bool> syncFileSystem;
 extern Getter<bool> version;
+extern Getter<bool> dumpSha1;
 extern Getter<std::string> statisticsLog;
 inline std::string envCache()
 {

@@ -332,6 +332,7 @@ bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();
 std::string formatJSONDiagnostics(const std::string &json);
+int dumpSha1();
 } // namespace Client
 
 #endif /* CLIENT_H */

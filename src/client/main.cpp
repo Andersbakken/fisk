@@ -136,6 +136,7 @@ int main(int argc, char **argv)
     if (Config::verify) {
         return clientVerify();
     }
+
     if (preresolved.empty()) {
         std::string fn;
         Client::parsePath(argv[0], &fn, nullptr);
@@ -162,6 +163,11 @@ int main(int argc, char **argv)
 #endif
         }
     }
+
+    if (Config::dumpSha1) {
+        return Client::dumpSha1();
+    }
+
     if (!Config::dumpSlots) {
         if (!Client::findCompiler(preresolved)) {
             FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
@@ -258,7 +264,7 @@ int main(int argc, char **argv)
     }
 
     daemonSocket.send(DaemonSocket::AcquireCppSlot);
-    data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, select, daemonSocket);
+    data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, &select, &daemonSocket);
     assert(data.preprocessed);
 
     std::map<std::string, std::string> headers;
