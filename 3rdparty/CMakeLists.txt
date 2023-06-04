@@ -5,6 +5,10 @@ add_subdirectory(wslay)
 add_subdirectory(json11)
 add_subdirectory(tiny-process-library)
 
+if (APPLE)
+    target_compile_options(json11 PRIVATE -Wno-unqualified-std-cast-call)
+endif ()
+
 add_library(LUrlParser LUrlParser/LUrlParser.cpp)
 target_include_directories(LUrlParser PUBLIC LUrlParser)
 

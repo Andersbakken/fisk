@@ -76,7 +76,7 @@ std::string Client::Data::CachedFile::line(size_t l)
             line = contents.substr(parsedIdx, newline - parsedIdx);
             parsedIdx = newline + 1;
         }
-        for (int i=line.size() - 1; i>=0; --i) {
+        for (int i=static_cast<int>(line.size()) - 1; i>=0; --i) {
             if (line[i] == '\t') {
                 line[i] = ' ';
             }
@@ -142,6 +142,9 @@ enum class Color {
     White
 };
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpedantic"
+
 const char *colors[] = {
     "\e[0m", // None
     "\e[0;30m", // Black
@@ -161,6 +164,8 @@ const char *colors[] = {
     "\e[0;37m", // LightGray
     "\e[1;37m" // White
 };
+
+#pragma clang diagnostic pop
 
 std::string colorize(const std::string &str, Color color,
                      size_t start = 0, size_t length = std::string::npos)
@@ -216,7 +221,7 @@ int integer(json11::Json value, const std::vector<std::string> &children)
 {
     value = resolve(value, children);
     if (value.is_number())
-        return value.number_value();
+        return static_cast<int>(value.number_value());
     return 0;
 }
 
@@ -861,11 +866,11 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                                 } else if (type == "gcc") {
                                     cacheHit.type = CompilerType::GCC;
                                 }
-                                const json11::Json version = value["version"];
-                                if (version.is_object()) {
-                                    cacheHit.version.major = integer(version, "major");
-                                    cacheHit.version.minor = integer(version, "minor");
-                                    cacheHit.version.patch = integer(version, "patch");
+                                const json11::Json ver = value["version"];
+                                if (ver.is_object()) {
+                                    cacheHit.version.major = integer(ver, "major");
+                                    cacheHit.version.minor = integer(ver, "minor");
+                                    cacheHit.version.patch = integer(ver, "patch");
                                 }
                                 // return cacheHit;
                             }
@@ -1219,7 +1224,7 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
 
     std::function<void(const json11::Json)> print = [&print, &ret](const json11::Json &item) {
         const std::string kind = string(item, "kind");
-        Color color;
+        Color color = Color::None;
         if (Config::color) {
             if (kind == "error") {
                 color = Color::LightRed;

@@ -167,7 +167,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
 
     size_t i;
     if (Log::minLogLevel <= Log::Verbose || !Config::color || hasJSONDiagnostics) {
-        size_t i = 0;
+        i = 0;
         while (i < ret->commandLine.size()) {
             std::string &arg = ret->commandLine[i];
             VERBOSE("%zu/%zu: %s", i+1, ret->commandLine.size(), arg.c_str());
