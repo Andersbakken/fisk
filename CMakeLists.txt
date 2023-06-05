@@ -36,6 +36,16 @@ set(TS_DEPS
     src/builder/fisk-builder.ts
     src/builder/load.ts
     src/builder/quitOnError.ts
+    src/clang-check/Options.ts
+    src/clang-check/align.ts
+    src/clang-check/clang-check.ts
+    src/clang-check/matchContains.ts
+    src/clang-check/matchExact.ts
+    src/clang-check/matchRegex.ts
+    src/clang-check/options.ts
+    src/clang-check/parallelize.ts
+    src/clang-check/post.ts
+    src/clang-check/sha1.ts
     src/common/BuilderAddedOrRemovedMessage.ts
     src/common/DropEnvironmentsMessage.ts
     src/common/FetchCacheObjectsMessage.ts

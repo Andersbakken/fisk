@@ -1,8 +1,8 @@
 import commonjs from "@rollup/plugin-commonjs";
-import resolve from "@rollup/plugin-node-resolve";
-import json from "@rollup/plugin-json";
-import typescript from "rollup-plugin-typescript2";
 import hashbang from "rollup-plugin-hashbang";
+import json from "@rollup/plugin-json";
+import resolve from "@rollup/plugin-node-resolve";
+import typescript from "rollup-plugin-typescript2";
 
 const plugins = [
     resolve({ preferBuiltins: true }),
@@ -82,6 +82,18 @@ export default [
             file: "monitor/fisk-monitor.js",
             format,
             name: "fisk-monitor",
+            exports: "named",
+            sourcemap: true
+        }
+    },
+    {
+        input: "src/clang-check/clang-check.ts",
+        onwarn,
+        plugins,
+        output: {
+            file: "clang-check/fisk-clang-check.js",
+            format,
+            name: "fisk-clang-check",
             exports: "named",
             sourcemap: true
         }
