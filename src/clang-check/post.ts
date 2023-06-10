@@ -3,14 +3,14 @@ import http from "http";
 
 export function post(path: string, body: string): Promise<string> {
     return new Promise((resolve, reject) => {
-        const match = /https?:\/\/([^:]*)(:[0-9]+)\/?/.exec(options().scheduler);
+        const match = /(https?:\/\/)?([^:]*)(:[0-9]+)\/?/.exec(options().scheduler);
         if (!match) {
             reject(new Error("Failed to parse scheduler"));
             return;
         }
         const opts: http.RequestOptions = {
-            host: match[1] || "",
-            port: match[2] ? match[2].substring(1) : 80,
+            host: match[2] || "",
+            port: match[3] ? match[3].substring(1) : 80,
             path,
             method: "POST"
         };
