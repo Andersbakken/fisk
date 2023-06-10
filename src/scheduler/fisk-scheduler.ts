@@ -12,6 +12,7 @@ import { JobFinishedMessage } from "./JobFinishedMessage";
 import { JobMonitorMessage } from "../common/JobMonitorMessage";
 import { JobScheduledMessage } from "./JobScheduledMessage";
 import { JobStartedMessage } from "./JobStartedMessage";
+import { Klung } from "./klung";
 import { MonitorMessage } from "./MonitorMessage";
 import { ObjectCacheManager } from "./ObjectCacheManager";
 import { Peak } from "./Peak";
@@ -38,6 +39,7 @@ const common = commonFunc(option);
 let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
+const klung = new Klung(option, common);
 
 const clientMinimumVersion = "3.4.96";
 const serverStartTime = Date.now();
@@ -549,7 +551,7 @@ server.on("listen", (app: express.Application) => {
         }
     });
 
-    app.get("/quit-builders", (req, res) => {
+    app.get("/quit-builders", (req: express.Request, res: express.Response) => {
         res.sendStatus(200);
         const msg = {
             type: "quit",
@@ -562,7 +564,7 @@ server.on("listen", (app: express.Application) => {
         }
     });
 
-    app.get("/environment/*", (req, res) => {
+    app.get("/environment/*", (req: express.Request, res: express.Response) => {
         const hash = req.path.substr(13);
         const env = Environments.instance.environment(hash);
         console.log("got env request", hash, env);
@@ -579,7 +581,7 @@ server.on("listen", (app: express.Application) => {
         rstream.pipe(res);
     });
 
-    app.get("/quit", (req, res) => {
+    app.get("/quit", (req: express.Request, res: express.Response) => {
         console.log("quitting", req.query);
         if ("purge_environments" in req.query) {
             try {
@@ -592,7 +594,7 @@ server.on("listen", (app: express.Application) => {
         setTimeout(() => process.exit(), 100);
     });
 
-    app.post("/builder-command", (req, res) => {
+    app.post("/builder-command", (req: express.Request, res: express.Response) => {
         console.log("Got builder command", req.body);
         if (!req.body || !req.body.builder || !req.body.command) {
             res.sendStatus(404);
@@ -663,6 +665,11 @@ ${msg.stdout ? "stdout:\n" + msg.stdout + "\n" : ""}${msg.stderr ? "stderr:\n" +
 
         // res.sendStatus(200);
     });
+
+    app.get("/clang-check/clear", klung.clear);
+    app.get("/clang-check/list", klung.list);
+    app.post("/clang-check/query", klung.query);
+    app.post("/clang-check/commit", klung.commit);
 });
 
 function updateLogFilesToMonitors() {

@@ -1,7 +1,17 @@
+import { OptionsFunction, default as createOptions } from "@jhanssen/options";
 import { align } from "./align";
 import { matchContains } from "./matchContains";
+import { matchExact } from "./matchExact";
 import { matchRegex } from "./matchRegex";
 import fs from "fs";
+import os from "os";
+import path from "path";
+
+const option: OptionsFunction = createOptions({
+    prefix: "fisk/clang-check",
+    noApplicationPath: true,
+    additionalFiles: ["fisk/clang-check.conf.override"]
+});
 
 export type LogFunction = (...args: unknown[]) => void;
 export type MatchFunction = (str: string) => boolean;
@@ -27,11 +37,11 @@ export interface Options {
 let verbose: undefined | LogFunction;
 let superVerbose: undefined | LogFunction;
 let compileCommands: string = "compile_commands.json";
-let scheduler = "http://localhost:6677";
+let scheduler = String(option("scheduler", "http://localhost:8097"));
 let analyzeBuild: string = "analyze-build";
 let output: string = ".";
-let title: string = "clang-analyzer";
-let fiskc: string = "fiskc";
+let title: string = String(option("html-title", "clang-analyzer"));
+let fiskc: string = String(option("fiskc", "fiskc"));
 const excludes: MatchFunction[] = [];
 const includes: MatchFunction[] = [];
 const removeArgs: MatchFunction[] = [];
@@ -99,7 +109,7 @@ export function options(): Options {
                     console.log(usage());
                     process.exit(0);
                 case "--version":
-                    console.log(JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version);
+                    console.log(JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")).version);
                     process.exit(0);
                 case "--verbose":
                 case "-v":
