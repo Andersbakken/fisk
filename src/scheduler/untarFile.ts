@@ -11,10 +11,15 @@ export function untarFile(archive: string, file: string): Promise<string> {
                 { cwd: tmpdir },
                 (err: child_process.ExecException | null) => {
                     if (err) {
+                        try {
+                            fs.removeSync(tmpdir);
+                        } catch (e) {
+                            console.error("Got an error removing the temp dir", tmpdir);
+                        }
                         reject(err);
                         return;
                     }
-                    fs.readFile(path.join(tmpdir, file), "utf8", (err: NodeJS.ErrnoException, data: string) => {
+                    fs.readFile(path.join(tmpdir, file), "utf8", (err: NodeJS.ErrnoException | null, data: string) => {
                         try {
                             fs.removeSync(tmpdir);
                         } catch (e) {
