@@ -1,4 +1,4 @@
-import { Response } from "./Response";
+import type { Response } from "./Response";
 
 export class ObjectCacheItem {
     response: Response;

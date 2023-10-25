@@ -1,8 +1,8 @@
-type IndexItem = {
+interface IndexItem {
     bytes: number;
-};
+}
 
-export type Response = {
+export interface Response {
     type: "response";
     // path: string;
     sha1: string;
@@ -15,4 +15,4 @@ export type Response = {
     commandLine?: string[];
     stderr?: string;
     stdout?: string;
-};
+}

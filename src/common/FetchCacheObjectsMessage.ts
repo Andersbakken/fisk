@@ -1,9 +1,9 @@
-export type FetchCacheObjectsMessageObject = {
+export interface FetchCacheObjectsMessageObject {
     sha1: string;
     source: string;
-};
+}
 
-export type FetchCacheObjectsMessage = {
+export interface FetchCacheObjectsMessage {
     type: "fetch_cache_objects";
     objects: FetchCacheObjectsMessageObject[];
-};
+}

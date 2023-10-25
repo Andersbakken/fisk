@@ -1,7 +1,6 @@
 import { Builder } from "./Builder";
 import { Client, ClientType } from "./Client";
 import { Compile } from "./Compile";
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
@@ -11,7 +10,8 @@ import crypto from "crypto";
 import express from "express";
 import fs from "fs";
 import http from "http";
-import stream from "stream";
+import type { OptionsFunction } from "@jhanssen/options";
+import type stream from "stream";
 
 function header(req: express.Request, name: string): string | undefined {
     const ret = req.headers[name];
@@ -41,6 +41,10 @@ export class Server extends EventEmitter {
         this.objectCache = false;
         this.nonces = new WeakMap();
         this.baseUrl = `http://localhost:${this.option.int("port", 8097)}`;
+    }
+
+    get express(): express.Express | undefined {
+        return this.app;
     }
 
     listen(): Promise<void> {
@@ -104,10 +108,6 @@ export class Server extends EventEmitter {
                 resolve();
             });
         });
-    }
-
-    get express(): express.Express | undefined {
-        return this.app;
     }
 
     _handleCompile(req: express.Request, ws: WebSocket, ip: string): void {
@@ -252,6 +252,8 @@ export class Server extends EventEmitter {
                         client.emit(remaining.type, { data: msg, last: !remaining.bytes });
                     }
                     break;
+                default:
+                    break;
             }
         });
     }
@@ -329,11 +331,14 @@ export class Server extends EventEmitter {
                     } else {
                         console.error("Bad message without type", json);
                     }
+                    break;
                 }
                 case "object":
                     if (msg instanceof Buffer) {
                         client.emit("data", msg);
                     }
+                    break;
+                default:
                     break;
             }
         });

@@ -1,32 +1,32 @@
 import { ObjectCacheItem } from "./ObjectCacheItem";
 import { ObjectCachePendingItem } from "./ObjectCachePendingItem";
-import { Response } from "./Response";
 import EventEmitter from "events";
 import fs from "fs-extra";
 import path from "path";
 import prettybytes from "pretty-bytes";
+import type { Response } from "./Response";
 
 function prettySize(bytes: number): string {
     return bytes >= 1024 ? prettybytes(bytes) : String(bytes);
 }
 
-type FileType = {
+interface FileType {
     path: string;
     size?: number;
     atime?: number;
-};
+}
 
-export type SyncData = {
+export interface SyncData {
     sha1: string;
     fileSize: number;
-};
+}
 
-export type Contents = {
+export interface Contents {
     contents: Buffer;
     path: string;
-};
+}
 
-export type InfoType = {
+export interface InfoType {
     cacheHits: number;
     usage: string;
     count: number;
@@ -36,7 +36,7 @@ export type InfoType = {
     size: number | string;
     maxSize: number | string;
     purgeSize: number | string;
-};
+}
 
 export class ObjectCache extends EventEmitter {
     private purgeSize: number;
@@ -91,6 +91,18 @@ export class ObjectCache extends EventEmitter {
             "size",
             prettySize(this.size)
         );
+    }
+
+    get keys(): string[] {
+        return Object.keys(this.cache);
+    }
+
+    get cacheHits(): number {
+        let ret = 0;
+        for (const sha1 in this.cache) {
+            ret += this.cache[sha1].cacheHits;
+        }
+        return ret;
     }
 
     loadFile(filePath: string, fileSize: number): void {
@@ -155,10 +167,6 @@ export class ObjectCache extends EventEmitter {
         return "none";
     }
 
-    get keys(): string[] {
-        return Object.keys(this.cache);
-    }
-
     clear(): void {
         this.purge(0);
     }
@@ -189,7 +197,9 @@ export class ObjectCache extends EventEmitter {
             delete this.pending[response.sha1];
         });
         this.pending[response.sha1] = pendingItem;
-        contents.forEach((c) => pendingItem.write(c.contents));
+        contents.forEach((c) => {
+            pendingItem.write(c.contents);
+        });
         pendingItem.end(() => {
             if (this.pending[response.sha1] === pendingItem) {
                 const cacheItem = new ObjectCacheItem(response, pendingItem.jsonLength);
@@ -232,14 +242,6 @@ export class ObjectCache extends EventEmitter {
                 delete this.pending[response.sha1];
             }
         });
-    }
-
-    get cacheHits(): number {
-        let ret = 0;
-        for (const sha1 in this.cache) {
-            ret += this.cache[sha1].cacheHits;
-        }
-        return ret;
     }
 
     info(query?: string): InfoType {

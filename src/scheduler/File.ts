@@ -1,17 +1,17 @@
 import assert from "assert";
 import fs from "fs-extra";
 
-type Pending = { data: Buffer; resolve: () => void; reject: (err: Error) => void };
+interface Pending { data: Buffer; resolve: () => void; reject: (err: Error) => void }
 
 export class File {
     private _fd?: number;
     private _pending?: Pending[];
     private _writing: boolean;
 
-    public path: string;
-    public hash: string;
-    public system?: string;
-    public originalPath?: string;
+    path: string;
+    hash: string;
+    system?: string;
+    originalPath?: string;
 
     constructor(path: string, hash: string) {
         this._fd = fs.openSync(path, "w");

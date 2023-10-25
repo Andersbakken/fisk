@@ -1,6 +1,6 @@
-import { JobData } from "./JobData";
 import EventEmitter from "events";
 import WebSocket from "ws";
+import type { JobData } from "./JobData";
 
 export class Job extends EventEmitter implements JobData {
     ws: WebSocket;
@@ -39,6 +39,10 @@ export class Job extends EventEmitter implements JobData {
         this.builderIp = data.builderIp;
     }
 
+    get readyState(): number {
+        return this.ws.readyState;
+    }
+
     send(type: unknown, msg?: Record<string, unknown>): void {
         if (this.ws.readyState !== WebSocket.OPEN) {
             return;
@@ -63,10 +67,6 @@ export class Job extends EventEmitter implements JobData {
         } catch (err) {
             console.error("got send error", this.id, type, err);
         }
-    }
-
-    get readyState(): number {
-        return this.ws.readyState;
     }
 
     close(): void {

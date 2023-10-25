@@ -1,9 +1,9 @@
-import { VM } from "./VM";
-import { VMCompileFinished } from "./VMMessage";
 import EventEmitter from "events";
 import assert from "assert";
 import fs from "fs-extra";
 import path from "path";
+import type { VM } from "./VM";
+import type { VMCompileFinished } from "./VMMessage";
 
 export class CompileJob extends EventEmitter {
     vm: VM;

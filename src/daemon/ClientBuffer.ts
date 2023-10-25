@@ -7,6 +7,10 @@ export class ClientBuffer {
         this.offset = 0;
     }
 
+    get available(): number {
+        return this.buffers.reduce((total, buf) => total + buf.length, 0) - this.offset;
+    }
+
     write(buffer: Buffer): void {
         this.buffers.push(buffer);
         // console.log("write", buffer.length, this.buffers.length, this.available);
@@ -64,9 +68,5 @@ export class ClientBuffer {
             }
         }
         return ret;
-    }
-
-    get available(): number {
-        return this.buffers.reduce((total, buf) => total + buf.length, 0) - this.offset;
     }
 }

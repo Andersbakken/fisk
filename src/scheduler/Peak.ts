@@ -1,5 +1,5 @@
-import { PeakData } from "./PeakData";
 import assert from "assert";
+import type { PeakData } from "./PeakData";
 
 export class Peak {
     readonly interval: number;

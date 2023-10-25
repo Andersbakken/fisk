@@ -37,7 +37,7 @@ function cpuAverage(): { idle: number; total: number } | undefined {
 //Grab first CPU Measure
 let startMeasure = cpuAverage();
 
-function measure() {
+function measure(): number | undefined {
     //Grab second Measure
     const endMeasure = cpuAverage();
 
@@ -64,11 +64,11 @@ class Load extends EventEmitter {
         this._interval = undefined;
     }
 
-    get running() {
+    get running(): boolean {
         return this._interval !== undefined;
     }
 
-    start(interval: number) {
+    start(interval: number): void {
         if (this._interval !== undefined) {
             throw new Error("Interval already running");
         }
@@ -80,7 +80,7 @@ class Load extends EventEmitter {
         }, interval);
     }
 
-    stop() {
+    stop(): void {
         if (!this._interval) {
             throw new Error("No interval running");
         }

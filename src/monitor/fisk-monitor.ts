@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 
-import blessed, { Widgets } from "@andersbakken/blessed";
+import blessed from "@andersbakken/blessed";
+import type { Widgets } from "@andersbakken/blessed";
 // import fs from "fs";
-import {
+import WebSocket from "ws";
+import assert from "assert";
+import humanize from "humanize-duration";
+import options from "@jhanssen/options";
+import type {
     BuilderAddedMessage,
     BuilderAddedOrRemovedBase,
     BuilderRemovedMessage
 } from "../common/BuilderAddedOrRemovedMessage";
-import { JobMonitorMessage, JobMonitorMessageClient } from "../common/JobMonitorMessage";
-import { JobMonitorMessageBase } from "../common/JobMonitorMessage";
-import WebSocket from "ws";
-import assert from "assert";
-import humanize, { Unit } from "humanize-duration";
-import options, { OptionsFunction } from "@jhanssen/options";
+import type { JobMonitorMessage, JobMonitorMessageBase, JobMonitorMessageClient } from "../common/JobMonitorMessage";
+import type { OptionsFunction } from "@jhanssen/options";
+import type { Unit } from "humanize-duration";
 
 const option: OptionsFunction = options({
     prefix: "fisk/monitor",
@@ -33,8 +35,8 @@ function humanizeDuration(age: number): string {
     } else {
         units = ["y", "mo", "w", "d"];
     }
-    const options = { units, round: true };
-    return humanize(age, options);
+    const opts = { units, round: true };
+    return humanize(age, opts);
 }
 
 const screen = blessed.screen({
@@ -196,8 +198,8 @@ screen.append(notificationBox);
 let builderDialogBox: Widgets.BoxElement | undefined;
 let clientDialogBox: Widgets.BoxElement | undefined;
 
-function hideDialogBoxes() {
-    let ret = false;
+function hideDialogBoxes(): boolean {
+    let ret: boolean = false;
     if (builderDialogBox) {
         builderDialogBox.detach();
         builderDialogBox = undefined;
@@ -330,7 +332,7 @@ clientBox.on("select", (ev) => {
 });
 
 let currentFocus: Widgets.ListElement | undefined;
-function activate(box: Widgets.ListElement) {
+function activate(box: Widgets.ListElement): void {
     if (currentFocus === box) {
         return;
     }
@@ -386,13 +388,13 @@ function activate(box: Widgets.ListElement) {
 activate(builderBox);
 activate(clientBox);
 
-function focusRight() {
+function focusRight(): void {
     if (currentFocus === builderBox) {
         activate(clientBox);
     }
 }
 
-function focusLeft() {
+function focusLeft(): void {
     if (currentFocus === clientBox) {
         activate(builderBox);
     }
@@ -413,8 +415,12 @@ screen.key(["escape", "q"], () => {
         process.exit();
     }
 });
-screen.key(["right", "l"], () => focusRight());
-screen.key(["left", "h"], () => focusLeft());
+screen.key(["right", "l"], () => {
+    focusRight();
+});
+screen.key(["left", "h"], () => {
+    focusLeft();
+});
 
 builderBox.on("click", () => {
     activate(builderBox);
@@ -437,8 +443,8 @@ function notify(msg: string): void {
         return;
     }
 
-    const notifyNow = (msg?: string) => {
-        notificationBox.setContent(msg || "");
+    const notifyNow = (message?: string): void => {
+        notificationBox.setContent(message || "");
         screen.render();
     };
 
@@ -477,7 +483,7 @@ const builders = new Map();
 const jobs = new Map();
 const jobsForClient = new Map();
 
-function clearData() {
+function clearData(): void {
     builders.clear();
     jobs.clear();
     jobsForClient.clear();
@@ -558,17 +564,17 @@ function updateBuilderBox(): void {
         selected = match[1];
     }
     let current;
-    const items = data.map((item, idx) => {
-        if (item[0] === selected) {
+    const items = data.map((itm, idx) => {
+        if (itm[0] === selected) {
             current = idx;
         }
         return (
-            formatCell(item[0], maxWidth[0]) +
-            formatCell(item[1], maxWidth[1]) +
-            formatCell(item[2], maxWidth[2]) +
-            formatCell(item[3], maxWidth[3]) +
-            formatCell(item[4], maxWidth[4]) +
-            formatCell(item[5], maxWidth[5])
+            formatCell(itm[0], maxWidth[0]) +
+            formatCell(itm[1], maxWidth[1]) +
+            formatCell(itm[2], maxWidth[2]) +
+            formatCell(itm[3], maxWidth[3]) +
+            formatCell(itm[4], maxWidth[4]) +
+            formatCell(itm[5], maxWidth[5])
         );
     });
     builderBox.setItems(items);
@@ -586,7 +592,7 @@ function updateBuilderBox(): void {
     }
 }
 
-function updateClientBox() {
+function updateClientBox(): void {
     const clientWidth = (clientContainer.width as number) - 3;
 
     const data = [];
@@ -624,11 +630,11 @@ function updateClientBox() {
         selected = match[1];
     }
     let current;
-    const items = data.map((item, idx) => {
-        if (item[0] === selected) {
+    const items = data.map((itm, idx) => {
+        if (itm[0] === selected) {
             current = idx;
         }
-        return formatCell(item[0], maxWidth[0]) + formatCell(item[1], maxWidth[1]) + formatCell(item[2], maxWidth[2]);
+        return formatCell(itm[0], maxWidth[0]) + formatCell(itm[1], maxWidth[1]) + formatCell(itm[2], maxWidth[2]);
     });
 
     clientBox.setItems(items);
@@ -640,7 +646,7 @@ function updateClientBox() {
     }
 }
 
-function update() {
+function update(): void {
     //let data = [];
     if (updateTimer) {
         return;
@@ -661,7 +667,7 @@ interface BuilderInfo extends BuilderAddedOrRemovedBase {
     active?: number;
 }
 
-function builderAdded(removed: BuilderAddedMessage) {
+function builderAdded(removed: BuilderAddedMessage): void {
     const msg = removed as BuilderInfo;
     msg.active = 0;
     delete msg.type;
@@ -670,7 +676,7 @@ function builderAdded(removed: BuilderAddedMessage) {
     update();
 }
 
-function builderRemoved(msg: BuilderRemovedMessage) {
+function builderRemoved(msg: BuilderRemovedMessage): void {
     const builderKey = msg.ip + ":" + msg.port;
 
     jobs.forEach((jobValue) => {
@@ -686,7 +692,7 @@ function builderRemoved(msg: BuilderRemovedMessage) {
     update();
 }
 
-function clientName(client: JobMonitorMessageClient) {
+function clientName(client: JobMonitorMessageClient): string {
     if (client.name) {
         if (client.name === client.hostname) {
             return "dev:" + (client.user || "nobody") + "@" + client.hostname;
@@ -712,7 +718,7 @@ interface JobData extends JobMonitorMessageBase {
     time: number;
 }
 
-function jobStarted(j: JobMonitorMessage) {
+function jobStarted(j: JobMonitorMessage): void {
     const job = j as JobData;
     // log(job);
     const builderKey = `${job.builder.ip}:${job.builder.port}`;
@@ -740,7 +746,7 @@ function jobStarted(j: JobMonitorMessage) {
     update();
 }
 
-function deleteJob(job: JobMonitorMessage) {
+function deleteJob(job: JobMonitorMessage): void {
     const clientKey = clientName(job.client);
     const client = jobsForClient.get(clientKey);
     if (client) {
@@ -751,7 +757,7 @@ function deleteJob(job: JobMonitorMessage) {
     }
 }
 
-function jobFinished(job: JobMonitorMessage) {
+function jobFinished(job: JobMonitorMessage): void {
     const activejob = jobs.get(job.id);
     if (!activejob) {
         return;
@@ -771,7 +777,7 @@ function jobFinished(job: JobMonitorMessage) {
 
 let ws: WebSocket | undefined;
 
-function connect() {
+function connect(): void {
     const url = `${scheduler}/monitor`;
     notify(`connect ${url}`);
     ws = new WebSocket(url);

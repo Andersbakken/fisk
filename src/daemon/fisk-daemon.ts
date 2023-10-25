@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import options, { OptionsFunction } from "@jhanssen/options";
+import options from "@jhanssen/options";
+import type { OptionsFunction } from "@jhanssen/options";
 
 import { Constants } from "./Constants";
 import { Server } from "./Server";

@@ -1,29 +1,29 @@
-export type VMReadyMessage = {
+export interface VMReadyMessage {
     type: "ready";
-};
-export type VMErrorMessage = {
+}
+export interface VMErrorMessage {
     type: "error";
     message: string;
-};
+}
 
-export type VMCompileStdOut = {
+export interface VMCompileStdOut {
     type: "compileStdOut";
     id: number;
     data: string;
-};
+}
 
-export type VMCompileStdErr = {
+export interface VMCompileStdErr {
     type: "compileStdErr";
     id: number;
     data: string;
-};
+}
 
-export type VMCompileFinishedFile = {
+export interface VMCompileFinishedFile {
     path: string;
     mapped?: string;
-};
+}
 
-export type VMCompileFinished = {
+export interface VMCompileFinished {
     type: "compileFinished";
     sourceFile: string;
     success: boolean;
@@ -31,6 +31,6 @@ export type VMCompileFinished = {
     files: VMCompileFinishedFile[];
     exitCode: number;
     error?: string;
-};
+}
 
 export type VMMessage = VMReadyMessage | VMErrorMessage | VMCompileStdOut | VMCompileStdErr | VMCompileFinished;

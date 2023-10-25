@@ -1,6 +1,6 @@
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
-import WebSocket from "ws";
+import type { OptionsFunction } from "@jhanssen/options";
+import type WebSocket from "ws";
 
 export const enum ClientType {
     Builder = 0,

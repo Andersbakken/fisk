@@ -8,9 +8,9 @@ import posix from "posix";
 
 const argv = minimist(process.argv.slice(2));
 
-type InitGroups = {
-    initgroups: (user: string |number, extraGroup: string | number) => void
-};
+interface InitGroups {
+    initgroups: (user: string | number, extraGroup: string | number) => void;
+}
 
 function send(message: Record<string, unknown>): void {
     try {
@@ -23,7 +23,7 @@ function send(message: Record<string, unknown>): void {
 }
 
 process.on("unhandledRejection", (reason: Record<string, unknown>, p: Promise<unknown>) => {
-    send({ type: "error", message: `Unhandled rejection at: Promise ${p} reason: ${reason?.stack}` });
+    send({ type: "error", message: `Unhandled rejection at: Promise reason: ${reason?.stack}` });
     console.error("Unhandled rejection at: Promise", p, "reason:", reason?.stack);
 });
 
@@ -69,7 +69,7 @@ process.on("error", (error) => {
 const libDirs: string[] = [];
 const mac = os.type() === "Darwin";
 
-function isLibrary(file: string) {
+function isLibrary(file: string): boolean {
     if (file === "ld.so.conf" || file === "ld.so.cache") {
         return false;
     }
@@ -85,7 +85,7 @@ function isLibrary(file: string) {
     return file.indexOf(".so.") !== -1;
 }
 
-function findLibraries(dir: string) {
+function findLibraries(dir: string): void {
     const files = fs.readdirSync(dir);
     // console.log("findLibraries", dir, files.length);
     let found = false;
@@ -159,8 +159,12 @@ process.on("message", (msg) => {
                 }
                 const compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug);
                 // console.log("running thing", msg.commandLine);
-                compile.on("stdout", (data) => send({ type: "compileStdOut", id: msg.id, data: data }));
-                compile.on("stderr", (data) => send({ type: "compileStdErr", id: msg.id, data: data }));
+                compile.on("stdout", (data) => {
+                    send({ type: "compileStdOut", id: msg.id, data: data });
+                });
+                compile.on("stderr", (data) => {
+                    send({ type: "compileStdErr", id: msg.id, data: data });
+                });
                 compile.on("exit", (event) => {
                     compiles.delete(msg.id);
                     if ("error" in event) {

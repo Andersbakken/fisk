@@ -1,8 +1,8 @@
 import { ClientBuffer } from "./ClientBuffer";
 import { Constants } from "./Constants";
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
-import net from "net";
+import type { OptionsFunction } from "@jhanssen/options";
+import type net from "net";
 
 export class Compile extends EventEmitter {
     private readonly debug: boolean;
@@ -88,7 +88,7 @@ export class Compile extends EventEmitter {
             }
         }
 
-        const emit = (type: string) => {
+        const emit = (type: string): void => {
             if (this.debug) {
                 console.log("Compile::_onData::emit", type, available);
             }

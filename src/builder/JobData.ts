@@ -1,6 +1,6 @@
-import WebSocket from "ws";
+import type WebSocket from "ws";
 
-export type JobData = {
+export interface JobData {
     ws: WebSocket;
     ip: string;
     hash: string;
@@ -12,4 +12,4 @@ export type JobData = {
     priority?: number;
     id: number;
     builderIp?: string;
-};
+}

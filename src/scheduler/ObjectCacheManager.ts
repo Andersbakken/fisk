@@ -1,15 +1,15 @@
-import { Builder } from "./Builder";
 import { NodeData } from "./NodeData";
-import { ObjectCacheManagerMessage } from "./ObjectCacheManagerMessage";
-import { ObjectCacheMessage } from "../common/ObjectCacheMessage";
-import { OptionsFunction } from "@jhanssen/options";
 import { SHA1Data } from "./SHA1Data";
 import { prettySize } from "./prettySize";
 import EventEmitter from "events";
 import assert from "assert";
-import express from "express";
+import type { Builder } from "./Builder";
+import type { ObjectCacheManagerMessage } from "./ObjectCacheManagerMessage";
+import type { ObjectCacheMessage } from "../common/ObjectCacheMessage";
+import type { OptionsFunction } from "@jhanssen/options";
+import type express from "express";
 
-function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder) {
+function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder): number {
     const data = bySHA1.get(sha1);
     if (data) {
         data.nodes.push(node);
@@ -19,7 +19,7 @@ function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: num
     return 1;
 }
 
-function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Builder) {
+function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Builder): void {
     const data = bySHA1.get(sha1);
     if (data) {
         const idx = data.nodes.indexOf(node);
@@ -36,10 +36,10 @@ function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Bu
     }
 }
 
-type CommandType = {
+interface CommandType {
     available: number;
     objects: unknown[];
-};
+}
 
 export class ObjectCacheManager extends EventEmitter {
     private bySHA1: Map<string, SHA1Data>;
@@ -158,7 +158,9 @@ export class ObjectCacheManager extends EventEmitter {
             return;
         }
         this.byNode.delete(node);
-        nodeData.sha1s.forEach((sha1) => removeFromSHA1Map(this.bySHA1, sha1, node));
+        nodeData.sha1s.forEach((sha1) => {
+            removeFromSHA1Map(this.bySHA1, sha1, node);
+        });
     }
 
     dump(query: Record<string, unknown>): unknown {
@@ -245,18 +247,18 @@ export class ObjectCacheManager extends EventEmitter {
         if (this.byNode.size >= 2) {
             // let max = 1;
             let roundRobinIndex = 0;
-            const processObject = (sha1: string, value: SHA1Data) => {
+            const processObject = (sha: string, value: SHA1Data): void => {
                 if (max !== undefined && max <= 0) {
                     return;
                 }
                 const needed = Math.min(redundancy + 1 - value.nodes.length, this.byNode.size - 1);
                 if (needed > 0) {
-                    const needed = redundancy + 1 - value.nodes.length;
+                    const needed2 = redundancy + 1 - value.nodes.length;
                     // console.log("should distribute", key, "to", needed, "nodes");
 
                     let firstIdx;
                     let found = 0;
-                    while (found < needed) {
+                    while (found < needed2) {
                         if (++nodeIdx === nodes.length) {
                             nodeIdx = 0;
                         }
@@ -288,7 +290,7 @@ export class ObjectCacheManager extends EventEmitter {
                         ++found;
                         data.available -= value.fileSize;
                         const src = value.nodes[roundRobinIndex++ % value.nodes.length];
-                        data.objects.push({ source: src.ip + ":" + src.port, sha1: sha1 });
+                        data.objects.push({ source: src.ip + ":" + src.port, sha1: sha });
                         if (max !== undefined && !--max) {
                             break;
                         }
@@ -304,7 +306,9 @@ export class ObjectCacheManager extends EventEmitter {
                     console.error("Couldn't find sha1", sha1);
                 }
             } else {
-                this.bySHA1.forEach((value, key) => processObject(key, value));
+                this.bySHA1.forEach((value, key) => {
+                    processObject(key, value);
+                });
             }
         }
         commands.forEach((value, key) => {

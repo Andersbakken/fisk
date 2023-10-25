@@ -1,12 +1,12 @@
-import { Database } from "./Database";
 import { Environment } from "./Environment";
 import { File } from "./File";
-import { LinkProperties } from "./LinkProperties";
 import { Links } from "./Links";
 import { untarFile } from "./untarFile";
 import assert from "assert";
 import fs from "fs-extra";
 import path from "path";
+import type { Database } from "./Database";
+import type { LinkProperties } from "./LinkProperties";
 
 export class Environments {
     private _data: Record<string, Environment>;
@@ -14,11 +14,19 @@ export class Environments {
     private _path?: string;
     private _db?: Database;
 
-    public static instance: Environments = new Environments();
+    static instance: Environments = new Environments();
 
     constructor() {
         this._data = {};
         this._links = {};
+    }
+
+    get environments(): Record<string, Environment> {
+        return this._data;
+    }
+
+    get path(): string {
+        return this._path || "";
     }
 
     load(db: Database, p: string): Promise<void> {
@@ -178,14 +186,6 @@ export class Environments {
             }
         }
         return this.syncLinks();
-    }
-
-    get environments(): Record<string, Environment> {
-        return this._data;
-    }
-
-    get path(): string {
-        return this._path || "";
     }
 
     environment(hash: string): Environment | undefined {

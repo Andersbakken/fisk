@@ -1,7 +1,7 @@
-import { Option, OptionsFunction } from "@jhanssen/options";
 import fs from "fs-extra";
 import os from "os";
 import path from "path";
+import type { Option, OptionsFunction } from "@jhanssen/options";
 
 const Version = 5;
 
@@ -36,10 +36,10 @@ function validateCache(option: OptionsFunction): void {
     fs.writeFileSync(file, buf);
 }
 
-export type Common = {
+export interface Common {
     cacheDir: () => string;
     Version: number;
-};
+}
 
 export function common(option: OptionsFunction): Common {
     validateCache(option);

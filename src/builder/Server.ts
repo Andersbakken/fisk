@@ -1,14 +1,14 @@
 import { Job } from "./Job";
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
 import assert from "assert";
 import express from "express";
 import http from "http";
-import net from "net";
-import stream from "stream";
 import zlib from "zlib";
+import type { OptionsFunction } from "@jhanssen/options";
+import type net from "net";
+import type stream from "stream";
 
 export class Server extends EventEmitter {
     private configVersion: number;
@@ -56,7 +56,7 @@ export class Server extends EventEmitter {
         let bytes: number | undefined;
         let ip = req.connection.remoteAddress;
         let clientEmitted = false;
-        const error = (msg: string) => {
+        const error = (msg: string): void => {
             ws.send(`{"error": "${msg}"}`);
             ws.close();
             if (client && clientEmitted) {
@@ -181,8 +181,11 @@ export class Server extends EventEmitter {
                         }
                     }
                     break;
+                default:
+                    break;
             }
         });
+
         ws.on("close", () => {
             if (client && clientEmitted) {
                 // console.error("GOT WS CLOSE", bytes, client.objectcache);
@@ -190,10 +193,11 @@ export class Server extends EventEmitter {
             }
             ws.removeAllListeners();
         });
-        ws.on("error", (error) => {
-            console.log("GOT WS ERROR", error);
+
+        ws.on("error", (err: unknown) => {
+            console.log("GOT WS ERROR", err);
             if (client && clientEmitted) {
-                client.emit("error", error);
+                client.emit("error", err);
             }
         });
     }

@@ -18,7 +18,7 @@ export class Database {
     get(record: string): Promise<Record<string, unknown> | undefined> {
         return new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
             // console.log("Reader promise", record, this.busy, this.queue);
-            const perform = () => {
+            const perform = (): Promise<void> => {
                 // console.log("perform called for read");
                 return this._read()
                     .then((records?: Record<string, Record<string, unknown>>) => {
@@ -41,7 +41,7 @@ export class Database {
 
     set(key: string, value: unknown): Promise<void> {
         return new Promise((resolve, reject) => {
-            const perform = () => {
+            const perform = (): Promise<void> => {
                 return this._read()
                     .then((records: Record<string, unknown> | undefined) => {
                         if (!records) {
@@ -49,18 +49,10 @@ export class Database {
                         }
                         records[key] = value;
 
-                        fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", (err) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                fs.rename(this.path + ".tmp", this.path, (err) => {
-                                    if (err) {
-                                        reject(new Error(`Failed to rename ${this.path}.tmp to ${this.path} ${err}`));
-                                    } else {
-                                        resolve();
-                                    }
-                                });
-                            }
+                        fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", () => {
+                            fs.rename(this.path + ".tmp", this.path, () => {
+                                resolve();
+                            });
                             this.finishedOperation();
                         });
                     })
@@ -95,9 +87,11 @@ export class Database {
                     } else {
                         try {
                             resolve(JSON.parse(data));
-                        } catch (err) {
+                        } catch (error: unknown) {
                             fs.renameSync(this.path, this.path + ".error");
-                            reject(new Error(`Failed to parse JSON from file: ${this.path} ${err}`));
+                            reject(
+                                new Error(`Failed to parse JSON from file: ${this.path} ${(error as Error).message}`)
+                            );
                         }
                     }
                 }

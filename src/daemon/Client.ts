@@ -1,10 +1,10 @@
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import WebSocket from "ws";
 import assert from "assert";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import type { OptionsFunction } from "@jhanssen/options";
 
 export class Client extends EventEmitter {
     configVersion: number;

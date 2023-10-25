@@ -21,12 +21,12 @@ export class Environment {
         console.log("Created environment", JSON.stringify(this), originalPath);
     }
 
-    toString(): string {
-        return JSON.stringify(this, null, 4);
-    }
-
     get file(): string {
         return `${this.hash}_${this.system}.tar.gz`;
+    }
+
+    toString(): string {
+        return JSON.stringify(this, null, 4);
     }
 
     canRun(system: string): boolean {

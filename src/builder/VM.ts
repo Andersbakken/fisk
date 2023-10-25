@@ -1,11 +1,11 @@
-import { CompileFinishedEvent } from "./CompileFinishedEvent";
 import { CompileJob } from "./CompileJob";
-import { OptionsFunction } from "@jhanssen/options";
-import { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 import EventEmitter from "events";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
+import type { CompileFinishedEvent } from "./CompileFinishedEvent";
+import type { OptionsFunction } from "@jhanssen/options";
+import type { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 
 export class VM extends EventEmitter {
     root: string;
@@ -29,7 +29,7 @@ export class VM extends EventEmitter {
         fs.remove(path.join(root, "compiles"));
 
         const args = [`--root=${root}`, `--hash=${hash}`];
-        const user = option("vm-user");
+        const user = String(option("vm-user"));
         if (user) {
             args.push(`--user=${user}`);
         }

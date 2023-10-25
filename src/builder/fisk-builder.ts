@@ -1,13 +1,7 @@
 #!/usr/bin/env node
 
 import { Client } from "./Client";
-import { CompileFinishedEvent, CompileFinishedEventFile } from "./CompileFinishedEvent";
-import { Contents, ObjectCache } from "./ObjectCache";
-import { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage";
-import { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
-import { J } from "./J";
-import { Job } from "./Job";
-import { Response } from "./Response";
+import { ObjectCache } from "./ObjectCache";
 import { Server } from "./Server";
 import { VM } from "./VM";
 import { common as commonFunc, stringOrUndefined } from "../common";
@@ -18,14 +12,22 @@ import assert from "assert";
 import axios from "axios";
 import bytes from "bytes";
 import child_process from "child_process";
-import express from "express";
 import fs from "fs-extra";
-import http from "http";
-import options, { OptionsFunction } from "@jhanssen/options";
+import options from "@jhanssen/options";
 import os from "os";
 import path from "path";
 import ws from "ws";
 import zlib from "zlib";
+import type { CompileFinishedEvent, CompileFinishedEventFile } from "./CompileFinishedEvent";
+import type { Contents } from "./ObjectCache";
+import type { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage";
+import type { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
+import type { J } from "./J";
+import type { Job } from "./Job";
+import type { OptionsFunction } from "@jhanssen/options";
+import type { Response } from "./Response";
+import type express from "express";
+import type http from "http";
 
 const option: OptionsFunction = options({
     prefix: "fisk/builder",
@@ -60,7 +62,7 @@ let debug = option("debug");
 
 let objectCache: ObjectCache | undefined;
 
-function getFromCache(job: Job, cb: (err?: Error) => void) {
+function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
     // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
     // if (objectCache)
     //     console.log("objectCache", job.sha1, objectCache.state(job.sha1), objectCache.keys);
@@ -89,9 +91,9 @@ function getFromCache(job: Job, cb: (err?: Error) => void) {
         // console.log("here", item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;
-        const work = () => {
+        const work = (): void => {
             // console.log("work", job.sha1);
-            function finish(err?: Error) {
+            const finish = (err?: Error): void => {
                 if (fd !== undefined) {
                     fs.closeSync(fd);
                 }
@@ -104,27 +106,26 @@ function getFromCache(job: Job, cb: (err?: Error) => void) {
                 }
 
                 cb(err);
-            }
-            const file = item?.response.index[fileIdx];
-            if (!file) {
+            };
+            const f = item?.response.index[fileIdx];
+            if (!f) {
                 finish();
                 return;
             }
-            const buffer = Buffer.allocUnsafe(file.bytes);
+            const buffer = Buffer.allocUnsafe(f.bytes);
             // console.log("reading from", file, path.join(objectCache.dir, item.response.sha1), pos);
             assert(fd !== undefined, "Must have fd");
-            fs.read(fd, buffer, 0, file.bytes, pos, (err: NodeJS.ErrnoException, read) => {
+            fs.read(fd, buffer, 0, f.bytes, pos, (err: NodeJS.ErrnoException, read) => {
                 // console.log("GOT READ RESPONSE", file, fileIdx, err, read);
-                if (err || read !== file.bytes) {
+                if (err || read !== f.bytes) {
                     if (!err) {
-                        err = new Error(`Short read ${read}/${file.bytes}`);
+                        err = new Error(`Short read ${read}/${f.bytes}`);
                     }
                     assert(objectCache, "Must have objectCache");
                     console.error(
-                        `Failed to read ${file.bytes} from ${path.join(
-                            objectCache.dir,
-                            item.response.sha1
-                        )} got ${read} ${err}`
+                        `Failed to read ${f.bytes} from ${path.join(objectCache.dir, item.response.sha1)} got ${read} ${
+                            err.message
+                        }`
                     );
                     finish(err);
                 } else {
@@ -291,11 +292,11 @@ client.on("fetch_cache_objects", (msg: unknown) => {
 
 const environmentsRoot = path.join(common.cacheDir(), "environments");
 
-function exec(command: string, options: child_process.ExecOptions) {
+function exec(command: string, opts: child_process.ExecOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
         child_process.exec(
             command,
-            options,
+            opts,
             (err: child_process.ExecException | null, _: string | Buffer, stderr: string | Buffer) => {
                 if (stderr) {
                     console.error("Got stderr from", command);
@@ -311,12 +312,12 @@ function exec(command: string, options: child_process.ExecOptions) {
     });
 }
 
-function loadEnvironments() {
+function loadEnvironments(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-        fs.readdir(environmentsRoot, (err, files) => {
+        fs.readdir(environmentsRoot, (readDirError: NodeJS.ErrnoException, files: string[]) => {
             // console.log("GOT FILES", files);
-            if (err) {
-                if (err.code === "ENOENT") {
+            if (readDirError) {
+                if (readDirError.code === "ENOENT") {
                     fs.mkdirp(environmentsRoot)
                         .then(() => {
                             // let user = option("fisk-user");
@@ -338,12 +339,12 @@ function loadEnvironments() {
                             // });
                             resolve();
                         })
-                        .catch((err) => {
-                            reject(new Error("Failed to create directory " + err.message));
+                        .catch((error: Error) => {
+                            reject(new Error("Failed to create directory " + error.message));
                         });
                     return;
                 }
-                reject(err);
+                reject(readDirError);
             } else {
                 if (files) {
                     let pending = 0;
@@ -358,14 +359,14 @@ function loadEnvironments() {
                             let env;
                             try {
                                 env = JSON.parse(fs.readFileSync(path.join(dir, "environment.json"), "utf8"));
-                            } catch (err) {
+                            } catch (error: unknown) {
                                 /* */
                             }
                             if (env && env.hash) {
                                 const vm = new VM(dir, env.hash, option);
                                 ++pending;
                                 environments[env.hash] = vm;
-                                const errorHandler = () => {
+                                const errorHandler = (): void => {
                                     if (!vm.ready && !--pending) {
                                         resolve();
                                     }
@@ -401,7 +402,9 @@ function loadEnvironments() {
 
 let connectInterval: NodeJS.Timeout | undefined;
 client.on("quit", (message: Record<string, unknown>) => {
-    console.log(`Server wants us to quit: ${message.code || 0} purge environments: ${message.purgeEnvironments}`);
+    console.log(
+        `Server wants us to quit: ${Number(message.code) || 0} purge environments: ${message.purgeEnvironments}`
+    );
     if (message.purgeEnvironments) {
         try {
             fs.removeSync(environmentsRoot);
@@ -456,7 +459,7 @@ client.on("getEnvironments", (message) => {
         base += ":8097";
     }
     base += "/environment/";
-    function work() {
+    const work = (): void => {
         if (!message.environments.length) {
             const restart = option("restart-on-new-environments");
             if (!restart) {
@@ -544,7 +547,7 @@ client.on("getEnvironments", (message) => {
                 }
                 fs.mkdirpSync(dir);
             });
-    }
+    };
     work();
 });
 
@@ -634,7 +637,7 @@ server.on("headers", (headers, req) => {
 });
 
 server.on("listen", (app: express.Express) => {
-    const setDebug = (enabled: boolean) => {
+    const setDebug = (enabled: boolean): void => {
         debug = enabled;
         for (const i in environments) {
             const env = environments[i];
@@ -685,7 +688,7 @@ server.on("listen", (app: express.Express) => {
     });
 });
 
-function startPending() {
+function startPending(): void {
     // console.log(`startPending called ${jobQueue.length}`);
     for (let idx = 0; idx < jobQueue.length; ++idx) {
         const jj = jobQueue[idx];
@@ -720,36 +723,36 @@ server.on("job", (job: Job) => {
         stdout: "",
         stderr: "",
         start: function () {
-            const job = this.job;
+            const jobJob = this.job;
             if (j.aborted) {
                 return;
             }
             if (
-                getFromCache(job, (err?: Error) => {
+                getFromCache(jobJob, (err?: Error) => {
                     if (j.aborted) {
                         return;
                     }
                     if (err) {
                         console.error("cache failed, let the client handle doing it itself");
-                        job.close();
+                        jobJob.close();
                     } else {
                         // console.log("GOT STUFF", job);
                         const info = {
                             type: "cacheHit",
                             client: {
-                                hostname: job.hostname,
-                                ip: job.ip,
-                                name: job.name,
-                                user: job.user
+                                hostname: jobJob.hostname,
+                                ip: jobJob.ip,
+                                name: jobJob.name,
+                                user: jobJob.user
                             },
-                            sourceFile: job.sourceFile,
-                            sha1: job.sha1,
-                            id: job.id
+                            sourceFile: jobJob.sourceFile,
+                            sha1: jobJob.sha1,
+                            id: jobJob.id
                         };
                         // console.log("sending cachehit", info);
                         client.send(info);
 
-                        console.log("Job finished from cache", j.id, job.sourceFile, "for", job.ip, job.name);
+                        console.log("Job finished from cache", j.id, jobJob.sourceFile, "for", jobJob.ip, jobJob.name);
                     }
                     j.done = true;
                     const idx = jobQueue.indexOf(j);
@@ -764,32 +767,32 @@ server.on("job", (job: Job) => {
             }
             j.started = true;
             client.send("jobStarted", {
-                id: job.id,
-                sourceFile: job.sourceFile,
+                id: jobJob.id,
+                sourceFile: jobJob.sourceFile,
                 client: {
-                    name: job.name,
-                    hostname: job.hostname,
-                    ip: job.ip,
-                    user: job.user
+                    name: jobJob.name,
+                    hostname: jobJob.hostname,
+                    ip: jobJob.ip,
+                    user: jobJob.user
                 },
                 builder: {
-                    ip: job.builderIp,
+                    ip: jobJob.builderIp,
                     name: option("name"),
                     hostname: option("hostname") || os.hostname(),
                     port: server.port
                 }
             });
 
-            console.log("Starting job", j.id, job.sourceFile, "for", job.ip, job.name, "wait", job.wait);
-            assert(job.commandLine, "Must have commandLine");
-            assert(job.argv0, "Must have argv0");
-            j.op = vm.startCompile(job.commandLine, job.argv0, job.id);
+            console.log("Starting job", j.id, jobJob.sourceFile, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
+            assert(jobJob.commandLine, "Must have commandLine");
+            assert(jobJob.argv0, "Must have argv0");
+            j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id);
             if (j.buffer) {
                 j.op.feed(j.buffer);
                 j.buffer = undefined;
             }
-            if (job.wait) {
-                job.send("resume", {});
+            if (jobJob.wait) {
+                jobJob.send("resume", {});
             }
             j.op.on("stdout", (data) => {
                 j.stdout += data;
@@ -807,10 +810,10 @@ server.on("job", (job: Job) => {
                 console.log(
                     "Job finished",
                     j.id,
-                    job.sourceFile,
+                    jobJob.sourceFile,
                     "for",
-                    job.ip,
-                    job.name,
+                    jobJob.ip,
+                    jobJob.name,
                     "exitCode",
                     event.exitCode,
                     "error",
@@ -843,7 +846,7 @@ server.on("job", (job: Job) => {
                     }),
                     success: event.success,
                     exitCode: event.exitCode,
-                    sha1: job.sha1,
+                    sha1: jobJob.sha1,
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
@@ -851,9 +854,9 @@ server.on("job", (job: Job) => {
                     response.error = event.error;
                 }
                 if (debug) {
-                    console.log("Sending response", job.ip, job.hostname, response);
+                    console.log("Sending response", jobJob.ip, jobJob.hostname, response);
                 }
-                job.send(response);
+                jobJob.send(response);
                 if (
                     response.exitCode === 0 &&
                     event.success &&
@@ -861,15 +864,15 @@ server.on("job", (job: Job) => {
                     response.sha1 &&
                     objectCache.state(response.sha1) === "none"
                 ) {
-                    response.sourceFile = job.sourceFile;
-                    response.commandLine = job.commandLine;
-                    response.environment = job.hash;
+                    response.sourceFile = jobJob.sourceFile;
+                    response.commandLine = jobJob.commandLine;
+                    response.environment = jobJob.hash;
                     objectCache.add(response, forCache);
                 }
 
                 contents.forEach((x) => {
                     if (x.contents.byteLength) {
-                        job.send(x.contents);
+                        jobJob.send(x.contents);
                     }
                 });
                 // console.log("GOT ID", j);
@@ -967,7 +970,7 @@ server.on("error", (err) => {
     console.error("server error", err);
 });
 
-function start() {
+function start(): void {
     loadEnvironments()
         .then(() => {
             console.log(`Loaded ${Object.keys(environments).length} environments from ${environmentsRoot}`);

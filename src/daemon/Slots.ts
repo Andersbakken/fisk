@@ -1,14 +1,14 @@
 import EventEmitter from "events";
 import assert from "assert";
 
-export type Data = {
+export interface Data {
     pid: number;
-};
+}
 
-type MapData = {
+interface MapData {
     cb: () => void;
     data: Data;
-};
+}
 
 export class Slots extends EventEmitter {
     private count: number;

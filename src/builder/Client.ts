@@ -1,4 +1,3 @@
-import { OptionsFunction } from "@jhanssen/options";
 import { stringOrUndefined } from "../common";
 import EventEmitter from "events";
 import WebSocket from "ws";
@@ -6,6 +5,7 @@ import assert from "assert";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import type { OptionsFunction } from "@jhanssen/options";
 
 export class Client extends EventEmitter {
     private readonly configVersion: number;
@@ -117,7 +117,7 @@ export class Client extends EventEmitter {
         });
 
         this.ws.on("message", (msg) => {
-            const error = (err: string) => {
+            const error = (err: string): void => {
                 if (this.ws) {
                     this.ws.send(`{"error": "${err}"}`);
                     this.ws.close();
@@ -177,6 +177,8 @@ export class Client extends EventEmitter {
                     } else {
                         error("Unexpected object");
                     }
+                    break;
+                default:
                     break;
             }
         });

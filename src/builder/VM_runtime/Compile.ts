@@ -1,9 +1,9 @@
-import { ExitEvent, ExitEventFile } from "./ExitEvent";
 import EventEmitter from "events";
 import assert from "assert";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
+import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
@@ -213,17 +213,17 @@ export class Compile extends EventEmitter {
         proc.on("exit", (exitCode) => {
             // try {
             const files: ExitEventFile[] = [];
-            const addDir = (dir: string, prefix: string) => {
+            const addDir = (directory: string, prefix: string): void => {
                 try {
-                    fs.readdirSync(dir).forEach((file: string) => {
+                    fs.readdirSync(directory).forEach((file: string) => {
                         if (file === "sourcefile") {
                             return;
                         }
                         try {
                             assert(output !== undefined, "Must have output");
-                            const stat = fs.statSync(path.join(dir, file));
+                            const stat = fs.statSync(path.join(directory, file));
                             if (stat.isDirectory()) {
-                                addDir(path.join(dir, file), prefix ? prefix + file + "/" : file + "/");
+                                addDir(path.join(directory, file), prefix ? prefix + file + "/" : file + "/");
                             } else if (stat.isFile()) {
                                 if (file === outputFileName) {
                                     files.push({ path: output, mapped: path.join(prefix, file) });

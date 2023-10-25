@@ -1,33 +1,34 @@
 #!/usr/bin/env node
 
-import { Builder } from "./Builder";
-import { BuilderAddedMessage, BuilderRemovedMessage } from "../common/BuilderAddedOrRemovedMessage";
-import { CacheHitMessage } from "./CacheHitMessage";
-import { Client } from "./Client";
-import { Compile } from "./Compile";
 import { Database } from "./Database";
 import { Environments } from "./Environments";
-import { File } from "./File";
-import { JobFinishedMessage } from "./JobFinishedMessage";
-import { JobMonitorMessage } from "../common/JobMonitorMessage";
-import { JobScheduledMessage } from "./JobScheduledMessage";
-import { JobStartedMessage } from "./JobStartedMessage";
-import { MonitorMessage } from "./MonitorMessage";
 import { ObjectCacheManager } from "./ObjectCacheManager";
 import { Peak } from "./Peak";
-import { PeakData } from "./PeakData";
 import { Server } from "./Server";
 import { common as commonFunc } from "../common";
 import assert from "assert";
 import bytes from "bytes";
 import compareVersions from "compare-versions";
 import crypto from "crypto";
-import express from "express";
 import fs from "fs-extra";
 import humanizeDuration from "humanize-duration";
-import options, { OptionsFunction } from "@jhanssen/options";
+import options from "@jhanssen/options";
 import path from "path";
 import posix from "posix";
+import type { Builder } from "./Builder";
+import type { BuilderAddedMessage, BuilderRemovedMessage } from "../common/BuilderAddedOrRemovedMessage";
+import type { CacheHitMessage } from "./CacheHitMessage";
+import type { Client } from "./Client";
+import type { Compile } from "./Compile";
+import type { File } from "./File";
+import type { JobFinishedMessage } from "./JobFinishedMessage";
+import type { JobMonitorMessage } from "../common/JobMonitorMessage";
+import type { JobScheduledMessage } from "./JobScheduledMessage";
+import type { JobStartedMessage } from "./JobStartedMessage";
+import type { MonitorMessage } from "./MonitorMessage";
+import type { OptionsFunction } from "@jhanssen/options";
+import type { PeakData } from "./PeakData";
+import type express from "express";
 
 const option: OptionsFunction = options({
     prefix: "fisk/scheduler",
@@ -43,7 +44,7 @@ const clientMinimumVersion = "3.4.96";
 const serverStartTime = Date.now();
 process.on("unhandledRejection", (reason: Error, p: Promise<unknown>) => {
     console.error("Unhandled Rejection at: Promise", p, "reason:", reason?.stack);
-    addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} p: ${p}\n` });
+    addLogFile({ source: "no source file", ip: "self", contents: `reason: ${reason.stack} promise` });
     // process.exit();
 });
 
@@ -101,7 +102,7 @@ function peakData(): Record<string, PeakData | string | number> {
     return ret;
 }
 
-function statsMessage() {
+function statsMessage(): unknown {
     const info = peakData();
     info.type = "stats";
     const jobs = jobsFailed + jobsFinished + (objectCache ? objectCache.hits : 0);
@@ -116,7 +117,7 @@ function statsMessage() {
 
 const pendingUsers: Record<string, boolean> = {};
 
-function nextJobId() {
+function nextJobId(): number {
     let id = ++jobId;
     if (id === 2147483647) {
         id = 1;
@@ -124,7 +125,10 @@ function nextJobId() {
     return id;
 }
 
-function jobStartedOrScheduled(type: "jobStarted" | "jobScheduled", job: JobStartedMessage | JobScheduledMessage) {
+function jobStartedOrScheduled(
+    type: "jobStarted" | "jobScheduled",
+    job: JobStartedMessage | JobScheduledMessage
+): void {
     if (monitors.length) {
         // console.log("GOT STUFF", job);
         const info: JobMonitorMessage = {
@@ -150,11 +154,13 @@ function jobStartedOrScheduled(type: "jobStarted" | "jobScheduled", job: JobStar
         if (monitorsLog) {
             console.log("send to monitors", info);
         }
-        monitors.forEach((monitor) => monitor.send(info));
+        monitors.forEach((monitor) => {
+            monitor.send(info);
+        });
     }
 }
 
-function cacheHit(builder: Builder, message: CacheHitMessage) {
+function cacheHit(builder: Builder, message: CacheHitMessage): void {
     if (objectCache) {
         objectCache.hit(message.sha1);
     }
@@ -189,11 +195,13 @@ function cacheHit(builder: Builder, message: CacheHitMessage) {
             console.log("send to monitors", info);
         }
         // console.log("sending info", info);
-        monitors.forEach((monitor) => monitor.send(info));
+        monitors.forEach((monitor) => {
+            monitor.send(info);
+        });
     }
 }
 
-function jobFinished(builder: Builder, job: JobFinishedMessage) {
+function jobFinished(builder: Builder, job: JobFinishedMessage): void {
     ++jobsFinished;
     ++builder.jobsPerformed;
     builder.totalCompileSpeed += job.compileSpeed;
@@ -217,7 +225,9 @@ function jobFinished(builder: Builder, job: JobFinishedMessage) {
         if (monitorsLog) {
             console.log("send to monitors", info);
         }
-        monitors.forEach((monitor) => monitor.send(info));
+        monitors.forEach((monitor) => {
+            monitor.send(info);
+        });
     }
 }
 
@@ -250,7 +260,7 @@ function builderToMonitorInfo(
     };
 }
 
-function insertBuilder(builder: Builder) {
+function insertBuilder(builder: Builder): void {
     builders[builderKey(builder)] = builder;
     ++builderCount;
     assert(typeof builder.slots === "number");
@@ -266,7 +276,7 @@ function insertBuilder(builder: Builder) {
     }
 }
 
-function forEachBuilder(cb: (builder: Builder) => void) {
+function forEachBuilder(cb: (builder: Builder) => void): void {
     for (const key in builders) {
         cb(builders[key]);
     }
@@ -278,9 +288,13 @@ function onObjectCacheCleared(): void {
     jobsScheduled = 0;
     jobsFinished = 0;
     const msg = { type: "clearObjectCache" };
-    forEachBuilder((builder) => builder.send(msg));
+    forEachBuilder((builder) => {
+        builder.send(msg);
+    });
     const info = statsMessage();
-    monitors.forEach((monitor) => monitor.send(info));
+    monitors.forEach((monitor) => {
+        monitor.send(info);
+    });
 }
 
 function setObjectCacheEnabled(on: boolean): void {
@@ -323,7 +337,7 @@ interface EnvInfo {
     created: number;
 }
 
-function purgeEnvironmentsToMaxSize() {
+function purgeEnvironmentsToMaxSize(): Promise<boolean> {
     return new Promise<boolean>((resolve: (val: boolean) => void) => {
         let max = option("max-environment-size");
         if (typeof max === "string") {
@@ -391,7 +405,7 @@ function purgeEnvironmentsToMaxSize() {
     });
 }
 
-function syncEnvironments(builder?: Builder) {
+function syncEnvironments(builder?: Builder): void {
     if (!builder) {
         forEachBuilder(syncEnvironments);
         return;
@@ -427,14 +441,14 @@ function syncEnvironments(builder?: Builder) {
     }
 }
 
-function environmentsInfo() {
+function environmentsInfo(): unknown {
     const ret: Record<string, unknown> = Object.assign({}, Environments.instance.environments);
     ret.maxSize = option("max-environment-size") || 0;
     const max = option("max-environment-size");
     ret.maxSizeBytes = max ? bytes.parse(String(max)) || 0 : 0;
     let usedSizeBytes = 0;
-    for (const hash in Environments.instance.environments) {
-        const env = Environments.instance.environments[hash];
+    for (const hsh in Environments.instance.environments) {
+        const env = Environments.instance.environments[hsh];
         if (env.size) {
             usedSizeBytes += env.size;
         }
@@ -459,8 +473,8 @@ server.on("listen", (app: express.Application) => {
     app.get("/builders", (req: express.Request, res: express.Response) => {
         const ret = [];
         const now = Date.now();
-        for (const builderKey in builders) {
-            const s: Builder = builders[builderKey];
+        for (const bKey in builders) {
+            const s: Builder = builders[bKey];
             ret.push({
                 ip: s.ip,
                 name: s.name,
@@ -563,9 +577,9 @@ server.on("listen", (app: express.Application) => {
     });
 
     app.get("/environment/*", (req, res) => {
-        const hash = req.path.substr(13);
-        const env = Environments.instance.environment(hash);
-        console.log("got env request", hash, env);
+        const h = req.path.substr(13);
+        const env = Environments.instance.environment(h);
+        console.log("got env request", h, env);
         if (!env) {
             res.sendStatus(404);
             return;
@@ -625,7 +639,7 @@ server.on("listen", (app: express.Application) => {
         console.log("Sending command to builder", found.ip, found.name, cmd);
         found.send(cmd);
 
-        const onCommand = (message: unknown) => {
+        const onCommand = (message: unknown): void => {
             assert(found);
             if (timedOut) {
                 console.log("Timed out already");
@@ -633,7 +647,7 @@ server.on("listen", (app: express.Application) => {
             }
             console.log("Got message from builder", found.ip, found.name, "\n", message);
             if (message && typeof message === "object") {
-                const msg = message as Record<string, unknown>;
+                const msg = message as Record<string, number | string>;
                 if (msg.id === id) {
                     found.removeListener("command", onCommand);
                     clearTimeout(timeOut);
@@ -665,7 +679,7 @@ ${msg.stdout ? "stdout:\n" + msg.stdout + "\n" : ""}${msg.stderr ? "stderr:\n" +
     });
 });
 
-function updateLogFilesToMonitors() {
+function updateLogFilesToMonitors(): void {
     if (monitors.length) {
         fs.readdir(logFileDir, (err, files) => {
             if (files) {
@@ -673,12 +687,14 @@ function updateLogFilesToMonitors() {
             }
             const msg = { type: "logFiles", files: files || [] };
             // console.log("sending files", msg);
-            monitors.forEach((monitor) => monitor.send(msg));
+            monitors.forEach((monitor) => {
+                monitor.send(msg);
+            });
         });
     }
 }
 
-function clearLogFiles() {
+function clearLogFiles(): void {
     fs.readdir(logFileDir, (err, files) => {
         if (err) {
             console.log("Got error removing log files", err);
@@ -686,9 +702,9 @@ function clearLogFiles() {
         }
 
         for (const file of files) {
-            fs.unlink(path.join(logFileDir, file), (err) => {
-                if (err) {
-                    console.log("failed to remove file", path.join(logFileDir, file), err);
+            fs.unlink(path.join(logFileDir, file), (error: NodeJS.ErrnoException): void => {
+                if (error) {
+                    console.log("failed to remove file", path.join(logFileDir, file), error);
                 }
             });
         }
@@ -820,8 +836,12 @@ server.on("builder", (builder: Builder) => {
         ++jobsStarted;
         jobStartedOrScheduled("jobStarted", job);
     });
-    builder.on("jobFinished", (job) => jobFinished(builder, job));
-    builder.on("cacheHit", (job) => cacheHit(builder, job));
+    builder.on("jobFinished", (job) => {
+        jobFinished(builder, job);
+    });
+    builder.on("cacheHit", (job) => {
+        cacheHit(builder, job);
+    });
 
     builder.on("jobAborted", (job) => {
         console.log(`builder: ${builder.ip}:${builder.port} aborted a job`, job);
@@ -831,13 +851,15 @@ server.on("builder", (builder: Builder) => {
                 id: job.id
             };
 
-            monitors.forEach((monitor) => monitor.send(info));
+            monitors.forEach((monitor) => {
+                monitor.send(info);
+            });
         }
     });
 });
 
 const pendingEnvironments: Record<string, boolean> = {};
-function requestEnvironment(compile: Compile) {
+function requestEnvironment(compile: Compile): boolean {
     if (compile.environment in pendingEnvironments) {
         return false;
     }
@@ -858,21 +880,21 @@ function requestEnvironment(compile: Compile) {
             compile.close();
             return;
         }
-        const hash = environment.hash;
-        compile.on("uploadEnvironmentData", (environment) => {
+        const hsh = environment.hash;
+        compile.on("uploadEnvironmentData", (env) => {
             if (!file) {
                 console.error("no pending file");
                 compile.send({ error: "no pending file" });
                 compile.close();
                 return;
             }
-            if (environment.last) {
+            if (env.last) {
                 gotLast = true;
-                console.log("Got environmentdata message", environment.data.length, environment.last);
+                console.log("Got environmentdata message", env.data.length, env.last);
             }
-            file.save(environment.data)
+            file.save(env.data)
                 .then(() => {
-                    if (environment.last) {
+                    if (env.last) {
                         assert(file);
                         file.close();
                         compile.close();
@@ -880,17 +902,16 @@ function requestEnvironment(compile: Compile) {
                     }
                     return undefined;
                 })
-                .then(() => {
-                    if (environment.last) {
+                .then((): void => {
+                    if (env.last) {
                         file = undefined;
                         // send any new environments to builders
-                        delete pendingEnvironments[hash];
-                        return purgeEnvironmentsToMaxSize();
+                        delete pendingEnvironments[hsh];
+                        purgeEnvironmentsToMaxSize();
                     }
-                    return undefined;
                 })
                 .then(() => {
-                    if (environment.last) {
+                    if (env.last) {
                         syncEnvironments();
                     }
                 })
@@ -953,10 +974,10 @@ server.on("compile", (compile: Compile) => {
         return;
     }
 
-    function score(s: Builder) {
+    const score = (s: Builder): number => {
         const available = Math.min(4, s.slots - s.activeClients);
         return available * (1 - s.load);
-    }
+    };
     let builder: undefined | Builder;
     let bestScore = Number.MIN_SAFE_INTEGER;
     let env: undefined | string;
@@ -964,7 +985,7 @@ server.on("compile", (compile: Compile) => {
     // ### should have a function match(s) that checks for env, score and compile.builder etc
     let foundInCache = false;
 
-    function filterBuilder(s: Builder) {
+    const filterBuilder = (s: Builder): boolean => {
         if (compile.builder && compile.builder !== s.ip && compile.builder !== s.name) {
             return false;
         }
@@ -977,7 +998,7 @@ server.on("compile", (compile: Compile) => {
             }
         }
         return true;
-    }
+    };
 
     if (objectCache && compile.sha1) {
         const data = objectCache.get(compile.sha1);
@@ -1064,7 +1085,9 @@ server.on("compile", (compile: Compile) => {
     });
     if (peakInfo && monitors.length) {
         const info = statsMessage();
-        monitors.forEach((monitor) => monitor.send(info));
+        monitors.forEach((monitor) => {
+            monitor.send(info);
+        });
     }
     ++builder.activeClients;
     ++builder.jobsScheduled;
@@ -1123,19 +1146,19 @@ function writeConfiguration(change: unknown): void {
 
 function hash(password: string, salt: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        crypto.pbkdf2(password, salt, 12000, 256, "sha512", (err: Error | null, hash: Buffer) => {
+        crypto.pbkdf2(password, salt, 12000, 256, "sha512", (err: Error | null, hsh: Buffer) => {
             if (err) {
                 reject(err);
             } else {
-                resolve(hash);
+                resolve(hsh);
             }
         });
     });
 }
 
-function randomBytes(bytes: number): Promise<Buffer> {
+function randomBytes(byteLength: number): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        crypto.randomBytes(bytes, (err: Error | null, result: Buffer) => {
+        crypto.randomBytes(byteLength, (err: Error | null, result: Buffer) => {
             if (err) {
                 reject(new Error(`Failed to random bytes ${err}`));
             } else {
@@ -1177,13 +1200,13 @@ server.on("monitor", (client: Client) => {
         console.log("Got monitor", client.ip, client.hostname);
     }
     monitors.push(client);
-    function remove() {
+    const remove = (): void => {
         const idx = monitors.indexOf(client);
         if (idx !== -1) {
             monitors.splice(idx, 1);
         }
         client.removeAllListeners();
-    }
+    };
     let user: string | undefined;
     client.on("message", (messageText) => {
         if (monitorsLog) {
@@ -1193,7 +1216,7 @@ server.on("monitor", (client: Client) => {
         try {
             message = JSON.parse(messageText);
         } catch (err) {
-            console.error(`Bad json message from monitor ${err.message}`);
+            console.error(`Bad json message from monitor ${(err as Error).message}`);
             client.send({ success: false, error: `Bad message won't parse as JSON: ${err}` });
             client.close();
             return;
@@ -1255,13 +1278,17 @@ server.on("monitor", (client: Client) => {
                     )
                     .then(() => {
                         const info = { type: "listEnvironments", environments: environmentsInfo() };
-                        monitors.forEach((monitor) => monitor.send(info));
+                        monitors.forEach((monitor) => {
+                            monitor.send(info);
+                        });
                     });
                 break;
             case "unlinkEnvironments":
                 Environments.instance.unlink(message.srcHash, message.targetHash).then(() => {
                     const info = { type: "listEnvironments", environments: environmentsInfo() };
-                    monitors.forEach((monitor) => monitor.send(info));
+                    monitors.forEach((monitor) => {
+                        monitor.send(info);
+                    });
                 });
                 break;
             case "listUsers": {
@@ -1364,8 +1391,8 @@ server.on("monitor", (client: Client) => {
                             }
                         } else {
                             return hash(message.password || "", Buffer.from(users[message.user].salt, "base64")).then(
-                                (hash) => {
-                                    if (users[message.user || ""]?.hash !== hash.toString("base64")) {
+                                (hsh: Buffer) => {
+                                    if (users[message.user || ""]?.hash !== hsh.toString("base64")) {
                                         throw new Error(`Wrong password ${message.user}`);
                                     }
                                 }
@@ -1426,8 +1453,8 @@ server.on("monitor", (client: Client) => {
                         };
                         return hash(message.password || "", salt);
                     })
-                    .then((hash) => {
-                        users[message.user || ""].hash = hash.toString("base64");
+                    .then((hsh: Buffer) => {
+                        users[message.user || ""].hash = hsh.toString("base64");
                         return randomBytes(256);
                     })
                     .then((cookie) => {

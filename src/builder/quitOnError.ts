@@ -1,4 +1,4 @@
-import { OptionsFunction } from "@jhanssen/options";
+import type { OptionsFunction } from "@jhanssen/options";
 
 export function quitOnError(option: OptionsFunction): () => void {
     return () => {

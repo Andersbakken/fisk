@@ -1,5 +1,5 @@
-import { Response } from "./Response";
 import fs from "fs-extra";
+import type { Response } from "./Response";
 
 export class ObjectCachePendingItem {
     response: Response;
@@ -27,7 +27,9 @@ export class ObjectCachePendingItem {
             if (!buf) {
                 throw new Error("Should have had a buffer");
             }
-            buf.forEach((b) => this.write(b));
+            buf.forEach((b) => {
+ this.write(b); 
+});
             if (!this.buffer && this.endCB) {
                 this.file.end();
                 this.endCB();

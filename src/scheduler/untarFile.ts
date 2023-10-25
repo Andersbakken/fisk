@@ -19,18 +19,22 @@ export function untarFile(archive: string, file: string): Promise<string> {
                         reject(err);
                         return;
                     }
-                    fs.readFile(path.join(tmpdir, file), "utf8", (err: NodeJS.ErrnoException | null, data: string) => {
-                        try {
-                            fs.removeSync(tmpdir);
-                        } catch (e) {
-                            console.error("Got an error removing the temp dir", tmpdir);
+                    fs.readFile(
+                        path.join(tmpdir, file),
+                        "utf8",
+                        (error: NodeJS.ErrnoException | null, data: string) => {
+                            try {
+                                fs.removeSync(tmpdir);
+                            } catch (e) {
+                                console.error("Got an error removing the temp dir", tmpdir);
+                            }
+                            if (error) {
+                                reject(error);
+                            } else {
+                                resolve(data);
+                            }
                         }
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve(data);
-                        }
-                    });
+                    );
                 }
             );
         });

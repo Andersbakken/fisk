@@ -1,9 +1,9 @@
-export type CompileFinishedEventFile = {
+export interface CompileFinishedEventFile {
     absolute: string;
     path: string;
-};
+}
 
-export type CompileFinishedEvent = {
+export interface CompileFinishedEvent {
     cppSize: number;
     compileDuration: number;
     exitCode: number;

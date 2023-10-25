@@ -1,4 +1,4 @@
-import { Builder } from "./Builder";
+import type { Builder } from "./Builder";
 
 export class SHA1Data {
     fileSize: number;

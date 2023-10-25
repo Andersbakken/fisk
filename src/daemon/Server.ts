@@ -1,10 +1,10 @@
-import { Common } from "../common";
 import { Compile } from "./Compile";
-import { OptionsFunction } from "@jhanssen/options";
 import EventEmitter from "events";
 import fs from "fs-extra";
 import net from "net";
 import path from "path";
+import type { Common } from "../common";
+import type { OptionsFunction } from "@jhanssen/options";
 
 export class Server extends EventEmitter {
     private readonly debug: boolean;

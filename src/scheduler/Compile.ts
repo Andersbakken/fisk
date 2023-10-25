@@ -1,6 +1,6 @@
 import { Client, ClientType } from "./Client";
-import { OptionsFunction } from "@jhanssen/options";
-import WebSocket from "ws";
+import type { OptionsFunction } from "@jhanssen/options";
+import type WebSocket from "ws";
 
 export class Compile extends Client {
     environment: string;

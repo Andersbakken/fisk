@@ -1,11 +1,11 @@
-export type ExitEventFile = {
+export interface ExitEventFile {
     path: string;
     mapped?: string;
 }
 
-export type ExitEvent = {
+export interface ExitEvent {
     exitCode: number;
     files: ExitEventFile[];
     error?: string;
     sourceFile: string;
-};
+}

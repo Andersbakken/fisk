@@ -1,4 +1,4 @@
-import { LinkProperties } from "./LinkProperties";
+import type { LinkProperties } from "./LinkProperties";
 
 export class Links {
     private _targets: Record<string, LinkProperties>;
@@ -7,12 +7,20 @@ export class Links {
         this._targets = {};
     }
 
-    toString(): string {
-        return JSON.stringify(this, null, 4);
-    }
-
     get targets(): Record<string, LinkProperties> {
         return this._targets;
+    }
+
+    get targetHashes(): string[] {
+        return Object.keys(this._targets);
+    }
+
+    get size(): number {
+        return Object.keys(this._targets).length;
+    }
+
+    toString(): string {
+        return JSON.stringify(this, null, 4);
     }
 
     toObject(): Record<string, LinkProperties> {
@@ -39,13 +47,5 @@ export class Links {
 
     unset(targetHash: string): void {
         delete this._targets[targetHash];
-    }
-
-    get targetHashes(): string[] {
-        return Object.keys(this._targets);
-    }
-
-    get size(): number {
-        return Object.keys(this._targets).length;
     }
 }
