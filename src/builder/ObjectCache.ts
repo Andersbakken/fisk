@@ -197,10 +197,10 @@ export class ObjectCache extends EventEmitter {
             delete this.pending[response.sha1];
         });
         this.pending[response.sha1] = pendingItem;
-        contents.forEach((c) => {
+        contents.forEach((c: Contents) => {
             pendingItem.write(c.contents);
         });
-        pendingItem.end(() => {
+        pendingItem.end().then(() => {
             if (this.pending[response.sha1] === pendingItem) {
                 const cacheItem = new ObjectCacheItem(response, pendingItem.jsonLength);
                 try {

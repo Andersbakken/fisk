@@ -55,11 +55,17 @@ export class ObjectCachePendingItem {
         }
     }
 
-    end(cb?: () => void): void {
-        if (this.buffer) {
-            this.endCB = cb;
-        } else {
-            this.file.end(cb);
-        }
+    end(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (this.endCB) {
+                reject(new Error("Don't end twice"));
+                return;
+            }
+            if (this.buffer) {
+                this.endCB = resolve;
+            } else {
+                this.file.end(resolve);
+            }
+        });
     }
 }
