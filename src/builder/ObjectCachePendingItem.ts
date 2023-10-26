@@ -28,8 +28,8 @@ export class ObjectCachePendingItem {
                 throw new Error("Should have had a buffer");
             }
             buf.forEach((b) => {
- this.write(b); 
-});
+                this.write(b);
+            });
             if (!this.buffer && this.endCB) {
                 this.file.end();
                 this.endCB();
