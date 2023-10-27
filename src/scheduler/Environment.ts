@@ -1,18 +1,10 @@
 import fs from "fs";
 
 export class Environment {
-    path: string;
-    hash: string;
-    system: string;
-    originalPath: string;
     info?: string;
     size?: number;
 
-    constructor(path: string, hash: string, system: string, originalPath: string) {
-        this.path = path;
-        this.hash = hash;
-        this.system = system;
-        this.originalPath = originalPath;
+    constructor(readonly path: string, readonly hash: string, readonly system: string, readonly originalPath: string) {
         try {
             this.size = fs.statSync(path).size;
         } catch (err: unknown) {

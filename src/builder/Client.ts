@@ -8,7 +8,6 @@ import path from "path";
 import type { OptionsFunction } from "@jhanssen/options";
 
 export class Client extends EventEmitter {
-    private readonly configVersion: number;
     private scheduler: string;
     private serverPort: number;
     private labels?: string;
@@ -19,10 +18,9 @@ export class Client extends EventEmitter {
     hostname?: string;
     slots: number;
 
-    constructor(option: OptionsFunction, configVersion: number) {
+    constructor(option: OptionsFunction, private readonly configVersion: number) {
         super();
 
-        this.configVersion = configVersion;
         this.scheduler = option("scheduler", "ws://localhost:8097") as string;
         if (this.scheduler.indexOf("://") === -1) {
             this.scheduler = "ws://" + this.scheduler;

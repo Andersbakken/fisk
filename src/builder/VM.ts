@@ -8,23 +8,17 @@ import type { OptionsFunction } from "@jhanssen/options";
 import type { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 
 export class VM extends EventEmitter {
-    root: string;
-    hash: string;
-    option: OptionsFunction;
     compiles: Record<number, CompileJob>;
     keepCompiles: boolean;
     destroying: boolean;
     child: child_process.ChildProcess;
     ready: boolean;
 
-    constructor(root: string, hash: string, option: OptionsFunction) {
+    constructor(readonly root: string, readonly hash: string, readonly option: OptionsFunction) {
         super();
-        this.root = root;
-        this.hash = hash;
         this.compiles = {};
         this.destroying = false;
         this.keepCompiles = Boolean(option("keep-compiles"));
-        this.option = option;
 
         fs.remove(path.join(root, "compiles"));
 

@@ -3,14 +3,12 @@ import fs from "fs";
 type Operation = () => void;
 
 export class Database {
-    private path: string;
     private busy: boolean;
     private queue: Operation[];
 
     static instance: Database = new Database("fisk.2");
 
-    constructor(path: string) {
-        this.path = path;
+    constructor(private readonly path: string) {
         this.busy = false;
         this.queue = [];
     }

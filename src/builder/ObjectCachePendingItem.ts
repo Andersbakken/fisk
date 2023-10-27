@@ -2,21 +2,17 @@ import fs from "fs-extra";
 import type { Response } from "./Response";
 
 export class ObjectCachePendingItem {
-    response: Response;
     file: fs.WriteStream;
-    path: string;
     remaining: number;
     endCB?: () => void;
     buffer?: Buffer[];
     jsonLength: number;
 
     constructor(
-        response: Response,
-        path: string,
+        readonly response: Response,
+        readonly path: string,
         dataBytes: number // not including the metadata
     ) {
-        this.response = response;
-        this.path = path;
         this.remaining = dataBytes;
         this.endCB = undefined;
         this.file = fs.createWriteStream(path);

@@ -39,20 +39,14 @@ export interface InfoType {
 }
 
 export class ObjectCache extends EventEmitter {
-    private purgeSize: number;
     private cache: Record<string, ObjectCacheItem>;
     private pending: Record<string, ObjectCachePendingItem>;
 
-    dir: string;
     size: number;
-    maxSize: number;
 
-    constructor(dir: string, maxSize: number, purgeSize: number) {
+    constructor(readonly dir: string, readonly maxSize: number, private readonly purgeSize: number) {
         super();
-        this.dir = dir;
         fs.mkdirpSync(dir);
-        this.maxSize = maxSize;
-        this.purgeSize = purgeSize;
         this.cache = {};
         this.pending = {};
         this.size = 0;

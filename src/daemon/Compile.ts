@@ -9,15 +9,10 @@ export class Compile extends EventEmitter {
     private messageLength: number;
     private pid?: number;
     private readonly buffer: ClientBuffer;
-    private readonly connection: net.Socket;
 
-    readonly id: number;
-
-    constructor(conn: net.Socket, id: number, option: OptionsFunction) {
+    constructor(private readonly connection: net.Socket, readonly id: number, option: OptionsFunction) {
         super();
         this.debug = option("debug") as boolean;
-        this.id = id;
-        this.connection = conn;
         this.buffer = new ClientBuffer();
         this.messageLength = 0;
         this.pid = undefined;

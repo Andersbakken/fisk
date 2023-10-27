@@ -11,12 +11,8 @@ export const enum ClientType {
 }
 
 export class Client extends EventEmitter {
-    type: ClientType;
     created: Date;
     pingSent?: number;
-    ws: WebSocket;
-    ip: string;
-    option?: OptionsFunction;
     nonce?: string;
     hostname: string;
     port: number;
@@ -25,13 +21,14 @@ export class Client extends EventEmitter {
     labels?: string[];
     npmVersion: string;
 
-    constructor(type: ClientType, ws: WebSocket, ip: string, option?: OptionsFunction) {
+    constructor(
+        readonly type: ClientType,
+        readonly ws: WebSocket,
+        readonly ip: string,
+        readonly option?: OptionsFunction
+    ) {
         super();
         this.created = new Date();
-        this.type = type;
-        this.ws = ws;
-        this.ip = ip;
-        this.option = option;
         this.hostname = "";
         this.name = "";
         this.npmVersion = "";

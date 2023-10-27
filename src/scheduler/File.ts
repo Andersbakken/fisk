@@ -1,23 +1,23 @@
 import assert from "assert";
 import fs from "fs-extra";
 
-interface Pending { data: Buffer; resolve: () => void; reject: (err: Error) => void }
+interface Pending {
+    data: Buffer;
+    resolve: () => void;
+    reject: (err: Error) => void;
+}
 
 export class File {
     private _fd?: number;
     private _pending?: Pending[];
     private _writing: boolean;
 
-    path: string;
-    hash: string;
     system?: string;
     originalPath?: string;
 
-    constructor(path: string, hash: string) {
+    constructor(readonly path: string, readonly hash: string) {
         this._fd = fs.openSync(path, "w");
 
-        this.path = path;
-        this.hash = hash;
         this.system = undefined;
         this._writing = false;
         this.originalPath = undefined;

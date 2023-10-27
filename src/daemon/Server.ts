@@ -9,13 +9,12 @@ import type { OptionsFunction } from "@jhanssen/options";
 export class Server extends EventEmitter {
     private readonly debug: boolean;
     private server?: net.Server;
-    private option: OptionsFunction;
     private _connectionId: number;
     private _connections: Record<string, net.Socket>;
 
     readonly file: string;
 
-    constructor(option: OptionsFunction, common: Common) {
+    constructor(private readonly option: OptionsFunction, common: Common) {
         super();
         this.debug = option("debug") as boolean;
         this.file = option("socket", path.join(common.cacheDir(), "socket")) as string;

@@ -11,18 +11,12 @@ interface MapData {
 }
 
 export class Slots extends EventEmitter {
-    private count: number;
-    private name: string;
-    private debug: boolean;
     private pending: Map<number, MapData>;
     private used: Map<number, Data>;
 
-    constructor(count: number, name: string, debug: boolean) {
+    constructor(private readonly count: number, private readonly name: string, private readonly debug: boolean) {
         super();
-        this.count = count;
-        this.name = name;
         this.used = new Map();
-        this.debug = debug;
         this.pending = new Map();
         if (this.debug) {
             console.log("Slots created", this.toString());

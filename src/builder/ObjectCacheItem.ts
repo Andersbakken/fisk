@@ -1,13 +1,9 @@
 import type { Response } from "./Response";
 
 export class ObjectCacheItem {
-    response: Response;
     cacheHits: number;
-    headerSize: number;
 
-    constructor(response: Response, headerSize: number) {
-        this.headerSize = headerSize;
-        this.response = response;
+    constructor(readonly response: Response, readonly headerSize: number) {
         this.cacheHits = 0;
     }
 

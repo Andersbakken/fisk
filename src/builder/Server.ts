@@ -11,8 +11,6 @@ import type net from "net";
 import type stream from "stream";
 
 export class Server extends EventEmitter {
-    private configVersion: number;
-    private option: OptionsFunction;
     private app?: express.Express;
     private server?: net.Server;
     private ws?: WebSocket.Server;
@@ -20,10 +18,8 @@ export class Server extends EventEmitter {
     readonly baseUrl: string;
     port?: number;
 
-    constructor(option: OptionsFunction, configVersion: number) {
+    constructor(private readonly option: OptionsFunction, private readonly configVersion: number) {
         super();
-        this.option = option;
-        this.configVersion = configVersion;
         this.app = undefined;
         this.baseUrl = `http://localhost:${this.option.int("port", 8096)}`;
     }

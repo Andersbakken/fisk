@@ -22,8 +22,6 @@ function header(req: express.Request, name: string): string | undefined {
 }
 
 export class Server extends EventEmitter {
-    private option: OptionsFunction;
-    private configVersion: number;
     private id: number;
     private app?: express.Express;
     private ws?: WebSocket.Server;
@@ -33,10 +31,8 @@ export class Server extends EventEmitter {
 
     objectCache: boolean;
 
-    constructor(option: OptionsFunction, configVersion: number) {
+    constructor(private readonly option: OptionsFunction, private readonly configVersion: number) {
         super();
-        this.option = option;
-        this.configVersion = configVersion;
         this.id = 0;
         this.objectCache = false;
         this.nonces = new WeakMap();

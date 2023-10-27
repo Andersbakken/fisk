@@ -2,8 +2,6 @@ import assert from "assert";
 import type { PeakData } from "./PeakData";
 
 export class Peak {
-    readonly interval: number;
-    readonly name: string;
     peakActiveJobs: number;
     peakActiveJobsTime: number;
     peakUtilization: number;
@@ -11,9 +9,7 @@ export class Peak {
     actives?: Array<[number, number]>;
     utilizations?: Array<[number, number]>;
 
-    constructor(interval: number, name: string) {
-        this.interval = interval;
-        this.name = name;
+    constructor(readonly interval: number, readonly name: string) {
         this.peakActiveJobs = 0;
         this.peakActiveJobsTime = Date.now();
         this.peakUtilization = 0;

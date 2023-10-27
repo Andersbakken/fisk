@@ -6,22 +6,14 @@ import type { VM } from "./VM";
 import type { VMCompileFinished } from "./VMMessage";
 
 export class CompileJob extends EventEmitter {
-    vm: VM;
-    commandLine: string[];
-    id: number;
-    argv0: string;
     dir: string;
     vmDir: string;
     cppSize: number;
     startCompile?: number;
     fd?: number;
 
-    constructor(commandLine: string[], argv0: string, id: number, vm: VM) {
+    constructor(readonly commandLine: string[], readonly argv0: string, readonly id: number, readonly vm: VM) {
         super();
-        this.vm = vm;
-        this.commandLine = commandLine;
-        this.argv0 = argv0;
-        this.id = id;
         this.dir = path.join(vm.root, "compiles", String(this.id));
         this.vmDir = path.join("/", "compiles", String(this.id));
         fs.mkdirpSync(this.dir);
