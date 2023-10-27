@@ -29,8 +29,8 @@ export class VM extends EventEmitter {
         fs.remove(path.join(root, "compiles"));
 
         const args = [`--root=${root}`, `--hash=${hash}`];
-        const user = String(option("vm-user"));
-        if (user) {
+        const user = option("vm-user");
+        if (typeof user === "string") {
             args.push(`--user=${user}`);
         }
         if (option("debug")) {
