@@ -1,11 +1,10 @@
-import { stringOrUndefined } from "../common";
 import EventEmitter from "events";
 import WebSocket from "ws";
 import assert from "assert";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 
 export class Client extends EventEmitter {
     private scheduler: string;
@@ -18,7 +17,7 @@ export class Client extends EventEmitter {
     hostname?: string;
     slots: number;
 
-    constructor(option: OptionsFunction, private readonly configVersion: number) {
+    constructor(option: Options, private readonly configVersion: number) {
         super();
 
         this.scheduler = option("scheduler", "ws://localhost:8097") as string;
@@ -29,8 +28,8 @@ export class Client extends EventEmitter {
             this.scheduler += ":8097";
         }
         this.serverPort = option.int("port", 8096);
-        this.hostname = stringOrUndefined(option("hostname"));
-        this.name = stringOrUndefined(option("name"));
+        this.hostname = option.string("hostname");
+        this.name = option.string("name");
         this.slots = option.int("slots", os.cpus().length);
         this.labels = option("labels") as string | undefined;
         try {

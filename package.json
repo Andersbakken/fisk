@@ -30,7 +30,7 @@
     ],
     "dependencies": {
         "@andersbakken/blessed": "^0.1.82",
-        "@jhanssen/options": "^1.0.34",
+        "@jhanssen/options": "^3.0.0",
         "axios": "^0.21.1",
         "bufferutil": "^4.0.7",
         "bytes": "^3.0.0",

@@ -6,7 +6,7 @@ import assert from "assert";
 import type { Builder } from "./Builder";
 import type { ObjectCacheManagerMessage } from "./ObjectCacheManagerMessage";
 import type { ObjectCacheMessage } from "../common/ObjectCacheMessage";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type express from "express";
 
 function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder): number {
@@ -50,7 +50,7 @@ export class ObjectCacheManager extends EventEmitter {
 
     hits: number;
 
-    constructor(option: OptionsFunction) {
+    constructor(option: Options) {
         super();
         this.hits = 0;
         this.bySHA1 = new Map();

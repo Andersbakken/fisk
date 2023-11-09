@@ -4,7 +4,7 @@ import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import type { CompileFinishedEvent } from "./CompileFinishedEvent";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
 
 export class VM extends EventEmitter {
@@ -14,7 +14,7 @@ export class VM extends EventEmitter {
     child: child_process.ChildProcess;
     ready: boolean;
 
-    constructor(readonly root: string, readonly hash: string, readonly option: OptionsFunction) {
+    constructor(readonly root: string, readonly hash: string, readonly option: Options) {
         super();
         this.compiles = {};
         this.destroying = false;

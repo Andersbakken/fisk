@@ -26,11 +26,11 @@ import type { JobMonitorMessage } from "../common/JobMonitorMessage";
 import type { JobScheduledMessage } from "./JobScheduledMessage";
 import type { JobStartedMessage } from "./JobStartedMessage";
 import type { MonitorMessage } from "./MonitorMessage";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type { PeakData } from "./PeakData";
 import type express from "express";
 
-const option: OptionsFunction = options({
+const option: Options = options({
     prefix: "fisk/scheduler",
     noApplicationPath: true,
     additionalFiles: ["fisk/scheduler.conf.override"]

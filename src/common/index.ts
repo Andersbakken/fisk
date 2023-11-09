@@ -1,11 +1,11 @@
 import fs from "fs-extra";
 import os from "os";
 import path from "path";
-import type { Option, OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 
 const Version = 5;
 
-function cacheDir(option: OptionsFunction): string {
+function cacheDir(option: Options): string {
     let dir = option("cache-dir");
     if (!dir) {
         dir = path.join(os.homedir(), ".cache", "fisk", path.basename(option.prefix || ""));
@@ -13,7 +13,7 @@ function cacheDir(option: OptionsFunction): string {
     return dir as string;
 }
 
-function validateCache(option: OptionsFunction): void {
+function validateCache(option: Options): void {
     const dir = cacheDir(option);
     const file = path.join(dir, "version");
     // console.log(dir);
@@ -41,14 +41,10 @@ export interface Common {
     Version: number;
 }
 
-export function common(option: OptionsFunction): Common {
+export function common(option: Options): Common {
     validateCache(option);
     return {
         cacheDir: cacheDir.bind(undefined, option),
         Version
     };
-}
-
-export function stringOrUndefined(value: Option): string | undefined {
-    return value === undefined ? undefined : String(value);
 }

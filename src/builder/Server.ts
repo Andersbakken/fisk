@@ -6,7 +6,7 @@ import assert from "assert";
 import express from "express";
 import http from "http";
 import zlib from "zlib";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type net from "net";
 import type stream from "stream";
 
@@ -18,7 +18,7 @@ export class Server extends EventEmitter {
     readonly baseUrl: string;
     port?: number;
 
-    constructor(private readonly option: OptionsFunction, private readonly configVersion: number) {
+    constructor(private readonly option: Options, private readonly configVersion: number) {
         super();
         this.app = undefined;
         this.baseUrl = `http://localhost:${this.option.int("port", 8096)}`;

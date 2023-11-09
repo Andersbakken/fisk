@@ -10,7 +10,7 @@ import crypto from "crypto";
 import express from "express";
 import fs from "fs";
 import http from "http";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type stream from "stream";
 
 function header(req: express.Request, name: string): string | undefined {
@@ -31,7 +31,7 @@ export class Server extends EventEmitter {
 
     objectCache: boolean;
 
-    constructor(private readonly option: OptionsFunction, private readonly configVersion: number) {
+    constructor(private readonly option: Options, private readonly configVersion: number) {
         super();
         this.id = 0;
         this.objectCache = false;
