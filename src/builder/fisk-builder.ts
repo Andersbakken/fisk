@@ -84,10 +84,10 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
         if (!item) {
             throw new Error("Couldn't find item " + job.sha1);
         }
+
         job.send(Object.assign({ objectCache: true }, item?.response));
         job.objectcache = true;
         pointOfNoReturn = true;
-        fd = fs.openSync(path.join(objectCache.dir, item.response.sha1), "r");
         // console.log("here", item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;

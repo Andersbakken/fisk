@@ -1,4 +1,4 @@
-interface IndexItem {
+export interface IndexItem {
     bytes: number;
 }
 

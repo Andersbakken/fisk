@@ -180,13 +180,8 @@ export class ObjectCache extends EventEmitter {
             /* */
         }
 
-        let remaining = 0;
-        response.index.forEach((file) => {
-            remaining += file.bytes;
-        });
-
-        const pendingItem = new ObjectCachePendingItem(response, absolutePath, remaining);
-        pendingItem.file.on("error", (err) => {
+        const pendingItem = new ObjectCachePendingItem(response, absolutePath);
+        pendingItem.on("error", (err) => {
             console.error("Failed to write pendingItem", response, err);
             delete this.pending[response.sha1];
         });
