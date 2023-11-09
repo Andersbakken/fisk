@@ -10,6 +10,7 @@ import crypto from "crypto";
 import express from "express";
 import fs from "fs";
 import http from "http";
+import https from "https";
 import type { Options } from "@jhanssen/options";
 import type stream from "stream";
 
@@ -26,6 +27,7 @@ export class Server extends EventEmitter {
     private app?: express.Express;
     private ws?: WebSocket.Server;
     private server?: http.Server;
+    private secureServer?: https.Server;
     private nonces: WeakMap<express.Request, string>;
     private readonly baseUrl: string;
 
@@ -44,7 +46,7 @@ export class Server extends EventEmitter {
     }
 
     listen(): Promise<void> {
-        return new Promise<void>((resolve: () => void) => {
+        return new Promise<void>((resolve: () => void, reject: (error: Error) => void) => {
             this.app = express();
             this.app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -58,16 +60,32 @@ export class Server extends EventEmitter {
             }
 
             this.server = http.createServer(this.app);
-            this.ws = new WebSocket.Server({ noServer: true });
-            const port = this.option.int("port", 8097);
+            const keyFile = this.option.string("key");
+            const certFile = this.option.string("cert");
+            let key: Buffer | undefined;
+            let cert: Buffer | undefined;
+            if (keyFile && certFile) {
+                try {
+                    key = fs.readFileSync(keyFile);
+                    cert = fs.readFileSync(certFile);
+                } catch (err: unknown) {
+                    reject(
+                        new Error(`Failed to read key (${keyFile}) or cert (${certFile}): ${(err as Error).message}`)
+                    );
+                    return;
+                }
+            }
             let defaultBacklog = 128;
             try {
                 defaultBacklog = parseInt(fs.readFileSync("/proc/sys/net/core/somaxconn", "utf8")) || 128;
             } catch (err: unknown) {
                 /* */
             }
-
             const backlog = this.option.int("backlog", defaultBacklog);
+            this.ws = new WebSocket.Server({ noServer: true });
+            let waitingServers = 1;
+            const port = this.option.int("port", 8097);
+
             this.server.listen({ port, backlog, host: "0.0.0.0" });
 
             this.server.on("upgrade", (req: express.Request, socket: stream.Duplex, head: Buffer) => {
@@ -75,16 +93,6 @@ export class Server extends EventEmitter {
                 this.ws.handleUpgrade(req, socket, head, (ws) => {
                     this._handleConnection(ws, req);
                 });
-            });
-
-            this.ws.on("headers", (headers: string[], request: express.Request) => {
-                const url = new Url(request.url, this.baseUrl);
-                headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
-                if (url.pathname === "/monitor") {
-                    const nonce = crypto.randomBytes(256).toString("base64");
-                    headers.push(`x-fisk-nonce: ${nonce}`);
-                    this.nonces.set(request, nonce);
-                }
             });
 
             this.server.on("error", (error: Error) => {
@@ -100,8 +108,53 @@ export class Server extends EventEmitter {
                 }
             });
             this.server.once("listening", () => {
-                console.log("listening on", port);
-                resolve();
+                console.log("http://listening on", port);
+                if (!--waitingServers) {
+                    resolve();
+                }
+            });
+
+            let securePort: number | undefined;
+            if (key && cert) {
+                securePort = this.option.int("securePort", 8098);
+                this.secureServer = https.createServer({ key, cert }, this.app);
+                this.secureServer!.listen({ port: securePort, backlog, host: "0.0.0.0" });
+                ++waitingServers;
+                this.secureServer!.on("error", (error: NodeJS.ErrnoException) => {
+                    if (error.code === "EADDRINUSE") {
+                        console.log(`Port ${securePort} is in use...`);
+                        setTimeout(() => {
+                            assert(this.secureServer);
+                            this.secureServer.listen({ port: securePort, backlog, host: "0.0.0.0" });
+                        }, 1000);
+                    } else {
+                        console.error("Got secure server error", error.message);
+                        this.emit("error", error);
+                    }
+                });
+
+                this.secureServer.on("upgrade", (req: express.Request, socket: stream.Duplex, head: Buffer) => {
+                    assert(this.ws);
+                    this.ws.handleUpgrade(req, socket, head, (ws) => {
+                        this._handleConnection(ws, req);
+                    });
+                });
+
+                this.secureServer.once("listening", () => {
+                    console.log("https://listening on", securePort);
+                    if (!--waitingServers) {
+                        resolve();
+                    }
+                });
+            }
+            this.ws.on("headers", (headers: string[], request: express.Request) => {
+                const url = new Url(request.url, this.baseUrl);
+                headers.push("x-fisk-object-cache: " + (this.objectCache ? "true" : "false"));
+                if (url.pathname === "/monitor") {
+                    const nonce = crypto.randomBytes(256).toString("base64");
+                    headers.push(`x-fisk-nonce: ${nonce}`);
+                    this.nonces.set(request, nonce);
+                }
             });
         });
     }

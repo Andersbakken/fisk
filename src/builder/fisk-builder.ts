@@ -5,6 +5,7 @@ import { ObjectCache } from "./ObjectCache";
 import { Server } from "./Server";
 import { VM } from "./VM";
 import { common as commonFunc } from "../common";
+import { default as createOptions } from "@jhanssen/options";
 import { load } from "./load";
 import { quitOnError } from "./quitOnError";
 import Url from "url-parse";
@@ -13,7 +14,6 @@ import axios from "axios";
 import bytes from "bytes";
 import child_process from "child_process";
 import fs from "fs-extra";
-import options from "@jhanssen/options";
 import os from "os";
 import path from "path";
 import ws from "ws";
@@ -29,7 +29,7 @@ import type { Response } from "./Response";
 import type express from "express";
 import type http from "http";
 
-const option: Options = options({
+const option: Options = createOptions({
     prefix: "fisk/builder",
     noApplicationPath: true,
     additionalFiles: ["fisk/builder.conf.override"]
