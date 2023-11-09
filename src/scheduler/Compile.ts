@@ -1,5 +1,5 @@
 import { Client, ClientType } from "./Client";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type WebSocket from "ws";
 
 export class Compile extends Client {
@@ -11,7 +11,7 @@ export class Compile extends Client {
         readonly environment: string,
         readonly sourceFile: string,
         readonly sha1?: string,
-        option?: OptionsFunction
+        option?: Options
     ) {
         super(ClientType.Compile, ws, ip, option);
     }

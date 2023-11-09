@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type WebSocket from "ws";
 
 export const enum ClientType {
@@ -21,12 +21,7 @@ export class Client extends EventEmitter {
     labels?: string[];
     npmVersion: string;
 
-    constructor(
-        readonly type: ClientType,
-        readonly ws: WebSocket,
-        readonly ip: string,
-        readonly option?: OptionsFunction
-    ) {
+    constructor(readonly type: ClientType, readonly ws: WebSocket, readonly ip: string, readonly option?: Options) {
         super();
         this.created = new Date();
         this.hostname = "";

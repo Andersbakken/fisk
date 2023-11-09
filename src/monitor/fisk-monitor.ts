@@ -13,10 +13,10 @@ import type {
     BuilderRemovedMessage
 } from "../common/BuilderAddedOrRemovedMessage";
 import type { JobMonitorMessage, JobMonitorMessageBase, JobMonitorMessageClient } from "../common/JobMonitorMessage";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type { Unit } from "humanize-duration";
 
-const option: OptionsFunction = options({
+const option: Options = options({
     prefix: "fisk/monitor",
     noApplicationPath: true,
     additionalFiles: ["fisk/monitor.conf.override"]

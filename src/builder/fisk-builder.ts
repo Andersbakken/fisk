@@ -4,7 +4,7 @@ import { Client } from "./Client";
 import { ObjectCache } from "./ObjectCache";
 import { Server } from "./Server";
 import { VM } from "./VM";
-import { common as commonFunc, stringOrUndefined } from "../common";
+import { common as commonFunc } from "../common";
 import { load } from "./load";
 import { quitOnError } from "./quitOnError";
 import Url from "url-parse";
@@ -24,12 +24,12 @@ import type { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage"
 import type { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
 import type { J } from "./J";
 import type { Job } from "./Job";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type { Response } from "./Response";
 import type express from "express";
 import type http from "http";
 
-const option: OptionsFunction = options({
+const option: Options = options({
     prefix: "fisk/builder",
     noApplicationPath: true,
     additionalFiles: ["fisk/builder.conf.override"]
@@ -166,8 +166,7 @@ client.on("objectCache", (enabled) => {
     const objectCacheSize = typeof size === "number" ? size : bytes.parse(String(size));
     // console.log("got object cache", enabled, objectCacheSize, option("object-cache-size"));
     if (enabled && objectCacheSize) {
-        const objectCacheDir =
-            stringOrUndefined(option("object-cache-dir")) || path.join(common.cacheDir(), "objectcache");
+        const objectCacheDir = option.string("object-cache-dir") || path.join(common.cacheDir(), "objectcache");
 
         objectCache = new ObjectCache(
             objectCacheDir,
