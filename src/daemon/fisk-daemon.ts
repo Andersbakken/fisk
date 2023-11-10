@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 
-import options from "@jhanssen/options";
-import type { OptionsFunction } from "@jhanssen/options";
-
 import { Constants } from "./Constants";
 import { Server } from "./Server";
 import { Slots } from "./Slots";
 import { common as commonFunc } from "../common";
 import assert from "assert";
+import createOptions from "@jhanssen/options";
 import os from "os";
+import type { Options } from "@jhanssen/options";
 
-const option: OptionsFunction = options({
+const option: Options = createOptions({
     prefix: "fisk/daemon",
     noApplicationPath: true,
     additionalFiles: ["fisk/daemon.conf.override"]
