@@ -1,7 +1,7 @@
 import { ClientBuffer } from "./ClientBuffer";
 import { Constants } from "./Constants";
 import EventEmitter from "events";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 import type net from "net";
 
 export class Compile extends EventEmitter {
@@ -10,7 +10,7 @@ export class Compile extends EventEmitter {
     private pid?: number;
     private readonly buffer: ClientBuffer;
 
-    constructor(private readonly connection: net.Socket, readonly id: number, option: OptionsFunction) {
+    constructor(private readonly connection: net.Socket, readonly id: number, option: Options) {
         super();
         this.debug = option("debug") as boolean;
         this.buffer = new ClientBuffer();

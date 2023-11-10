@@ -4,7 +4,7 @@ import fs from "fs-extra";
 import net from "net";
 import path from "path";
 import type { Common } from "../common";
-import type { OptionsFunction } from "@jhanssen/options";
+import type { Options } from "@jhanssen/options";
 
 export class Server extends EventEmitter {
     private readonly debug: boolean;
@@ -14,7 +14,7 @@ export class Server extends EventEmitter {
 
     readonly file: string;
 
-    constructor(private readonly option: OptionsFunction, common: Common) {
+    constructor(private readonly option: Options, common: Common) {
         super();
         this.debug = option("debug") as boolean;
         this.file = option("socket", path.join(common.cacheDir(), "socket")) as string;
