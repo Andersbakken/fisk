@@ -100,6 +100,7 @@ export class Compile extends EventEmitter {
                 case "-iwithprefix":
                 case "-iwithprefixbefore":
                 case "-target":
+                case "-framework":
                     ++i;
                     break;
                 default:
