@@ -30,7 +30,7 @@
     ],
     "dependencies": {
         "@andersbakken/blessed": "^0.1.82",
-        "@andersbakken/fisk-native": "^3.0.0",
+        "@andersbakken/fisk-native": "^13.0.0",
         "@jhanssen/options": "^6.0.0",
         "axios": "^0.21.1",
         "bufferutil": "^4.0.7",
