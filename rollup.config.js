@@ -52,7 +52,7 @@ export default [
     {
         input: "src/builder/VM_runtime/VM_runtime.ts",
         plugins,
-        external: ["posix"],
+        external: ["@andersbakken/fisk-native"],
         output: {
             file: "builder/VM_runtime.js",
             format,
@@ -64,7 +64,7 @@ export default [
     {
         input: "src/scheduler/fisk-scheduler.ts",
         plugins,
-        external: ["posix"],
+        external: ["@andersbakken/fisk-native"],
         output: {
             file: "scheduler/fisk-scheduler.js",
             format,
