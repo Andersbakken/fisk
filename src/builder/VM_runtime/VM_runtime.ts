@@ -1,10 +1,10 @@
 import { Compile } from "./Compile";
+import { chroot, getpwnam } from "@andersbakken/fisk-native";
 import assert from "assert";
 import fs from "fs";
 import minimist from "minimist";
 import os from "os";
 import path from "path";
-import posix from "posix";
 
 const argv = minimist(process.argv.slice(2));
 
@@ -35,7 +35,7 @@ process.on("uncaughtException", (err: Error) => {
 let pwd;
 if (argv.user) {
     try {
-        pwd = posix.getpwnam(argv.user);
+        pwd = getpwnam(argv.user);
     } catch (err) {
         console.error("Couldn't find user", argv.user);
         throw err;
@@ -50,7 +50,7 @@ if (argv.user) {
 
 try {
     console.log("Chrooting to", argv.root);
-    posix.chroot(argv.root);
+    chroot(argv.root);
 } catch (err) {
     console.error("Changing root or user failed", err);
     process.exit(1);

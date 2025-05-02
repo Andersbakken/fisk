@@ -742,7 +742,7 @@ void Client::runLocal(const std::string &reason)
     }
 }
 
-static bool gettime(timeval *time)
+static bool gettime(struct timeval *time)
 {
 #if defined(__APPLE__)
     static mach_timebase_info_data_t info;
