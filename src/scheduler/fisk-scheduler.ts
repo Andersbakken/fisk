@@ -6,6 +6,7 @@ import { ObjectCacheManager } from "./ObjectCacheManager";
 import { Peak } from "./Peak";
 import { Server } from "./Server";
 import { common as commonFunc } from "../common";
+import { setrlimit } from "../fisk-native";
 import assert from "assert";
 import bytes from "bytes";
 import compareVersions from "compare-versions";
@@ -14,7 +15,6 @@ import fs from "fs-extra";
 import humanizeDuration from "humanize-duration";
 import options from "@jhanssen/options";
 import path from "path";
-import posix from "posix";
 import type { Builder } from "./Builder";
 import type { BuilderAddedMessage, BuilderRemovedMessage } from "../common/BuilderAddedOrRemovedMessage";
 import type { CacheHitMessage } from "./CacheHitMessage";
@@ -1500,7 +1500,7 @@ Environments.instance
         const limit = option.int("max-file-descriptors");
         if (limit) {
             console.log("setting limit", limit);
-            posix.setrlimit("nofile", { soft: limit });
+            setrlimit("nofile", { soft: limit });
         }
     })
     .then(purgeEnvironmentsToMaxSize)

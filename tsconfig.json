@@ -1,10 +1,11 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "esnext",
         "newLine": "LF",
-        "module": "es6",
+        "module": "esnext",
         "moduleResolution": "node",
         "typeRoots": ["./src/typings"],
+        "forceConsistentCasingInFileNames": true,
         "pretty": true,
         "noImplicitAny": true,
         "esModuleInterop": true,

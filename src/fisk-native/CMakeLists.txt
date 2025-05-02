@@ -14,5 +14,5 @@ set_target_properties(fisk-native
     PROPERTIES
     PREFIX ""
     SUFFIX ".node"
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}  # This will put the .node file in the build directory
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

@@ -313,6 +313,7 @@ int main(int argc, char **argv)
         }
     }
 
+    DEBUG("GOT HERE %d", static_cast<bool>(Config::objectCache));
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
         while (!data.preprocessed->done()

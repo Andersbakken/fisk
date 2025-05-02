@@ -1,8 +1,8 @@
 import commonjs from "@rollup/plugin-commonjs";
-import resolve from "@rollup/plugin-node-resolve";
-import json from "@rollup/plugin-json";
-import typescript from "rollup-plugin-typescript2";
 import hashbang from "rollup-plugin-hashbang";
+import json from "@rollup/plugin-json";
+import resolve from "@rollup/plugin-node-resolve";
+import typescript from "rollup-plugin-typescript2";
 
 const plugins = [
     resolve({ preferBuiltins: true }),
@@ -11,7 +11,7 @@ const plugins = [
         tsconfig: `tsconfig.json`,
         cacheRoot: ".cache"
     }),
-    hashbang(),
+    hashbang.default(),
     json()
 ];
 
@@ -21,6 +21,12 @@ function onwarn(warning) {
     }
 
     console.warn(warning.message);
+}
+
+function rollupExternal(id) {
+    // console.log("External module:", id);
+    return id.endsWith("fisk-native.node");
+    // return false;
 }
 
 // Define forms
@@ -52,7 +58,7 @@ export default [
     {
         input: "src/builder/VM_runtime/VM_runtime.ts",
         plugins,
-        external: ["posix"],
+        external: rollupExternal,
         output: {
             file: "builder/VM_runtime.js",
             format,
@@ -64,7 +70,7 @@ export default [
     {
         input: "src/scheduler/fisk-scheduler.ts",
         plugins,
-        external: ["posix"],
+        external: rollupExternal,
         output: {
             file: "scheduler/fisk-scheduler.js",
             format,

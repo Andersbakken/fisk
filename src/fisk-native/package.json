@@ -1,16 +1,7 @@
 {
-  "name": "native-addon",
-  "version": "1.0.0",
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "cmake-js compile && tsc",
-    "start": "node dist/index.js"
-  },
-  "devDependencies": {
-    "cmake-js": "^7.0.0",
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "node-addon-api": "^7.0.0"
-  }
+    "name": "fisk-native",
+    "version": "1.0.0",
+    "main": "index.mjs",
+    "types": "index.d.ts",
+    "type": "module"
 }

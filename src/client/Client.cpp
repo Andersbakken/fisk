@@ -742,7 +742,7 @@ void Client::runLocal(const std::string &reason)
     }
 }
 
-static bool gettime(timeval *time)
+static bool gettime(struct timeval *time)
 {
 #if defined(__APPLE__)
     static mach_timebase_info_data_t info;
@@ -753,7 +753,7 @@ static bool gettime(timeval *time)
         mach_timebase_info(&info);
     }
     machtime = machtime * info.numer / (info.denom * 1000); // microseconds
-    time->tv_sec = static_cast<long>(machtime / 1000000);
+    time->tv_sec = (long)(machtime / 1000000);
     time->tv_usec = machtime % 1000000;
 #elif defined(__linux__)
     timespec spec;
@@ -775,7 +775,7 @@ unsigned long long Client::mono()
 {
     timeval time;
     if (gettime(&time)) {
-        return (time.tv_sec * static_cast<uint64_t>(1000)) + (time.tv_usec / static_cast<uint64_t>(1000));
+        return (time.tv_sec * (double)1000) + (time.tv_usec / (double)(1000));
     }
     return 0;
 }

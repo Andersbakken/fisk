@@ -10,6 +10,7 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
 add_subdirectory(3rdparty)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(src/client)
+add_subdirectory(src/fisk-native)
 
 set(TS_DEPS
     .eslintrc
