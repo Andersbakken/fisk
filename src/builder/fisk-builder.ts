@@ -828,20 +828,27 @@ server.on("job", (job: Job) => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
-                const forCache: Contents[] = event.files.map((f: CompileFinishedEventFile) => ({
-                    contents: fs.readFileSync(f.absolute),
-                    path: f.path
-                }));
-                const contents: Contents[] = !j.job.compressed
-                    ? forCache
-                    : forCache.map((x) => ({
-                          path: x.path,
-                          contents: x.contents.byteLength ? zlib.gzipSync(x.contents) : x.contents
-                      }));
+                const contents: Contents[] = event.files.map((f: CompileFinishedEventFile) => {
+                    let fileContents = fs.readFileSync(f.absolute);
+                    let uncompressed: Buffer | undefined;
+                    if (j.job.compressed) {
+                        uncompressed = fileContents;
+                        fileContents = zlib.gzipSync(fileContents);
+                    }
+                    return {
+                        contents: fileContents,
+                        uncompressed,
+                        path: f.path
+                    };
+                });
                 const response: Response = {
                     type: "response",
                     index: contents.map((item) => {
-                        return { path: item.path, bytes: item.contents.length };
+                        return {
+                            path: item.path,
+                            bytes: item.contents.length,
+                            uncompressedSize: item.uncompressed?.byteLength ?? item.contents.byteLength
+                        };
                     }),
                     success: event.success,
                     exitCode: event.exitCode,
@@ -866,7 +873,7 @@ server.on("job", (job: Job) => {
                     response.sourceFile = jobJob.sourceFile;
                     response.commandLine = jobJob.commandLine;
                     response.environment = jobJob.hash;
-                    objectCache.add(response, forCache);
+                    objectCache.add(response, contents);
                 }
 
                 contents.forEach((x) => {

@@ -9,7 +9,7 @@ export class ObjectCacheItem {
 
     get contentsSize(): number {
         return this.response.index.reduce((total, item) => {
-            return total + item.bytes;
+            return total + item.uncompressedSize;
         }, 0);
     }
     get fileSize(): number {

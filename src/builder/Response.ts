@@ -1,5 +1,6 @@
 interface IndexItem {
     bytes: number;
+    uncompressedSize: number;
 }
 
 export interface Response {
