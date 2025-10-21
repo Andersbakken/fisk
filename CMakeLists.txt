@@ -82,11 +82,13 @@ set(TS_DEPS
     src/scheduler/untarFile.ts
     tsconfig.json)
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-builder.js ${CMAKE_CURRENT_LIST_DIR}/dist/VM_runtime.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-scheduler.js
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/
-    DEPENDS ${TS_DEPS}
-    COMMENT "Building typescript"
-    COMMAND npm run build)
+if (NOT FISK_SKIP_TYPESCRIPT)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-builder.js ${CMAKE_CURRENT_LIST_DIR}/dist/VM_runtime.js ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-scheduler.js
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/
+        DEPENDS ${TS_DEPS}
+        COMMENT "Building typescript"
+        COMMAND npm run build)
 
-add_custom_target(graph ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js)
+    add_custom_target(graph ALL DEPENDS ${CMAKE_CURRENT_LIST_DIR}/dist/fisk-daemon.js)
+endif ()
