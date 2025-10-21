@@ -284,6 +284,7 @@ int main(int argc, char **argv)
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
+    headers["x-fisk-supports-compressed-response"] = "true";
     {
         std::string builder = Config::builder;
         if (!builder.empty())

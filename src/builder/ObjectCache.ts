@@ -183,7 +183,7 @@ export class ObjectCache extends EventEmitter {
 
         let remaining = 0;
         response.index.forEach((file) => {
-            remaining += file.uncompressedSize;
+            remaining += file.bytes; // Cache stores compressed, so use compressed size
         });
 
         const pendingItem = new ObjectCachePendingItem(response, absolutePath, remaining);
@@ -193,7 +193,7 @@ export class ObjectCache extends EventEmitter {
         });
         this.pending[response.sha1] = pendingItem;
         contents.forEach((c: Contents) => {
-            pendingItem.write(c.uncompressed ?? c.contents);
+            pendingItem.write(c.contents); // Cache stores compressed data
         });
         pendingItem.end().then(() => {
             if (this.pending[response.sha1] === pendingItem) {

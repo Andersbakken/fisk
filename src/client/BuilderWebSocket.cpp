@@ -201,7 +201,7 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     }
 
     bool ok;
-    if (Config::compress && !Client::data().objectCache) {
+    if (Config::compress) {
         ok = Client::uncompressToFile(front.path, f, data, len);
     } else {
         ok = fwrite(data, 1, len, f) == len;

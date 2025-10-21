@@ -192,7 +192,7 @@ export class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
-        console.log("going for it", compiler, args);
+        console.log(`Compiling source file: ${sourceFile}\n${[compiler, ...args].join(" ")}`);
         // const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
         const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, args, {
             /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
@@ -247,7 +247,7 @@ export class Compile extends EventEmitter {
                                 }
                             }
                         } catch (err) {
-                            /* */
+                            console.error("Got an error file", path.join(directory, file), err);
                         }
                     });
                 } catch (err: unknown) {

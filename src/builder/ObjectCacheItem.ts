@@ -9,7 +9,7 @@ export class ObjectCacheItem {
 
     get contentsSize(): number {
         return this.response.index.reduce((total, item) => {
-            return total + item.uncompressedSize;
+            return total + item.bytes; // Cache stores compressed, so use compressed size
         }, 0);
     }
     get fileSize(): number {

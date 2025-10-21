@@ -84,7 +84,13 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
         if (!item) {
             throw new Error("Couldn't find item " + job.sha1);
         }
-        job.send(Object.assign({ objectCache: true }, item?.response));
+        // Cache stores compressed data. If client doesn't want compression, we need to uncompress
+        const response = Object.assign({ objectCache: true }, item?.response);
+        if (!job.compressed) {
+            // Client wants uncompressed, update metadata to reflect we'll send uncompressed
+            response.index = response.index.map((f) => ({ ...f, bytes: f.uncompressedSize }));
+        }
+        job.send(response);
         job.objectcache = true;
         pointOfNoReturn = true;
         fd = fs.openSync(path.join(objectCache.dir, item.response.sha1), "r");
@@ -112,6 +118,7 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                 finish();
                 return;
             }
+            // Cache stores compressed data (f.bytes is compressed size)
             const buffer = Buffer.allocUnsafe(f.bytes);
             // console.log("reading from", file, path.join(objectCache.dir, item.response.sha1), pos);
             assert(fd !== undefined, "Must have fd");
@@ -131,7 +138,12 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                 } else {
                     // console.log("got good response from file", file);
                     // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
-                    job.send(buffer);
+                    let sendBuffer = buffer;
+                    // If client doesn't want compression, decompress the cached data
+                    if (!job.compressed && buffer.byteLength > 0) {
+                        sendBuffer = zlib.gunzipSync(buffer);
+                    }
+                    job.send(sendBuffer);
                     pos += read;
                     if (++fileIdx < item.response.index.length) {
                         work();
@@ -828,26 +840,36 @@ server.on("job", (job: Job) => {
                 }
 
                 // this can't be async, the directory is removed after the event is fired
+                // Always compress for cache storage, but send based on client preference
                 const contents: Contents[] = event.files.map((f: CompileFinishedEventFile) => {
-                    let fileContents = fs.readFileSync(f.absolute);
-                    let uncompressed: Buffer | undefined;
-                    if (j.job.compressed) {
-                        uncompressed = fileContents;
-                        fileContents = zlib.gzipSync(fileContents);
-                    }
+                    const uncompressed = fs.readFileSync(f.absolute);
+                    const compressed = uncompressed.byteLength > 0 ? zlib.gzipSync(uncompressed) : uncompressed;
                     return {
-                        contents: fileContents,
+                        contents: compressed, // Always store compressed for cache
                         uncompressed,
                         path: f.path
                     };
                 });
+
+                // Prepare data to send to client (compressed or uncompressed based on preference)
+                const toSend = contents.map((item) => {
+                    assert(item.uncompressed, "Must have uncompressed data");
+                    return {
+                        contents: j.job.compressed ? item.contents : item.uncompressed,
+                        path: item.path
+                    };
+                });
+
                 const response: Response = {
                     type: "response",
-                    index: contents.map((item) => {
+                    index: toSend.map((item) => {
+                        const original = contents.find((c) => c.path === item.path);
+                        assert(original, "Must have original contents");
+                        assert(original.uncompressed, "Must have uncompressed data");
                         return {
                             path: item.path,
                             bytes: item.contents.length,
-                            uncompressedSize: item.uncompressed?.byteLength ?? item.contents.byteLength
+                            uncompressedSize: original.uncompressed.byteLength
                         };
                     }),
                     success: event.success,
@@ -870,14 +892,26 @@ server.on("job", (job: Job) => {
                     response.sha1 &&
                     objectCache.state(response.sha1) === "none"
                 ) {
-                    response.sourceFile = jobJob.sourceFile;
-                    response.commandLine = jobJob.commandLine;
-                    response.environment = jobJob.hash;
-                    objectCache.add(response, contents);
+                    // Cache metadata needs to reflect compressed sizes since we store compressed
+                    const cacheResponse = {
+                        ...response,
+                        index: contents.map((item) => {
+                            assert(item.uncompressed, "Must have uncompressed data");
+                            return {
+                                path: item.path,
+                                bytes: item.contents.length, // Compressed size
+                                uncompressedSize: item.uncompressed.byteLength
+                            };
+                        })
+                    };
+                    cacheResponse.sourceFile = jobJob.sourceFile;
+                    cacheResponse.commandLine = jobJob.commandLine;
+                    cacheResponse.environment = jobJob.hash;
+                    objectCache.add(cacheResponse, contents);
                 }
 
-                contents.forEach((x) => {
-                    if (x.contents.byteLength) {
+                toSend.forEach((x) => {
+                    if (x.contents && x.contents.byteLength) {
                         jobJob.send(x.contents);
                     }
                 });
