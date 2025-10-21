@@ -4,6 +4,7 @@ import assert from "assert";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import util from "util";
 import type { Options } from "@jhanssen/options";
 
 export class Client extends EventEmitter {
@@ -114,7 +115,8 @@ export class Client extends EventEmitter {
         });
 
         this.ws.on("message", (msg) => {
-            const error = (err: string): void => {
+            const error = (...args: unknown[]): void => {
+                const err = util.format(...args);
                 if (this.ws) {
                     this.ws.send(`{"error": "${err}"}`);
                     this.ws.close();
@@ -141,7 +143,7 @@ export class Client extends EventEmitter {
                         return;
                     }
                     if (!json.type) {
-                        error("Bad message, no type");
+                        error("Bad message, no type", json);
                         return;
                     }
 
