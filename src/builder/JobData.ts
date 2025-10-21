@@ -12,4 +12,5 @@ export interface JobData {
     priority?: number;
     id: number;
     builderIp?: string;
+    supportsCompressedResponse?: boolean;
 }

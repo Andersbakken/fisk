@@ -102,6 +102,7 @@ export class Server extends EventEmitter {
                     sha1: String(req.headers["x-fisk-sha1"]),
                     sourceFile: String(req.headers["x-fisk-sourcefile"]),
                     user: String(req.headers["x-fisk-user"]),
+                    supportsCompressedResponse: req.headers["x-fisk-supports-compressed-response"] === "true",
                     ws
                 });
 

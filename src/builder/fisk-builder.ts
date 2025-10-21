@@ -84,10 +84,12 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
         if (!item) {
             throw new Error("Couldn't find item " + job.sha1);
         }
-        // Cache stores compressed data. If client doesn't want compression, we need to uncompress
+        // Cache stores compressed data.
+        // Only send compressed if client both wants compression AND supports compressed responses from cache
+        const sendCompressed = job.compressed && job.supportsCompressedResponse;
         const response = Object.assign({ objectCache: true }, item?.response);
-        if (!job.compressed) {
-            // Client wants uncompressed, update metadata to reflect we'll send uncompressed
+        if (!sendCompressed) {
+            // Client wants uncompressed (or doesn't support compressed cache), update metadata
             response.index = response.index.map((f) => ({ ...f, bytes: f.uncompressedSize }));
         }
         job.send(response);
@@ -139,8 +141,8 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                     // console.log("got good response from file", file);
                     // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
                     let sendBuffer = buffer;
-                    // If client doesn't want compression, decompress the cached data
-                    if (!job.compressed && buffer.byteLength > 0) {
+                    // Decompress if client doesn't support compressed responses from cache
+                    if (!sendCompressed && buffer.byteLength > 0) {
                         sendBuffer = zlib.gunzipSync(buffer);
                     }
                     job.send(sendBuffer);
@@ -851,11 +853,13 @@ server.on("job", (job: Job) => {
                     };
                 });
 
-                // Prepare data to send to client (compressed or uncompressed based on preference)
+                // Prepare data to send to client (compressed or uncompressed based on preference and capability)
+                // Only send compressed if client wants it AND supports compressed responses
+                const sendCompressed = j.job.compressed && j.job.supportsCompressedResponse;
                 const toSend = contents.map((item) => {
                     assert(item.uncompressed, "Must have uncompressed data");
                     return {
-                        contents: j.job.compressed ? item.contents : item.uncompressed,
+                        contents: sendCompressed ? item.contents : item.uncompressed,
                         path: item.path
                     };
                 });

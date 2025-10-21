@@ -22,6 +22,7 @@ export class Job extends EventEmitter implements JobData {
     connectTime?: number;
     wait?: boolean;
     objectcache?: boolean;
+    supportsCompressedResponse?: boolean;
     heartbeatTimer?: NodeJS.Timeout;
 
     constructor(data: JobData) {
@@ -37,6 +38,7 @@ export class Job extends EventEmitter implements JobData {
         this.sha1 = data.sha1;
         this.id = data.id;
         this.builderIp = data.builderIp;
+        this.supportsCompressedResponse = data.supportsCompressedResponse;
     }
 
     get readyState(): number {
