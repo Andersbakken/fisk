@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import type { Options } from "@jhanssen/options";
 
-const Version = 5;
+const Version = 6;
 
 function cacheDir(option: Options): string {
     let dir = option("cache-dir");
