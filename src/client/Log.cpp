@@ -86,6 +86,29 @@ static void logTime(FILE *f, unsigned long long elapsed)
     fprintf(f, "%s pid: %llu: elapsed: %llu.%03llu: ", buf, sPid, elapsed ? elapsed / 1000 : 0, elapsed % 1000);
 }
 
+static void writeWithPrefix(FILE *f, const std::string &string, bool addPrefix, unsigned long long elapsed)
+{
+    if (!addPrefix) {
+        fwrite(string.c_str(), 1, string.size(), f);
+        return;
+    }
+
+    size_t start = 0;
+    size_t pos = 0;
+    while (pos < string.size()) {
+        if (string[pos] == '\n') {
+            logTime(f, elapsed);
+            fwrite(string.c_str() + start, 1, pos - start + 1, f);
+            start = pos + 1;
+        }
+        pos++;
+    }
+    if (start < string.size()) {
+        logTime(f, elapsed);
+        fwrite(string.c_str() + start, 1, string.size() - start, f);
+    }
+}
+
 void Log::log(Level level, const std::string &string, unsigned int flags)
 {
     if (level < sLevel && !sLogFile)
@@ -96,10 +119,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - Client::started;
     if (level >= sLevel) {
-        if (Config::logTimePrefix) {
-            logTime(f, elapsed);
-        }
-        fwrite(string.c_str(), 1, string.size(), f);
+        writeWithPrefix(f, string, Config::logTimePrefix, elapsed);
     }
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
@@ -111,9 +131,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     }
 
     if (sLogFile) {
-        if (Config::logTimePrefix)
-            logTime(sLogFile, elapsed);
-        fwrite(string.c_str(), 1, string.size(), sLogFile);
+        writeWithPrefix(sLogFile, string, Config::logTimePrefix, elapsed);
     }
     if (!(flags & NoTrailingNewLine) && string.at(string.size() - 1) != '\n') {
         if (level >= sLevel)
