@@ -12,10 +12,7 @@ import type express from "express";
 function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder): number {
     const data = bySHA1.get(sha1);
     if (data) {
-        // Check for duplicates before adding
-        if (data.nodes.indexOf(node) === -1) {
-            data.nodes.push(node);
-        }
+        data.nodes.push(node);
         return data.nodes.length;
     }
     bySHA1.set(sha1, new SHA1Data(fileSize, node));
@@ -50,9 +47,6 @@ export class ObjectCacheManager extends EventEmitter {
     private distributeOnInsertion: boolean;
     private distributeOnCacheHit: boolean;
     private redundancy: number;
-    private inFlightFetches: Map<string, Set<Builder>>;
-    private lastCacheHitDistribution: Map<string, number>;
-    private cacheHitDistributionThrottleMs: number;
 
     hits: number;
 
@@ -61,16 +55,12 @@ export class ObjectCacheManager extends EventEmitter {
         this.hits = 0;
         this.bySHA1 = new Map();
         this.byNode = new Map();
-        this.inFlightFetches = new Map();
-        this.lastCacheHitDistribution = new Map();
         this.redundancy = option.int("object-cache-redundancy", 1);
         if (this.redundancy <= 0) {
             this.redundancy = 1;
         }
         this.distributeOnInsertion = Boolean(option("distribute-object-cache-on-insertion"));
         this.distributeOnCacheHit = Boolean(option("distribute-object-cache-on-cache-hit"));
-        // Throttle cache hit distributions to once per 5 seconds per SHA1
-        this.cacheHitDistributionThrottleMs = option.int("object-cache-hit-distribution-throttle-ms", 5000);
     }
 
     clear(): void {
@@ -81,14 +71,7 @@ export class ObjectCacheManager extends EventEmitter {
     hit(sha1: string): void {
         ++this.hits;
         if (this.distributeOnCacheHit) {
-            const now = Date.now();
-            const lastDistribution = this.lastCacheHitDistribution.get(sha1);
-
-            // Only distribute if enough time has passed since last distribution
-            if (!lastDistribution || now - lastDistribution >= this.cacheHitDistributionThrottleMs) {
-                this.lastCacheHitDistribution.set(sha1, now);
-                this.distribute({ sha1: sha1, redundancy: this.redundancy });
-            }
+            this.distribute({ sha1: sha1, redundancy: this.redundancy });
         }
     }
 
@@ -108,22 +91,9 @@ export class ObjectCacheManager extends EventEmitter {
             nodeData ? nodeData.sha1s.length : -1
         );
         if (nodeData) {
-            // Check for duplicates before adding
-            if (!nodeData.sha1s.includes(msg.sha1)) {
-                nodeData.sha1s.push(msg.sha1);
-            }
+            nodeData.sha1s.push(msg.sha1);
             nodeData.size = msg.cacheSize;
             const count = addToSHA1Map(this.bySHA1, msg.sha1, msg.fileSize, node);
-
-            // Clear in-flight tracking since the fetch completed
-            const inFlight = this.inFlightFetches.get(msg.sha1);
-            if (inFlight) {
-                inFlight.delete(node);
-                if (inFlight.size === 0) {
-                    this.inFlightFetches.delete(msg.sha1);
-                }
-            }
-
             if (this.distributeOnInsertion && count - 1 < this.redundancy) {
                 this.distribute({ sha1: msg.sha1, redundancy: this.redundancy });
             }
@@ -151,15 +121,6 @@ export class ObjectCacheManager extends EventEmitter {
             }
             removeFromSHA1Map(this.bySHA1, msg.sha1, node);
             nodeData.size = msg.cacheSize;
-
-            // Clean up in-flight tracking if this object was being fetched
-            const inFlight = this.inFlightFetches.get(msg.sha1);
-            if (inFlight) {
-                inFlight.delete(node);
-                if (inFlight.size === 0) {
-                    this.inFlightFetches.delete(msg.sha1);
-                }
-            }
         } else {
             console.error("remove: We don't seem to have this node", node.ip + ":" + node.port);
         }
@@ -199,16 +160,6 @@ export class ObjectCacheManager extends EventEmitter {
         this.byNode.delete(node);
         nodeData.sha1s.forEach((sha1) => {
             removeFromSHA1Map(this.bySHA1, sha1, node);
-        });
-
-        // Clean up any in-flight fetches for this node
-        this.inFlightFetches.forEach((nodes, sha1) => {
-            if (nodes.has(node)) {
-                nodes.delete(node);
-                if (nodes.size === 0) {
-                    this.inFlightFetches.delete(sha1);
-                }
-            }
         });
     }
 
@@ -320,11 +271,6 @@ export class ObjectCacheManager extends EventEmitter {
                         if (value.nodes.indexOf(node) !== -1) {
                             continue;
                         }
-                        // Skip if node is already fetching this SHA1
-                        const inFlight = this.inFlightFetches.get(sha);
-                        if (inFlight && inFlight.has(node)) {
-                            continue;
-                        }
                         let data = commands.get(node);
                         let available;
                         if (data) {
@@ -376,15 +322,6 @@ export class ObjectCacheManager extends EventEmitter {
                 }
                 count += value.objects.length;
                 if (!dry) {
-                    // Track in-flight fetches
-                    value.objects.forEach((obj: any) => {
-                        let inFlight = this.inFlightFetches.get(obj.sha1);
-                        if (!inFlight) {
-                            inFlight = new Set();
-                            this.inFlightFetches.set(obj.sha1, inFlight);
-                        }
-                        inFlight.add(key);
-                    });
                     key.send({ type: "fetch_cache_objects", objects: value.objects });
                 }
             }
