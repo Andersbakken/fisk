@@ -42,7 +42,6 @@ set(TS_DEPS
     src/common/JobMonitorMessage.ts
     src/common/ObjectCacheMessage.ts
     src/common/index.ts
-    src/daemon/Client.ts
     src/daemon/ClientBuffer.ts
     src/daemon/Compile.ts
     src/daemon/Constants.ts
