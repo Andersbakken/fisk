@@ -167,6 +167,10 @@ export class ObjectCache extends EventEmitter {
     }
 
     add(response: Response, contents: Contents[]): void {
+        if (!response.sha1) {
+            console.error("Cannot add to cache without valid sha1", response);
+            return;
+        }
         if (response.sha1 in this.pending) {
             console.log("Already writing this, I suppose this is possible", response);
             return;
@@ -189,28 +193,28 @@ export class ObjectCache extends EventEmitter {
         const pendingItem = new ObjectCachePendingItem(response, absolutePath, remaining);
         pendingItem.file.on("error", (err) => {
             console.error("Failed to write pendingItem", response, err);
-            delete this.pending[response.sha1];
+            delete this.pending[response.sha1!];
         });
-        this.pending[response.sha1] = pendingItem;
+        this.pending[response.sha1!] = pendingItem;
         contents.forEach((c: Contents) => {
             pendingItem.write(c.contents); // Cache stores compressed data
         });
         pendingItem.end().then(() => {
-            if (this.pending[response.sha1] === pendingItem) {
+            if (this.pending[response.sha1!] === pendingItem) {
                 const cacheItem = new ObjectCacheItem(response, pendingItem.jsonLength);
                 try {
-                    const stat = fs.statSync(path.join(this.dir, response.sha1));
+                    const stat = fs.statSync(path.join(this.dir, response.sha1!));
                     // console.log("stat is", stat.size, "for", path.join(this.dir, response.sha1));
                     // console.log("shit", cacheItem);
                     // console.log("ass", pendingItem);
                     if (cacheItem.fileSize !== stat.size) {
                         throw new Error(
-                            `Wrong file size for ${path.join(this.dir, response.sha1)}, should have been ${
+                            `Wrong file size for ${path.join(this.dir, response.sha1!)}, should have been ${
                                 cacheItem.fileSize
                             } but ended up being ${stat.size}`
                         );
                     }
-                    this.cache[response.sha1] = cacheItem;
+                    this.cache[response.sha1!] = cacheItem;
                     // console.log(response);
                     this.emit("added", {
                         sha1: response.sha1,
@@ -234,7 +238,7 @@ export class ObjectCache extends EventEmitter {
                     }
                 }
 
-                delete this.pending[response.sha1];
+                delete this.pending[response.sha1!];
             }
         });
     }

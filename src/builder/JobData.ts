@@ -5,7 +5,7 @@ export interface JobData {
     ip: string;
     hash: string;
     name: string;
-    sha1: string;
+    sha1?: string;
     hostname?: string;
     user?: string;
     sourceFile?: string;

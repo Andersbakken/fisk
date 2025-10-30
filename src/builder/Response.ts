@@ -6,7 +6,7 @@ interface IndexItem {
 export interface Response {
     type: "response";
     // path: string;
-    sha1: string;
+    sha1?: string;
     index: IndexItem[];
     error?: string;
     exitCode: number;

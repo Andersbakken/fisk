@@ -8,7 +8,7 @@ export class Job extends EventEmitter implements JobData {
     hash: string;
     name: string;
     id: number;
-    sha1: string;
+    sha1?: string;
 
     hostname?: string;
     user?: string;

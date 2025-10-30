@@ -66,7 +66,7 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
     // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
     // if (objectCache)
     //     console.log("objectCache", job.sha1, objectCache.state(job.sha1), objectCache.keys);
-    if (!objectCache || objectCache.state(job.sha1) !== "exists") {
+    if (!objectCache || !job.sha1 || objectCache.state(job.sha1) !== "exists") {
         return false;
     }
     const file = path.join(objectCache.dir, job.sha1);
@@ -95,7 +95,7 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
         job.send(response);
         job.objectcache = true;
         pointOfNoReturn = true;
-        fd = fs.openSync(path.join(objectCache.dir, item.response.sha1), "r");
+        fd = fs.openSync(path.join(objectCache.dir, item.response.sha1!), "r");
         // console.log("here", item.response);
         let pos = 4 + item.headerSize;
         let fileIdx = 0;
@@ -106,7 +106,9 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                     fs.closeSync(fd);
                 }
                 if (err) {
-                    objectCache?.remove(job.sha1);
+                    if (job.sha1) {
+                        objectCache?.remove(job.sha1);
+                    }
                     job.close();
                 } else {
                     assert(item, "Must have item");
@@ -132,7 +134,7 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                     }
                     assert(objectCache, "Must have objectCache");
                     console.error(
-                        `Failed to read ${f.bytes} from ${path.join(objectCache.dir, item.response.sha1)} got ${read} ${
+                        `Failed to read ${f.bytes} from ${path.join(objectCache.dir, item.response.sha1!)} got ${read} ${
                             err.message
                         }`
                     );

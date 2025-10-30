@@ -91,6 +91,13 @@ export class Server extends EventEmitter {
                 if (Array.isArray(builderIp)) {
                     builderIp = String(builderIp);
                 }
+
+                const sha1 = req.headers["x-fisk-sha1"];
+                if (Array.isArray(sha1)) {
+                    error("Bad sha1 header [" + sha1.join(", ") + "]");
+                    return;
+                }
+
                 client = new Job({
                     builderIp,
                     hash,
@@ -99,7 +106,7 @@ export class Server extends EventEmitter {
                     ip,
                     name,
                     priority: parseInt(String(req.headers["x-fisk-priority"])),
-                    sha1: String(req.headers["x-fisk-sha1"]),
+                    sha1,
                     sourceFile: String(req.headers["x-fisk-sourcefile"]),
                     user: String(req.headers["x-fisk-user"]),
                     supportsCompressedResponse: req.headers["x-fisk-supports-compressed-response"] === "true",
