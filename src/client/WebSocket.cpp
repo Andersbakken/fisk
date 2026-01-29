@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -179,25 +178,6 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
             EINTRWRAP(cret, ::close(mFD));
             mFD = -1;
             continue;
-        }
-
-        // Optimize socket for better throughput with concurrent connections
-        {
-            // Disable Nagle's algorithm for lower latency
-            int nodelay = 1;
-            setsockopt(mFD, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
-
-            // Increase socket buffer sizes (256KB) - helps especially on Mac
-            // where defaults are smaller and many concurrent connections compete for buffer space
-            int bufsize = 256 * 1024;
-            setsockopt(mFD, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize));
-            setsockopt(mFD, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize));
-
-#ifdef __APPLE__
-            // On Mac, prevent SIGPIPE on write to closed socket
-            int nosigpipe = 1;
-            setsockopt(mFD, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
-#endif
         }
 
         EINTRWRAP(ret, ::connect(mFD, addr->ai_addr, addr->ai_addrlen));
