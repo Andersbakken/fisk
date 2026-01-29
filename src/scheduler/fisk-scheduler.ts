@@ -1016,6 +1016,13 @@ server.on("compile", (compile: Compile) => {
                     bestScore = builderScore;
                     builder = s;
                     foundInCache = true;
+                    // Find which usable environment this builder has
+                    for (let i = 0; i < usableEnvs.length; ++i) {
+                        if (usableEnvs[i] in s.environments) {
+                            env = usableEnvs[i];
+                            break;
+                        }
+                    }
                 }
             });
         }
