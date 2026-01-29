@@ -17,9 +17,11 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     WARN("Got message from builder %s %s", url().c_str(),
          std::string(reinterpret_cast<const char *>(bytes), len).c_str());
     std::string err;
-    json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(bytes), len), err, json11::JsonParse::COMMENTS);
+    const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
+    json11::Json msg = json11::Json::parse(rawMsg, err, json11::JsonParse::COMMENTS);
     if (!err.empty()) {
-        ERROR("Failed to parse json from builder: %s", err.c_str());
+        ERROR("Failed to parse json from builder %s: %s (raw message: %.200s%s)",
+              url().c_str(), err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
         data.watchdog->stop();
         error = "builder json parse error";
         done = true;
@@ -43,7 +45,11 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     if (type == "response") {
         const auto success = msg["success"];
         if (!success.is_bool() || !success.bool_value()) {
-            ERROR("Builder had some issue. Build locally: %s", msg["error"].string_value().c_str());
+            const std::string builderError = msg["error"].string_value();
+            ERROR("Builder %s failed to compile %s: %s",
+                  url().c_str(),
+                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown",
+                  builderError.empty() ? "(no error message)" : builderError.c_str());
             data.watchdog->stop();
             error = "builder run failure";
             done = true;
@@ -165,7 +171,10 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         return;
     }
 
-    ERROR("Unexpected message type %s.", msg["type"].string_value().c_str());
+    ERROR("Unexpected message type '%s' from builder %s while compiling %s",
+          msg["type"].string_value().c_str(),
+          url().c_str(),
+          data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
     Client::data().watchdog->stop();
     error = "builder protocol error 5";
     done = true;
@@ -173,18 +182,23 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
 
 void BuilderWebSocket::handleFileContents(const void *data, size_t len)
 {
+    Client::Data &clientData = Client::data();
     DEBUG("Got binary data: %zu bytes", len);
     if (files.empty()) {
-        ERROR("Unexpected binary data (%zu bytes)", len);
-        Client::data().watchdog->stop();
+        ERROR("Unexpected binary data (%zu bytes) from builder %s while compiling %s - no files expected",
+              len, url().c_str(),
+              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        clientData.watchdog->stop();
         error = "builder protocol error 2";
         done = true;
         return;
     }
     File &front = files.front();
     if (len != front.size) {
-        ERROR("Unexpected file data from server for file %s expected %zu, got %zu", front.path.c_str(), front.size, len);
-        Client::data().watchdog->stop();
+        ERROR("File size mismatch from builder %s for output file %s: expected %zu bytes, got %zu bytes (source: %s)",
+              url().c_str(), front.path.c_str(), front.size, len,
+              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        clientData.watchdog->stop();
         error = "builder file data error";
         done = true;
         return;
@@ -193,8 +207,10 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     FILE *f = fopen(front.path.c_str(), "w");
     DEBUG("Opened file [%s] -> [%s] -> %p", front.path.c_str(), Client::realpath(front.path).c_str(), f);
     if (!f) {
-        ERROR("Failed to open file for writing %s (%d %s)", front.path.c_str(), errno, strerror(errno));
-        Client::data().watchdog->stop();
+        ERROR("Failed to open output file for writing: %s (%d %s) - builder: %s, source: %s",
+              front.path.c_str(), errno, strerror(errno), url().c_str(),
+              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        clientData.watchdog->stop();
         error = "builder file open error";
         done = true;
         return;
@@ -206,9 +222,12 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     } else {
         ok = fwrite(data, 1, len, f) == len;
     }
+    fclose(f);
     if (!ok) {
-        ERROR("Failed to write to file %s (%d %s)", front.path.c_str(), errno, strerror(errno));
-        Client::data().watchdog->stop();
+        ERROR("Failed to write to output file: %s (%d %s) - builder: %s, source: %s",
+              front.path.c_str(), errno, strerror(errno), url().c_str(),
+              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        clientData.watchdog->stop();
         error = "builder file write error";
         done = true;
         return;

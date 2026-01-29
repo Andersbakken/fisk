@@ -417,7 +417,10 @@ int main(int argc, char **argv)
 
     if ((data.builderHostname.empty() && data.builderIp.empty())
         || !data.builderPort) {
-        DEBUG("Have to run locally because no builder");
+        ERROR("No builder available for environment %s (source: %s). "
+              "This may indicate no builders have this compiler environment or a compatible cross-compiler.",
+              data.hash.c_str(),
+              data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         runLocal("no builder");
         return 0; // unreachable
     }
@@ -547,8 +550,11 @@ int main(int argc, char **argv)
                 Client::writeStatistics();
                 return data.exitCode;
             } else {
-                ERROR("Have to run locally because something happened with the builder %s\n%s",
+                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s",
                       data.compilerArgs->sourceFile().c_str(),
+                      data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+                      data.builderPort,
+                      data.hash.c_str(),
                       builderWebSocket.error.c_str());
 
                 runLocal("error");

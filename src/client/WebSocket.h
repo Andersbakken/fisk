@@ -22,7 +22,7 @@ public:
     bool connect(const std::string &url, const std::map<std::string, std::string> &headers);
     bool send(MessageType mode, const void *data, size_t len);
     void close(const char *reason);
-    bool hasPendingSendData() const { return !mSendBuffer.empty(); }
+    bool hasPendingSendData() const { return mSendBufferOffset < mSendBuffer.size(); }
     enum State {
         Error = -2,
         Closed = -1,
@@ -74,6 +74,7 @@ private:
     wslay_event_context *mContext { nullptr };
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
+    size_t mSendBufferOffset { 0 };
     std::vector<std::string> mHandshakeResponseHeaders;
     State mState { None };
 };

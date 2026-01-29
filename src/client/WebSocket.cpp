@@ -332,12 +332,12 @@ unsigned int WebSocket::mode() const
     case ConnectedTCP:
     case WaitingForUpgrade:
         ret = Read;
-        if (!mSendBuffer.empty())
+        if (hasPendingSendData())
             ret |= Write;
         break;
     case ConnectedWebSocket:
         ret |= Read;
-        if (wslay_event_want_write(mContext) || !mSendBuffer.empty())
+        if (wslay_event_want_write(mContext) || hasPendingSendData())
             ret |= Write;
         break;
     }
@@ -425,12 +425,15 @@ void WebSocket::onRead()
 
 void WebSocket::send()
 {
-    size_t sendBufferOffset = 0;
-    while (sendBufferOffset < mSendBuffer.size()) {
-        const ssize_t r = ::write(mFD, &mSendBuffer[sendBufferOffset], std::min<size_t>(BUFSIZ, mSendBuffer.size() - sendBufferOffset));
+    // Use larger write chunks for better throughput (64KB instead of BUFSIZ which is often 8KB)
+    static constexpr size_t writeChunkSize = 64 * 1024;
+
+    while (mSendBufferOffset < mSendBuffer.size()) {
+        const size_t remaining = mSendBuffer.size() - mSendBufferOffset;
+        const ssize_t r = ::write(mFD, &mSendBuffer[mSendBufferOffset], std::min<size_t>(writeChunkSize, remaining));
         VERBOSE("Wrote %zd bytes\n", r);
         if (r > 0) {
-            sendBufferOffset += r;
+            mSendBufferOffset += r;
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
         } else if (errno != EINTR) {
@@ -441,7 +444,9 @@ void WebSocket::send()
             break;
         }
     }
-    if (sendBufferOffset) {
-        mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + sendBufferOffset);
+    // Only compact buffer when we've consumed a significant portion (avoid O(n) erase on every write)
+    if (mSendBufferOffset > 0 && (mSendBufferOffset >= mSendBuffer.size() || mSendBufferOffset >= 256 * 1024)) {
+        mSendBuffer.erase(mSendBuffer.begin(), mSendBuffer.begin() + mSendBufferOffset);
+        mSendBufferOffset = 0;
     }
 }

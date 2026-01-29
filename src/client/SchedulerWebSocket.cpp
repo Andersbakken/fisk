@@ -10,9 +10,11 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
     if (type == WebSocket::Text) {
         Client::Data &data = Client::data();
         std::string err;
-        json11::Json msg = json11::Json::parse(std::string(reinterpret_cast<const char *>(bytes), len), err, json11::JsonParse::COMMENTS);
+        const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
+        json11::Json msg = json11::Json::parse(rawMsg, err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
-            ERROR("Failed to parse json from scheduler: %s", err.c_str());
+            ERROR("Failed to parse json from scheduler: %s (raw message: %.200s%s)",
+                  err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
             data.watchdog->stop();
             error = "scheduler json parse error";
             done = true;
@@ -20,6 +22,7 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
         }
         const std::string t = msg["type"].string_value();
         if (t == "needsEnvironment") {
+            WARN("Scheduler needs environment %s to be uploaded", data.hash.c_str());
             needsEnvironment = true;
             done = true;
         } else if (t == "builder") {
@@ -33,6 +36,17 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
             }
             data.builderPort = static_cast<uint16_t>(msg["port"].int_value());
             jobId = msg["id"].int_value();
+            if (data.builderIp.empty() && data.builderHostname.empty()) {
+                ERROR("Scheduler returned no builder for environment %s (source: %s). "
+                      "No builders have a compatible environment available.",
+                      data.hash.c_str(),
+                      data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+            } else if (!environment.empty() && environment != data.hash) {
+                WARN("Scheduler assigned alternate environment %s (requested: %s) on builder %s:%d",
+                     environment.c_str(), data.hash.c_str(),
+                     data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+                     data.builderPort);
+            }
             DEBUG("type %d", msg["port"].type());
             DEBUG("Got here %s:%d", data.builderIp.c_str(), data.builderPort);
             done = true;
@@ -45,7 +59,9 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
                   npm_version, msg["minimum_version"].string_value().c_str());
             done = true;
         } else {
-            ERROR("Unexpected message type: %s", t.c_str());
+            ERROR("Unexpected message type from scheduler: '%s' (environment: %s, source: %s)",
+                  t.c_str(), data.hash.c_str(),
+                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         }
         // } else {
         //     printf("Got binary message: %zu bytes\n", len);
