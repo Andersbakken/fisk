@@ -572,7 +572,7 @@ int main(int argc, char **argv)
     if (!Config::storePreprocessedDataOnError)
         data.preprocessed->stdOut.clear();
 
-    while (data.watchdog->timedOut()
+    while (!data.watchdog->timedOut()
            && builderWebSocket.hasPendingSendData()
            && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
         select.exec();
