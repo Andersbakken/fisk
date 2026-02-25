@@ -218,9 +218,15 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             return nullptr;
         }
 
-        if (arg == "-M" || arg == "-MM" || !strncmp(arg.c_str(), "-B", 2)) {
+        if (arg == "-M" || arg == "-MM") {
             DEBUG("%s, running local", arg.c_str());
             *localReason = Local_Preprocess;
+            return nullptr;
+        }
+
+        if (!strncmp(arg.c_str(), "-B", 2)) {
+            DEBUG("%s, running local", arg.c_str());
+            *localReason = Local_BinPath;
             return nullptr;
         }
 
@@ -626,6 +632,7 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     case Local_NoSources: return "NoSources";
     case Local_Link: return "Link";
     case Local_NoIntegratedAs: return "NoIntegratedAs";
+    case Local_BinPath: return "BinPath";
     }
     assert(0);
     return nullptr;

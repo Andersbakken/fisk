@@ -75,7 +75,8 @@ struct CompilerArgs
         Local_StdinInput,
         Local_NoSources,
         Local_Link,
-        Local_NoIntegratedAs
+        Local_NoIntegratedAs,
+        Local_BinPath
     };
     static const char *localReasonToString(LocalReason reason);
     static std::shared_ptr<CompilerArgs> create(const Client::CompilerInfo &info,
