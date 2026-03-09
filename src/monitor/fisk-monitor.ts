@@ -496,6 +496,7 @@ function formatCell(str: string, num: number, prefix?: string, suffix?: string):
 }
 
 let updateTimer: NodeJS.Timeout | undefined;
+let refreshTimer: NodeJS.Timeout | undefined;
 let timeout = 0;
 
 function updateBuilderBox(): void {
@@ -585,10 +586,13 @@ function updateBuilderBox(): void {
         builderBox.scrollTo(0);
     }
 
+    if (refreshTimer) {
+        clearTimeout(refreshTimer);
+    }
     if (newest < 60000) {
-        setTimeout(update, 1000);
+        refreshTimer = setTimeout(update, 1000);
     } else {
-        setTimeout(update, 60000);
+        refreshTimer = setTimeout(update, 60000);
     }
 }
 
