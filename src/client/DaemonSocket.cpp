@@ -1,13 +1,13 @@
 #include "DaemonSocket.h"
-#include "Config.h"
 #include "Client.h"
+#include "Config.h"
 #include "Watchdog.h"
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
-#include <arpa/inet.h>
 
 DaemonSocket::DaemonSocket()
 {
@@ -34,7 +34,7 @@ bool DaemonSocket::connect()
         return false;
     }
 
-    if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
+    if (!Client::setFlag(mFD, O_NONBLOCK | O_CLOEXEC)) {
         ::close(mFD);
         mFD = -1;
         ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
@@ -89,7 +89,7 @@ void DaemonSocket::onWrite()
         int err;
         do {
             socklen_t size = sizeof(err);
-            int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &size);
+            int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size);
 
             if (e == -1) {
                 mState = Error;
@@ -122,11 +122,7 @@ void DaemonSocket::onRead()
         ssize_t r;
         errno = 0;
         EINTRWRAP(r, ::read(mFD, buf, sizeof(buf)));
-        VERBOSE("Read from socket %s -> %ld (%d %s)",
-                Config::socket.get().c_str(),
-                r,
-                r == -1 ? errno : 0,
-                r == -1 ? strerror(errno) : "");
+        VERBOSE("Read from socket %s -> %ld (%d %s)", Config::socket.get().c_str(), r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
 
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
@@ -168,11 +164,7 @@ void DaemonSocket::write()
     do {
         ssize_t r;
         EINTRWRAP(r, ::write(mFD, mSendBuffer.c_str() + mSendBufferOffset, mSendBuffer.size() - mSendBufferOffset));
-        VERBOSE("Write to socket %s -> %zd (%d %s)",
-                Config::socket.get().c_str(),
-                r,
-                r == -1 ? errno : 0,
-                r == -1 ? strerror(errno) : "");
+        VERBOSE("Write to socket %s -> %zd (%d %s)", Config::socket.get().c_str(), r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
                 break;
@@ -200,10 +192,13 @@ void DaemonSocket::send(Command cmd)
 void DaemonSocket::send(const std::string &json)
 {
     send(JSON);
-    union {
+
+    union
+    {
         uint32_t bytes;
         char buf[sizeof(uint32_t)];
     };
+
     bytes = htonl(json.size());
     mSendBuffer.append(buf, sizeof(buf));
     mSendBuffer.append(json.c_str(), json.size());
@@ -256,34 +251,35 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
         size_t used = 0;
         // DEBUG("CHECKING MESSAGE TYPE %d", msg[ret]);
         switch (msg[ret]) {
-        case CppSlotAcquired: {
-            DEBUG("CppSlotAcquired");
-            std::unique_lock<std::mutex> lock(mMutex);
-            mHasCppSlot = true;
-            mCond.notify_one();
-            used = 1;
-            break; }
-        case CompileSlotAcquired:
-            DEBUG("CompileSlotAcquired");
-            mHasCompileSlot = true;
-            used = 1;
-            break;
-        case JSONResponse:
-            DEBUG("JSONResponse len %zu", len - ret);
-            if (ret + 4 < len) {
-                uint32_t msgLen;
-                memcpy(&msgLen, msg + ret + 1, 4);
-                msgLen = ntohl(msgLen);
-                DEBUG("Read message ret %zu msgLen %u len %zu", ret, msgLen, len);
-                if (ret + 4 + msgLen < len) {
-                    std::string json(msg + ret + 5, msgLen);
-                    used += 1 + 4 + msgLen;
-                    processJSON(json);
-                }
+            case CppSlotAcquired: {
+                DEBUG("CppSlotAcquired");
+                std::unique_lock<std::mutex> lock(mMutex);
+                mHasCppSlot = true;
+                mCond.notify_one();
+                used = 1;
+                break;
             }
-            break;
-        default:
-            break;
+            case CompileSlotAcquired:
+                DEBUG("CompileSlotAcquired");
+                mHasCompileSlot = true;
+                used = 1;
+                break;
+            case JSONResponse:
+                DEBUG("JSONResponse len %zu", len - ret);
+                if (ret + 4 < len) {
+                    uint32_t msgLen;
+                    memcpy(&msgLen, msg + ret + 1, 4);
+                    msgLen = ntohl(msgLen);
+                    DEBUG("Read message ret %zu msgLen %u len %zu", ret, msgLen, len);
+                    if (ret + 4 + msgLen < len) {
+                        std::string json(msg + ret + 5, msgLen);
+                        used += 1 + 4 + msgLen;
+                        processJSON(json);
+                    }
+                }
+                break;
+            default:
+                break;
         }
         if (used) {
             ret += used;

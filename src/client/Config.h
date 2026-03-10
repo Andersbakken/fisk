@@ -1,20 +1,24 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <json11.hpp>
-#include <string>
-#include <cstdint>
-#include <vector>
-#include <type_traits>
-#include <strings.h>
 #include <assert.h>
-#include <sstream>
+#include <cstdint>
+#include <json11.hpp>
 #include <limits>
+#include <sstream>
+#include <string>
+#include <strings.h>
+#include <type_traits>
+#include <vector>
 
 #include <functional>
 
 namespace Config {
-enum { Version = 5 };
+enum
+{
+    Version = 5
+};
+
 bool init(int &argc, char **&argv);
 void usage(FILE *f);
 
@@ -23,16 +27,39 @@ class GetterBase
 public:
     GetterBase(const char *arg, const char *help);
     virtual ~GetterBase();
-    std::string jsonKey() const { return mJsonKey; }
-    std::string environmentVariable() const { return mEnvironmentVariable; }
-    std::string commandLine() const { return mCommandLine; }
+
+    std::string jsonKey() const
+    {
+        return mJsonKey;
+    }
+
+    std::string environmentVariable() const
+    {
+        return mEnvironmentVariable;
+    }
+
+    std::string commandLine() const
+    {
+        return mCommandLine;
+    }
+
     virtual bool apply(const std::string &value) = 0;
     virtual bool apply(const json11::Json &input) = 0;
     virtual void flip() = 0;
-    bool isBoolean() const { return !requiresArgument(); }
+
+    bool isBoolean() const
+    {
+        return !requiresArgument();
+    }
+
     virtual bool requiresArgument() const = 0;
     virtual std::string toString() const = 0;
-    const char *help() const { return mHelp; }
+
+    const char *help() const
+    {
+        return mHelp;
+    }
+
 private:
     const char *mHelp;
     bool mDone { false };
@@ -45,27 +72,74 @@ class Separator : public GetterBase
 public:
     Separator(const char *hlp = nullptr)
         : GetterBase(nullptr, hlp ? hlp : "")
-    {}
+    {
+    }
+
     virtual ~Separator() override;
-    virtual bool apply(const std::string &) override { return false; }
-    virtual bool apply(const json11::Json &) override { return false; }
-    virtual void flip() override { abort(); }
-    virtual bool requiresArgument() const override { return false; }
-    virtual std::string toString() const override { return std::string(); }
+
+    virtual bool apply(const std::string &) override
+    {
+        return false;
+    }
+
+    virtual bool apply(const json11::Json &) override
+    {
+        return false;
+    }
+
+    virtual void flip() override
+    {
+        abort();
+    }
+
+    virtual bool requiresArgument() const override
+    {
+        return false;
+    }
+
+    virtual std::string toString() const override
+    {
+        return std::string();
+    }
 };
 
-template <typename T> T identity(const T &t) { return t; }
+template <typename T>
+T identity(const T &t)
+{
+    return t;
+}
+
 template <typename T>
 class Getter : public GetterBase
 {
 public:
     Getter(const char *arg, const char *hlp, const T &defaultValue = T(), const std::function<T(const T &)> &getter = identity<T>)
-        : GetterBase(arg, hlp), mValue(defaultValue), mGetter(getter)
-    {}
-    operator T() const { return mGetter(mValue); }
-    virtual bool apply(const std::string &input) override { return applyValue(input, mValue); }
-    virtual bool apply(const json11::Json &input) override { return applyJsonValue(input, mValue); }
-    virtual bool requiresArgument() const override { return !std::is_same<T, bool>::value; }
+        : GetterBase(arg, hlp)
+        , mValue(defaultValue)
+        , mGetter(getter)
+    {
+    }
+
+    operator T() const
+    {
+        return mGetter(mValue);
+    }
+
+    virtual bool apply(const std::string &input) override
+    {
+        return applyValue(input, mValue);
+    }
+
+    virtual bool apply(const json11::Json &input) override
+    {
+        return applyJsonValue(input, mValue);
+    }
+
+    virtual bool requiresArgument() const override
+    {
+        return !std::is_same<T, bool>::value;
+    }
+
     virtual std::string toString() const override
     {
         std::ostringstream str;
@@ -77,16 +151,30 @@ public:
             str << '"';
         return str.str();
     }
-    T get() const { return mGetter(mValue); }
+
+    T get() const
+    {
+        return mGetter(mValue);
+    }
+
     virtual void flip() override
     {
         assert(isBoolean());
         flip(mValue);
     }
+
 private:
     template <typename TT>
-    static void flip(TT &) { abort(); }
-    static void flip(bool &value) { value = !value; }
+    static void flip(TT &)
+    {
+        abort();
+    }
+
+    static void flip(bool &value)
+    {
+        value = !value;
+    }
+
     static bool applyValue(const std::string &input, std::string &dest)
     {
         if (input.empty())
@@ -101,15 +189,9 @@ private:
             dest = true;
             return true;
         }
-        if (!strcasecmp(input.c_str(), "true")
-            || !strcasecmp(input.c_str(), "1")
-            || !strcasecmp(input.c_str(), "on")
-            || !strcasecmp(input.c_str(), "yes")) {
+        if (!strcasecmp(input.c_str(), "true") || !strcasecmp(input.c_str(), "1") || !strcasecmp(input.c_str(), "on") || !strcasecmp(input.c_str(), "yes")) {
             dest = true;
-        } else if (!strcasecmp(input.c_str(), "false")
-                   || !strcasecmp(input.c_str(), "0")
-                   || !strcasecmp(input.c_str(), "off")
-                   || !strcasecmp(input.c_str(), "no")) {
+        } else if (!strcasecmp(input.c_str(), "false") || !strcasecmp(input.c_str(), "0") || !strcasecmp(input.c_str(), "off") || !strcasecmp(input.c_str(), "no")) {
             dest = false;
         } else {
             return false;
@@ -118,8 +200,7 @@ private:
     }
 
     template <typename Value>
-    static bool applyValue(const std::string &input, Value &dest,
-                           typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
+    static bool applyValue(const std::string &input, Value &dest, typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
                            typename std::enable_if<std::is_signed<Value>::value>::type * = nullptr)
     {
         if (input.empty())
@@ -133,8 +214,7 @@ private:
     }
 
     template <typename Value>
-    static bool applyValue(const std::string &input, Value &dest,
-                           typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
+    static bool applyValue(const std::string &input, Value &dest, typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
                            typename std::enable_if<!std::is_signed<Value>::value>::type * = nullptr)
     {
         if (input.empty())
@@ -222,6 +302,7 @@ extern Getter<bool> syncFileSystem;
 extern Getter<bool> version;
 extern Getter<bool> dumpSha1;
 extern Getter<std::string> statisticsLog;
+
 inline std::string envCache()
 {
     std::string ret = cacheDir;
@@ -231,6 +312,7 @@ inline std::string envCache()
     }
     return ret;
 }
+
 extern Getter<size_t> compileSlots;
 extern Getter<size_t> desiredCompileSlots;
 extern Getter<size_t> cppSlots;
@@ -250,5 +332,5 @@ extern Getter<bool> debug;
 extern Getter<bool> discardComments;
 extern Getter<unsigned long long> delay;
 extern Getter<bool> compress;
-}
+} // namespace Config
 #endif /* CONFIG_H */

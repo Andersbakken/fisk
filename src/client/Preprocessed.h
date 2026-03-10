@@ -2,13 +2,14 @@
 #define PREPROCESSED_H
 
 #include "Select.h"
-#include <thread>
-#include <string>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
+#include <string>
+#include <thread>
 
 struct CompilerArgs;
 class DaemonSocket;
+
 class Preprocessed
 {
 public:
@@ -23,10 +24,9 @@ public:
     unsigned long long duration { 0 };
     unsigned long long slotDuration { 0 };
 
-    static std::unique_ptr<Preprocessed> create(const std::string &compiler,
-                                                const std::shared_ptr<CompilerArgs> &args,
-                                                Select *select,
+    static std::unique_ptr<Preprocessed> create(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args, Select *select,
                                                 DaemonSocket *daemonSocket);
+
 private:
     Preprocessed();
     mutable std::mutex mMutex;

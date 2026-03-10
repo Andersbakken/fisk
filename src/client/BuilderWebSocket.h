@@ -1,13 +1,14 @@
 #ifndef BUILDERWEBSOCKET_H
 #define BUILDERWEBSOCKET_H
 
-#include "WebSocket.h"
 #include "Client.h"
 #include "Preprocessed.h"
 #include "Watchdog.h"
+#include "WebSocket.h"
 #include <string>
 
 extern "C" const char *npm_version;
+
 class BuilderWebSocket : public WebSocket
 {
 public:
@@ -17,7 +18,8 @@ public:
     virtual void onMessage(MessageType messageType, const void *bytes, size_t len) override;
     void handleFileContents(const void *data, size_t len);
 
-    struct File {
+    struct File
+    {
         std::string path;
         size_t size;
     };
@@ -27,6 +29,5 @@ public:
     std::string error;
     std::string cachedSourcePath;
 };
-
 
 #endif /* BUILDERWEBSOCKET_H */

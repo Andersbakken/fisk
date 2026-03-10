@@ -51,8 +51,7 @@ int Select::exec(int timeoutMs) const
     }
 
     const unsigned long long after = Client::mono();
-    VERBOSE("Woke up from select timeout %dms after %llums with %d sockets fired",
-            timeoutMs, after - before, ret);
+    VERBOSE("Woke up from select timeout %dms after %llums with %d sockets fired", timeoutMs, after - before, ret);
 
     size_t idx = 0;
     if (FD_ISSET(mPipe[0], &r)) {
@@ -95,4 +94,3 @@ void Select::wakeup()
         DEBUG("Pipe not there");
     }
 }
-

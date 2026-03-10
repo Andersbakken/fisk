@@ -1,9 +1,9 @@
 #ifndef SCHEDULERWEBSOCKET_H
 #define SCHEDULERWEBSOCKET_H
 
-#include "WebSocket.h"
 #include "Client.h"
 #include "Watchdog.h"
+#include "WebSocket.h"
 #include <string>
 
 extern "C" const char *npm_version;
@@ -21,6 +21,5 @@ public:
     std::string environment;
     std::vector<std::string> extraArguments;
 };
-
 
 #endif /* SCHEDULERWEBSOCKET_H */

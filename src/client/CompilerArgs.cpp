@@ -14,121 +14,124 @@
    along with Fisk.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include "CompilerArgs.h"
-#include "Log.h"
 #include "Client.h"
+#include "Log.h"
 #include <string.h>
 
-struct OptionArg {
+struct OptionArg
+{
     const char *name;
     size_t args;
     bool sha1;
-    bool operator<(const OptionArg &other) const { return strcmp(name, other.name) < 0; }
+
+    bool operator<(const OptionArg &other) const
+    {
+        return strcmp(name, other.name) < 0;
+    }
 };
 
-static const OptionArg argOptions[] = {
-    { "--CLASSPATH", 1, true },
-    { "--assert", 1, true },
-    { "--bootclasspath", 1, true },
-    { "--classpath", 1, true },
-    { "--config", 1, true },
-    { "--define-macro", 1, true },
-    { "--dyld-prefix", 1, true },
-    { "--encoding", 1, true },
-    { "--extdirs", 1, true },
-    { "--for-linker", 1, true },
-    { "--force-link", 1, true },
-    { "--include-directory", 1, true },
-    { "--include-directory-after", 1, true },
-    { "--include-prefix", 1, true },
-    { "--include-with-prefix", 1, true },
-    { "--include-with-prefix-after", 1, true },
-    { "--include-with-prefix-before", 1, true },
-    { "--language", 1, true },
-    { "--library-directory", 1, true },
-    { "--mhwdiv", 1, true },
-    { "--output", 1, true },
-    { "--output-class-directory", 1, true },
-    { "--param", 1, true },
-    { "--prefix", 1, true },
-    { "--print-file-name", 1, true },
-    { "--print-prog-name", 1, true },
-    { "--resource", 1, true },
-    { "--rtlib", 1, true },
-    { "--serialize-diagnostics", 1, true },
-    { "--std", 1, true },
-    { "--stdlib", 1, true },
-    { "--sysroot", 1, true },
-    { "--system-header-prefix", 1, true },
-    { "--undefine-macro", 1, true },
-    { "-I", 1, false },
-    { "-Xanalyzer", 1, true },
-    { "-Xassembler", 1, true },
-    { "-Xclang", 1, true },
-    { "-Xcuda-fatbinary", 1, true },
-    { "-Xcuda-ptxas", 1, true },
-    { "-Xlinker", 1, true },
-    { "-Xopenmp-target", 1, true },
-    { "-Xpreprocessor", 1, true },
-    { "-allowable_client", 1, true },
-    { "-arch", 1, true },
-    { "-arch_only", 1, true },
-    { "-arcmt-migrate-report-output", 1, true },
-    { "-bundle_loader", 1, true },
-    { "-cxx-isystem", 1, false },
-    { "-dependency-dot", 1, true },
-    { "-dependency-file", 1, true },
-    { "-dylib_file", 1, true },
-    { "-exported_symbols_list", 1, true },
-    { "-filelist", 1, true },
-    { "-fmodule-implementation-of", 1, true },
-    { "-fmodule-name", 1, true },
-    { "-fmodules-user-build-path", 1, true },
-    { "-fnew-alignment", 1, true },
-    { "-force_load", 1, true },
-    { "-framework", 1, true },
-    { "-frewrite-map-file", 1, true },
-    { "-ftrapv-handler", 1, true },
-    { "-gcc-toolchain", 1, true },
-    { "-image_base", 1, true },
-    { "-imultilib", 1, true },
-    { "-include", 1, true },
-    { "-include-pch", 1, true },
-    { "-init", 1, true },
-    { "-install_name", 1, true },
-    { "-isysroot", 1, true },
-    { "-isystem", 1, false },
-    { "-lazy_framework", 1, true },
-    { "-lazy_library", 1, true },
-    { "-meabi", 1, true },
-    { "-mllvm", 1, true },
-    { "-module-dependency-dir", 1, true },
-    { "-mthread-model", 1, true },
-    { "-multiply_defined", 1, true },
-    { "-multiply_defined_unused", 1, true },
-    { "-o", 1, true },
-    { "-read_only_relocs", 1, true },
-    { "-rpath", 1, true },
-    { "-sectalign", 3, true },
-    { "-sectcreate", 3, true },
-    { "-sectobjectsymbols", 2, true },
-    { "-sectorder", 3, true },
-    { "-seg_addr_table", 1, true },
-    { "-seg_addr_table_filename", 1, true },
-    { "-segaddr", 2, true },
-    { "-segcreate", 3, true },
-    { "-segprot", 3, true },
-    { "-segs_read_only_addr", 1, true },
-    { "-segs_read_write_addr", 1, true },
-    { "-serialize-diagnostics", 1, true },
-    { "-target", 1, true },
-    { "-umbrella", 1, true },
-    { "-unexported_symbols_list", 1, true },
-    { "-weak_framework", 1, true },
-    { "-weak_library", 1, true },
-    { "-weak_reference_mismatches", 1, true },
-    { "-x", 1, true },
-    { "-z", 1, true }
-};
+static const OptionArg argOptions[] = { { "--CLASSPATH", 1, true },
+                                        { "--assert", 1, true },
+                                        { "--bootclasspath", 1, true },
+                                        { "--classpath", 1, true },
+                                        { "--config", 1, true },
+                                        { "--define-macro", 1, true },
+                                        { "--dyld-prefix", 1, true },
+                                        { "--encoding", 1, true },
+                                        { "--extdirs", 1, true },
+                                        { "--for-linker", 1, true },
+                                        { "--force-link", 1, true },
+                                        { "--include-directory", 1, true },
+                                        { "--include-directory-after", 1, true },
+                                        { "--include-prefix", 1, true },
+                                        { "--include-with-prefix", 1, true },
+                                        { "--include-with-prefix-after", 1, true },
+                                        { "--include-with-prefix-before", 1, true },
+                                        { "--language", 1, true },
+                                        { "--library-directory", 1, true },
+                                        { "--mhwdiv", 1, true },
+                                        { "--output", 1, true },
+                                        { "--output-class-directory", 1, true },
+                                        { "--param", 1, true },
+                                        { "--prefix", 1, true },
+                                        { "--print-file-name", 1, true },
+                                        { "--print-prog-name", 1, true },
+                                        { "--resource", 1, true },
+                                        { "--rtlib", 1, true },
+                                        { "--serialize-diagnostics", 1, true },
+                                        { "--std", 1, true },
+                                        { "--stdlib", 1, true },
+                                        { "--sysroot", 1, true },
+                                        { "--system-header-prefix", 1, true },
+                                        { "--undefine-macro", 1, true },
+                                        { "-I", 1, false },
+                                        { "-Xanalyzer", 1, true },
+                                        { "-Xassembler", 1, true },
+                                        { "-Xclang", 1, true },
+                                        { "-Xcuda-fatbinary", 1, true },
+                                        { "-Xcuda-ptxas", 1, true },
+                                        { "-Xlinker", 1, true },
+                                        { "-Xopenmp-target", 1, true },
+                                        { "-Xpreprocessor", 1, true },
+                                        { "-allowable_client", 1, true },
+                                        { "-arch", 1, true },
+                                        { "-arch_only", 1, true },
+                                        { "-arcmt-migrate-report-output", 1, true },
+                                        { "-bundle_loader", 1, true },
+                                        { "-cxx-isystem", 1, false },
+                                        { "-dependency-dot", 1, true },
+                                        { "-dependency-file", 1, true },
+                                        { "-dylib_file", 1, true },
+                                        { "-exported_symbols_list", 1, true },
+                                        { "-filelist", 1, true },
+                                        { "-fmodule-implementation-of", 1, true },
+                                        { "-fmodule-name", 1, true },
+                                        { "-fmodules-user-build-path", 1, true },
+                                        { "-fnew-alignment", 1, true },
+                                        { "-force_load", 1, true },
+                                        { "-framework", 1, true },
+                                        { "-frewrite-map-file", 1, true },
+                                        { "-ftrapv-handler", 1, true },
+                                        { "-gcc-toolchain", 1, true },
+                                        { "-image_base", 1, true },
+                                        { "-imultilib", 1, true },
+                                        { "-include", 1, true },
+                                        { "-include-pch", 1, true },
+                                        { "-init", 1, true },
+                                        { "-install_name", 1, true },
+                                        { "-isysroot", 1, true },
+                                        { "-isystem", 1, false },
+                                        { "-lazy_framework", 1, true },
+                                        { "-lazy_library", 1, true },
+                                        { "-meabi", 1, true },
+                                        { "-mllvm", 1, true },
+                                        { "-module-dependency-dir", 1, true },
+                                        { "-mthread-model", 1, true },
+                                        { "-multiply_defined", 1, true },
+                                        { "-multiply_defined_unused", 1, true },
+                                        { "-o", 1, true },
+                                        { "-read_only_relocs", 1, true },
+                                        { "-rpath", 1, true },
+                                        { "-sectalign", 3, true },
+                                        { "-sectcreate", 3, true },
+                                        { "-sectobjectsymbols", 2, true },
+                                        { "-sectorder", 3, true },
+                                        { "-seg_addr_table", 1, true },
+                                        { "-seg_addr_table_filename", 1, true },
+                                        { "-segaddr", 2, true },
+                                        { "-segcreate", 3, true },
+                                        { "-segprot", 3, true },
+                                        { "-segs_read_only_addr", 1, true },
+                                        { "-segs_read_write_addr", 1, true },
+                                        { "-serialize-diagnostics", 1, true },
+                                        { "-target", 1, true },
+                                        { "-umbrella", 1, true },
+                                        { "-unexported_symbols_list", 1, true },
+                                        { "-weak_framework", 1, true },
+                                        { "-weak_library", 1, true },
+                                        { "-weak_reference_mismatches", 1, true },
+                                        { "-x", 1, true },
+                                        { "-z", 1, true } };
 
 // { "-Xarch_<arg1> <arg2>", 1, true },
 // { "-Xarch_<arg1> <arg2>", 1, true },
@@ -148,8 +151,7 @@ static inline size_t hasArg(const std::string &arg, bool &sha1)
     return 0;
 }
 
-std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &info,
-                                                   std::vector<std::string> &&arguments,
+std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &info, std::vector<std::string> &&arguments,
                                                    LocalReason *localReason)
 {
     const bool objectCache = Config::objectCache;
@@ -161,16 +163,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     std::string hasArch;
     bool hasProfileDir = false;
     bool hasProfiling = false;
-    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
-                                     && info.type == Client::CompilerType::GCC
-                                     && info.version.major >= 10);
+    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
 
     size_t i;
     if (Log::minLogLevel <= Log::Verbose || !Config::color || hasJSONDiagnostics) {
         i = 0;
         while (i < ret->commandLine.size()) {
             std::string &arg = ret->commandLine[i];
-            VERBOSE("%zu/%zu: %s", i+1, ret->commandLine.size(), arg.c_str());
+            VERBOSE("%zu/%zu: %s", i + 1, ret->commandLine.size(), arg.c_str());
             if (!Config::color) {
                 if (arg == "-fcolor-diagnostics") {
                     arg = "-fno-color-diagnostics";
@@ -197,7 +197,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
     };
 
-    for (i=1; i<ret->commandLine.size(); ++i) {
+    for (i = 1; i < ret->commandLine.size(); ++i) {
         const std::string &arg = ret->commandLine[i];
 
         if (arg == "-S") {
@@ -259,7 +259,6 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             sha1();
             continue;
         }
-
 
         if (arg == "-o") {
             if (i + 1 < ret->commandLine.size() && ret->commandLine[i + 1] == "-") {
@@ -398,19 +397,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 == ret->commandLine.size())
                 return std::shared_ptr<CompilerArgs>();
             const std::string lang = ret->commandLine.at(i);
-            const CompilerArgs::Flag languages[] = {
-                CPlusPlus,
-                C,
-                CPreprocessed,
-                CPlusPlusPreprocessed,
-                ObjectiveC,
-                ObjectiveCPreprocessed,
-                ObjectiveCPlusPlus,
-                ObjectiveCPlusPlusPreprocessed,
-                AssemblerWithCpp,
-                Assembler
-            };
-            for (size_t j=0; j<sizeof(languages) / sizeof(languages[0]); ++j) {
+            const CompilerArgs::Flag languages[] = { CPlusPlus, C, CPreprocessed, CPlusPlusPreprocessed, ObjectiveC, ObjectiveCPreprocessed, ObjectiveCPlusPlus, ObjectiveCPlusPlusPreprocessed, AssemblerWithCpp, Assembler };
+            for (size_t j = 0; j < sizeof(languages) / sizeof(languages[0]); ++j) {
                 if (lang == CompilerArgs::languageName(languages[j])) {
                     ret->flags &= ~LanguageMask;
                     ret->flags |= languages[j];
@@ -461,9 +449,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                     DEBUG("link job, building local");
                     *localReason = Local_Link;
                 } else {
-                    DEBUG("Multiple source files %s and %s",
-                          ret->commandLine[ret->sourceFileIndex].c_str(),
-                          arg.c_str());
+                    DEBUG("Multiple source files %s and %s", ret->commandLine[ret->sourceFileIndex].c_str(), arg.c_str());
                     *localReason = Local_MultiSource;
                 }
                 return nullptr;
@@ -473,32 +459,33 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                 const size_t lastDot = arg.rfind('.');
                 if (lastDot != std::string::npos) {
                     const char *ext = arg.c_str() + lastDot + 1;
+
                     // https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html
-                    struct {
+                    struct
+                    {
                         const char *suffix;
                         const Flag flag;
-                    } static const suffixes[] = {
-                        { "C", CPlusPlus },
-                        { "cc", CPlusPlus },
-                        { "cxx", CPlusPlus },
-                        { "cpp", CPlusPlus },
-                        { "cp", CPlusPlus },
-                        { "CPP", CPlusPlus },
-                        { "c++", CPlusPlus },
-                        { "ii", CPlusPlusPreprocessed },
-                        { "c", C },
-                        { "i", CPreprocessed },
-                        { "m", ObjectiveC },
-                        { "mi", ObjectiveCPreprocessed },
-                        { "M", ObjectiveCPlusPlus },
-                        { "mm", ObjectiveCPlusPlus },
-                        { "mii", ObjectiveCPlusPlusPreprocessed },
-                        { "S", Assembler },
-                        { "sx", Assembler },
-                        { "s", AssemblerWithCpp },
-                        { nullptr, None }
-                    };
-                    for (size_t ii=0; suffixes[ii].suffix; ++ii) {
+                    } static const suffixes[] = { { "C", CPlusPlus },
+                                                  { "cc", CPlusPlus },
+                                                  { "cxx", CPlusPlus },
+                                                  { "cpp", CPlusPlus },
+                                                  { "cp", CPlusPlus },
+                                                  { "CPP", CPlusPlus },
+                                                  { "c++", CPlusPlus },
+                                                  { "ii", CPlusPlusPreprocessed },
+                                                  { "c", C },
+                                                  { "i", CPreprocessed },
+                                                  { "m", ObjectiveC },
+                                                  { "mi", ObjectiveCPreprocessed },
+                                                  { "M", ObjectiveCPlusPlus },
+                                                  { "mm", ObjectiveCPlusPlus },
+                                                  { "mii", ObjectiveCPlusPlusPreprocessed },
+                                                  { "S", Assembler },
+                                                  { "sx", Assembler },
+                                                  { "s", AssemblerWithCpp },
+                                                  { nullptr, None } };
+
+                    for (size_t ii = 0; suffixes[ii].suffix; ++ii) {
                         if (!strcmp(ext, suffixes[ii].suffix)) {
                             ret->flags |= suffixes[ii].flag;
                             break;
@@ -532,7 +519,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
 
     // #warning need to handle clang_get_default_target
 
-    if (ret->flags & (AssemblerWithCpp|Assembler)) {
+    if (ret->flags & (AssemblerWithCpp | Assembler)) {
         DEBUG("Assembler, building local");
         *localReason = Local_DoNotAssemble;
         return nullptr;
@@ -563,7 +550,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         ret->commandLine.push_back("-fprofile-dir=" + dir);
     }
 
-    if (ret->flags & (HasDashMMD|HasDashMD) && !(ret->flags & HasDashMF)) {
+    if (ret->flags & (HasDashMMD | HasDashMD) && !(ret->flags & HasDashMF)) {
         const std::string out = ret->output();
         ret->commandLine.push_back("-MF");
         std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
@@ -602,17 +589,28 @@ const char *CompilerArgs::languageName(Flag flag, bool preprocessed)
             flag = preflag;
     }
     switch (flag) {
-    case CPlusPlus: return "c++";
-    case C: return "c";
-    case CPreprocessed: return "cpp-output";
-    case CPlusPlusPreprocessed: return "c++-cpp-output";
-    case ObjectiveC: return "objective-c";
-    case ObjectiveCPreprocessed: return "objective-c-cpp-output";
-    case ObjectiveCPlusPlus: return "objective-c++";
-    case ObjectiveCPlusPlusPreprocessed: return "objective-c++-cpp-output";
-    case AssemblerWithCpp: return "assembler-with-cpp";
-    case Assembler: return "assembler";
-    default: break;
+        case CPlusPlus:
+            return "c++";
+        case C:
+            return "c";
+        case CPreprocessed:
+            return "cpp-output";
+        case CPlusPlusPreprocessed:
+            return "c++-cpp-output";
+        case ObjectiveC:
+            return "objective-c";
+        case ObjectiveCPreprocessed:
+            return "objective-c-cpp-output";
+        case ObjectiveCPlusPlus:
+            return "objective-c++";
+        case ObjectiveCPlusPlusPreprocessed:
+            return "objective-c++-cpp-output";
+        case AssemblerWithCpp:
+            return "assembler-with-cpp";
+        case Assembler:
+            return "assembler";
+        default:
+            break;
     }
     return "";
 }
@@ -620,21 +618,36 @@ const char *CompilerArgs::languageName(Flag flag, bool preprocessed)
 const char *CompilerArgs::localReasonToString(LocalReason reason)
 {
     switch (reason) {
-    case Remote: return "Remote";
-    case Local_Preprocess: return "Preprocess";
-    case Local_DoNotAssemble: return "DoNotAssemble";
-    case Local_StdOutOutput: return "StdOutOutput";
-    case Local_ParseError: return "ParseError";
-    case Local_NativeArch: return "NativeArch";
-    case Local_Charset: return "Charset";
-    case Local_ExtraFiles: return "ExtraFiles";
-    case Local_MultiArch: return "MultiArch";
-    case Local_MultiSource: return "MultiSource";
-    case Local_StdinInput: return "StdinInput";
-    case Local_NoSources: return "NoSources";
-    case Local_Link: return "Link";
-    case Local_NoIntegratedAs: return "NoIntegratedAs";
-    case Local_BinPath: return "BinPath";
+        case Remote:
+            return "Remote";
+        case Local_Preprocess:
+            return "Preprocess";
+        case Local_DoNotAssemble:
+            return "DoNotAssemble";
+        case Local_StdOutOutput:
+            return "StdOutOutput";
+        case Local_ParseError:
+            return "ParseError";
+        case Local_NativeArch:
+            return "NativeArch";
+        case Local_Charset:
+            return "Charset";
+        case Local_ExtraFiles:
+            return "ExtraFiles";
+        case Local_MultiArch:
+            return "MultiArch";
+        case Local_MultiSource:
+            return "MultiSource";
+        case Local_StdinInput:
+            return "StdinInput";
+        case Local_NoSources:
+            return "NoSources";
+        case Local_Link:
+            return "Link";
+        case Local_NoIntegratedAs:
+            return "NoIntegratedAs";
+        case Local_BinPath:
+            return "BinPath";
     }
     assert(0);
     return nullptr;

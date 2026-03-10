@@ -34,9 +34,7 @@ bool Preprocessed::done() const
     return mDone;
 }
 
-std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
-                                                   const std::shared_ptr<CompilerArgs> &args,
-                                                   Select *select,
+std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args, Select *select,
                                                    DaemonSocket *daemonSocket)
 {
     const unsigned long long started = Client::mono();
@@ -47,7 +45,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
         ptr->stdOut.reserve(1024 * 1024);
         std::string commandLine = compiler;
         const size_t count = args->commandLine.size();
-        for (size_t i=1; i<count; ++i) {
+        for (size_t i = 1; i < count; ++i) {
             const std::string arg = args->commandLine.at(i);
             if (arg == "-o" && args->commandLine.size() > i + 1) {
                 ++i;
@@ -75,10 +73,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
         } else {
             ptr->slotDuration = Client::mono() - started;
             DEBUG("Running preprocess: %s", commandLine.c_str());
-            if (args->flags & (CompilerArgs::CPreprocessed
-                               |CompilerArgs::ObjectiveCPreprocessed
-                               |CompilerArgs::ObjectiveCPlusPlusPreprocessed
-                               |CompilerArgs::CPlusPlusPreprocessed)) {
+            if (args->flags & (CompilerArgs::CPreprocessed | CompilerArgs::ObjectiveCPreprocessed | CompilerArgs::ObjectiveCPlusPlusPreprocessed | CompilerArgs::CPlusPlusPreprocessed)) {
                 DEBUG("Already preprocessed. No need to do it");
                 ptr->exitStatus = Client::readFile(args->sourceFile(), ptr->stdOut) ? 0 : 1;
             } else {
@@ -95,29 +90,31 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
                     compressed.reserve(1024 * 1024);
                 }
                 DEBUG("Executing:\n%s", commandLine.c_str());
-                TinyProcessLib::Process proc(commandLine, std::string(),
-                                             [ptr, &strm, &compressed, &compressOffset](const char *bytes, size_t n) {
-                                                 VERBOSE("Preprocess appending %zu bytes to stdout", n);
-                                                 ptr->stdOut.insert(ptr->stdOut.end(), reinterpret_cast<const unsigned char *>(bytes),
-                                                                    reinterpret_cast<const unsigned char *>(bytes) + n);
-                                                 if (Config::compress) {
-                                                     unsigned char outBuf[16384];
-                                                     strm.avail_in = static_cast<uint32_t>(ptr->stdOut.size() - compressOffset);
-                                                     strm.next_in = ptr->stdOut.data() + compressOffset;
-                                                     int r;
-                                                     do {
-                                                         strm.next_out = outBuf;
-                                                         strm.avail_out = sizeof(outBuf);
-                                                         r = deflate(&strm, Z_NO_FLUSH);
-                                                         const size_t written = sizeof(outBuf) - strm.avail_out;
-                                                         compressed.insert(compressed.end(), outBuf, outBuf + written);
-                                                     } while (r != Z_STREAM_END && r != Z_BUF_ERROR);
-                                                     compressOffset = ptr->stdOut.size() - strm.avail_in;
-                                                 }
-                                             }, [ptr](const char *bytes, size_t n) {
-                                                 VERBOSE("Preprocess appending %zu bytes to stderr", n);
-                                                 ptr->stdErr.append(bytes, n);
-                                             });
+                TinyProcessLib::Process proc(
+                    commandLine,
+                    std::string(),
+                    [ptr, &strm, &compressed, &compressOffset](const char *bytes, size_t n) {
+                    VERBOSE("Preprocess appending %zu bytes to stdout", n);
+                    ptr->stdOut.insert(ptr->stdOut.end(), reinterpret_cast<const unsigned char *>(bytes), reinterpret_cast<const unsigned char *>(bytes) + n);
+                    if (Config::compress) {
+                        unsigned char outBuf[16384];
+                        strm.avail_in = static_cast<uint32_t>(ptr->stdOut.size() - compressOffset);
+                        strm.next_in = ptr->stdOut.data() + compressOffset;
+                        int r;
+                        do {
+                            strm.next_out = outBuf;
+                            strm.avail_out = sizeof(outBuf);
+                            r = deflate(&strm, Z_NO_FLUSH);
+                            const size_t written = sizeof(outBuf) - strm.avail_out;
+                            compressed.insert(compressed.end(), outBuf, outBuf + written);
+                        } while (r != Z_STREAM_END && r != Z_BUF_ERROR);
+                        compressOffset = ptr->stdOut.size() - strm.avail_in;
+                    }
+                },
+                    [ptr](const char *bytes, size_t n) {
+                    VERBOSE("Preprocess appending %zu bytes to stderr", n);
+                    ptr->stdErr.append(bytes, n);
+                });
                 VERBOSE("Preprocess calling get_status");
                 ptr->exitStatus = proc.get_exit_status();
                 if (Config::compress) {

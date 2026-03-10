@@ -1,6 +1,6 @@
 #include "Watchdog.h"
-#include "Config.h"
 #include "Client.h"
+#include "Config.h"
 #include "Log.h"
 
 Watchdog::Watchdog()
@@ -20,9 +20,7 @@ void Watchdog::transition(Stage stage)
         return;
     Watchdog::timings[mStage + 1] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
-    DEBUG("Watchdog transition from %s to %s (stage took %llu)",
-          stageName(stages[mStage]), stageName(stage),
-          Watchdog::timings[mStage + 1] - Watchdog::timings[mStage]);
+    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(stages[mStage]), stageName(stage), Watchdog::timings[mStage + 1] - Watchdog::timings[mStage]);
     assert(stages[mStage + 1] == stage);
     ++mStage;
     mTransitionTime = Client::mono();
@@ -47,49 +45,43 @@ int Watchdog::timeout()
     const unsigned long long now = Client::mono();
     mTimeoutTime = mTransitionTime;
     switch (stages[mStage + 1]) {
-    case Initial:
-        assert(0);
-        break;
-    case ConnectedToDaemon:
-        mTimeoutTime += Config::daemonConnectTimeout;
-        break;
-    case ConnectedToScheduler:
-        mTimeoutTime += Config::schedulerConnectTimeout;
-        break;
-    case PreprocessFinished:
-        mTimeoutTime += Config::preprocessTimeout;
-        break;
-    case AcquiredBuilder:
-        mTimeoutTime += Config::acquiredBuilderTimeout;
-        break;
-    case ConnectedToBuilder:
-        mTimeoutTime += Config::builderConnectTimeout;
-        break;
-    case UploadedJob:
-        mTimeoutTime += Config::uploadJobTimeout;
-        break;
-    case Finished:
-        mTimeoutTime += Config::responseTimeout;
-        break;
+        case Initial:
+            assert(0);
+            break;
+        case ConnectedToDaemon:
+            mTimeoutTime += Config::daemonConnectTimeout;
+            break;
+        case ConnectedToScheduler:
+            mTimeoutTime += Config::schedulerConnectTimeout;
+            break;
+        case PreprocessFinished:
+            mTimeoutTime += Config::preprocessTimeout;
+            break;
+        case AcquiredBuilder:
+            mTimeoutTime += Config::acquiredBuilderTimeout;
+            break;
+        case ConnectedToBuilder:
+            mTimeoutTime += Config::builderConnectTimeout;
+            break;
+        case UploadedJob:
+            mTimeoutTime += Config::uploadJobTimeout;
+            break;
+        case Finished:
+            mTimeoutTime += Config::responseTimeout;
+            break;
     }
     if (now >= mTimeoutTime) {
         DEBUG("Already timed out waiting for %s", stageName(static_cast<Stage>(mStage + 1)));
         return 0;
     }
-    VERBOSE("Setting watchdog timeout to %llu (%llu/%llu) waiting for %s",
-            mTimeoutTime - now,
-            mTimeoutTime, now,
-            stageName(static_cast<Stage>(mStage + 1)));
+    VERBOSE("Setting watchdog timeout to %llu (%llu/%llu) waiting for %s", mTimeoutTime - now, mTimeoutTime, now, stageName(static_cast<Stage>(mStage + 1)));
     return static_cast<int>(mTimeoutTime - now);
 }
 
 void Watchdog::onTimeout()
 {
     if (mState == Running && Client::mono() >= mTimeoutTime) {
-        ERROR("%d %d Watchdog timed out waiting for %s",
-              mState,
-              static_cast<int>(Config::watchdog),
-              stageName(static_cast<Stage>(stages[mStage + 1])));
+        ERROR("%d %d Watchdog timed out waiting for %s", mState, static_cast<int>(Config::watchdog), stageName(static_cast<Stage>(stages[mStage + 1])));
         // Client::runLocal(Client::acquireSlot(Client::Slot::Compile), "watchdog");
         mState = TimedOut;
     }

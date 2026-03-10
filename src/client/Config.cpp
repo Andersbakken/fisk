@@ -1,13 +1,13 @@
 #include "Config.h"
 #include "Client.h"
 #include "Log.h"
+#include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
-#include <thread>
-#include <arpa/inet.h>
-#include <sys/types.h>
 #include <sys/file.h>
+#include <sys/types.h>
+#include <thread>
+#include <unistd.h>
 
 extern char **environ;
 
@@ -25,6 +25,7 @@ static json11::Json value(const std::vector<json11::Json> &jsons, const std::str
 namespace Config {
 static std::map<std::string, GetterBase *> sGetters;
 static std::vector<GetterBase *> sOrderedGetters;
+
 GetterBase::GetterBase(const char *arg, const char *hlp)
     : mHelp(hlp)
 {
@@ -83,18 +84,24 @@ Getter<bool> color("color", "Set to false to disable colorized output", true);
 Getter<bool> jsonDiagnostics("json-diagnostics",
                              "Use json-diagnostics (-fdignostics-format=json) when possible to print proper carets for warnings and errors",
                              false);
-Getter<bool> jsonDiagnosticsRaw("json-diagnostics-raw",
-                                "Use json-diagnostics (-fdignostics-format=json) when possible but print the json directly without transforming it",
-                                false);
+Getter<bool>
+    jsonDiagnosticsRaw("json-diagnostics-raw",
+                       "Use json-diagnostics (-fdignostics-format=json) when possible but print the json directly without transforming it",
+                       false);
 
 Getter<bool> dumpSlots("dump-slots", "Dump slots info for fisk-daemon", false);
 Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<int> priority("priority", "Set to a higher value if you want to jump the line", 0);
 Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
-Getter<bool> objectCache("object-cache", "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be configured with --object-cache and the builders to have --object-cache-size", true);
-Getter<std::string> objectCacheTag("object-cache-tag", "Additional tag that gets sha1'ed into the cache key, default is username-hostname", defaultObjectCacheTag());
-Getter<bool> storePreprocessedDataOnError("store-preprocessed-data-on-error", "Set to true to store the preprocessed data on errors", false);
+Getter<bool> objectCache("object-cache",
+                         "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be "
+                         "configured with --object-cache and the builders to have --object-cache-size",
+                         true);
+Getter<std::string> objectCacheTag("object-cache-tag", "Additional tag that gets sha1'ed into the cache key, default is username-hostname",
+                                   defaultObjectCacheTag());
+Getter<bool> storePreprocessedDataOnError("store-preprocessed-data-on-error", "Set to true to store the preprocessed data on errors",
+                                          false);
 Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", true);
 Getter<bool> verify("verify", "Only verify that the npm version is correct", false);
 Getter<unsigned long long> delay("delay", "Delay this many milliseconds before starting", 0);
@@ -110,9 +117,11 @@ Getter<unsigned long long> acquiredBuilderTimeout("acquire-builder-timeout", "Se
 Getter<unsigned long long> builderConnectTimeout("builder-connect-timeout", "Set builder connect watchdog timeout", 7500);
 Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 10 * 60000);
 Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload job watchdog timeout", 15000);
-Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))", 10000); // restarts on each heartbeat which happen every 5 seconds
+Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))",
+                                           10000); // restarts on each heartbeat which happen every 5 seconds
 Getter<std::string> compiler("compiler", "Set fiskc's resolved compiler");
-Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir", getenv("HOME") ? std::string(getenv("HOME") + std::string("/.cache/fisk/client/")) : std::string(),
+Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir",
+                             getenv("HOME") ? std::string(getenv("HOME") + std::string("/.cache/fisk/client/")) : std::string(),
                              [](const std::string &value) {
                                  if (value.empty())
                                      return value;
@@ -124,9 +133,15 @@ Getter<std::string> statisticsLog("statistics-log", "Dump statistics into this f
 
 static Separator s6;
 static Separator s7("CPU allowances:");
-Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(), [](const size_t &value) { return std::max<size_t>(1, value); });
+Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::hardware_concurrency(),
+                            [](const size_t &value) {
+                                return std::max<size_t>(1, value);
+                            });
 Getter<size_t> desiredCompileSlots("desired-slots", "Number of desired compile slots", 0);
-Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2, [](const size_t &value) { return std::max<size_t>(1, value); });
+Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2,
+                        [](const size_t &value) {
+                            return std::max<size_t>(1, value);
+                        });
 Getter<std::string> releaseCppSlotMode("release-cpp-slot-mode", "Release cpp slot mode: cpp-finished or upload-finished", "cpp-finished");
 
 static Separator s8;
@@ -144,17 +159,18 @@ Getter<std::string> name("name", "Set name (used for visualization)", std::strin
         return value;
     return static_cast<std::string>(hostname);
 });
-static  Separator s10;
+static Separator s10;
 static Separator s11("Logging:");
 Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr than)", false);
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
-Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\", \"fatal\" or \"silent\")", "fatal");
+Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\", \"fatal\" or \"silent\")",
+                             "fatal");
 
 Getter<bool> logTimePrefix("log-time-prefix", "Add a time prefix to logs", false);
 Getter<bool> debug("debug", "Set log level to \"debug\"", false);
 Getter<bool> verbose("verbose", "Set log level to \"verbose\"", false);
-};
+}; // namespace Config
 
 bool Config::init(int &argc, char **&argv)
 {
@@ -202,7 +218,7 @@ bool Config::init(int &argc, char **&argv)
 
     std::vector<std::string> &originalArgs = Client::data().originalArgs;
     originalArgs.resize(argc);
-    for (int j=0; j<argc; ++j) {
+    for (int j = 0; j < argc; ++j) {
         originalArgs[j] = argv[j];
     }
 
@@ -314,7 +330,7 @@ bool Config::init(int &argc, char **&argv)
     }
 
     if (environ) {
-        for (size_t j=0; environ[j]; ++j) {
+        for (size_t j = 0; environ[j]; ++j) {
             const char *env = environ[j];
             if (strncmp(env, "FISK_", 5))
                 continue;
@@ -388,7 +404,7 @@ bool Config::init(int &argc, char **&argv)
     const std::string dir = cacheDir;
     if (!dir.empty()) {
         std::string versionFile = dir + "version";
-        int fd = open(versionFile.c_str(), O_RDONLY|O_CLOEXEC);
+        int fd = open(versionFile.c_str(), O_RDONLY | O_CLOEXEC);
         if (fd != -1) {
             flock(fd, LOCK_SH); // what if it fails?
             uint32_t ver;
@@ -403,7 +419,7 @@ bool Config::init(int &argc, char **&argv)
         Client::recursiveRmdir(dir);
         Client::recursiveMkdir(dir);
 
-        fd = open(versionFile.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+        fd = open(versionFile.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
         if (fd != -1) {
             flock(fd, LOCK_EX); // what if it fails?
             const uint32_t ver = htonl(Version);

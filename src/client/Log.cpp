@@ -1,8 +1,8 @@
 #include "Log.h"
 #include "Client.h"
-#include <unistd.h>
 #include <sys/file.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 static Log::Level sLevel = Log::Fatal;
 static FILE *sLogFile = nullptr;
@@ -14,6 +14,7 @@ static std::string sLogFileName;
 namespace Log {
 Level minLogLevel = Log::Silent;
 }
+
 Log::Level Log::logLevel()
 {
     return sLevel;

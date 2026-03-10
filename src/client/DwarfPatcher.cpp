@@ -1,13 +1,14 @@
 #include "DwarfPatcher.h"
 #include "Log.h"
-#include <elfio/elfio.hpp>
 #include <cstring>
+#include <elfio/elfio.hpp>
 #include <string>
 #include <vector>
 #include <zlib.h>
 
 // DWARF constants
-enum {
+enum
+{
     DW_AT_name = 0x03,
     DW_AT_comp_dir = 0x1b,
     DW_FORM_strp = 0x0e,
@@ -56,7 +57,8 @@ enum {
 };
 
 // ELF constants
-enum {
+enum
+{
     SHF_COMPRESSED = 0x800,
     ELFCOMPRESS_ZLIB = 1,
 };
@@ -92,84 +94,84 @@ static int64_t readSLEB128(const uint8_t *&p)
 static int formSize(uint16_t form, uint8_t addressSize, uint8_t offsetSize, const uint8_t *&infoPtr)
 {
     switch (form) {
-    case DW_FORM_addr:
-        return addressSize;
-    case DW_FORM_data1:
-    case DW_FORM_ref1:
-    case DW_FORM_flag:
-    case DW_FORM_strx1:
-    case DW_FORM_addrx1:
-        return 1;
-    case DW_FORM_data2:
-    case DW_FORM_ref2:
-    case DW_FORM_strx2:
-    case DW_FORM_addrx2:
-        return 2;
-    case DW_FORM_strx3:
-    case DW_FORM_addrx3:
-        return 3;
-    case DW_FORM_data4:
-    case DW_FORM_ref4:
-    case DW_FORM_ref_sup4:
-    case DW_FORM_strx4:
-    case DW_FORM_addrx4:
-        return 4;
-    case DW_FORM_data8:
-    case DW_FORM_ref8:
-    case DW_FORM_ref_sig8:
-    case DW_FORM_ref_sup8:
-        return 8;
-    case DW_FORM_data16:
-        return 16;
-    case DW_FORM_strp:
-    case DW_FORM_line_strp:
-    case DW_FORM_sec_offset:
-    case DW_FORM_ref_addr:
-    case DW_FORM_strp_sup:
-        return offsetSize;
-    case DW_FORM_flag_present:
-    case DW_FORM_implicit_const:
-        return 0;
-    case DW_FORM_sdata:
-        readSLEB128(infoPtr);
-        return 0; // already advanced
-    case DW_FORM_udata:
-    case DW_FORM_ref_udata:
-    case DW_FORM_loclistx:
-    case DW_FORM_rnglistx:
-    case DW_FORM_strx:
-    case DW_FORM_addrx:
-        readULEB128(infoPtr);
-        return 0; // already advanced
-    case DW_FORM_string: {
-        int len = 0;
-        while (infoPtr[len])
-            ++len;
-        return len + 1; // include null terminator
-    }
-    case DW_FORM_block1: {
-        uint8_t sz = *infoPtr++;
-        return sz;
-    }
-    case DW_FORM_block2: {
-        uint16_t sz;
-        memcpy(&sz, infoPtr, 2);
-        infoPtr += 2;
-        return sz;
-    }
-    case DW_FORM_block4: {
-        uint32_t sz;
-        memcpy(&sz, infoPtr, 4);
-        infoPtr += 4;
-        return sz;
-    }
-    case DW_FORM_block:
-    case DW_FORM_exprloc: {
-        uint64_t sz = readULEB128(infoPtr);
-        return static_cast<int>(sz);
-    }
-    default:
-        return -1;
+        case DW_FORM_addr:
+            return addressSize;
+        case DW_FORM_data1:
+        case DW_FORM_ref1:
+        case DW_FORM_flag:
+        case DW_FORM_strx1:
+        case DW_FORM_addrx1:
+            return 1;
+        case DW_FORM_data2:
+        case DW_FORM_ref2:
+        case DW_FORM_strx2:
+        case DW_FORM_addrx2:
+            return 2;
+        case DW_FORM_strx3:
+        case DW_FORM_addrx3:
+            return 3;
+        case DW_FORM_data4:
+        case DW_FORM_ref4:
+        case DW_FORM_ref_sup4:
+        case DW_FORM_strx4:
+        case DW_FORM_addrx4:
+            return 4;
+        case DW_FORM_data8:
+        case DW_FORM_ref8:
+        case DW_FORM_ref_sig8:
+        case DW_FORM_ref_sup8:
+            return 8;
+        case DW_FORM_data16:
+            return 16;
+        case DW_FORM_strp:
+        case DW_FORM_line_strp:
+        case DW_FORM_sec_offset:
+        case DW_FORM_ref_addr:
+        case DW_FORM_strp_sup:
+            return offsetSize;
+        case DW_FORM_flag_present:
+        case DW_FORM_implicit_const:
+            return 0;
+        case DW_FORM_sdata:
+            readSLEB128(infoPtr);
+            return 0; // already advanced
+        case DW_FORM_udata:
+        case DW_FORM_ref_udata:
+        case DW_FORM_loclistx:
+        case DW_FORM_rnglistx:
+        case DW_FORM_strx:
+        case DW_FORM_addrx:
+            readULEB128(infoPtr);
+            return 0; // already advanced
+        case DW_FORM_string: {
+            int len = 0;
+            while (infoPtr[len])
+                ++len;
+            return len + 1; // include null terminator
+        }
+        case DW_FORM_block1: {
+            uint8_t sz = *infoPtr++;
+            return sz;
+        }
+        case DW_FORM_block2: {
+            uint16_t sz;
+            memcpy(&sz, infoPtr, 2);
+            infoPtr += 2;
+            return sz;
+        }
+        case DW_FORM_block4: {
+            uint32_t sz;
+            memcpy(&sz, infoPtr, 4);
+            infoPtr += 4;
+            return sz;
+        }
+        case DW_FORM_block:
+        case DW_FORM_exprloc: {
+            uint64_t sz = readULEB128(infoPtr);
+            return static_cast<int>(sz);
+        }
+        default:
+            return -1;
     }
 }
 
@@ -244,15 +246,15 @@ static std::vector<uint8_t> compressSection(const std::vector<uint8_t> &uncompre
 }
 
 // Structure to track which .debug_info offsets need relocation patching
-struct AttrLocation {
+struct AttrLocation
+{
     size_t infoOffset; // offset within .debug_info where the strp value is
-    bool isName;       // true = DW_AT_name, false = DW_AT_comp_dir
+    bool isName; // true = DW_AT_name, false = DW_AT_comp_dir
 };
 
 // Parse the first CU's first DIE to find DW_AT_name and DW_AT_comp_dir positions.
 // Takes decompressed data buffers.
-static bool findAttrLocations(const uint8_t *infoData, size_t infoSize,
-                              const uint8_t *abbrevData, size_t abbrevSize,
+static bool findAttrLocations(const uint8_t *infoData, size_t infoSize, const uint8_t *abbrevData, size_t abbrevSize,
                               std::vector<AttrLocation> &locations)
 {
     const uint8_t *p = infoData;
@@ -310,7 +312,7 @@ static bool findAttrLocations(const uint8_t *infoData, size_t infoSize,
         if (code == 0)
             break;
         readULEB128(ap); // tag
-        ap++;            // has_children
+        ap++; // has_children
 
         if (code == abbrevCode) {
             while (ap < abbrevEnd) {
@@ -323,8 +325,7 @@ static bool findAttrLocations(const uint8_t *infoData, size_t infoSize,
 
                 size_t attrOffset = p - infoData;
 
-                if ((attrName == DW_AT_name || attrName == DW_AT_comp_dir)
-                    && (attrForm == DW_FORM_strp || attrForm == DW_FORM_line_strp)) {
+                if ((attrName == DW_AT_name || attrName == DW_AT_comp_dir) && (attrForm == DW_FORM_strp || attrForm == DW_FORM_line_strp)) {
                     locations.push_back({ attrOffset, attrName == DW_AT_name });
                 }
 
@@ -489,8 +490,7 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
                 syma.get_symbol(symbol, symName, symValue, symSize, symBind, symType, symSection, symOther);
 
                 if (symSection != debugStrIdx) {
-                    DEBUG("DwarfPatcher: relocation at 0x%zx targets section %d, not .debug_str (%d)",
-                          loc.infoOffset, symSection, debugStrIdx);
+                    DEBUG("DwarfPatcher: relocation at 0x%zx targets section %d, not .debug_str (%d)", loc.infoOffset, symSection, debugStrIdx);
                     continue;
                 }
 

@@ -1,20 +1,20 @@
+#include "BuilderWebSocket.h"
 #include "Client.h"
 #include "CompilerArgs.h"
 #include "Config.h"
-#include "BuilderWebSocket.h"
-#include "SchedulerWebSocket.h"
 #include "Log.h"
 #include "Preprocessed.h"
+#include "SchedulerWebSocket.h"
 #include "Select.h"
-#include <execinfo.h>
 #include "Watchdog.h"
 #include "WebSocket.h"
-#include <json11.hpp>
 #include <climits>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
+#include <execinfo.h>
+#include <json11.hpp>
 #include <unistd.h>
-#include <csignal>
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
@@ -25,6 +25,7 @@ static unsigned long long preprocessedSlotDuration = 0;
 extern "C" const char *npm_version;
 static std::string schedulerUrl();
 static int clientVerify();
+
 int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
@@ -37,14 +38,9 @@ int main(int argc, char **argv)
     std::atexit([]() {
         Client::Data &data = Client::data();
         if (Log::minLogLevel <= Log::Warn) {
-            std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)",
-                                             Client::milliseconds_since_epoch,
-                                             preprocessedDuration,
-                                             preprocessedSlotDuration);
-            for (size_t i=Watchdog::ConnectedToScheduler; i<=Watchdog::Finished; ++i) {
-                str += Client::format("\n %s: %llu (%llu)", Watchdog::stageName(static_cast<Watchdog::Stage>(i)),
-                                      data.watchdog->timings[i] - data.watchdog->timings[i - 1],
-                                      data.watchdog->timings[i] - Client::started);
+            std::string str = Client::format("since epoch: %llu preprocess time: %llu (slot time: %llu)", Client::milliseconds_since_epoch, preprocessedDuration, preprocessedSlotDuration);
+            for (size_t i = Watchdog::ConnectedToScheduler; i <= Watchdog::Finished; ++i) {
+                str += Client::format("\n %s: %llu (%llu)", Watchdog::stageName(static_cast<Watchdog::Stage>(i)), data.watchdog->timings[i] - data.watchdog->timings[i - 1], data.watchdog->timings[i] - Client::started);
             }
             Log::log(Log::Warn, str);
         }
@@ -91,7 +87,7 @@ int main(int argc, char **argv)
     if (Log::minLogLevel <= Log::Debug) {
         Log::debug("CWD: %s", Client::cwd().c_str());
         std::string ret;
-        for (int i=0; i<argc; ++i) {
+        for (int i = 0; i < argc; ++i) {
             ret += " \"";
             ret += argv[i];
             ret += '"';
@@ -142,16 +138,8 @@ int main(int argc, char **argv)
         Client::parsePath(argv[0], &fn, nullptr);
         if (fn == "fiskc") {
             bool c = true;
-            for (int i=1; i<argc; ++i) {
-                if (Client::endsWith(".cpp", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".cxx", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".cc", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".C", argv[i])
-                    || Client::endsWith(".cpp.o", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".cxx.o", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".cc.o", argv[i], Client::CaseInsensitive)
-                    || Client::endsWith(".C.o", argv[i])
-                    || (!strncmp(argv[i], "-std=", 4) && strstr(argv[i] + 4, "++"))) {
+            for (int i = 1; i < argc; ++i) {
+                if (Client::endsWith(".cpp", argv[i], Client::CaseInsensitive) || Client::endsWith(".cxx", argv[i], Client::CaseInsensitive) || Client::endsWith(".cc", argv[i], Client::CaseInsensitive) || Client::endsWith(".C", argv[i]) || Client::endsWith(".cpp.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".cxx.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".cc.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".C.o", argv[i]) || (!strncmp(argv[i], "-std=", 4) && strstr(argv[i] + 4, "++"))) {
                     c = false;
                     break;
                 }
@@ -174,10 +162,7 @@ int main(int argc, char **argv)
             return 107;
         }
 
-        DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")",
-              data.argv[0], preresolved.c_str(),
-              data.compiler.c_str(), data.resolvedCompiler.c_str(),
-              data.builderCompiler.c_str());
+        DEBUG("Resolved compiler %s (%s) to \"%s\" \"%s\" \"%s\")", data.argv[0], preresolved.c_str(), data.compiler.c_str(), data.resolvedCompiler.c_str(), data.builderCompiler.c_str());
     }
     DaemonSocket daemonSocket;
     if (!daemonSocket.connect()) {
@@ -248,7 +233,7 @@ int main(int argc, char **argv)
     Client::CompilerInfo info;
     {
         std::vector<std::string> args(data.argc);
-        for (int i=0; i<data.argc; ++i) {
+        for (int i = 0; i < data.argc; ++i) {
             // printf("%zu: %s\n", i, argv[i]);
             args[i] = data.argv[i];
         }
@@ -316,9 +301,7 @@ int main(int argc, char **argv)
 
     if (Config::objectCache) {
         DEBUG("Waiting for preprocessed");
-        while (!data.preprocessed->done()
-               && daemonSocket.state() == DaemonSocket::Connected
-               && !data.watchdog->timedOut()) {
+        while (!data.preprocessed->done() && daemonSocket.state() == DaemonSocket::Connected && !data.watchdog->timedOut()) {
             select.exec();
         }
         if (data.watchdog->timedOut()) {
@@ -373,10 +356,7 @@ int main(int argc, char **argv)
 
         select.add(schedulerWebsocket.get());
         DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket->done
-               && !data.watchdog->timedOut()
-               && schedulerWebsocket->state() >= WebSocket::None
-               && schedulerWebsocket->state() <= WebSocket::ConnectedWebSocket) {
+        while (!schedulerWebsocket->done && !data.watchdog->timedOut() && schedulerWebsocket->state() >= WebSocket::None && schedulerWebsocket->state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
 
@@ -415,8 +395,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if ((data.builderHostname.empty() && data.builderIp.empty())
-        || !data.builderPort) {
+    if ((data.builderHostname.empty() && data.builderIp.empty()) || !data.builderPort) {
         ERROR("No builder available for environment %s (source: %s). "
               "This may indicate no builders have this compiler environment or a compatible cross-compiler.",
               data.hash.c_str(),
@@ -428,9 +407,7 @@ int main(int argc, char **argv)
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredBuilder);
     BuilderWebSocket builderWebSocket;
-    builderWebSocket.hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
-                                           && info.type == Client::CompilerType::GCC
-                                           && info.version.major >= 10);
+    builderWebSocket.hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
     select.add(&builderWebSocket);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
@@ -440,9 +417,10 @@ int main(int argc, char **argv)
         DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket->environment.c_str());
         headers["x-fisk-environments"] = schedulerWebsocket->environment;
     }
-    const std::string builderUrl = Client::format("ws://%s:%d/compile",
-                                                  data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
-                                                  data.builderPort);
+    const std::string builderUrl = Client::format(
+        "ws://%s:%d/compile",
+        data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
+        data.builderPort);
     DEBUG("Connecting to builder %s", builderUrl.c_str());
     if (!builderWebSocket.connect(builderUrl, headers)) {
         DEBUG("Have to run locally because no builder connection");
@@ -450,9 +428,7 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    while (!data.watchdog->timedOut()
-           && builderWebSocket.state() < WebSocket::ConnectedWebSocket
-           && builderWebSocket.state() > WebSocket::None) {
+    while (!data.watchdog->timedOut() && builderWebSocket.state() < WebSocket::ConnectedWebSocket && builderWebSocket.state() > WebSocket::None) {
         select.exec();
     }
 
@@ -470,9 +446,7 @@ int main(int argc, char **argv)
     data.watchdog->transition(Watchdog::ConnectedToBuilder);
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
-        while (!data.preprocessed->done()
-               && daemonSocket.state() == DaemonSocket::Connected
-               && !data.watchdog->timedOut()) {
+        while (!data.preprocessed->done() && daemonSocket.state() == DaemonSocket::Connected && !data.watchdog->timedOut()) {
             select.exec();
         }
         if (data.watchdog->timedOut()) {
@@ -512,22 +486,18 @@ int main(int argc, char **argv)
     }
 
     const bool wait = builderWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
-    json11::Json::object msg {
-        { "commandLine", args },
-        { "argv0", data.compiler },
-        { "wait", wait },
-        { "compressed", Config::compress.get() },
-        { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }
-    };
+    json11::Json::object msg { { "commandLine", args },
+                               { "argv0", data.compiler },
+                               { "wait", wait },
+                               { "compressed", Config::compress.get() },
+                               { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) } };
 
     const std::string json = json11::Json(msg).dump();
     DEBUG("Sending to builder:\n%s\n", json.c_str());
     builderWebSocket.wait = wait;
     builderWebSocket.send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
-        while (!builderWebSocket.done
-               && !data.watchdog->timedOut()
-               && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+        while (!builderWebSocket.done && !data.watchdog->timedOut() && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
             select.exec();
         }
         if (builderWebSocket.done) {
@@ -550,12 +520,7 @@ int main(int argc, char **argv)
                 Client::writeStatistics();
                 return data.exitCode;
             } else {
-                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s",
-                      data.compilerArgs->sourceFile().c_str(),
-                      data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
-                      data.builderPort,
-                      data.hash.c_str(),
-                      builderWebSocket.error.c_str());
+                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket.error.c_str());
 
                 runLocal("error");
                 return 0; // unreachable
@@ -578,9 +543,7 @@ int main(int argc, char **argv)
     if (!Config::storePreprocessedDataOnError)
         data.preprocessed->stdOut.clear();
 
-    while (!data.watchdog->timedOut()
-           && builderWebSocket.hasPendingSendData()
-           && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+    while (!data.watchdog->timedOut() && builderWebSocket.hasPendingSendData() && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -601,9 +564,7 @@ int main(int argc, char **argv)
         daemonSocket.send(DaemonSocket::ReleaseCppSlot);
     }
 
-    while (!data.watchdog->timedOut()
-           && !builderWebSocket.done
-           && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+    while (!data.watchdog->timedOut() && !builderWebSocket.done && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -620,8 +581,7 @@ int main(int argc, char **argv)
     }
 
     if (!builderWebSocket.error.empty()) {
-        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s",
-              builderWebSocket.error.c_str());
+        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket.error.c_str());
         runLocal("builder error");
         return 0; // unreachable
     }
@@ -681,9 +641,7 @@ static int clientVerify()
         select.add(&schedulerWebsocket);
 
         DEBUG("Starting schedulerWebsocket");
-        while (!schedulerWebsocket.done
-               && schedulerWebsocket.state() >= WebSocket::None
-               && schedulerWebsocket.state() <= WebSocket::ConnectedWebSocket) {
+        while (!schedulerWebsocket.done && schedulerWebsocket.state() >= WebSocket::None && schedulerWebsocket.state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
         DEBUG("Finished schedulerWebsocket");

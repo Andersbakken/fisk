@@ -8,24 +8,19 @@ void BuilderWebSocket::onConnected()
 void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, size_t len)
 {
     Client::Data &data = Client::data();
-    DEBUG("Got message %s %zu bytes",
-          messageType == WebSocket::Text ? "text" : "binary",
-          len);
+    DEBUG("Got message %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
 
     if (messageType == WebSocket::Binary) {
         handleFileContents(bytes, len);
         return;
     }
 
-    WARN("Got message from builder %s %s",
-         url().c_str(),
-         std::string(reinterpret_cast<const char *>(bytes), len).c_str());
+    WARN("Got message from builder %s %s", url().c_str(), std::string(reinterpret_cast<const char *>(bytes), len).c_str());
     std::string err;
     const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
     json11::Json msg = json11::Json::parse(rawMsg, err, json11::JsonParse::COMMENTS);
     if (!err.empty()) {
-        ERROR("Failed to parse json from builder %s: %s (raw message: %.200s%s)",
-              url().c_str(), err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
+        ERROR("Failed to parse json from builder %s: %s (raw message: %.200s%s)", url().c_str(), err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
         data.watchdog->stop();
         error = "builder json parse error";
         done = true;
@@ -50,10 +45,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const auto success = msg["success"];
         if (!success.is_bool() || !success.bool_value()) {
             const std::string builderError = msg["error"].string_value();
-            ERROR("Builder %s failed to compile %s: %s",
-                  url().c_str(),
-                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown",
-                  builderError.empty() ? "(no error message)" : builderError.c_str());
+            ERROR("Builder %s failed to compile %s: %s", url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown", builderError.empty() ? "(no error message)" : builderError.c_str());
             data.watchdog->stop();
             error = "builder run failure";
             done = true;
@@ -74,13 +66,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
             } else {
                 haystack = &stdErr;
             }
-            if (haystack->empty()
-                || haystack->find("unable to rename temporary ") != std::string::npos
-                || haystack->find("execvp: No such file or directory") != std::string::npos
-                || haystack->find("cannot execute ") != std::string::npos
-                || haystack->find("cannot open ") != std::string::npos
-                || haystack->find("internal compiler error") != std::string::npos
-                || haystack->find("error trying to exec") != std::string::npos) {
+            if (haystack->empty() || haystack->find("unable to rename temporary ") != std::string::npos || haystack->find("execvp: No such file or directory") != std::string::npos || haystack->find("cannot execute ") != std::string::npos || haystack->find("cannot open ") != std::string::npos || haystack->find("internal compiler error") != std::string::npos || haystack->find("error trying to exec") != std::string::npos) {
                 ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
                       data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
                       url().c_str(),
@@ -104,9 +90,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                 }
             }
 
-            fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n%s\n",
-                    data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(),
-                    data.objectCache ? "true" : "false", npm_version, str.c_str());
+            fprintf(stderr, "error: exit code: %d Fisk builder: %s source file: %s cache: %s fisk-version: %s\n%s\n", data.exitCode, url().c_str(), data.compilerArgs->sourceFile().c_str(), data.objectCache ? "true" : "false", npm_version, str.c_str());
         }
 
         if (!data.preprocessed->stdErr.empty()) {
@@ -142,7 +126,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
 
         if (!index.empty()) {
             files.reserve(index.size());
-            for (size_t i=0; i<index.size(); ++i) {
+            for (size_t i = 0; i < index.size(); ++i) {
                 File ff;
                 ff.path = index[i]["path"].string_value();
                 ff.size = index[i]["bytes"].int_value();
@@ -156,10 +140,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                 }
                 if (!ff.size) {
                     FILE *f = fopen(ff.path.c_str(), "w");
-                    DEBUG("Opened file [%s] -> [%s] -> %p",
-                          files[0].path.c_str(),
-                          Client::realpath(files[0].path).c_str(),
-                          f);
+                    DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
                     if (!f) {
                         ERROR("Can't open file: %s", files[0].path.c_str());
                         Client::data().watchdog->stop();
@@ -179,10 +160,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         return;
     }
 
-    ERROR("Unexpected message type '%s' from builder %s while compiling %s",
-          msg["type"].string_value().c_str(),
-          url().c_str(),
-          data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+    ERROR("Unexpected message type '%s' from builder %s while compiling %s", msg["type"].string_value().c_str(), url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
     Client::data().watchdog->stop();
     error = "builder protocol error 5";
     done = true;
@@ -193,9 +171,7 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     Client::Data &clientData = Client::data();
     DEBUG("Got binary data: %zu bytes", len);
     if (files.empty()) {
-        ERROR("Unexpected binary data (%zu bytes) from builder %s while compiling %s - no files expected",
-              len, url().c_str(),
-              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        ERROR("Unexpected binary data (%zu bytes) from builder %s while compiling %s - no files expected", len, url().c_str(), clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
         clientData.watchdog->stop();
         error = "builder protocol error 2";
         done = true;
@@ -203,9 +179,7 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     }
     File &front = files.front();
     if (len != front.size) {
-        ERROR("File size mismatch from builder %s for output file %s: expected %zu bytes, got %zu bytes (source: %s)",
-              url().c_str(), front.path.c_str(), front.size, len,
-              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        ERROR("File size mismatch from builder %s for output file %s: expected %zu bytes, got %zu bytes (source: %s)", url().c_str(), front.path.c_str(), front.size, len, clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
         clientData.watchdog->stop();
         error = "builder file data error";
         done = true;
@@ -213,14 +187,9 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     }
 
     FILE *f = fopen(front.path.c_str(), "w");
-    DEBUG("Opened file [%s] -> [%s] -> %p",
-          front.path.c_str(),
-          Client::realpath(front.path).c_str(),
-          f);
+    DEBUG("Opened file [%s] -> [%s] -> %p", front.path.c_str(), Client::realpath(front.path).c_str(), f);
     if (!f) {
-        ERROR("Failed to open output file for writing: %s (%d %s) - builder: %s, source: %s",
-              front.path.c_str(), errno, strerror(errno), url().c_str(),
-              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        ERROR("Failed to open output file for writing: %s (%d %s) - builder: %s, source: %s", front.path.c_str(), errno, strerror(errno), url().c_str(), clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
         clientData.watchdog->stop();
         error = "builder file open error";
         done = true;
@@ -235,22 +204,17 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     }
     fclose(f);
     if (!ok) {
-        ERROR("Failed to write to output file: %s (%d %s) - builder: %s, source: %s",
-              front.path.c_str(), errno, strerror(errno), url().c_str(),
-              clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
+        ERROR("Failed to write to output file: %s (%d %s) - builder: %s, source: %s", front.path.c_str(), errno, strerror(errno), url().c_str(), clientData.compilerArgs ? clientData.compilerArgs->sourceFile().c_str() : "unknown");
         clientData.watchdog->stop();
         error = "builder file write error";
         done = true;
         return;
     }
 
-    if (!cachedSourcePath.empty() && clientData.compilerArgs
-        && Client::endsWith(front.path, ".o")
-        && cachedSourcePath != clientData.compilerArgs->sourceFile()) {
+    if (!cachedSourcePath.empty() && clientData.compilerArgs && Client::endsWith(front.path, ".o") && cachedSourcePath != clientData.compilerArgs->sourceFile()) {
         patchDwarfSourcePath(front.path, cachedSourcePath, clientData.compilerArgs->sourceFile());
     }
 
     files.erase(files.begin());
     done = files.empty();
 }
-

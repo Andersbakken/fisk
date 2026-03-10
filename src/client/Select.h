@@ -1,25 +1,29 @@
 #ifndef SELECT_H
 #define SELECT_H
 
-#include <set>
-#include <map>
+#include "Client.h"
+#include "Log.h"
 #include <errno.h>
-#include <string.h>
 #include <functional>
+#include <map>
+#include <set>
+#include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
-#include "Log.h"
-#include "Client.h"
 
 class Select;
+
 struct Socket
 {
     virtual ~Socket();
-    enum Mode {
+
+    enum Mode
+    {
         None = 0x0,
         Read = 0x1,
         Write = 0x2
     };
+
     virtual int fd() const = 0;
     virtual unsigned int mode() const = 0;
     virtual void onWrite() = 0;
@@ -27,6 +31,7 @@ struct Socket
     virtual void onTimeout() = 0;
     virtual int timeout() = 0;
     void wakeup();
+
 private:
     Select *mSelect { nullptr };
     friend class Select;
@@ -41,6 +46,7 @@ public:
             mPipe[0] = mPipe[1] = -1;
         }
     }
+
     ~Select()
     {
         if (mPipe[0] != -1)
@@ -52,11 +58,24 @@ public:
             socket->mSelect = nullptr;
         }
     }
-    void add(Socket *socket) { assert(!socket->mSelect); socket->mSelect = this; mSockets.insert(socket); }
-    void remove(Socket *socket) { assert(socket->mSelect == this); socket->mSelect = nullptr; mSockets.erase(socket); }
+
+    void add(Socket *socket)
+    {
+        assert(!socket->mSelect);
+        socket->mSelect = this;
+        mSockets.insert(socket);
+    }
+
+    void remove(Socket *socket)
+    {
+        assert(socket->mSelect == this);
+        socket->mSelect = nullptr;
+        mSockets.erase(socket);
+    }
 
     int exec(int timeoutMs = -1) const;
     void wakeup();
+
 private:
     std::set<Socket *> mSockets;
     int mPipe[2];

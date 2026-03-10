@@ -1,8 +1,8 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include "Config.h"
 #include "CompilerArgs.h"
+#include "Config.h"
 #include "Log.h"
 #include <assert.h>
 #include <condition_variable>
@@ -19,17 +19,20 @@
 #include <string.h>
 #include <string>
 #include <sys/stat.h>
-#include <sys/stat.h>
 #include <thread>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
-#define EINTRWRAP(VAR, BLOCK) do { VAR = BLOCK; } while (VAR == -1 && errno == EINTR)
+#define EINTRWRAP(VAR, BLOCK) \
+    do { \
+        VAR = BLOCK; \
+    } while (VAR == -1 && errno == EINTR)
 
 class Watchdog;
 class DaemonSocket;
 class SchedulerWebSocket;
 class Preprocessed;
+
 namespace Client {
 struct Data
 {
@@ -54,7 +57,8 @@ struct Data
     Watchdog *watchdog { nullptr };
     CompilerArgs::LocalReason localReason { CompilerArgs::Remote };
 
-    struct CachedFile {
+    struct CachedFile
+    {
         std::string contents;
         std::vector<std::string> lines;
         size_t parsedIdx = 0;
@@ -77,7 +81,7 @@ struct Data
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
         EVP_DigestUpdate(sha1Context, data, len);
 #else
-        SHA1_Update(&sha1, data,  len);
+        SHA1_Update(&sha1, data, len);
 #endif
     }
 
@@ -91,6 +95,7 @@ struct Data
 #endif
     }
 };
+
 Data &data();
 
 extern const unsigned long long started;
@@ -101,10 +106,12 @@ bool findCompiler(const std::string &preresolved);
 std::string findInPath(const std::string &fn);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
 const char *trimSourceRoot(const std::string &str, size_t *len);
+
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
     return parsePath(path.c_str(), basename, dirname);
 }
+
 void writeStatistics();
 [[noreturn]] void runLocal(const std::string &reason);
 unsigned long long mono();
@@ -129,14 +136,14 @@ inline static std::string vformat(const char *format, va_list args)
         ret.assign(buffer, size);
     } else {
         ret.resize(size);
-        ::vsnprintf(&ret[0], size+1, format, copy);
+        ::vsnprintf(&ret[0], size + 1, format, copy);
     }
     va_end(copy);
     return ret;
 }
 
 template <size_t StaticBufSize = 4096>
-inline std::string format(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+inline std::string format(const char *fmt, ...) __attribute__((__format__(__printf__, 1, 2)));
 
 template <size_t StaticBufSize>
 inline std::string format(const char *fmt, ...)
@@ -148,10 +155,12 @@ inline std::string format(const char *fmt, ...)
     return ret;
 }
 
-enum CaseSensitivity {
+enum CaseSensitivity
+{
     CaseInsensitive,
     CaseSensitive
 };
+
 inline bool endsWith(const std::string &haystack, const std::string &needle, CaseSensitivity cs = CaseSensitive)
 {
     if (needle.size() > haystack.size())
@@ -172,6 +181,7 @@ inline std::string sha1(const std::string &str)
 
 std::string base64(const std::string &src);
 std::string uncolor(std::string src);
+
 inline std::string toHex(const void *t, size_t s)
 {
     std::string ret(s * 2, ' ');
@@ -214,7 +224,8 @@ inline std::vector<std::string> split(const std::string &str, const std::string 
     return ret;
 }
 
-enum FileType {
+enum FileType
+{
     File,
     Directory,
     Symlink,
@@ -247,25 +258,24 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
 #ifdef READFILE_ERR
 #error Do not define READFILE_ERR
 #endif
-#define READFILE_ERR(...)                           \
-    do {                                            \
-        if (error) {                                \
-            *error = Client::format(__VA_ARGS__);   \
-        } else {                                    \
-            ERROR(__VA_ARGS__);                     \
-        }                                           \
-        if (f) {                                    \
-            int r;                                  \
-            EINTRWRAP(r, fclose(f));                \
-        }                                           \
-        return false;                               \
+#define READFILE_ERR(...) \
+    do { \
+        if (error) { \
+            *error = Client::format(__VA_ARGS__); \
+        } else { \
+            ERROR(__VA_ARGS__); \
+        } \
+        if (f) { \
+            int r; \
+            EINTRWRAP(r, fclose(f)); \
+        } \
+        return false; \
     } while (false)
 
     FILE *f;
     do {
         f = fopen(fileName.c_str(), "r");
     } while (!f && errno == EINTR);
-
 
     if (opened)
         *opened = f;
@@ -308,7 +318,8 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
     return true;
 }
 
-enum class CompilerType {
+enum class CompilerType
+{
     Unknown,
     GCC,
     Clang
@@ -320,7 +331,9 @@ struct CompilerInfo
 {
     std::string hash;
     CompilerType type { CompilerType::Unknown };
-    struct Version {
+
+    struct Version
+    {
         int major { 0 };
         int minor { 0 };
         int patch { 0 };

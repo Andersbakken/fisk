@@ -13,8 +13,7 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
         const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
         json11::Json msg = json11::Json::parse(rawMsg, err, json11::JsonParse::COMMENTS);
         if (!err.empty()) {
-            ERROR("Failed to parse json from scheduler: %s (raw message: %.200s%s)",
-                  err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
+            ERROR("Failed to parse json from scheduler: %s (raw message: %.200s%s)", err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
             data.watchdog->stop();
             error = "scheduler json parse error";
             done = true;
@@ -42,26 +41,22 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
                       data.hash.c_str(),
                       data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
             } else if (!environment.empty() && environment != data.hash) {
-                WARN("Scheduler assigned alternate environment %s (requested: %s) on builder %s:%d",
-                     environment.c_str(), data.hash.c_str(),
-                     data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(),
-                     data.builderPort);
+                WARN("Scheduler assigned alternate environment %s (requested: %s) on builder %s:%d", environment.c_str(), data.hash.c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort);
             }
             DEBUG("type %d", msg["port"].type());
             DEBUG("Got here %s:%d", data.builderIp.c_str(), data.builderPort);
             done = true;
         } else if (t == "version_mismatch") {
-            FATAL("*** Fisk Version mismatch detected, client version: %s minimum client version required: %s. Please update your fisk client.",
-                  npm_version, msg["minimum_version"].string_value().c_str());
+            FATAL("*** Fisk Version mismatch detected, client version: %s minimum client version required: %s. Please update your fisk "
+                  "client.",
+                  npm_version,
+                  msg["minimum_version"].string_value().c_str());
             _exit(108);
         } else if (t == "version_verified") {
-            ERROR("Fisk Version verified, client version: %s minimum client version required: %s",
-                  npm_version, msg["minimum_version"].string_value().c_str());
+            ERROR("Fisk Version verified, client version: %s minimum client version required: %s", npm_version, msg["minimum_version"].string_value().c_str());
             done = true;
         } else {
-            ERROR("Unexpected message type from scheduler: '%s' (environment: %s, source: %s)",
-                  t.c_str(), data.hash.c_str(),
-                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+            ERROR("Unexpected message type from scheduler: '%s' (environment: %s, source: %s)", t.c_str(), data.hash.c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         }
         // } else {
         //     printf("Got binary message: %zu bytes\n", len);

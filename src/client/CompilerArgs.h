@@ -16,12 +16,12 @@
    You should have received a copy of the GNU General Public License
    along with Fisk.  If not, see <http://www.gnu.org/licenses/>. */
 
-#include <vector>
-#include <string>
-#include <memory>
-#include <cstdint>
 #include <assert.h>
+#include <cstdint>
 #include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace Client {
 struct CompilerInfo;
@@ -33,7 +33,8 @@ struct CompilerArgs
     size_t sourceFileIndex { std::numeric_limits<size_t>::max() };
     size_t objectFileIndex { std::numeric_limits<size_t>::max() };
 
-    enum Flag {
+    enum Flag
+    {
         None = 0x000000,
         MultiSource = 0x000001,
         HasDashO = 0x000002,
@@ -55,13 +56,15 @@ struct CompilerArgs
         ObjectiveCPlusPlusPreprocessed = 0x0800000,
         AssemblerWithCpp = 0x01000000,
         Assembler = 0x02000000,
-        LanguageMask = CPlusPlus|C|CPreprocessed|CPlusPlusPreprocessed|ObjectiveC|ObjectiveCPreprocessed|ObjectiveCPlusPlus|ObjectiveCPlusPlusPreprocessed|AssemblerWithCpp|Assembler
+        LanguageMask = CPlusPlus | C | CPreprocessed | CPlusPlusPreprocessed | ObjectiveC | ObjectiveCPreprocessed | ObjectiveCPlusPlus | ObjectiveCPlusPlusPreprocessed | AssemblerWithCpp | Assembler
     };
+
     static Flag preprocessedFlag(Flag);
     static const char *languageName(Flag flag, bool preprocessed = false);
     uint32_t flags { 0 };
 
-    enum LocalReason {
+    enum LocalReason
+    {
         Remote,
         Local_Preprocess,
         Local_DoNotAssemble,
@@ -78,10 +81,9 @@ struct CompilerArgs
         Local_NoIntegratedAs,
         Local_BinPath
     };
+
     static const char *localReasonToString(LocalReason reason);
-    static std::shared_ptr<CompilerArgs> create(const Client::CompilerInfo &info,
-                                                std::vector<std::string> &&args,
-                                                LocalReason *reason);
+    static std::shared_ptr<CompilerArgs> create(const Client::CompilerInfo &info, std::vector<std::string> &&args, LocalReason *reason);
 
     std::string sourceFile() const
     {
@@ -95,12 +97,12 @@ struct CompilerArgs
 inline CompilerArgs::Flag CompilerArgs::preprocessedFlag(Flag flag)
 {
     switch (flag) {
-    case C:
-        return CPreprocessed;
-    case CPlusPlus:
-        return CPlusPlusPreprocessed;
-    default:
-        break;
+        case C:
+            return CPreprocessed;
+        case CPlusPlus:
+            return CPlusPlusPreprocessed;
+        default:
+            break;
     }
     return None;
 }

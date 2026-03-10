@@ -1,23 +1,22 @@
 #include "Client.h"
-#include <unistd.h>
-#include "SchedulerWebSocket.h"
+#include "Config.h"
 #include "DaemonSocket.h"
 #include "Preprocessed.h"
+#include "SchedulerWebSocket.h"
 #include "Select.h"
-#include "Config.h"
-#include <unistd.h>
+#include <algorithm>
 #include <climits>
 #include <cstdlib>
+#include <dirent.h>
 #include <string.h>
 #include <sys/file.h>
-#include <dirent.h>
-#include <algorithm>
+#include <unistd.h>
 #ifdef __linux__
 #include <sys/inotify.h>
 #endif
+#include <process.hpp>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <process.hpp>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #include <mach/mach.h>
@@ -48,6 +47,7 @@ Client::Data::Data()
     SHA1_Init(&sha1);
 #endif
 }
+
 Client::Data::~Data()
 {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -58,6 +58,7 @@ Client::Data::~Data()
 static Client::Data sData;
 const unsigned long long Client::started = Client::mono();
 const unsigned long long Client::milliseconds_since_epoch = std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
+
 Client::Data &Client::data()
 {
     return sData;
@@ -76,7 +77,7 @@ std::string Client::Data::CachedFile::line(size_t l)
             line = contents.substr(parsedIdx, newline - parsedIdx);
             parsedIdx = newline + 1;
         }
-        for (int i=static_cast<int>(line.size()) - 1; i>=0; --i) {
+        for (int i = static_cast<int>(line.size()) - 1; i >= 0; --i) {
             if (line[i] == '\t') {
                 line[i] = ' ';
             }
@@ -90,12 +91,14 @@ std::string Client::Data::CachedFile::line(size_t l)
 }
 
 static std::mutex sMutex;
+
 std::mutex &Client::mutex()
 {
     return sMutex;
 }
 
-enum CheckResult {
+enum CheckResult
+{
     Stop,
     Continue
 };
@@ -120,9 +123,9 @@ enum CheckResult {
   export COLOR_WHITE='\e[1;37m'
 */
 
-
 namespace {
-enum class Color {
+enum class Color
+{
     None,
     Black,
     Gray,
@@ -167,18 +170,13 @@ const char *colors[] = {
 
 #pragma clang diagnostic pop
 
-std::string colorize(const std::string &str, Color color,
-                     size_t start = 0, size_t length = std::string::npos)
+std::string colorize(const std::string &str, Color color, size_t start = 0, size_t length = std::string::npos)
 {
     if (color == Color::None || !Config::color)
         return str;
     if (length == std::string::npos)
         length = str.size() - start;
-    return (str.substr(0, start)
-            + colors[static_cast<int>(color)]
-            + str.substr(start, length)
-            + colors[static_cast<int>(Color::None)]
-            + str.substr(start + length));
+    return (str.substr(0, start) + colors[static_cast<int>(color)] + str.substr(start, length) + colors[static_cast<int>(Color::None)] + str.substr(start + length));
 }
 
 const std::string lineFromFile(const std::string &file, int line)
@@ -193,7 +191,7 @@ const std::string lineFromFile(const std::string &file, int line)
 
 json11::Json resolve(json11::Json value, const std::vector<std::string> &children)
 {
-    for (size_t i=0; i<children.size(); ++i) {
+    for (size_t i = 0; i < children.size(); ++i) {
         if (value.is_object()) {
             value = value[children[i]];
         } else {
@@ -232,7 +230,7 @@ int integer(const json11::Json &value, const std::string &child = std::string())
 
 void filter(const std::string &needle, std::string &output)
 {
-    size_t i=0;
+    size_t i = 0;
     while ((i = output.find(needle, i)) != std::string::npos) {
         if (!i || output[i - 1] == '\n') {
             size_t endLine = output.find("\n", i);
@@ -262,7 +260,8 @@ std::string resolveSymlink(const std::string &link, const std::function<CheckRes
     while (true) {
         char buf[PATH_MAX + 1];
         const ssize_t ret = readlink(l.c_str(), buf, PATH_MAX);
-        // printf("resolved %s to %s -> %zd %d %s\n", l.c_str(), ret > 0 ? std::string(buf, ret).c_str() : "<nut>", ret, errno, strerror(errno));
+        // printf("resolved %s to %s -> %zd %d %s\n", l.c_str(), ret > 0 ? std::string(buf, ret).c_str() : "<nut>", ret, errno,
+        // strerror(errno));
         if (ret == -1) {
             if (errno != EINVAL) {
                 ERROR("Failed to resolve symlink %s (%d %s)", link.c_str(), errno, strerror(errno));
@@ -290,18 +289,10 @@ Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::stri
     Client::CompilerInfo info {};
     info.hash = Client::toHex(Client::sha1(version));
     size_t idx = std::string::npos;
-    if (exec.find("clang") != std::string::npos
-        || exec.find("CLANG") != std::string::npos
-        || exec.find("Clang") != std::string::npos
-        || version.find("clang") != std::string::npos
-        || version.find("CLANG") != std::string::npos
-        || version.find("Clang") != std::string::npos) {
+    if (exec.find("clang") != std::string::npos || exec.find("CLANG") != std::string::npos || exec.find("Clang") != std::string::npos || version.find("clang") != std::string::npos || version.find("CLANG") != std::string::npos || version.find("Clang") != std::string::npos) {
         info.type = Client::CompilerType::Clang;
         idx = version.find("clang version ");
-    } else if (exec.find("gcc") != std::string::npos
-               || exec.find("GCC") != std::string::npos
-               || version.find("gcc") != std::string::npos
-               || version.find("GCC") != std::string::npos) {
+    } else if (exec.find("gcc") != std::string::npos || exec.find("GCC") != std::string::npos || version.find("gcc") != std::string::npos || version.find("GCC") != std::string::npos) {
         info.type = Client::CompilerType::GCC;
         idx = version.find("gcc version ");
     }
@@ -425,19 +416,19 @@ bool Client::findCompiler(const std::string &preresolved)
             while (*ch) {
                 if (*ch == 'g') {
                     if (!strncmp(ch + 1, "++", 2)) {
-                        data.builderCompiler =  "/usr/bin/g++";
+                        data.builderCompiler = "/usr/bin/g++";
                         return true;
                     } else if (!strncmp(ch + 1, "cc", 2)) {
-                        data.builderCompiler =  "/usr/bin/gcc";
+                        data.builderCompiler = "/usr/bin/gcc";
                         return true;
                     }
                 } else if (*ch == 'c') {
                     if (!strncmp(ch + 1, "lang", 4)) {
                         if (!strncmp(ch + 5, "++", 2)) {
-                            data.builderCompiler =  "/usr/bin/clang++";
+                            data.builderCompiler = "/usr/bin/clang++";
                             return true;
                         } else {
-                            data.builderCompiler =  "/usr/bin/clang";
+                            data.builderCompiler = "/usr/bin/clang";
                             return true;
                         }
                     }
@@ -446,10 +437,7 @@ bool Client::findCompiler(const std::string &preresolved)
             }
             return false;
         };
-        if (!findBuilderCompiler(exec)
-            && !findBuilderCompiler(data.resolvedCompiler)
-            && !findBuilderCompiler(Client::realpath(exec))
-            && !findBuilderCompiler(Client::realpath(data.resolvedCompiler))) {
+        if (!findBuilderCompiler(exec) && !findBuilderCompiler(data.resolvedCompiler) && !findBuilderCompiler(Client::realpath(exec)) && !findBuilderCompiler(Client::realpath(data.resolvedCompiler))) {
             if (exec.find("++") != std::string::npos) {
                 findBuilderCompiler("g++");
             } else {
@@ -460,7 +448,7 @@ bool Client::findCompiler(const std::string &preresolved)
     {
         const size_t slash = data.resolvedCompiler.rfind('/');
         if (slash != std::string::npos) {
-            for (size_t i=slash + 2; i<data.resolvedCompiler.size(); ++i) {
+            for (size_t i = slash + 2; i < data.resolvedCompiler.size(); ++i) {
                 if (data.resolvedCompiler[i] == '+' && data.resolvedCompiler[i - 1] == '+') {
                     if (data.resolvedCompiler[i - 2] == 'c') {
                         data.resolvedCompiler[i - 1] = 'c';
@@ -493,7 +481,7 @@ bool Client::findCompiler(const std::string &preresolved)
 void Client::parsePath(const char *path, std::string *basename, std::string *dirname)
 {
     size_t lastSlash = std::string::npos;
-    for (size_t i=0; i<PATH_MAX && path[i]; ++i) {
+    for (size_t i = 0; i < PATH_MAX && path[i]; ++i) {
         if (path[i] == '/' && path[i + 1])
             lastSlash = i;
     }
@@ -512,11 +500,7 @@ const char *Client::trimSourceRoot(const std::string &str, size_t *len)
     // strcpy
     size_t idx = 0;
     struct stat st;
-    static const char *files[] = {
-        ".git",
-        "CMakeLists.txt",
-        "configure"
-    };
+    static const char *files[] = { ".git", "CMakeLists.txt", "configure" };
     while (true) {
         const size_t tmp = str.find('/', idx) + 1;
         if (!tmp)
@@ -563,7 +547,7 @@ bool Client::recursiveMkdir(const std::string &dir, mode_t mode)
 
     std::string subdir = dir;
     if (subdir.size() < PATH_MAX && subdir.length()) {
-        if (subdir[subdir.length()-1] != '/')
+        if (subdir[subdir.length() - 1] != '/')
             subdir += '/';
         for (size_t i = 1; i < subdir.length(); ++i) {
             if (subdir[i] == '/') {
@@ -583,7 +567,9 @@ bool Client::recursiveRmdir(const std::string &dir)
 {
     DIR *d = opendir(dir.c_str());
     size_t path_len = dir.size();
-    union {
+
+    union
+    {
         char buf[PATH_MAX];
         dirent dbuf;
     };
@@ -680,7 +666,7 @@ static std::string argsAsString()
 {
     const Client::Data &data = Client::data();
     std::string ret = data.compiler;
-    for (int i=1; i<data.argc; ++i) {
+    for (int i = 1; i < data.argc; ++i) {
         ret += ' ';
         ret += data.argv[i];
     }
@@ -691,11 +677,15 @@ void Client::runLocal(const std::string &reason)
 {
     const Client::Data &data = Client::data();
 
-    enum { Increment = 75000 };
+    enum
+    {
+        Increment = 75000
+    };
+
     auto run = [&reason, &data]() {
-        char **argvCopy = new char*[data.argc + 1];
+        char **argvCopy = new char *[data.argc + 1];
         argvCopy[0] = strdup(data.compiler.c_str());
-        for (int i=1; i<data.argc; ++i) {
+        for (int i = 1; i < data.argc; ++i) {
             argvCopy[i] = data.argv[i];
         }
         argvCopy[data.argc] = nullptr;
@@ -718,9 +708,8 @@ void Client::runLocal(const std::string &reason)
         if (pid == -1 && errno == EAGAIN) {
             if (micros < Increment * 10)
                 micros += Increment;
-            ERROR("Fork failed (%s) again errno: %d %s. Trying again... in %zums",
-                  data.compiler.c_str(), errno, strerror(errno), micros / 1000);
-            usleep(static_cast<unsigned int >(micros));
+            ERROR("Fork failed (%s) again errno: %d %s. Trying again... in %zums", data.compiler.c_str(), errno, strerror(errno), micros / 1000);
+            usleep(static_cast<unsigned int>(micros));
         } else {
             break;
         }
@@ -783,15 +772,22 @@ unsigned long long Client::mono()
 const char *Client::compilerTypeToString(CompilerType type)
 {
     switch (type) {
-    case CompilerType::Unknown: return "unknown";
-    case CompilerType::GCC: return "gcc";
-    case CompilerType::Clang: return "clang";
+        case CompilerType::Unknown:
+            return "unknown";
+        case CompilerType::GCC:
+            return "gcc";
+        case CompilerType::Clang:
+            return "clang";
     }
     assert(0 && "Impossible impossibility");
     return "";
 }
 
-enum { EnvironmentCacheVersion = 3 };
+enum
+{
+    EnvironmentCacheVersion = 3
+};
+
 Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
 {
     struct stat st;
@@ -801,12 +797,15 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
 
     auto readSignature = [&compiler]() -> std::string {
         std::string out, err;
-        TinyProcessLib::Process proc(compiler + " -v", std::string(),
-                                     [&out](const char *bytes, size_t n) {
-                                         out.append(bytes, n);
-                                     }, [&err](const char *bytes, size_t n) {
-                                         err.append(bytes, n);
-                                     });
+        TinyProcessLib::Process proc(
+            compiler + " -v",
+            std::string(),
+            [&out](const char *bytes, size_t n) {
+            out.append(bytes, n);
+        },
+            [&err](const char *bytes, size_t n) {
+            err.append(bytes, n);
+        });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
@@ -826,7 +825,7 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
     json11::Json::object json;
     int fd;
-    if ((fd = open(cache.c_str(), O_CLOEXEC|O_RDONLY)) != -1) {
+    if ((fd = open(cache.c_str(), O_CLOEXEC | O_RDONLY)) != -1) {
         if (flock(fd, LOCK_SH)) {
             ERROR("Failed to flock shared %s (%d %s)", cache.c_str(), errno, strerror(errno));
             ::close(fd);
@@ -908,9 +907,9 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
         std::string dirname;
         parsePath(cache.c_str(), nullptr, &dirname);
         recursiveMkdir(dirname);
-        if ((fd = open(cache.c_str(), O_CREAT|O_RDWR|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH)) != -1) {
+        if ((fd = open(cache.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)) != -1) {
             std::string str = json11::Json(json).dump() + '\n';
-            if (flock(fd, LOCK_EX|LOCK_NB)) {
+            if (flock(fd, LOCK_EX | LOCK_NB)) {
                 DEBUG("Failed to flock exclusive %s (%d %s)", cache.c_str(), errno, strerror(errno));
                 ::close(fd);
                 return ret;
@@ -1046,11 +1045,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         return false;
     }
     {
-        json11::Json::object msg {
-            { "type", "uploadEnvironment" },
-            { "hash", data.hash },
-            { "bytes", static_cast<int>(st.st_size) }
-        };
+        json11::Json::object msg { { "type", "uploadEnvironment" }, { "hash", data.hash }, { "bytes", static_cast<int>(st.st_size) } };
 
         std::string json = json11::Json(msg).dump();
         schedulerWebSocket->send(WebSocket::Text, json.c_str(), json.size());
@@ -1080,6 +1075,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
 
 extern "C" const unsigned char create_fisk_env[];
 extern "C" const unsigned create_fisk_env_size;
+
 std::string Client::prepareEnvironmentForUpload(std::string *directory)
 {
     const Client::Data &data = Client::data();
@@ -1101,14 +1097,19 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         return std::string();
     }
 
-    fprintf(f, "{ \"hash\": \"%s\", \"system\": \"%s\", \"originalPath\": \"%s\" }\n",
-            data.hash.c_str(), systemName, data.resolvedCompiler.c_str());
+    fprintf(f, "{ \"hash\": \"%s\", \"system\": \"%s\", \"originalPath\": \"%s\" }\n", data.hash.c_str(), systemName, data.resolvedCompiler.c_str());
 
     {
         std::string stdOut, stdErr;
-        TinyProcessLib::Process proc(data.resolvedCompiler + " -v", dir,
-                                     [&stdOut](const char *bytes, size_t n) { stdOut.append(bytes, n); },
-                                     [&stdErr](const char *bytes, size_t n) { stdErr.append(bytes, n); });
+        TinyProcessLib::Process proc(
+            data.resolvedCompiler + " -v",
+            dir,
+            [&stdOut](const char *bytes, size_t n) {
+            stdOut.append(bytes, n);
+        },
+            [&stdErr](const char *bytes, size_t n) {
+            stdErr.append(bytes, n);
+        });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s", data.resolvedCompiler.c_str(), stdErr.c_str());
@@ -1129,20 +1130,23 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         EINTRWRAP(ret, fclose(f));
     }
 
-
     std::string stdOut, stdErr;
-    TinyProcessLib::Process proc("bash", dir,
-                                 [&stdOut](const char *bytes, size_t n) {
-                                     stdOut.append(bytes, n);
-                                     // printf("%s", std::string(bytes, n).c_str());
-                                     if (Log::minLogLevel <= Log::Debug)
-                                         Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
-                                 }, [&stdErr](const char *bytes, size_t n) {
-                                     stdErr.append(bytes, n);
-                                     // fprintf(stderr, "%s", std::string(bytes, n).c_str());
-                                     if (Log::minLogLevel <= Log::Debug)
-                                         Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
-                                 }, true);
+    TinyProcessLib::Process proc(
+        "bash",
+        dir,
+        [&stdOut](const char *bytes, size_t n) {
+        stdOut.append(bytes, n);
+            // printf("%s", std::string(bytes, n).c_str());
+        if (Log::minLogLevel <= Log::Debug)
+            Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+    },
+        [&stdErr](const char *bytes, size_t n) {
+        stdErr.append(bytes, n);
+            // fprintf(stderr, "%s", std::string(bytes, n).c_str());
+        if (Log::minLogLevel <= Log::Debug)
+            Log::log(Log::Debug, std::string(bytes, n), Log::NoTrailingNewLine);
+    },
+        true);
 
     proc.write(Client::format("export ARG1=%s\n"
                               "export ARG2=--addfile\n"
@@ -1272,15 +1276,14 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
                 option = " [" + option + ']';
             }
 
-            ret += Client::format("%s:%d:%d: %s: %s%s\n", file.c_str(), caretLine, caretColumn,
-                                  colorize(kind, color).c_str(), message.c_str(), option.c_str());
+            ret += Client::format("%s:%d:%d: %s: %s%s\n", file.c_str(), caretLine, caretColumn, colorize(kind, color).c_str(), message.c_str(), option.c_str());
             std::string srcLine = lineFromFile(file, caretLine);
             if (!srcLine.empty()) {
                 ret += colorize(srcLine, color, startCol - 1, finishCol - startCol + 1) + '\n';
             }
             std::string caret(startCol - 1, ' ');
             std::string tmp;
-            for (int i=startCol; i<finishCol + 1; ++i) {
+            for (int i = startCol; i < finishCol + 1; ++i) {
                 tmp += i == caretColumn ? '^' : '~';
             }
             caret += colorize(tmp, color);
@@ -1313,7 +1316,7 @@ int Client::dumpSha1()
     Client::CompilerInfo info;
     {
         std::vector<std::string> args(data.argc);
-        for (int i=0; i<data.argc; ++i) {
+        for (int i = 0; i < data.argc; ++i) {
             // printf("%zu: %s\n", i, argv[i]);
             args[i] = data.argv[i];
         }
@@ -1336,4 +1339,3 @@ int Client::dumpSha1()
     printf("%s\n", sha1.c_str());
     return 0;
 }
-
