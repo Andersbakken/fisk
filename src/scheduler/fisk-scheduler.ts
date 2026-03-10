@@ -65,7 +65,7 @@ let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
 
-const clientMinimumVersion = "3.4.96";
+const clientMinimumVersion = "4.0.53";
 const serverStartTime = Date.now();
 process.on("unhandledRejection", (reason: Error, p: Promise<unknown>) => {
     console.error("Unhandled Rejection at: Promise", p, "reason:", reason?.stack);
