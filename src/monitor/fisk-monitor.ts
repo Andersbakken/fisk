@@ -295,7 +295,7 @@ clientBox.on("select", (ev) => {
                 if (jobKey === "total") {
                     continue;
                 }
-                const sourceBasename = path.basename(jobValue.sourcePath);
+                const sourceBasename = path.basename(jobValue.sourcePath || jobValue.sourceFile || "");
                 widest[0] = Math.max(sourceBasename.length + 1, widest[0]);
                 data.push([
                     sourceBasename,
