@@ -29,6 +29,35 @@ import type { Response } from "./Response";
 import type express from "express";
 import type http from "http";
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`Usage: fisk-builder [options]
+
+Options:
+  --scheduler=URL              Scheduler URL (default: localhost:8097)
+  --port=PORT                  Listen port (default: 8096)
+  --slots=N                    Number of compile slots
+  --debug                      Enable debug logging
+  --object-cache-size=SIZE     Object cache size (e.g. "10gb")
+  --object-cache-dir=PATH      Object cache directory
+  --object-cache-purge-size=N  Size to purge cache down to
+  --restart-on-new-environments  Restart when new environments arrive
+  --name=NAME                  Builder name
+  --hostname=HOST              Builder hostname (default: os.hostname())
+  --labels=LABELS              Builder labels
+  --npm-version-file=PATH      Path to npm version file
+  --keep-compiles              Keep compile directories after completion
+  --vm-user=USER               User for VM processes
+  --inform-delay=MS            Delay before informing scheduler (default: 5000)
+  --quit-on-error-delay=MS     Delay before quitting on error
+  --loadInterval=MS            Load reporting interval (default: 1000)
+  --backlog=N                  Listen backlog (default: 50)
+  --cache-dir=PATH             Cache directory (default: ~/.cache/fisk/builder)
+
+Config files: ~/.config/fisk/builder.conf, /etc/xdg/fisk/builder.conf
+Environment variables: FISK_BUILDER_SCHEDULER, FISK_BUILDER_PORT, etc.`);
+    process.exit(0);
+}
+
 const option: Options = createOptions({
     prefix: "fisk/builder",
     noApplicationPath: true,

@@ -30,6 +30,31 @@ import type { Options } from "@jhanssen/options";
 import type { PeakData } from "./PeakData";
 import type express from "express";
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`Usage: fisk-scheduler [options]
+
+Options:
+  --port=PORT                  Listen port (default: 8097)
+  --securePort=PORT            TLS listen port (default: 8098)
+  --key=PATH                   TLS key file
+  --cert=PATH                  TLS certificate file
+  --backlog=N                  Listen backlog
+  --object-cache               Enable object cache
+  --object-cache-redundancy=N  Cache redundancy across builders
+  --max-environment-size=SIZE  Maximum environment tarball size
+  --max-pong-interval=MS       Maximum pong interval before disconnect
+  --max-file-descriptors=N     File descriptor limit
+  --ping-interval=MS           WebSocket ping interval
+  --monitor-log=PATH           Log file for monitor events
+  --env-dir=PATH               Directory for compiler environments
+  --ui=PATH                    Path to scheduler UI static files
+  --cache-dir=PATH             Cache directory (default: ~/.cache/fisk/scheduler)
+
+Config files: ~/.config/fisk/scheduler.conf, /etc/xdg/fisk/scheduler.conf
+Environment variables: FISK_SCHEDULER_PORT, FISK_SCHEDULER_KEY, etc.`);
+    process.exit(0);
+}
+
 const option: Options = options({
     prefix: "fisk/scheduler",
     noApplicationPath: true,

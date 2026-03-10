@@ -9,6 +9,21 @@ import createOptions from "@jhanssen/options";
 import os from "os";
 import type { Options } from "@jhanssen/options";
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`Usage: fisk-daemon [options]
+
+Options:
+  --debug                Enable debug logging
+  --socket=PATH          Unix socket path (default: ~/.cache/fisk/daemon/socket)
+  --cpp-slots=N          Preprocess slot count (default: cpus * 2)
+  --slots=N              Compile slot count (default: cpus)
+  --cache-dir=PATH       Cache directory (default: ~/.cache/fisk/daemon)
+
+Config files: ~/.config/fisk/daemon.conf, /etc/xdg/fisk/daemon.conf
+Environment variables: FISK_DAEMON_DEBUG, FISK_DAEMON_SLOTS, etc.`);
+    process.exit(0);
+}
+
 const option: Options = createOptions({
     prefix: "fisk/daemon",
     noApplicationPath: true,

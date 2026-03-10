@@ -16,6 +16,17 @@ import type { JobMonitorMessage, JobMonitorMessageBase, JobMonitorMessageClient 
 import type { Options } from "@jhanssen/options";
 import type { Unit } from "humanize-duration";
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`Usage: fisk-monitor [options]
+
+Options:
+  --scheduler=URL        Scheduler URL (default: ws://localhost:8097)
+
+Config files: ~/.config/fisk/monitor.conf, /etc/xdg/fisk/monitor.conf
+Environment variables: FISK_MONITOR_SCHEDULER, etc.`);
+    process.exit(0);
+}
+
 const option: Options = options({
     prefix: "fisk/monitor",
     noApplicationPath: true,
