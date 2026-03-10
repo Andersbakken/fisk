@@ -165,7 +165,7 @@ function jobStartedOrScheduled(
                 user: job.client.user,
                 labels: job.client.labels
             },
-            sourceFile: job.sourceFile,
+            sourcePath: job.sourcePath,
             builder: {
                 hostname: job.builder.hostname,
                 ip: job.builder.ip,
@@ -198,7 +198,7 @@ function cacheHit(builder: Builder, message: CacheHitMessage): void {
                 name: message.client.name,
                 user: message.client.user
             },
-            sourceFile: message.sourceFile,
+            sourcePath: message.sourcePath,
             builder: {
                 ip: builder.ip,
                 name: builder.name,
@@ -1124,7 +1124,7 @@ server.on("compile", (compile: Compile) => {
     ++builder.activeClients;
     ++builder.jobsScheduled;
     console.log(
-        `${compile.name} ${compile.ip} ${compile.sourceFile} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
+        `${compile.name} ${compile.ip} ${compile.sourcePath} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
             `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
     );
     builder.lastJob = Date.now();
@@ -1150,7 +1150,7 @@ server.on("compile", (compile: Compile) => {
             port: builder.port
         },
         id: id,
-        sourceFile: compile.sourceFile
+        sourcePath: compile.sourcePath
     });
     ++jobsScheduled;
     compile.on("error", (msg) => {

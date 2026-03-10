@@ -25,6 +25,7 @@ public:
     std::vector<File> files;
     bool done { false };
     std::string error;
+    std::string cachedSourcePath;
 };
 
 

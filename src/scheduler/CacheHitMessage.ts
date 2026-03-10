@@ -5,7 +5,7 @@ export interface CacheHitMessage {
         name: string;
         user: string;
     };
-    sourceFile: string;
+    sourcePath: string;
     sha1: string;
     id: number;
 }

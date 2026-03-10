@@ -84,7 +84,7 @@ export class ObjectCacheManager extends EventEmitter {
         const nodeData = this.byNode.get(node);
         console.log(
             "adding",
-            msg.sourceFile,
+            msg.sourcePath,
             msg.sha1,
             "for",
             node.ip + ":" + node.port,
@@ -106,7 +106,7 @@ export class ObjectCacheManager extends EventEmitter {
         const nodeData = this.byNode.get(node);
         console.log(
             "removing",
-            msg.sourceFile,
+            msg.sourcePath,
             msg.sha1,
             "for",
             node.ip + ":" + node.port,

@@ -31,7 +31,7 @@ export class CompileJob extends EventEmitter {
                 id: this.id,
                 files: [],
                 exitCode: -1,
-                sourceFile: "",
+                sourcePath: "",
                 error: error.toString()
             };
             this.vm.compileFinished(compileFinished);

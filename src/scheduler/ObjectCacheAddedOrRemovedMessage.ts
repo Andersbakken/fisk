@@ -1,6 +1,6 @@
 export interface ObjectCacheAddedOrRemovedMessage {
     sha1: string;
-    sourceFile: string;
+    sourcePath: string;
     cacheSize: number;
     fileSize: number;
 }

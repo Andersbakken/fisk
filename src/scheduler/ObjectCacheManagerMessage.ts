@@ -1,5 +1,5 @@
 export interface ObjectCacheManagerMessage {
-    sourceFile: string;
+    sourcePath: string;
     sha1: string;
     fileSize: number;
     cacheSize: number;

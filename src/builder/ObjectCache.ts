@@ -129,7 +129,7 @@ export class ObjectCache extends EventEmitter {
                 fs.closeSync(fd);
                 this.size += item.fileSize;
                 this.cache[fileName] = item;
-                this.emit("added", { sha1: response.sha1, sourceFile: response.sourceFile, fileSize: stat.size });
+                this.emit("added", { sha1: response.sha1, sourcePath: response.sourcePath, fileSize: stat.size });
             } else {
                 throw new Error("Unexpected file " + fileName);
             }
@@ -218,7 +218,7 @@ export class ObjectCache extends EventEmitter {
                     // console.log(response);
                     this.emit("added", {
                         sha1: response.sha1,
-                        sourceFile: response.sourceFile,
+                        sourcePath: response.sourcePath,
                         fileSize: cacheItem.fileSize
                     });
 
@@ -269,7 +269,7 @@ export class ObjectCache extends EventEmitter {
             const info = this.cache[sha1];
             this.size -= info.fileSize;
             delete this.cache[sha1];
-            this.emit("removed", { sha1: sha1, sourceFile: info.response.sourceFile, fileSize: info.fileSize });
+            this.emit("removed", { sha1: sha1, sourcePath: info.response.sourcePath, fileSize: info.fileSize });
             fs.unlinkSync(path.join(this.dir, sha1));
         } catch (err: unknown) {
             console.error("Can't remove file", path.join(this.dir, sha1), err);

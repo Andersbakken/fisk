@@ -9,6 +9,6 @@ export interface CompileFinishedEvent {
     exitCode: number;
     success: boolean;
     error?: string;
-    sourceFile: string;
+    sourcePath: string;
     files: CompileFinishedEventFile[];
 }

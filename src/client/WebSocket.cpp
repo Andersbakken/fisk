@@ -169,8 +169,10 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
 
         sockaddr_in *sockAddr = reinterpret_cast<sockaddr_in *>(addr->ai_addr);
         sockAddr->sin_port = htons(mPort);
-        DEBUG("Connecting socket %s (%s:%d)", mHost.c_str(),
-              inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
+        DEBUG("Connecting socket %s (%s:%d)",
+              mHost.c_str(),
+              inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
+              mPort);
 
         if (!Client::setFlag(mFD, O_NONBLOCK|O_CLOEXEC)) {
             ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
@@ -183,16 +185,21 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
         EINTRWRAP(ret, ::connect(mFD, addr->ai_addr, addr->ai_addrlen));
 
         if (!ret) {
-            DEBUG("Connected to server %s (%s:%d)", mHost.c_str(),
-                  inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort);
+            DEBUG("Connected to server %s (%s:%d)",
+                  mHost.c_str(),
+                  inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
+                  mPort);
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
             int cret;
             EINTRWRAP(cret, ::close(mFD));
-            ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(),
+            ERROR("Failed to connect socket %s (%s:%d) %d %s",
+                  mHost.c_str(),
                   inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr),
-                  mPort, errno, strerror(errno));
+                  mPort,
+                  errno,
+                  strerror(errno));
             mFD = -1;
             mState = Error;
             break;

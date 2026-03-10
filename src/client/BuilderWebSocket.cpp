@@ -1,4 +1,5 @@
 #include "BuilderWebSocket.h"
+#include "DwarfPatcher.h"
 
 void BuilderWebSocket::onConnected()
 {
@@ -7,14 +8,17 @@ void BuilderWebSocket::onConnected()
 void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, size_t len)
 {
     Client::Data &data = Client::data();
-    DEBUG("Got message %s %zu bytes", messageType == WebSocket::Text ? "text" : "binary", len);
+    DEBUG("Got message %s %zu bytes",
+          messageType == WebSocket::Text ? "text" : "binary",
+          len);
 
     if (messageType == WebSocket::Binary) {
         handleFileContents(bytes, len);
         return;
     }
 
-    WARN("Got message from builder %s %s", url().c_str(),
+    WARN("Got message from builder %s %s",
+         url().c_str(),
          std::string(reinterpret_cast<const char *>(bytes), len).c_str());
     std::string err;
     const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
@@ -133,6 +137,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const auto objectCache = msg["objectCache"];
         if (objectCache.is_bool() && objectCache.bool_value()) {
             data.objectCache = true;
+            cachedSourcePath = msg["sourcePath"].string_value();
         }
 
         if (!index.empty()) {
@@ -151,7 +156,10 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                 }
                 if (!ff.size) {
                     FILE *f = fopen(ff.path.c_str(), "w");
-                    DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
+                    DEBUG("Opened file [%s] -> [%s] -> %p",
+                          files[0].path.c_str(),
+                          Client::realpath(files[0].path).c_str(),
+                          f);
                     if (!f) {
                         ERROR("Can't open file: %s", files[0].path.c_str());
                         Client::data().watchdog->stop();
@@ -205,7 +213,10 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     }
 
     FILE *f = fopen(front.path.c_str(), "w");
-    DEBUG("Opened file [%s] -> [%s] -> %p", front.path.c_str(), Client::realpath(front.path).c_str(), f);
+    DEBUG("Opened file [%s] -> [%s] -> %p",
+          front.path.c_str(),
+          Client::realpath(front.path).c_str(),
+          f);
     if (!f) {
         ERROR("Failed to open output file for writing: %s (%d %s) - builder: %s, source: %s",
               front.path.c_str(), errno, strerror(errno), url().c_str(),
@@ -231,6 +242,12 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
         error = "builder file write error";
         done = true;
         return;
+    }
+
+    if (!cachedSourcePath.empty() && clientData.compilerArgs
+        && Client::endsWith(front.path, ".o")
+        && cachedSourcePath != clientData.compilerArgs->sourceFile()) {
+        patchDwarfSourcePath(front.path, cachedSourcePath, clientData.compilerArgs->sourceFile());
     }
 
     files.erase(files.begin());

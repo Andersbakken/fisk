@@ -9,7 +9,7 @@ export interface JobMonitorMessageClient {
 
 export interface JobMonitorMessageBase {
     client: JobMonitorMessageClient;
-    sourceFile: string;
+    sourcePath: string;
     builder: JobMonitorMessageClient;
     id: number;
     jobs?: number;

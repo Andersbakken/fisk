@@ -280,7 +280,7 @@ int main(int argc, char **argv)
     }
 
     headers["x-fisk-environments"] = data.hash; // always a single one but fisk-builder sends multiple so we'll just keep it like this for now
-    Client::parsePath(data.compilerArgs->sourceFile(), &headers["x-fisk-sourcefile"], nullptr);
+    headers["x-fisk-sourcefile"] = data.compilerArgs->sourceFile();
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
@@ -620,7 +620,8 @@ int main(int argc, char **argv)
     }
 
     if (!builderWebSocket.error.empty()) {
-        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket.error.c_str());
+        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s",
+              builderWebSocket.error.c_str());
         runLocal("builder error");
         return 0; // unreachable
     }

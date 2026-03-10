@@ -12,7 +12,7 @@ export class Job extends EventEmitter implements JobData {
 
     hostname?: string;
     user?: string;
-    sourceFile?: string;
+    sourcePath?: string;
     priority: number;
     builderIp?: string;
     closed?: boolean;
@@ -33,7 +33,7 @@ export class Job extends EventEmitter implements JobData {
         this.name = data.name;
         this.hostname = data.hostname;
         this.user = data.user;
-        this.sourceFile = data.sourceFile;
+        this.sourcePath = data.sourcePath;
         this.priority = data.priority || 0;
         this.sha1 = data.sha1;
         this.id = data.id;

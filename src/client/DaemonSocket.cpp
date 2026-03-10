@@ -122,8 +122,11 @@ void DaemonSocket::onRead()
         ssize_t r;
         errno = 0;
         EINTRWRAP(r, ::read(mFD, buf, sizeof(buf)));
-        VERBOSE("Read from socket %s -> %ld (%d %s)", Config::socket.get().c_str(),
-                r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
+        VERBOSE("Read from socket %s -> %ld (%d %s)",
+                Config::socket.get().c_str(),
+                r,
+                r == -1 ? errno : 0,
+                r == -1 ? strerror(errno) : "");
 
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
@@ -165,8 +168,11 @@ void DaemonSocket::write()
     do {
         ssize_t r;
         EINTRWRAP(r, ::write(mFD, mSendBuffer.c_str() + mSendBufferOffset, mSendBuffer.size() - mSendBufferOffset));
-        VERBOSE("Write to socket %s -> %zd (%d %s)", Config::socket.get().c_str(),
-                r, r == -1 ? errno : 0, r == -1 ? strerror(errno) : "");
+        VERBOSE("Write to socket %s -> %zd (%d %s)",
+                Config::socket.get().c_str(),
+                r,
+                r == -1 ? errno : 0,
+                r == -1 ? strerror(errno) : "");
         if (r == -1) {
             if (errno == EWOULDBLOCK || errno == EAGAIN)
                 break;

@@ -7,5 +7,5 @@ export interface ExitEvent {
     exitCode: number;
     files: ExitEventFile[];
     error?: string;
-    sourceFile: string;
+    sourcePath: string;
 }

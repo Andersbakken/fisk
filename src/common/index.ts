@@ -4,7 +4,7 @@ import path from "path";
 import type { Options } from "@jhanssen/options";
 
 const Version = 5;
-const ObjectCacheFormatVersion = 1;
+const ObjectCacheFormatVersion = 2;
 
 function cacheDir(option: Options): string {
     let dir = option("cache-dir");

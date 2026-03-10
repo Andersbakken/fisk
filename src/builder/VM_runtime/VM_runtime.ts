@@ -175,7 +175,7 @@ process.on("message", (msg) => {
                             id: msg.id,
                             files: event.files,
                             exitCode: event.exitCode,
-                            sourceFile: event.sourceFile
+                            sourcePath: event.sourcePath
                         });
                     } else {
                         send({
@@ -184,7 +184,7 @@ process.on("message", (msg) => {
                             id: msg.id,
                             files: event.files,
                             exitCode: event.exitCode,
-                            sourceFile: event.sourceFile
+                            sourcePath: event.sourcePath
                         });
                     }
                     if (destroying && !compiles.size) {

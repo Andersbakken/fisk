@@ -107,7 +107,7 @@ export class Server extends EventEmitter {
                     name,
                     priority: parseInt(String(req.headers["x-fisk-priority"])),
                     sha1,
-                    sourceFile: String(req.headers["x-fisk-sourcefile"]),
+                    sourcePath: String(req.headers["x-fisk-sourcefile"]),
                     user: String(req.headers["x-fisk-user"]),
                     supportsCompressedResponse: req.headers["x-fisk-supports-compressed-response"] === "true",
                     ws

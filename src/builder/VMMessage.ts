@@ -25,7 +25,7 @@ export interface VMCompileFinishedFile {
 
 export interface VMCompileFinished {
     type: "compileFinished";
-    sourceFile: string;
+    sourcePath: string;
     success: boolean;
     id: number;
     files: VMCompileFinishedFile[];

@@ -9,7 +9,7 @@ export class Compile extends Client {
         ws: WebSocket,
         ip: string,
         readonly environment: string,
-        readonly sourceFile: string,
+        readonly sourcePath: string,
         readonly sha1?: string,
         option?: Options
     ) {

@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 
-import blessed from "@andersbakken/blessed";
-import type { Widgets } from "@andersbakken/blessed";
-// import fs from "fs";
 import WebSocket from "ws";
 import assert from "assert";
+import blessed from "@andersbakken/blessed";
 import humanize from "humanize-duration";
 import options from "@jhanssen/options";
+import path from "path";
 import type {
     BuilderAddedMessage,
     BuilderAddedOrRemovedBase,
@@ -15,6 +14,7 @@ import type {
 import type { JobMonitorMessage, JobMonitorMessageBase, JobMonitorMessageClient } from "../common/JobMonitorMessage";
 import type { Options } from "@jhanssen/options";
 import type { Unit } from "humanize-duration";
+import type { Widgets } from "@andersbakken/blessed";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(`Usage: fisk-monitor [options]
@@ -295,9 +295,10 @@ clientBox.on("select", (ev) => {
                 if (jobKey === "total") {
                     continue;
                 }
-                widest[0] = Math.max(jobValue.sourceFile.length + 1, widest[0]);
+                const sourceBasename = path.basename(jobValue.sourcePath);
+                widest[0] = Math.max(sourceBasename.length + 1, widest[0]);
                 data.push([
-                    jobValue.sourceFile,
+                    sourceBasename,
                     jobValue.builder.ip + ":" + jobValue.builder.port,
                     humanizeDuration(now - jobValue.time)
                 ]);

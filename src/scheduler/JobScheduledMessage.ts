@@ -15,5 +15,5 @@ export interface JobScheduledMessage {
         labels?: string[];
     };
     id: number;
-    sourceFile: string;
+    sourcePath: string;
 }

@@ -181,9 +181,9 @@ export class Server extends EventEmitter {
             return;
         }
 
-        const sourceFile = header(req, "x-fisk-sourcefile");
-        if (!sourceFile) {
-            ws.send(`{"error": "No sourceFile"}`);
+        const sourcePath = header(req, "x-fisk-sourcefile");
+        if (!sourcePath) {
+            ws.send(`{"error": "No sourcePath"}`);
             ws.close();
             return;
         }
@@ -194,7 +194,7 @@ export class Server extends EventEmitter {
             ws.close();
             return;
         }
-        const client = new Compile(ws, ip, compileEnvironment, sourceFile, sha1, this.option);
+        const client = new Compile(ws, ip, compileEnvironment, sourcePath, sha1, this.option);
         const npmVersion = header(req, "x-fisk-npm-version");
         if (npmVersion) {
             client.npmVersion = npmVersion;

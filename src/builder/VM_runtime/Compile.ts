@@ -26,7 +26,7 @@ export class Compile extends EventEmitter {
         let outputFileName: string | undefined;
         let hasDashO: boolean = false;
         let hasDashX: boolean = false;
-        let sourceFile: string | undefined;
+        let sourcePath: string | undefined;
 
         for (let i = 0; i < args.length; ++i) {
             // console.log(i, args[i]);
@@ -110,22 +110,22 @@ export class Compile extends EventEmitter {
                     }
 
                     if (args[i][0] !== "-") {
-                        if (sourceFile) {
-                            console.log("Multiple source files", sourceFile, args[i]);
+                        if (sourcePath) {
+                            console.log("Multiple source files", sourcePath, args[i]);
                             throw new Error("More than one source file");
                         }
-                        sourceFile = args[i];
+                        sourcePath = args[i];
                         args[i] = path.join(dir, "sourcefile");
                     }
                     break;
             }
         }
-        if (!sourceFile) {
+        if (!sourcePath) {
             throw new Error("No sourcefile");
         }
 
         if (!hasDashX) {
-            switch (path.extname(sourceFile)) {
+            switch (path.extname(sourcePath)) {
                 case ".C":
                 case ".cc":
                 case ".cpp":
@@ -169,7 +169,7 @@ export class Compile extends EventEmitter {
                     args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
                     break;
                 default:
-                    throw new Error(`Can't determine source language for file: ${sourceFile}`);
+                    throw new Error(`Can't determine source language for file: ${sourcePath}`);
             }
             args.unshift("-x");
         }
@@ -180,8 +180,8 @@ export class Compile extends EventEmitter {
         }
 
         if (!hasDashO) {
-            const suffix = path.extname(sourceFile);
-            outputFileName = output = sourceFile.substring(0, sourceFile.length - suffix.length) + ".o";
+            const suffix = path.extname(sourcePath);
+            outputFileName = output = sourcePath.substring(0, sourcePath.length - suffix.length) + ".o";
             args.push("-o", outputFileName);
         }
 
@@ -192,7 +192,7 @@ export class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
-        console.log(`Compiling source file: ${sourceFile}\n${[compiler, ...args].join(" ")}`);
+        console.log(`Compiling source file: ${sourcePath}\n${[compiler, ...args].join(" ")}`);
         // const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
         const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, args, {
             /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
@@ -251,13 +251,13 @@ export class Compile extends EventEmitter {
                         }
                     });
                 } catch (err: unknown) {
-                    console.error("Got an error processing outputs for", sourceFile, err);
-                    assert(sourceFile !== undefined, "Must have sourceFile");
+                    console.error("Got an error processing outputs for", sourcePath, err);
+                    assert(sourcePath !== undefined, "Must have sourcePath");
                     const errorExitEvent: ExitEvent = {
                         exitCode: 110,
                         files: [],
                         error: (err as Error).toString(),
-                        sourceFile
+                        sourcePath
                     };
 
                     this.emit("exit", errorExitEvent);
@@ -270,8 +270,8 @@ export class Compile extends EventEmitter {
             if (exitCode === null) {
                 exitCode = 111;
             }
-            assert(sourceFile !== undefined, "Must have sourceFile4");
-            const exitEvent: ExitEvent = { exitCode, files, sourceFile };
+            assert(sourcePath !== undefined, "Must have sourcePath4");
+            const exitEvent: ExitEvent = { exitCode, files, sourcePath };
             this.emit("exit", exitEvent);
         });
     }

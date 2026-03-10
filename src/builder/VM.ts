@@ -94,7 +94,7 @@ export class VM extends EventEmitter {
             exitCode: msg.exitCode,
             success: msg.success,
             error: msg.error,
-            sourceFile: msg.sourceFile,
+            sourcePath: msg.sourcePath,
             files: msg.files.map((file: VMCompileFinishedFile) => {
                 return {
                     path: file.path,

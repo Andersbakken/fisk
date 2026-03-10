@@ -223,7 +223,7 @@ client.on("objectCache", (enabled) => {
             client.send({
                 type: "objectCacheAdded",
                 sha1: data.sha1,
-                sourceFile: data.sourceFile,
+                sourcePath: data.sourcePath,
                 cacheSize: objectCache.size,
                 fileSize: data.fileSize
             });
@@ -234,7 +234,7 @@ client.on("objectCache", (enabled) => {
             client.send({
                 type: "objectCacheRemoved",
                 sha1: data.sha1,
-                sourceFile: data.sourceFile,
+                sourcePath: data.sourcePath,
                 cacheSize: objectCache.size,
                 fileSize: data.fileSize
             });
@@ -789,14 +789,14 @@ server.on("job", (job: Job) => {
                                 name: jobJob.name,
                                 user: jobJob.user
                             },
-                            sourceFile: jobJob.sourceFile,
+                            sourcePath: jobJob.sourcePath,
                             sha1: jobJob.sha1,
                             id: jobJob.id
                         };
                         // console.log("sending cachehit", info);
                         client.send(info);
 
-                        console.log("Job finished from cache", j.id, jobJob.sourceFile, "for", jobJob.ip, jobJob.name);
+                        console.log("Job finished from cache", j.id, jobJob.sourcePath, "for", jobJob.ip, jobJob.name);
                     }
                     j.done = true;
                     const idx = jobQueue.indexOf(j);
@@ -812,7 +812,7 @@ server.on("job", (job: Job) => {
             j.started = true;
             client.send("jobStarted", {
                 id: jobJob.id,
-                sourceFile: jobJob.sourceFile,
+                sourcePath: jobJob.sourcePath,
                 client: {
                     name: jobJob.name,
                     hostname: jobJob.hostname,
@@ -827,7 +827,7 @@ server.on("job", (job: Job) => {
                 }
             });
 
-            console.log("Starting job", j.id, jobJob.sourceFile, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
+            console.log("Starting job", j.id, jobJob.sourcePath, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
             assert(jobJob.commandLine, "Must have commandLine");
             assert(jobJob.argv0, "Must have argv0");
             j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id);
@@ -854,7 +854,7 @@ server.on("job", (job: Job) => {
                 console.log(
                     "Job finished",
                     j.id,
-                    jobJob.sourceFile,
+                    jobJob.sourcePath,
                     "for",
                     jobJob.ip,
                     jobJob.name,
@@ -939,7 +939,7 @@ server.on("job", (job: Job) => {
                             };
                         })
                     };
-                    cacheResponse.sourceFile = jobJob.sourceFile;
+                    cacheResponse.sourcePath = jobJob.sourcePath;
                     cacheResponse.commandLine = jobJob.commandLine;
                     cacheResponse.environment = jobJob.hash;
                     objectCache.add(cacheResponse, contents);
