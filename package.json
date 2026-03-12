@@ -21,6 +21,9 @@
         "url": "https://github.com/Andersbakken/fisk/issues"
     },
     "homepage": "https://github.com/Andersbakken/fisk#readme",
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org/"
+    },
     "files": [
         "scheduler/fisk-scheduler.js",
         "daemon/fisk-daemon.js",
