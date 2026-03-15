@@ -79,7 +79,8 @@ struct CompilerArgs
         Local_NoSources,
         Local_Link,
         Local_NoIntegratedAs,
-        Local_BinPath
+        Local_BinPath,
+        Local_CompileTest
     };
 
     static const char *localReasonToString(LocalReason reason);

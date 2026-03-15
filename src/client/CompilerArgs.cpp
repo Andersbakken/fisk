@@ -511,6 +511,27 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         return nullptr;
     }
 
+    // Check if this looks like a build system compile test
+    {
+        const std::string &src = ret->commandLine[ret->sourceFileIndex];
+        std::string basename;
+        Client::parsePath(src, &basename, nullptr);
+
+        // autoconf/automake: conftest.c, conftest.cc, conftest.cpp, etc.
+        if (basename.size() >= 10 && !strncmp(basename.c_str(), "conftest.", 9)) {
+            DEBUG("Compile test (conftest): %s, building local", src.c_str());
+            *localReason = Local_CompileTest;
+            return nullptr;
+        }
+
+        // cmake compile tests: anything in CMakeFiles/ subdirectory
+        if (src.find("/CMakeFiles/") != std::string::npos || !strncmp(src.c_str(), "CMakeFiles/", 11)) {
+            DEBUG("Compile test (CMakeFiles): %s, building local", src.c_str());
+            *localReason = Local_CompileTest;
+            return nullptr;
+        }
+    }
+
     if (!hasDashC) {
         *localReason = Local_Link;
         DEBUG("link job, building local");
@@ -648,6 +669,8 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
             return "NoIntegratedAs";
         case Local_BinPath:
             return "BinPath";
+        case Local_CompileTest:
+            return "CompileTest";
     }
     assert(0);
     return nullptr;
