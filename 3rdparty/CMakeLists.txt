@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 set(WSLAY_CONFIGURE_INSTALL NO)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wformat -Wall")
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 add_subdirectory(wslay)
 add_subdirectory(json11)
 add_subdirectory(tiny-process-library)
