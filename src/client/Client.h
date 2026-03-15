@@ -10,10 +10,17 @@
 #include <fcntl.h>
 #include <memory>
 #include <mutex>
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-strict"
+#endif
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #include <set>
 #include <string.h>
