@@ -15,6 +15,12 @@ export const Constants = {
     get JSON(): number {
         return 5;
     },
+    get AcquireSlot(): number {
+        return 6;
+    },
+    get ReleaseLocalSlot(): number {
+        return 7;
+    },
 
     // daemon codes
     get CppSlotAcquired(): number {
@@ -25,5 +31,8 @@ export const Constants = {
     },
     get JSONResponse(): number {
         return 12;
+    },
+    get LocalSlotAcquired(): number {
+        return 13;
     }
 };

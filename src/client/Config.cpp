@@ -71,7 +71,6 @@ Getter<bool> dumpSlots("dump-slots", "Dump slots info for fisk-daemon", false);
 Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
 Getter<bool> disabled("disabled", "Set to true if you don't want to distribute this job", false);
 Getter<int> priority("priority", "Set to a higher value if you want to jump the line", 0);
-Getter<bool> noDesire("no-desire", "Set to true if you want to override desired-slots to for this job", false);
 Getter<bool> objectCache("object-cache",
                          "Set to true if you want the scheduler to cache output from compiles. Also requires the scheduler to be "
                          "configured with --object-cache and the builders to have --object-cache-size",
@@ -114,7 +113,6 @@ Getter<size_t> compileSlots("slots", "Number of compile slots", std::thread::har
                             [](const size_t &value) {
                                 return std::max<size_t>(1, value);
                             });
-Getter<size_t> desiredCompileSlots("desired-slots", "Number of desired compile slots", 0);
 Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::hardware_concurrency() * 2,
                         [](const size_t &value) {
                             return std::max<size_t>(1, value);

@@ -294,7 +294,6 @@ extern Getter<bool> jsonDiagnosticsRaw;
 extern Getter<bool> objectCache;
 extern Getter<std::string> objectCacheTag;
 extern Getter<bool> storePreprocessedDataOnError;
-extern Getter<bool> noDesire;
 extern Getter<bool> disabled;
 extern Getter<int> priority;
 extern Getter<bool> help;
@@ -314,7 +313,6 @@ inline std::string envCache()
 }
 
 extern Getter<size_t> compileSlots;
-extern Getter<size_t> desiredCompileSlots;
 extern Getter<size_t> cppSlots;
 extern Getter<std::string> releaseCppSlotMode;
 extern Getter<bool> watchdog;

@@ -17,6 +17,8 @@ Options:
   --socket=PATH          Unix socket path (default: ~/.cache/fisk/daemon/socket)
   --cpp-slots=N          Preprocess slot count (default: cpus * 2)
   --slots=N              Compile slot count (default: cpus)
+  --local-slots=N        Local compile slot count (default: 0, disabled)
+  --local-slots-max-load=N  Max system load average (1-min) to allow local compiles (default: 0, no limit)
   --cache-dir=PATH       Cache directory (default: ~/.cache/fisk/daemon)
 
 Config files: ~/.config/fisk/daemon.conf, /etc/xdg/fisk/daemon.conf
@@ -59,10 +61,29 @@ server.on("error", (err) => {
 
 const cppSlots = new Slots(option.int("cpp-slots", Math.max(os.cpus().length * 2, 1)), "cpp", debug);
 const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)), "compile", debug);
+const localSlotCount = option.int("local-slots", 0);
+const localSlots = new Slots(localSlotCount, "local", debug);
+const localSlotsMaxLoad = option("local-slots-max-load") as number || 0;
+
+function canAcquireLocalSlot(): boolean {
+    if (localSlotCount <= 0) {
+        return false;
+    }
+    if (localSlotsMaxLoad > 0) {
+        const loadAvg = os.loadavg()[0];
+        if (loadAvg > localSlotsMaxLoad) {
+            if (debug) {
+                console.log(`Local slot denied: load ${loadAvg.toFixed(2)} > max ${localSlotsMaxLoad}`);
+            }
+            return false;
+        }
+    }
+    return true;
+}
 
 server.on("compile", (compile) => {
     compile.on("dumpSlots", () => {
-        const ret = { cpp: cppSlots.dump(), compile: compileSlots.dump() };
+        const ret = { cpp: cppSlots.dump(), compile: compileSlots.dump(), local: localSlots.dump() };
         if (debug) {
             console.log("sending dump", ret);
         }
@@ -70,6 +91,7 @@ server.on("compile", (compile) => {
         compile.send(ret);
     });
     let requestedCppSlot = false;
+    let requestedLocalSlot = false;
     compile.on("acquireCppSlot", () => {
         if (debug) {
             console.log("acquireCppSlot");
@@ -121,6 +143,41 @@ server.on("compile", (compile) => {
         }
     });
 
+    compile.on("acquireSlot", () => {
+        if (debug) {
+            console.log("acquireSlot");
+        }
+
+        if (canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
+            if (debug) {
+                console.log("acquireSlot -> local slot granted");
+            }
+            requestedLocalSlot = true;
+            compile.send(Constants.LocalSlotAcquired);
+        } else {
+            if (debug) {
+                console.log("acquireSlot -> falling back to cpp slot");
+            }
+            assert(!requestedCppSlot);
+            requestedCppSlot = true;
+            cppSlots.acquire(compile.id, { pid: compile.pid }, () => {
+                compile.send(Constants.CppSlotAcquired);
+            });
+        }
+    });
+
+    compile.on("releaseLocalSlot", () => {
+        if (debug) {
+            console.log("releaseLocalSlot");
+        }
+
+        assert(requestedLocalSlot);
+        if (requestedLocalSlot) {
+            requestedLocalSlot = false;
+            localSlots.release(compile.id);
+        }
+    });
+
     compile.on("error", (err: Error) => {
         if (debug) {
             console.error("Got error from fiskc", compile.id, compile.pid, err);
@@ -132,6 +189,10 @@ server.on("compile", (compile) => {
         if (requestedCompileSlot) {
             requestedCompileSlot = false;
             compileSlots.release(compile.id);
+        }
+        if (requestedLocalSlot) {
+            requestedLocalSlot = false;
+            localSlots.release(compile.id);
         }
     });
 
@@ -146,6 +207,10 @@ server.on("compile", (compile) => {
         if (requestedCompileSlot) {
             requestedCompileSlot = false;
             compileSlots.release(compile.id);
+        }
+        if (requestedLocalSlot) {
+            requestedLocalSlot = false;
+            localSlots.release(compile.id);
         }
     });
 });

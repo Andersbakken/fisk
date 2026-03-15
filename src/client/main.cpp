@@ -215,15 +215,6 @@ int main(int argc, char **argv)
         Client::runLocal(reason);
     };
 
-#if 0
-    if (!Config::noDesire) {
-        if (std::unique_ptr<Client::Slot> slot = Client::tryAcquireSlot(Client::Slot::DesiredCompile)) {
-            runLocal("nodesire");
-            return 0;
-        }
-    }
-#endif
-
     if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
         runLocal("disabled");
@@ -248,7 +239,26 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    daemonSocket.send(DaemonSocket::AcquireCppSlot);
+    // Send unified slot request - daemon decides local vs remote
+    daemonSocket.send(DaemonSocket::AcquireSlot);
+    daemonSocket.waitForSlot(select);
+
+    if (daemonSocket.hasLocalSlot()) {
+        DEBUG("Got local compile slot, running locally");
+        data.watchdog->stop();
+        // Local slot is released by the daemon when our socket closes (on exec)
+        Client::runLocal("local slot");
+        return 0; // unreachable
+    }
+
+    if (!daemonSocket.hasCppSlot()) {
+        DEBUG("Failed to acquire any slot from daemon");
+        data.watchdog->stop();
+        Client::runLocal("slot acquisition failure");
+        return 0; // unreachable
+    }
+
+    // Got a cpp slot - proceed with remote compilation
     data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, &select, &daemonSocket);
     assert(data.preprocessed);
 

@@ -229,6 +229,15 @@ bool DaemonSocket::waitForCompileSlot(Select &select)
     return mHasCompileSlot;
 }
 
+bool DaemonSocket::waitForSlot(Select &select)
+{
+    const unsigned long long start = Client::mono();
+    while (!mHasCppSlot && !mHasLocalSlot && mState == Connected && Client::mono() - start < Config::slotAcquisitionTimeout) {
+        select.exec();
+    }
+    return mHasCppSlot || mHasLocalSlot;
+}
+
 void DaemonSocket::close(std::string &&err)
 {
     if (mFD != -1) {
@@ -262,6 +271,11 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
             case CompileSlotAcquired:
                 DEBUG("CompileSlotAcquired");
                 mHasCompileSlot = true;
+                used = 1;
+                break;
+            case LocalSlotAcquired:
+                DEBUG("LocalSlotAcquired");
+                mHasLocalSlot = true;
                 used = 1;
                 break;
             case JSONResponse:

@@ -37,7 +37,9 @@ public:
         AcquireCompileSlot = 2,
         ReleaseCppSlot = 3,
         ReleaseCompileSlot = 4,
-        JSON = 5
+        JSON = 5,
+        AcquireSlot = 6,
+        ReleaseLocalSlot = 7
     };
 
     void send(const std::string &json);
@@ -50,7 +52,13 @@ public:
         return mHasCompileSlot;
     }
 
+    bool hasLocalSlot() const
+    {
+        return mHasLocalSlot;
+    }
+
     bool waitForCompileSlot(Select &select);
+    bool waitForSlot(Select &select);
 
     std::string error() const
     {
@@ -88,7 +96,8 @@ private:
     {
         CppSlotAcquired = 10,
         CompileSlotAcquired = 11,
-        JSONResponse = 12
+        JSONResponse = 12,
+        LocalSlotAcquired = 13
     };
 
     size_t processMessage(const char *msg, size_t len);
@@ -100,6 +109,7 @@ private:
     std::string mRecvBuffer;
     bool mHasCppSlot { false };
     bool mHasCompileSlot { false };
+    bool mHasLocalSlot { false };
     std::string mError;
     mutable std::mutex mMutex;
     std::condition_variable mCond;

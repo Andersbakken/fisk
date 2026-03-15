@@ -115,6 +115,12 @@ export class Compile extends EventEmitter {
                     case Constants.ReleaseCompileSlot:
                         emit("releaseCompileSlot");
                         continue;
+                    case Constants.AcquireSlot:
+                        emit("acquireSlot");
+                        continue;
+                    case Constants.ReleaseLocalSlot:
+                        emit("releaseLocalSlot");
+                        continue;
                     case Constants.JSON:
                         if (available < 5) {
                             break;

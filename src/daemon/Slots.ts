@@ -23,6 +23,17 @@ export class Slots extends EventEmitter {
         }
     }
 
+    tryAcquire(id: number, data: Data): boolean {
+        if (this.used.size < this.count) {
+            this.used.set(id, data);
+            if (this.debug) {
+                console.log("tryAcquire succeeded", id, data, this.toString());
+            }
+            return true;
+        }
+        return false;
+    }
+
     acquire(id: number, data: Data, cb: () => void): void {
         if (this.used.size < this.count) {
             this.used.set(id, data);
