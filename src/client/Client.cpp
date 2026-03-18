@@ -496,6 +496,17 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
 const char *Client::trimSourceRoot(const std::string &str, size_t *len)
 {
     const char *cstr = str.c_str();
+
+    // Strip conan home prefix if present, so that builds under
+    // ~/.conan2/... produce the same hash on every machine.
+    static const char conanMarker[] = "/.conan2/";
+    const char *conan = strstr(cstr, conanMarker);
+    if (conan) {
+        const char *trimmed = conan + 1; // points at ".conan2/..."
+        *len = str.size() - (trimmed - cstr);
+        return trimmed;
+    }
+
     char buf[PATH_MAX];
     // strcpy
     size_t idx = 0;
