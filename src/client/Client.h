@@ -122,7 +122,7 @@ inline void parsePath(const std::string &path, std::string *basename, std::strin
 void writeStatistics();
 [[noreturn]] void runLocal(const std::string &reason);
 unsigned long long mono();
-bool setFlag(int fd, int flag);
+bool setFlag(int fd, uint32_t flag);
 bool recursiveMkdir(const std::string &path, mode_t mode = S_IRWXU);
 bool recursiveRmdir(const std::string &path);
 std::string realpath(const std::string &path);

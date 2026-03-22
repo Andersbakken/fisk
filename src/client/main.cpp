@@ -248,14 +248,12 @@ int main(int argc, char **argv)
         data.watchdog->stop();
         // Local slot is released by the daemon when our socket closes (on exec)
         Client::runLocal("local slot");
-        return 0; // unreachable
     }
 
     if (!daemonSocket.hasCppSlot()) {
         DEBUG("Failed to acquire any slot from daemon");
         data.watchdog->stop();
         Client::runLocal("slot acquisition failure");
-        return 0; // unreachable
     }
 
     // Got a cpp slot - proceed with remote compilation
@@ -317,7 +315,6 @@ int main(int argc, char **argv)
         if (data.watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
-            return 0; // unreachable
         }
         if (releaseCppSlotOnCppFinished)
             daemonSocket.send(DaemonSocket::ReleaseCppSlot);
@@ -329,13 +326,11 @@ int main(int argc, char **argv)
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
             runLocal("preprocess error 2");
-            return 0; // unreachable
         }
 
         if (data.preprocessed->stdOut.empty()) {
             ERROR("Empty preprocessed output. Running locally");
             runLocal("preprocess error 3");
-            return 0; // unreachable
         }
 
         VERBOSE("SHA1'ing compiler hash [%s]", data.hash.c_str());
@@ -361,7 +356,6 @@ int main(int argc, char **argv)
         if (!schedulerWebsocket->connect(url + "/compile", headers)) {
             DEBUG("Have to run locally because no server");
             runLocal("scheduler connect error");
-            return 0; // unreachable
         }
 
         select.add(schedulerWebsocket.get());
@@ -373,14 +367,12 @@ int main(int argc, char **argv)
         if (data.watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out trying to connect ro the scheduler");
             runLocal("watchdog scheduler connect");
-            return 0; // unreachable
         }
     } while (!schedulerWebsocket->done);
 
     if (!schedulerWebsocket->error.empty()) {
         DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error.c_str());
         runLocal(schedulerWebsocket->error);
-        return 0; // unreachable
     }
 
     if (schedulerWebsocket->needsEnvironment) {
@@ -394,7 +386,6 @@ int main(int argc, char **argv)
         }
         Client::recursiveRmdir(dir);
         runLocal("needs environment");
-        return 0;
     }
 
     const bool objectCache = schedulerWebsocket->handshakeResponseHeader("x-fisk-object-cache") == "true";
@@ -411,7 +402,6 @@ int main(int argc, char **argv)
               data.hash.c_str(),
               data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         runLocal("no builder");
-        return 0; // unreachable
     }
 
     // usleep(1000 * 1000 * 16);
@@ -435,7 +425,6 @@ int main(int argc, char **argv)
     if (!builderWebSocket.connect(builderUrl, headers)) {
         DEBUG("Have to run locally because no builder connection");
         runLocal("builder connection failure");
-        return 0; // unreachable
     }
 
     while (!data.watchdog->timedOut() && builderWebSocket.state() < WebSocket::ConnectedWebSocket && builderWebSocket.state() > WebSocket::None) {
@@ -445,13 +434,11 @@ int main(int argc, char **argv)
     if (data.watchdog->timedOut()) {
         DEBUG("Have to run locally because we timed out trying to connect to builder");
         runLocal("watchdog builder connect");
-        return 0; // unreachable
     }
 
     if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because no builder connection 2");
         runLocal("builder connection failure 2");
-        return 0;
     }
     data.watchdog->transition(Watchdog::ConnectedToBuilder);
     if (!Config::objectCache) {
@@ -462,7 +449,6 @@ int main(int argc, char **argv)
         if (data.watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
-            return 0; // unreachable
         }
 
         if (releaseCppSlotOnCppFinished)
@@ -475,13 +461,11 @@ int main(int argc, char **argv)
         if (data.preprocessed->exitStatus != 0) {
             ERROR("Failed to preprocess. Running locally");
             runLocal("preprocess error 4");
-            return 0; // unreachable
         }
 
         if (data.preprocessed->stdOut.empty()) {
             ERROR("Empty preprocessed output. Running locally");
             runLocal("preprocess error 5");
-            return 0; // unreachable
         }
     }
 
@@ -533,18 +517,15 @@ int main(int argc, char **argv)
                 ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket.error.c_str());
 
                 runLocal("error");
-                return 0; // unreachable
             }
         }
         if (data.watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out waiting for builder");
             runLocal("watchdog");
-            return 0; // unreachable
         }
         if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the builder");
             runLocal("builder protocol error 6");
-            return 0; // unreachable
         }
     }
 
@@ -560,13 +541,11 @@ int main(int argc, char **argv)
     if (data.watchdog->timedOut()) {
         DEBUG("Have to run locally because we timed out waiting for builder");
         runLocal("watchdog upload");
-        return 0; // unreachable
     }
 
     if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the builder");
         runLocal("builder connect error 3");
-        return 0; // unreachable
     }
 
     data.watchdog->transition(Watchdog::UploadedJob);
@@ -581,19 +560,16 @@ int main(int argc, char **argv)
     if (data.watchdog->timedOut()) {
         DEBUG("Have to run locally because we timed out waiting for builder somehow");
         runLocal("watchdog builder");
-        return 0; // unreachable
     }
 
     if (!builderWebSocket.done) {
         DEBUG("Have to run locally because something went wrong with the builder, part deux");
         runLocal("builder network error");
-        return 0; // unreachable
     }
 
     if (!builderWebSocket.error.empty()) {
         DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket.error.c_str());
         runLocal("builder error");
-        return 0; // unreachable
     }
 
     data.watchdog->transition(Watchdog::Finished);

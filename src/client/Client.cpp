@@ -533,7 +533,7 @@ const char *Client::trimSourceRoot(const std::string &str, size_t *len)
     return str.c_str();
 }
 
-bool Client::setFlag(int fd, int flag)
+bool Client::setFlag(int fd, uint32_t flag)
 {
     int flags, r;
     EINTRWRAP(flags, fcntl(fd, F_GETFL, 0));
