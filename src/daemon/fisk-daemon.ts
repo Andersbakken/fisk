@@ -7,6 +7,7 @@ import { common as commonFunc } from "../common";
 import assert from "assert";
 import createOptions from "@jhanssen/options";
 import os from "os";
+import type { Compile } from "./Compile";
 import type { Options } from "@jhanssen/options";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -63,7 +64,49 @@ const cppSlots = new Slots(option.int("cpp-slots", Math.max(os.cpus().length * 2
 const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)), "compile", debug);
 const localSlotCount = option.int("local-slots", 0);
 const localSlots = new Slots(localSlotCount, "local", debug);
-const localSlotsMaxLoad = option("local-slots-max-load") as number || 0;
+const localSlotsMaxLoad = (option("local-slots-max-load") as number) || 0;
+
+interface SlotSubscriber {
+    compile: Compile;
+    handler: () => void;
+}
+
+const slotSubscribers: SlotSubscriber[] = [];
+
+function slotsInfo(): Record<string, unknown> {
+    return {
+        type: "slotsInfo",
+        local: {
+            active: localSlots.active,
+            capacity: localSlots.capacity,
+            total: localSlots.totalAcquired
+        },
+        cpp: {
+            active: cppSlots.active,
+            capacity: cppSlots.capacity,
+            total: cppSlots.totalAcquired
+        },
+        compile: {
+            active: compileSlots.active,
+            capacity: compileSlots.capacity,
+            total: compileSlots.totalAcquired
+        }
+    };
+}
+
+function broadcastSlotsInfo(): void {
+    if (slotSubscribers.length === 0) {
+        return;
+    }
+    const info = slotsInfo();
+    for (const sub of slotSubscribers) {
+        sub.compile.send(info);
+    }
+}
+
+for (const slots of [localSlots, cppSlots, compileSlots]) {
+    slots.on("changed", broadcastSlotsInfo);
+}
 
 function canAcquireLocalSlot(): boolean {
     if (localSlotCount <= 0) {
@@ -89,6 +132,29 @@ server.on("compile", (compile) => {
         }
 
         compile.send(ret);
+    });
+
+    compile.on("subscribeSlots", () => {
+        if (debug) {
+            console.log("subscribeSlots from", compile.id);
+        }
+
+        const subscriber: SlotSubscriber = {
+            compile,
+            handler: () => {
+                // Remove subscriber on disconnect
+                const idx = slotSubscribers.indexOf(subscriber);
+                if (idx !== -1) {
+                    slotSubscribers.splice(idx, 1);
+                }
+            }
+        };
+        slotSubscribers.push(subscriber);
+        compile.on("end", subscriber.handler);
+        compile.on("error", subscriber.handler);
+
+        // Send current state immediately
+        compile.send(slotsInfo());
     });
     let requestedCppSlot = false;
     let requestedLocalSlot = false;

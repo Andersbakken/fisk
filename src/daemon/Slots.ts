@@ -13,22 +13,38 @@ interface MapData {
 export class Slots extends EventEmitter {
     private pending: Map<number, MapData>;
     private used: Map<number, Data>;
+    private _totalAcquired: number;
 
     constructor(private readonly count: number, private readonly name: string, private readonly debug: boolean) {
         super();
         this.used = new Map();
         this.pending = new Map();
+        this._totalAcquired = 0;
         if (this.debug) {
             console.log("Slots created", this.toString());
         }
     }
 
+    get capacity(): number {
+        return this.count;
+    }
+
+    get active(): number {
+        return this.used.size;
+    }
+
+    get totalAcquired(): number {
+        return this._totalAcquired;
+    }
+
     tryAcquire(id: number, data: Data): boolean {
         if (this.used.size < this.count) {
             this.used.set(id, data);
+            ++this._totalAcquired;
             if (this.debug) {
                 console.log("tryAcquire succeeded", id, data, this.toString());
             }
+            this.emit("changed");
             return true;
         }
         return false;
@@ -37,9 +53,11 @@ export class Slots extends EventEmitter {
     acquire(id: number, data: Data, cb: () => void): void {
         if (this.used.size < this.count) {
             this.used.set(id, data);
+            ++this._totalAcquired;
             if (this.debug) {
                 console.log("acquired slot", id, data, this.toString());
             }
+            this.emit("changed");
             cb();
         } else {
             if (this.debug) {
@@ -63,9 +81,11 @@ export class Slots extends EventEmitter {
             for (const p of this.pending) {
                 this.used.set(p[0], p[1].data);
                 this.pending.delete(p[0]);
+                ++this._totalAcquired;
                 p[1].cb();
                 break;
             }
+            this.emit("changed");
         }
     }
 

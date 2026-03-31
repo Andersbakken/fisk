@@ -4,7 +4,9 @@ import WebSocket from "ws";
 import assert from "assert";
 import blessed from "@andersbakken/blessed";
 import humanize from "humanize-duration";
+import net from "net";
 import options from "@jhanssen/options";
+import os from "os";
 import path from "path";
 import type {
     BuilderAddedMessage,
@@ -21,6 +23,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 
 Options:
   --scheduler=URL        Scheduler URL (default: ws://localhost:8097)
+  --daemon-socket=PATH   Daemon Unix socket path (default: ~/.cache/fisk/daemon/socket)
 
 Config files: ~/.config/fisk/monitor.conf, /etc/xdg/fisk/monitor.conf
 Environment variables: FISK_MONITOR_SCHEDULER, etc.`);
@@ -456,7 +459,12 @@ function notify(msg: string): void {
     }
 
     const notifyNow = (message?: string): void => {
-        notificationBox.setContent(message || "");
+        if (message) {
+            notificationBox.setContent(message);
+        } else {
+            updateNotificationBar();
+            return;
+        }
         screen.render();
     };
 
@@ -838,4 +846,117 @@ function connect(): void {
     });
 }
 
+// --- Daemon connection for local slot info ---
+
+const DaemonJSON = 5;
+const DaemonJSONResponse = 12;
+
+const daemonSocketPath = String(option("daemon-socket", path.join(os.homedir(), ".cache", "fisk", "daemon", "socket")));
+
+interface SlotInfo {
+    active: number;
+    capacity: number;
+    total: number;
+}
+
+interface SlotsInfoMessage {
+    type: "slotsInfo";
+    local: SlotInfo;
+    cpp: SlotInfo;
+    compile: SlotInfo;
+}
+
+let daemonSlotsInfo: SlotsInfoMessage | undefined;
+let daemonSocket: net.Socket | undefined;
+let daemonRecvBuffer = Buffer.alloc(0);
+
+function updateNotificationBar(): void {
+    if (daemonSlotsInfo && daemonSlotsInfo.local.capacity > 0) {
+        const local = daemonSlotsInfo.local;
+        notificationBox.setContent(
+            `{bold}Local:{/bold} ${local.active}/${local.capacity} active, ${local.total} total`
+        );
+    } else {
+        notificationBox.setContent("");
+    }
+    screen.render();
+}
+
+function processDaemonMessage(json: string): void {
+    try {
+        const msg = JSON.parse(json) as SlotsInfoMessage;
+        if (msg.type === "slotsInfo") {
+            daemonSlotsInfo = msg;
+            updateNotificationBar();
+        }
+    } catch (e) {
+        // ignore parse errors
+    }
+}
+
+function processDaemonData(): void {
+    while (daemonRecvBuffer.length > 0) {
+        const type = daemonRecvBuffer[0];
+        if (type === DaemonJSONResponse) {
+            if (daemonRecvBuffer.length < 5) {
+                break; // need more data for length header
+            }
+            const msgLen = daemonRecvBuffer.readUInt32BE(1);
+            if (daemonRecvBuffer.length < 5 + msgLen) {
+                break; // need more data for body
+            }
+            const json = daemonRecvBuffer.subarray(5, 5 + msgLen).toString("utf8");
+            daemonRecvBuffer = daemonRecvBuffer.subarray(5 + msgLen);
+            processDaemonMessage(json);
+        } else {
+            // Unknown single-byte message, skip it
+            daemonRecvBuffer = daemonRecvBuffer.subarray(1);
+        }
+    }
+}
+
+function sendDaemonJSON(sock: net.Socket, obj: unknown): void {
+    const jsonBuf = Buffer.from(JSON.stringify(obj), "utf8");
+    const header = Buffer.allocUnsafe(5);
+    header.writeUInt8(DaemonJSON, 0);
+    header.writeUInt32BE(jsonBuf.length, 1);
+    sock.write(header);
+    sock.write(jsonBuf);
+}
+
+function connectDaemon(): void {
+    daemonSlotsInfo = undefined;
+    daemonRecvBuffer = Buffer.alloc(0);
+
+    daemonSocket = net.createConnection(daemonSocketPath);
+
+    daemonSocket.on("connect", () => {
+        assert(daemonSocket);
+        // Send PID (4 bytes, big-endian) as the daemon protocol requires
+        const pidBuf = Buffer.allocUnsafe(4);
+        pidBuf.writeUInt32BE(process.pid, 0);
+        daemonSocket.write(pidBuf);
+
+        // Subscribe to slot updates
+        sendDaemonJSON(daemonSocket, { type: "subscribeSlots" });
+    });
+
+    daemonSocket.on("data", (data: Buffer) => {
+        daemonRecvBuffer = Buffer.concat([daemonRecvBuffer, data]);
+        processDaemonData();
+    });
+
+    daemonSocket.on("error", () => {
+        // Daemon may not be running, silently retry
+    });
+
+    daemonSocket.on("close", () => {
+        daemonSocket = undefined;
+        daemonSlotsInfo = undefined;
+        updateNotificationBar();
+        setTimeout(connectDaemon, 5000);
+    });
+}
+
 connect();
+connectDaemon();
