@@ -368,11 +368,11 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
 
     for (auto &sec : elf.sections) {
         const std::string &name = sec->get_name();
-        if (name == ".debug_info")
+        if (name == ".debug_info" || name == ".debug_info.dwo")
             debugInfo = sec.get();
-        else if (name == ".debug_abbrev")
+        else if (name == ".debug_abbrev" || name == ".debug_abbrev.dwo")
             debugAbbrev = sec.get();
-        else if (name == ".debug_str")
+        else if (name == ".debug_str" || name == ".debug_str.dwo")
             debugStr = sec.get();
         else if (name == ".rela.debug_info")
             relaDebugInfo = sec.get();

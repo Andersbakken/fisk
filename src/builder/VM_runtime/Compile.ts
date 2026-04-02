@@ -228,19 +228,22 @@ export class Compile extends EventEmitter {
                             } else if (stat.isFile()) {
                                 if (file === outputFileName) {
                                     files.push({ path: output, mapped: path.join(prefix, file) });
-                                } else if (path.extname(file) === ".gcno") {
-                                    // console.log("mapping", output, prefix, file);
-                                    files.push({
-                                        path: output.substring(0, output.length - 1) + "gcno",
-                                        mapped: path.join(prefix, file)
-                                    });
-                                } else if (path.extname(file) === ".gcda") {
-                                    files.push({
-                                        path: output.substring(0, output.length - 1) + "gcda",
-                                        mapped: path.join(prefix, file)
-                                    });
                                 } else {
-                                    files.push({ path: path.join(prefix, file) });
+                                    const ext = path.extname(file);
+                                    switch (ext) {
+                                        case ".gcno":
+                                        case ".gcda":
+                                        case ".dwo":
+                                            files.push({
+                                                path: output.substring(0, output.length - 2) + ext,
+                                                mapped: path.join(prefix, file)
+                                            });
+                                            break;
+
+                                        default:
+                                            files.push({ path: path.join(prefix, file) });
+                                            break;
+                                    }
                                 }
                                 if (debug) {
                                     console.log("Added file", file, files[files.length - 1]);

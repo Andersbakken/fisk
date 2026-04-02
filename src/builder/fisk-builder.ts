@@ -163,9 +163,10 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                     }
                     assert(objectCache, "Must have objectCache");
                     console.error(
-                        `Failed to read ${f.bytes} from ${path.join(objectCache.dir, item.response.sha1!)} got ${read} ${
-                            err.message
-                        }`
+                        `Failed to read ${f.bytes} from ${path.join(
+                            objectCache.dir,
+                            item.response.sha1!
+                        )} got ${read} ${err.message}`
                     );
                     finish(err);
                 } else {
@@ -505,7 +506,10 @@ client.on("getEnvironments", (message) => {
     base += "/environment/";
     const work = (): void => {
         if (!message.environments.length) {
-            const restart = option("restart-on-new-environments");
+            let restart = option("restart-on-new-environments");
+            if (restart === "false" || restart === "0") {
+                restart = false;
+            }
             if (!restart) {
                 setTimeout(() => {
                     client.send("environments", { environments: Object.keys(environments) });
@@ -901,11 +905,12 @@ server.on("job", (job: Job) => {
                         const original = contents.find((c) => c.path === item.path);
                         assert(original, "Must have original contents");
                         assert(original.uncompressed, "Must have uncompressed data");
-                        return {
+                        const ret = {
                             path: item.path,
                             bytes: item.contents.length,
                             uncompressedSize: original.uncompressed.byteLength
                         };
+                        return ret;
                     }),
                     success: event.success,
                     exitCode: event.exitCode,
