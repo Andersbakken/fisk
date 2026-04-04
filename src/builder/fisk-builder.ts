@@ -254,74 +254,91 @@ client.on("fetch_cache_objects", (msg: unknown) => {
     for (let idx = 0; idx < max; ++idx) {
         promises.push(Promise.resolve());
     }
+    const fetchTimeoutMs = option.int("object-cache-fetch-timeout", 5 * 60 * 1000);
     message.objects.forEach((operation: FetchCacheObjectsMessageObject, idx) => {
         promises[idx % promises.length] = promises[idx % promises.length].then(() => {
             return new Promise<void>((resolve: () => void) => {
                 assert(objectCache, "Must have objectCache");
-                const file = path.join(objectCache.dir, operation.sha1);
-                const url = `http://${operation.source}/objectcache/${operation.sha1}`;
-                console.log("Downloading", url, "->", file);
-                let expectedSize: number | undefined;
-                let writeStream: fs.WriteStream;
-                try {
-                    writeStream = fs.createWriteStream(file);
-                } catch (err: unknown) {
-                    console.error("Got some error from write stream", err);
-                    try {
-                        fs.unlinkSync(file);
-                    } catch (e) {
-                        /* */
-                    }
+                if (objectCache.state(operation.sha1) !== "none") {
+                    console.log("Skipping", operation.sha1, "already", objectCache.state(operation.sha1));
                     resolve();
                     return;
                 }
-                axios({ method: "get", url: url, responseType: "stream" })
+                const finalPath = path.join(objectCache.dir, operation.sha1);
+                const tmpPath = finalPath + ".tmp." + process.pid;
+                const url = `http://${operation.source}/objectcache/${operation.sha1}`;
+                console.log("Downloading", url, "->", tmpPath);
+                let expectedSize: number | undefined;
+                let writeStream: fs.WriteStream;
+                let resolved = false;
+                const cleanup = (): void => {
+                    try {
+                        fs.unlinkSync(tmpPath);
+                    } catch (e) {
+                        /* */
+                    }
+                    if (!resolved) {
+                        resolved = true;
+                        resolve();
+                    }
+                };
+                try {
+                    writeStream = fs.createWriteStream(tmpPath);
+                } catch (err: unknown) {
+                    console.error("Failed to create write stream for", tmpPath, err);
+                    cleanup();
+                    return;
+                }
+                axios({ method: "get", url: url, responseType: "stream", timeout: fetchTimeoutMs })
                     .then((response) => {
                         expectedSize = parseInt(response.headers["content-length"]);
                         response.data.pipe(writeStream);
                         response.data.on("error", (err: unknown) => {
-                            console.error("Got some error from stream", err);
+                            console.error("Got http stream error for", operation.sha1, err);
                             writeStream.destroy(new Error("http stream error " + (err as Error).toString()));
                         });
-                        // console
                     })
                     .catch((err: unknown) => {
-                        console.error("Got some error", err);
+                        console.error("Got http error fetching", operation.sha1, err);
                         writeStream.destroy(new Error("http error " + (err as Error).toString()));
                     });
                 writeStream.on("finish", () => {
-                    console.log("Finished writing file", file);
                     let stat;
                     try {
-                        stat = fs.statSync(file);
+                        stat = fs.statSync(tmpPath);
                     } catch (err) {
                         /* */
                     }
                     if (!stat || stat.size !== expectedSize) {
                         console.log(
                             "Got wrong size for",
-                            file,
+                            operation.sha1,
                             url,
                             "\nGot",
                             stat ? stat.size : -1,
                             "expected",
                             expectedSize
                         );
-                        try {
-                            fs.unlinkSync(file);
-                        } catch (err) {
-                            // console.log("Got error unlinking file", file, err);
-                        }
+                        cleanup();
                     } else {
-                        ++filesReceived;
-                        assert(objectCache, "Must have objectcache");
-                        objectCache.loadFile(file, stat.size);
+                        try {
+                            fs.renameSync(tmpPath, finalPath);
+                            ++filesReceived;
+                            assert(objectCache, "Must have objectcache");
+                            objectCache.loadFile(finalPath, stat.size);
+                        } catch (err) {
+                            console.error("Failed to rename", tmpPath, "to", finalPath, err);
+                            cleanup();
+                        }
                     }
-                    resolve();
+                    if (!resolved) {
+                        resolved = true;
+                        resolve();
+                    }
                 });
                 writeStream.on("error", (err) => {
-                    console.error("Got stream error", err);
-                    resolve();
+                    console.error("Got stream error for", operation.sha1, err);
+                    cleanup();
                 });
             });
         });
@@ -329,10 +346,6 @@ client.on("fetch_cache_objects", (msg: unknown) => {
     Promise.all(promises).then(() => {
         console.log("got results", filesReceived);
     });
-    // chain.then(() => {
-    //     console.log("Received", filesReceived, "files. Restarting");
-    //     process.exit();
-    // });
 });
 
 const environmentsRoot = path.join(common.cacheDir(), "environments");
@@ -726,7 +739,12 @@ server.on("listen", (app: express.Express) => {
             const rstream = fs.createReadStream(file);
             rstream.on("error", (err) => {
                 console.error("Got read stream error for", file, err);
-                rstream.close();
+                rstream.destroy();
+                if (!res.headersSent) {
+                    res.sendStatus(500);
+                } else {
+                    res.destroy();
+                }
             });
             rstream.pipe(res);
         } catch (err) {
