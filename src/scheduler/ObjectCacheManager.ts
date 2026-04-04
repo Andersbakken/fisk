@@ -12,7 +12,9 @@ import type express from "express";
 function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder): number {
     const data = bySHA1.get(sha1);
     if (data) {
-        data.nodes.push(node);
+        if (data.nodes.indexOf(node) === -1) {
+            data.nodes.push(node);
+        }
         return data.nodes.length;
     }
     bySHA1.set(sha1, new SHA1Data(fileSize, node));
@@ -91,7 +93,9 @@ export class ObjectCacheManager extends EventEmitter {
             nodeData ? nodeData.sha1s.length : -1
         );
         if (nodeData) {
-            nodeData.sha1s.push(msg.sha1);
+            if (nodeData.sha1s.indexOf(msg.sha1) === -1) {
+                nodeData.sha1s.push(msg.sha1);
+            }
             nodeData.size = msg.cacheSize;
             const count = addToSHA1Map(this.bySHA1, msg.sha1, msg.fileSize, node);
             if (this.distributeOnInsertion && count - 1 < this.redundancy) {

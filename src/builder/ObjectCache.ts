@@ -102,7 +102,10 @@ export class ObjectCache extends EventEmitter {
 
     loadFile(filePath: string, fileSize: number): void {
         const fileName = path.basename(filePath);
-        // console.log("got file", filePath, fileSize);
+        // Skip if already cached — makes loadFile idempotent
+        if (fileName in this.cache) {
+            return;
+        }
         let fd;
         let jsonBuffer;
         try {
@@ -130,6 +133,9 @@ export class ObjectCache extends EventEmitter {
                 this.size += item.fileSize;
                 this.cache[fileName] = item;
                 this.emit("added", { sha1: response.sha1, sourcePath: response.sourcePath, fileSize: stat.size });
+                if (this.size > this.maxSize) {
+                    this.purge(this.purgeSize);
+                }
             } else {
                 throw new Error("Unexpected file " + fileName);
             }
@@ -215,14 +221,13 @@ export class ObjectCache extends EventEmitter {
                         );
                     }
                     this.cache[response.sha1!] = cacheItem;
-                    // console.log(response);
+                    this.size += cacheItem.fileSize;
                     this.emit("added", {
                         sha1: response.sha1,
                         sourcePath: response.sourcePath,
                         fileSize: cacheItem.fileSize
                     });
 
-                    this.size += cacheItem.fileSize;
                     if (this.size > this.maxSize) {
                         this.purge(this.purgeSize);
                     }
