@@ -43,6 +43,11 @@ public:
         return mCommandLine;
     }
 
+    bool isAmbiguous() const
+    {
+        return mAmbiguous;
+    }
+
     virtual bool apply(const std::string &value) = 0;
     virtual bool apply(const json11::Json &input) = 0;
     virtual void flip() = 0;
@@ -63,6 +68,7 @@ public:
 private:
     const char *mHelp;
     bool mDone { false };
+    bool mAmbiguous { false };
     friend bool Config::init(int &argc, char **&argv);
     std::string mJsonKey, mEnvironmentVariable, mCommandLine;
 };

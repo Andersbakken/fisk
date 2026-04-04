@@ -207,12 +207,14 @@ bool Config::init(int &argc, char **&argv)
     while (i < argc) {
         if (!strcmp("--help", argv[i])) {
             gotHelp = true;
+            help.mAmbiguous = true;
             ++i;
             continue;
         }
 
         if (!strcmp("--version", argv[i])) {
             gotVersion = true;
+            version.mAmbiguous = true;
             ++i;
             continue;
         }
@@ -292,18 +294,6 @@ bool Config::init(int &argc, char **&argv)
         it->second->mDone = true;
     }
 
-    if ((gotHelp || gotVersion) && static_cast<std::string>(compiler).empty()) {
-        std::string file;
-        Client::parsePath(argv[0], &file, nullptr);
-        if (file == "fiskc") {
-            if (gotHelp) {
-                help.apply(std::string());
-            } else {
-                version.apply(std::string());
-            }
-        }
-    }
-
     if (environ) {
         for (size_t j = 0; environ[j]; ++j) {
             const char *env = environ[j];
@@ -336,17 +326,34 @@ bool Config::init(int &argc, char **&argv)
             if (it == sGetters.end() || (no && !it->second->isBoolean())) {
                 continue;
             }
-            if (it->second->mDone) // set from command line, no need to worry about environment
+
+            GetterBase *getter = it->second;
+
+            if (getter->mDone) // set from command line, no need to worry about environment
                 continue;
 
-            if (!it->second->apply(value)) {
+            if (!getter->apply(value)) {
                 usage(stderr);
                 fprintf(stderr, "Can't parse environment variable %s\n", env);
                 return false;
             }
             if (no)
-                it->second->flip();
-            it->second->mDone = true;
+                getter->flip();
+            getter->mDone = true;
+        }
+    }
+
+    if ((gotHelp || gotVersion) && static_cast<std::string>(compiler).empty()) {
+        std::string file;
+        Client::parsePath(argv[0], &file, nullptr);
+        if (file == "fiskc") {
+            if (gotHelp) {
+                help.apply(std::string());
+            }
+
+            if (gotVersion) {
+                version.apply(std::string());
+            }
         }
     }
 

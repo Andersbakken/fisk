@@ -48,17 +48,16 @@ int main(int argc, char **argv)
         Log::shutdown();
     });
 
-    const int argCount = argc;
     if (!Config::init(argc, argv) && !Config::help) {
         return 105;
     }
 
-    if (Config::help || argCount == 1) {
+    if (Config::help && !Config::version.isAmbiguous()) {
         Config::usage(stdout);
         return 0;
     }
 
-    if (Config::version) {
+    if (Config::version && !Config::version.isAmbiguous()) {
         printf("%s\n", npm_version);
         return 0;
     }
