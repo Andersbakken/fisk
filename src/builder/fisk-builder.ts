@@ -90,6 +90,7 @@ process.on("uncaughtException", (err) => {
 let debug = option("debug");
 
 let objectCache: ObjectCache | undefined;
+let fetchSequence = 0;
 
 function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
     // console.log("got job", job.sha1, objectCache ? objectCache.state(job.sha1) : false);
@@ -265,7 +266,7 @@ client.on("fetch_cache_objects", (msg: unknown) => {
                     return;
                 }
                 const finalPath = path.join(objectCache.dir, operation.sha1);
-                const tmpPath = finalPath + ".tmp." + process.pid;
+                const tmpPath = finalPath + ".tmp." + process.pid + "." + ++fetchSequence;
                 const url = `http://${operation.source}/objectcache/${operation.sha1}`;
                 console.log("Downloading", url, "->", tmpPath);
                 let expectedSize: number | undefined;

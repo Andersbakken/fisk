@@ -77,6 +77,11 @@ export class ObjectCacheManager extends EventEmitter {
 
     clear(): void {
         this.hits = 0;
+        for (const timer of this.pendingTransferTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.pendingTransfers.clear();
+        this.pendingTransferTimers.clear();
         this.emit("cleared");
     }
 
