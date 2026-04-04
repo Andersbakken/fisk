@@ -38,6 +38,10 @@ function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Bu
     }
 }
 
+function pendingKey(sha1: string, node: Builder): string {
+    return sha1 + ":" + node.ip + ":" + node.port;
+}
+
 interface CommandType {
     available: number;
     objects: unknown[];
@@ -69,59 +73,6 @@ export class ObjectCacheManager extends EventEmitter {
         this.pendingTransferTimeoutMs = option.int("object-cache-transfer-timeout", 5 * 60 * 1000);
         this.distributeOnInsertion = Boolean(option("distribute-object-cache-on-insertion"));
         this.distributeOnCacheHit = Boolean(option("distribute-object-cache-on-cache-hit"));
-    }
-
-    private pendingKey(sha1: string, node: Builder): string {
-        return sha1 + ":" + node.ip + ":" + node.port;
-    }
-
-    private addPendingTransfer(sha1: string, node: Builder): void {
-        const key = this.pendingKey(sha1, node);
-        this.pendingTransfers.add(key);
-        const timer = setTimeout(() => {
-            this.pendingTransfers.delete(key);
-            this.pendingTransferTimers.delete(key);
-        }, this.pendingTransferTimeoutMs);
-        timer.unref();
-        this.pendingTransferTimers.set(key, timer);
-    }
-
-    private clearPendingTransfer(sha1: string, node: Builder): void {
-        const key = this.pendingKey(sha1, node);
-        this.pendingTransfers.delete(key);
-        const timer = this.pendingTransferTimers.get(key);
-        if (timer) {
-            clearTimeout(timer);
-            this.pendingTransferTimers.delete(key);
-        }
-    }
-
-    private clearAllPendingForNode(node: Builder): void {
-        const suffix = ":" + node.ip + ":" + node.port;
-        for (const key of this.pendingTransfers) {
-            if (key.endsWith(suffix)) {
-                this.pendingTransfers.delete(key);
-                const timer = this.pendingTransferTimers.get(key);
-                if (timer) {
-                    clearTimeout(timer);
-                    this.pendingTransferTimers.delete(key);
-                }
-            }
-        }
-    }
-
-    private pendingCountForSha1(sha1: string): number {
-        let count = 0;
-        for (const key of this.pendingTransfers) {
-            if (key.startsWith(sha1 + ":")) {
-                ++count;
-            }
-        }
-        return count;
-    }
-
-    private hasPendingTransfer(sha1: string, node: Builder): boolean {
-        return this.pendingTransfers.has(this.pendingKey(sha1, node));
     }
 
     clear(): void {
@@ -281,11 +232,12 @@ export class ObjectCacheManager extends EventEmitter {
         if (isNaN(max) || max <= 0) {
             max = undefined;
         }
-        const sha1 = String(query.sha1);
+        const sha1 = query.sha1 && typeof query.sha1 === "string" ? query.sha1 : undefined;
+        const nodeRestriction = query.node && typeof query.node === "string" ? query.node : undefined;
 
         let ret: Record<string, unknown> | undefined;
         if (res) {
-            ret = { type: "fetch_cache_objects", dry: dry, commands: {} };
+            ret = { type: "fetch_cache_objects", dry: dry, commands: {} as Record<string, unknown> };
             console.log(
                 "distribute called with redundancy of",
                 redundancy,
@@ -294,7 +246,7 @@ export class ObjectCacheManager extends EventEmitter {
                 "dry",
                 dry,
                 "sha1",
-                sha1
+                sha1 || "(all)"
             );
         }
 
@@ -306,11 +258,8 @@ export class ObjectCacheManager extends EventEmitter {
                 commands.set(key, { objects: [], available: value.maxSize - value.size });
             });
         }
-        const nodeRestriction = query.node;
         let count = 0;
-        // console.log(commands);
         if (this.byNode.size >= 2) {
-            // let max = 1;
             let roundRobinIndex = 0;
             const processObject = (sha: string, value: SHA1Data): void => {
                 if (max !== undefined && max <= 0) {
@@ -338,6 +287,9 @@ export class ObjectCacheManager extends EventEmitter {
                         if (this.hasPendingTransfer(sha, node)) {
                             continue;
                         }
+                        if (nodeRestriction && node.ip + ":" + node.port !== nodeRestriction) {
+                            continue;
+                        }
                         let data = commands.get(node);
                         let available;
                         if (data) {
@@ -362,7 +314,6 @@ export class ObjectCacheManager extends EventEmitter {
                             break;
                         }
                     }
-                    // console.log("found candidates", candidates.map(node => node.ip + ":" + node.port));
                 }
             };
             if (sha1) {
@@ -379,13 +330,12 @@ export class ObjectCacheManager extends EventEmitter {
             }
         }
         commands.forEach((value, key) => {
-            // console.log(key.ip + ": " + key.port, "will receive", value.objects);
-            if (value.objects.length && (!nodeRestriction || key.ip + ":" + key.port === nodeRestriction)) {
+            if (value.objects.length) {
                 console.log(
                     `sending ${value.objects.length}/${this.bySHA1.size} fetch_cache_objects to ${key.ip}:${key.port}`
                 );
                 if (ret) {
-                    ret[`${key.ip}:${key.port}`] = value.objects;
+                    (ret.commands as Record<string, unknown>)[`${key.ip}:${key.port}`] = value.objects;
                 }
                 count += value.objects.length;
                 if (!dry) {
@@ -399,7 +349,55 @@ export class ObjectCacheManager extends EventEmitter {
         if (ret && res) {
             ret.count = count;
             res.send(JSON.stringify(ret, null, 4) + "\n");
-            // } else if (res) {
         }
+    }
+
+    private addPendingTransfer(sha1: string, node: Builder): void {
+        const key = pendingKey(sha1, node);
+        this.pendingTransfers.add(key);
+        const timer = setTimeout(() => {
+            this.pendingTransfers.delete(key);
+            this.pendingTransferTimers.delete(key);
+        }, this.pendingTransferTimeoutMs);
+        timer.unref();
+        this.pendingTransferTimers.set(key, timer);
+    }
+
+    private clearPendingTransfer(sha1: string, node: Builder): void {
+        const key = pendingKey(sha1, node);
+        this.pendingTransfers.delete(key);
+        const timer = this.pendingTransferTimers.get(key);
+        if (timer) {
+            clearTimeout(timer);
+            this.pendingTransferTimers.delete(key);
+        }
+    }
+
+    private clearAllPendingForNode(node: Builder): void {
+        const suffix = ":" + node.ip + ":" + node.port;
+        for (const key of this.pendingTransfers) {
+            if (key.endsWith(suffix)) {
+                this.pendingTransfers.delete(key);
+                const timer = this.pendingTransferTimers.get(key);
+                if (timer) {
+                    clearTimeout(timer);
+                    this.pendingTransferTimers.delete(key);
+                }
+            }
+        }
+    }
+
+    private pendingCountForSha1(sha1: string): number {
+        let count = 0;
+        for (const key of this.pendingTransfers) {
+            if (key.startsWith(sha1 + ":")) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    private hasPendingTransfer(sha1: string, node: Builder): boolean {
+        return this.pendingTransfers.has(pendingKey(sha1, node));
     }
 }

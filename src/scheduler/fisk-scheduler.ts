@@ -581,7 +581,6 @@ server.on("listen", (app: express.Application) => {
             res.sendStatus(200);
         } else if (req.query && "distribute" in req.query) {
             objectCache.distribute(req.query, res);
-            res.sendStatus(200);
         } else {
             const pretty = req.query && req.query.unpretty ? undefined : 4;
             res.send(JSON.stringify(objectCache.dump(req.query || {}), null, pretty) + "\n");

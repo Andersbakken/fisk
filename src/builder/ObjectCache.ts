@@ -155,7 +155,6 @@ export class ObjectCache extends EventEmitter {
                 console.error("Can't even delete this one", doubleError);
             }
         }
-        return undefined;
     }
 
     state(sha1: string): string {
