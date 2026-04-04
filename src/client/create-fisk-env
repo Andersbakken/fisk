@@ -224,6 +224,11 @@ else
         # just the binary name, not full path.
         added_clang=$($1 -print-prog-name=$(basename $1))
         added_clangxx=$($1 -print-prog-name=$(basename $1)++)
+        # If the C++ compiler wasn't found (e.g. binary is "clang.real" so
+        # "clang.real++" doesn't exist), ask the compiler for plain "clang++".
+        if ! test -x "$added_clangxx"; then
+            added_clangxx=$($1 -print-prog-name=clang++)
+        fi
     elif echo "$test_output" | grep -q 'clang __clang__ gcc.*'; then
         gcc=1
         # Gcc's -print-prog-name is useless, as it prints simply "gcc", so we have to
@@ -291,8 +296,10 @@ if test -n "$clang"; then
         exit 1
     fi
     if ! file --mime-type -L "$added_clangxx" | grep -q ': application/'; then
-        echo "$added_clangxx is not a binary file."
-        exit 1
+        # clang++ may be a shell wrapper script (e.g. Chromium's clang toolchain).
+        # The underlying clang binary can compile C++ just fine when invoked as
+        # clang++, so reuse the C compiler binary for both roles.
+        added_clangxx="$added_clang"
     fi
 fi
 
