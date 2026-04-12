@@ -42,9 +42,18 @@ class Select
 public:
     Select()
     {
+#ifdef __APPLE__
         if (pipe(mPipe) == -1) {
             mPipe[0] = mPipe[1] = -1;
+        } else {
+            fcntl(mPipe[0], F_SETFD, FD_CLOEXEC);
+            fcntl(mPipe[1], F_SETFD, FD_CLOEXEC);
         }
+#else
+        if (pipe2(mPipe, O_CLOEXEC) == -1) {
+            mPipe[0] = mPipe[1] = -1;
+        }
+#endif
     }
 
     ~Select()

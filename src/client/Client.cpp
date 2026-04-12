@@ -536,6 +536,23 @@ const char *Client::trimSourceRoot(const std::string &str, size_t *len)
 bool Client::setFlag(int fd, uint32_t flag)
 {
     int flags, r;
+
+    if (flag & O_CLOEXEC) {
+        EINTRWRAP(flags, fcntl(fd, F_GETFD, 0));
+        if (flags == -1) {
+            ERROR("Failed to read fd flags from %d %d %s", fd, errno, strerror(errno));
+            return false;
+        }
+        EINTRWRAP(r, fcntl(fd, F_SETFD, flags | FD_CLOEXEC));
+        if (r == -1) {
+            ERROR("Failed to set FD_CLOEXEC on %d %d %s", fd, errno, strerror(errno));
+            return false;
+        }
+        flag &= ~static_cast<uint32_t>(O_CLOEXEC);
+        if (!flag)
+            return true;
+    }
+
     EINTRWRAP(flags, fcntl(fd, F_GETFL, 0));
     if (flags == -1) {
         ERROR("Failed to read flags from %d %d %s", fd, errno, strerror(errno));

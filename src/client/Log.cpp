@@ -1,5 +1,6 @@
 #include "Log.h"
 #include "Client.h"
+#include <fcntl.h>
 #include <sys/file.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -34,6 +35,7 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
         if (!sLogFile) {
             ERROR("Couldn't open log file %s for writing", file.c_str());
         } else {
+            fcntl(fileno(sLogFile), F_SETFD, FD_CLOEXEC);
             sLogFileName = std::move(file);
         }
     } else if (!file.empty()) {
@@ -126,6 +128,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     if (!sLogFileName.empty() && sLogFileMode == Append) {
         sLogFile = fopen(sLogFileName.c_str(), "a");
         fd = fileno(sLogFile);
+        fcntl(fd, F_SETFD, FD_CLOEXEC);
         if (fd != -1) {
             flock(LOCK_EX, fd);
         }
