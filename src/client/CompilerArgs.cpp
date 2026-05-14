@@ -435,7 +435,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             ret->flags |= HasDashX;
             if (i + 1 == ret->commandLine.size())
                 return std::shared_ptr<CompilerArgs>();
-            const std::string lang = ret->commandLine.at(i);
+            const std::string lang = ret->commandLine.at(i + 1);
             const CompilerArgs::Flag languages[] = { CPlusPlus, C, CPreprocessed, CPlusPlusPreprocessed, ObjectiveC, ObjectiveCPreprocessed, ObjectiveCPlusPlus, ObjectiveCPlusPlusPreprocessed, AssemblerWithCpp, Assembler };
             for (size_t j = 0; j < sizeof(languages) / sizeof(languages[0]); ++j) {
                 if (lang == CompilerArgs::languageName(languages[j])) {
