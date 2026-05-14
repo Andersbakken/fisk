@@ -44,7 +44,7 @@ int Select::exec(int timeoutMs) const
             timeout->tv_usec = (timeoutMs % 1000) * 1000;
         }
         ret = select(max + 1, &r, &w, nullptr, timeout);
-    } while (ret == EINTR);
+    } while (ret == -1 && errno == EINTR);
     if (ret == -1) {
         ERROR("Select failed %d %s", errno, strerror(errno));
         return -1;
