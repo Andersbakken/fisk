@@ -628,18 +628,12 @@ client.on("getEnvironments", (message) => {
             })
             .catch((error) => {
                 console.log("Got error from request", error);
+                // writeStream.on("error", ...) handles dir cleanup and work() reschedule.
                 if (writeStream.destroy instanceof Function) {
                     writeStream.destroy(error instanceof Error ? error : new Error(String(error)));
                 } else {
                     writeStream.end();
                 }
-                try {
-                    fs.removeSync(dir);
-                } catch (err) {
-                    /* */
-                }
-                fs.mkdirpSync(dir);
-                setTimeout(work, 0);
             });
     };
     work();
