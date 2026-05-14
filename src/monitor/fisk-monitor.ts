@@ -832,6 +832,7 @@ function connect(): void {
             obj = JSON.parse(msg.toString());
         } catch (e) {
             notify(`msg parse error: ${msg}, ${e}`);
+            return;
         }
         switch (obj.type) {
             case "builderAdded":
