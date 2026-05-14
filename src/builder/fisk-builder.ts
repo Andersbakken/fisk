@@ -559,7 +559,21 @@ client.on("getEnvironments", (message) => {
 
         const file = path.join(dir, "env.tar.gz");
         const writeStream = fs.createWriteStream(file);
+        let writeStreamFailed = false;
+        writeStream.on("error", (err) => {
+            writeStreamFailed = true;
+            console.error("Got writeStream error for", file, err);
+            try {
+                fs.removeSync(dir);
+            } catch (rmErr) {
+                /* */
+            }
+            setTimeout(work, 0);
+        });
         writeStream.on("finish", () => {
+            if (writeStreamFailed) {
+                return;
+            }
             console.log("Got finish", env);
             exec("tar xf '" + file + "'", { cwd: dir })
                 .then(() => {
