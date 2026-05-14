@@ -613,6 +613,11 @@ server.on("listen", (app: express.Application) => {
         rstream.on("error", (err) => {
             console.error("Got read stream error for", env.path, err);
             rstream.close();
+            if (!res.headersSent) {
+                res.sendStatus(500);
+            } else {
+                res.destroy(err);
+            }
         });
         rstream.pipe(res);
     });
