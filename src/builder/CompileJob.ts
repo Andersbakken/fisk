@@ -43,7 +43,7 @@ export class CompileJob extends EventEmitter {
         fs.writeSync(this.fd, data);
         this.cppSize += data.length;
         this.startCompile = Date.now();
-        fs.close(this.fd);
+        fs.closeSync(this.fd);
         this.fd = undefined;
         this.vm.child.send(
             { type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir },
