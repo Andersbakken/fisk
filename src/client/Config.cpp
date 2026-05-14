@@ -183,7 +183,10 @@ bool Config::init(int &argc, char **&argv)
     std::map<std::string, std::string> commandLine, environmentVariables;
     int i = 1;
     auto consumeArg = [&i, &argv, &argc](int extra) {
-        memmove(&argv[i], &argv[i + extra + 1], sizeof(argv[0]) * (argc - i + 1));
+        // Shift argv[i+extra+1 .. argc] down by (extra+1) slots, including
+        // the NULL terminator at argv[argc]. The number of slots to move
+        // is argc - i - extra (== argc - (i + extra + 1) + 1).
+        memmove(&argv[i], &argv[i + extra + 1], sizeof(argv[0]) * (argc - i - extra));
         argc -= (extra + 1);
         argv[argc] = nullptr;
     };
