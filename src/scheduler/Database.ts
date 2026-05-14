@@ -47,9 +47,18 @@ export class Database {
                         }
                         records[key] = value;
 
-                        fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", () => {
-                            fs.rename(this.path + ".tmp", this.path, () => {
-                                resolve();
+                        fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", (writeErr) => {
+                            if (writeErr) {
+                                reject(writeErr);
+                                this.finishedOperation();
+                                return;
+                            }
+                            fs.rename(this.path + ".tmp", this.path, (renameErr) => {
+                                if (renameErr) {
+                                    reject(renameErr);
+                                } else {
+                                    resolve();
+                                }
                                 this.finishedOperation();
                             });
                         });
