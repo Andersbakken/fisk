@@ -228,7 +228,7 @@ bool Config::init(int &argc, char **&argv)
         }
 
         std::string key;
-        char *eq = strchr(argv[i] + 8, '=');
+        char *eq = strchr(argv[i] + 7, '=');
         if (eq) {
             key.assign(argv[i] + 7, eq);
         } else {
