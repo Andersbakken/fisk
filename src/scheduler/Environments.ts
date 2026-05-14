@@ -210,19 +210,22 @@ export class Environments {
     }
 
     remove(hash: string): void {
-        // ### this should be promisified
         const env = this._data[hash];
         if (!env) {
             return;
         }
         try {
             fs.removeSync(env.path);
-            delete this._data[hash];
-            this.unlink(hash);
-            this.unlink(undefined, hash);
-            this.syncLinks();
         } catch (err: unknown) {
             console.error("Failed to remove environment", env.path, err);
+            return;
         }
+        delete this._data[hash];
+        this.unlink(hash)
+            .then(() => this.unlink(undefined, hash))
+            .then(() => this.syncLinks())
+            .catch((err: unknown) => {
+                console.error("Failed to unlink environment metadata", env.path, err);
+            });
     }
 }
