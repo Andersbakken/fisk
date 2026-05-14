@@ -138,7 +138,7 @@ int main(int argc, char **argv)
         if (fn == "fiskc") {
             bool c = true;
             for (int i = 1; i < argc; ++i) {
-                if (Client::endsWith(".cpp", argv[i], Client::CaseInsensitive) || Client::endsWith(".cxx", argv[i], Client::CaseInsensitive) || Client::endsWith(".cc", argv[i], Client::CaseInsensitive) || Client::endsWith(".C", argv[i]) || Client::endsWith(".cpp.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".cxx.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".cc.o", argv[i], Client::CaseInsensitive) || Client::endsWith(".C.o", argv[i]) || (!strncmp(argv[i], "-std=", 4) && strstr(argv[i] + 4, "++"))) {
+                if (Client::endsWith(argv[i], ".cpp", Client::CaseInsensitive) || Client::endsWith(argv[i], ".cxx", Client::CaseInsensitive) || Client::endsWith(argv[i], ".cc", Client::CaseInsensitive) || Client::endsWith(argv[i], ".C") || Client::endsWith(argv[i], ".cpp.o", Client::CaseInsensitive) || Client::endsWith(argv[i], ".cxx.o", Client::CaseInsensitive) || Client::endsWith(argv[i], ".cc.o", Client::CaseInsensitive) || Client::endsWith(argv[i], ".C.o") || (!strncmp(argv[i], "-std=", 4) && strstr(argv[i] + 4, "++"))) {
                     c = false;
                     break;
                 }
