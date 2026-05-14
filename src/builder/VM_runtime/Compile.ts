@@ -264,7 +264,6 @@ export class Compile extends EventEmitter {
                     };
 
                     this.emit("exit", errorExitEvent);
-                    4;
                 }
             };
             if (exitCode === 0) {
