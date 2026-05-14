@@ -1405,7 +1405,7 @@ server.on("monitor", (client: Client) => {
                                 throw new Error("No cookie");
                             } else if (users[message.user].cookieIp !== client.ip) {
                                 throw new Error("Wrong ip address");
-                            } else if (users[message.user].cookieExpiration || 0 <= Date.now()) {
+                            } else if ((users[message.user].cookieExpiration || 0) <= Date.now()) {
                                 throw new Error("Cookie expired");
                             } else {
                                 const hmac = crypto.createHmac(
