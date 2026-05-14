@@ -393,12 +393,11 @@ bool Config::init(int &argc, char **&argv)
         if (fd != -1) {
             flock(fd, LOCK_SH); // what if it fails?
             uint32_t ver;
-            if (read(fd, &ver, sizeof(ver)) == sizeof(ver)) {
-                flock(fd, LOCK_UN); // what if it fails?
-                ::close(fd);
-                if (ver == htonl(Version)) {
-                    return true;
-                }
+            const ssize_t readRet = read(fd, &ver, sizeof(ver));
+            flock(fd, LOCK_UN); // what if it fails?
+            ::close(fd);
+            if (readRet == sizeof(ver) && ver == htonl(Version)) {
+                return true;
             }
         }
         Client::recursiveRmdir(dir);
