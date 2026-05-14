@@ -1031,22 +1031,26 @@ server.on("compile", (compile: Compile) => {
                 if (!filterBuilder(s)) {
                     return;
                 }
+                let candidateEnv: string | undefined;
+                for (let i = 0; i < usableEnvs.length; ++i) {
+                    if (usableEnvs[i] in s.environments) {
+                        candidateEnv = usableEnvs[i];
+                        break;
+                    }
+                }
+                if (!candidateEnv) {
+                    return;
+                }
                 const builderScore = score(s);
                 if (
                     !builder ||
                     builderScore > bestScore ||
-                    (builderScore === bestScore && builder.lastJob < s.lastJob)
+                    (builderScore === bestScore && s.lastJob < builder.lastJob)
                 ) {
                     bestScore = builderScore;
                     builder = s;
                     foundInCache = true;
-                    // Find which usable environment this builder has
-                    for (let i = 0; i < usableEnvs.length; ++i) {
-                        if (usableEnvs[i] in s.environments) {
-                            env = usableEnvs[i];
-                            break;
-                        }
-                    }
+                    env = candidateEnv;
                 }
             });
         }
