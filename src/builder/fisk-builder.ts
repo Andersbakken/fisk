@@ -616,13 +616,20 @@ client.on("getEnvironments", (message) => {
         });
         axios({ method: "get", url: url, responseType: "stream" })
             .then((response) => {
+                response.data.on("error", (err: Error) => {
+                    console.error("Got error from environment download stream", url, err);
+                    if (writeStream.destroy instanceof Function) {
+                        writeStream.destroy(err);
+                    } else {
+                        writeStream.end();
+                    }
+                });
                 response.data.pipe(writeStream);
-                // console
             })
             .catch((error) => {
                 console.log("Got error from request", error);
                 if (writeStream.destroy instanceof Function) {
-                    writeStream.destroy();
+                    writeStream.destroy(error instanceof Error ? error : new Error(String(error)));
                 } else {
                     writeStream.end();
                 }
@@ -632,6 +639,7 @@ client.on("getEnvironments", (message) => {
                     /* */
                 }
                 fs.mkdirpSync(dir);
+                setTimeout(work, 0);
             });
     };
     work();
