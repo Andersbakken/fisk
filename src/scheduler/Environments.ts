@@ -49,42 +49,41 @@ export class Environments {
                         if (st.isDirectory()) {
                             // we're good
                             this._path = p;
-                            fs.readdir(p).then((files) => {
-                                const promises: Array<Promise<void>> = [];
-                                files.forEach((e) => {
-                                    if (e.length === 47 && e.indexOf(".tar.gz", 40) === 40) {
-                                        const tarFile = path.join(p, e);
-                                        const hash = e.substr(0, 40);
-                                        promises.push(
-                                            untarFile(tarFile, "etc/compiler_info")
-                                                .then((data: string) => {
-                                                    const idx = data.indexOf("\n");
-                                                    const info = JSON.parse(data.substr(0, idx));
-                                                    const env = new Environment(
-                                                        tarFile,
-                                                        hash,
-                                                        info.system,
-                                                        info.originalPath
-                                                    );
-                                                    env.info = data.substr(idx + 1);
+                            fs.readdir(p)
+                                .then((files) => {
+                                    const promises: Array<Promise<void>> = [];
+                                    files.forEach((e) => {
+                                        if (e.length === 47 && e.indexOf(".tar.gz", 40) === 40) {
+                                            const tarFile = path.join(p, e);
+                                            const hash = e.substr(0, 40);
+                                            promises.push(
+                                                untarFile(tarFile, "etc/compiler_info")
+                                                    .then((data: string) => {
+                                                        const idx = data.indexOf("\n");
+                                                        const info = JSON.parse(data.substr(0, idx));
+                                                        const env = new Environment(
+                                                            tarFile,
+                                                            hash,
+                                                            info.system,
+                                                            info.originalPath
+                                                        );
+                                                        env.info = data.substr(idx + 1);
 
-                                                    this._data[hash] = env;
-                                                })
-                                                .catch((err: unknown) => {
-                                                    console.error("Failed to extract compiler_info", err);
-                                                })
-                                        );
-                                    }
+                                                        this._data[hash] = env;
+                                                    })
+                                                    .catch((err: unknown) => {
+                                                        console.error("Failed to extract compiler_info", err);
+                                                    })
+                                            );
+                                        }
+                                    });
+                                    return Promise.all(promises).then(() => {
+                                        resolve();
+                                    });
+                                })
+                                .catch((err: unknown) => {
+                                    reject(`Failed to read environments directory ${p}: ${err}`);
                                 });
-                                Promise.all(promises).then(() => {
-                                    resolve();
-                                });
-
-                                // setTimeout(() => {
-                                //     // console.log(JSON.stringify(environments._links, null, 4));
-                                //     this.link("28CD22DF1176120F63EC463E095F13D4330194D7", "177EF462A7AEC31C26502F5833A92B51C177C01B", [], []);
-                                // }, 1000);
-                            });
                         } else {
                             reject(`Can't use path ${p}`);
                         }
