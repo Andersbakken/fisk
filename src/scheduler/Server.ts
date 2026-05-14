@@ -221,7 +221,6 @@ export class Server extends EventEmitter {
         }
         this.emit("compile", client);
         const remaining: { bytes?: number; type?: string } = {};
-        client.ws.on("close", (status, reason) => client.emit("close", status, reason));
         client.ws.on("error", (err) => client.emit("error", err));
         client.ws.on("close", (code, reason) => {
             if (remaining.bytes) {
