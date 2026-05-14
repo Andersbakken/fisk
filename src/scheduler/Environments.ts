@@ -119,15 +119,12 @@ export class Environments {
     }
 
     complete(file: File): Promise<void> {
-        return new Promise<void>((resolve) => {
-            untarFile(file.path, "etc/compiler_info").then((data) => {
-                const idx = data.indexOf("\n");
-                const info = JSON.parse(data.substr(0, idx));
-                const env = new Environment(file.path, file.hash, info.system, info.originalPath);
-                env.info = data.substr(idx + 1);
-                this._data[file.hash] = env;
-                resolve();
-            });
+        return untarFile(file.path, "etc/compiler_info").then((data) => {
+            const idx = data.indexOf("\n");
+            const info = JSON.parse(data.substr(0, idx));
+            const env = new Environment(file.path, file.hash, info.system, info.originalPath);
+            env.info = data.substr(idx + 1);
+            this._data[file.hash] = env;
         });
     }
 
