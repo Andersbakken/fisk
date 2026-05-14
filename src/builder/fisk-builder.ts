@@ -683,7 +683,7 @@ server.on("headers", (headers, req) => {
     if (objectCache && objectCache.state(req.headers["x-fisk-sha1"]) === "exists") {
         wait = true;
     } else if (jobQueue.length >= client.slots) {
-        const priority = parseInt(req.headers["x-fisk-sha1"]) || 0;
+        const priority = parseInt(String(req.headers["x-fisk-priority"])) || 0;
         let idx = jobQueue.length - 1;
         while (idx >= client.slots) {
             const job = jobQueue[idx].job;
