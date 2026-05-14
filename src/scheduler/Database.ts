@@ -50,8 +50,8 @@ export class Database {
                         fs.writeFile(this.path + ".tmp", JSON.stringify(records) + "\n", () => {
                             fs.rename(this.path + ".tmp", this.path, () => {
                                 resolve();
+                                this.finishedOperation();
                             });
-                            this.finishedOperation();
                         });
                     })
                     .catch((err) => {
