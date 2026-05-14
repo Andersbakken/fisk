@@ -74,7 +74,7 @@ Log::Level Log::stringToLevel(const char *str, bool *ok)
     } else if (!strcasecmp("Silent", str)) {
         return Silent;
     }
-    if (!ok)
+    if (ok)
         *ok = false;
     return Silent;
 }
