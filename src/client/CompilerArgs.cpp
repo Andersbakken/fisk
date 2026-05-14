@@ -492,6 +492,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         {
             bool needSHA1 = false;
             if (size_t count = hasArg(arg, needSHA1)) {
+                if (i + count >= ret->commandLine.size()) {
+                    DEBUG("%s missing operand(s), building local", arg.c_str());
+                    *localReason = Local_ParseError;
+                    return nullptr;
+                }
                 if (needSHA1)
                     sha1(count + 1);
                 i += count;
