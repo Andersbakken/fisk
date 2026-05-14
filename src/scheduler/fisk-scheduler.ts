@@ -1316,15 +1316,23 @@ server.on("monitor", (client: Client) => {
                         monitors.forEach((monitor) => {
                             monitor.send(info);
                         });
+                    })
+                    .catch((err) => {
+                        console.error("Failed to link environments", err);
                     });
                 break;
             case "unlinkEnvironments":
-                Environments.instance.unlink(message.srcHash, message.targetHash).then(() => {
-                    const info = { type: "listEnvironments", environments: environmentsInfo() };
-                    monitors.forEach((monitor) => {
-                        monitor.send(info);
+                Environments.instance
+                    .unlink(message.srcHash, message.targetHash)
+                    .then(() => {
+                        const info = { type: "listEnvironments", environments: environmentsInfo() };
+                        monitors.forEach((monitor) => {
+                            monitor.send(info);
+                        });
+                    })
+                    .catch((err) => {
+                        console.error("Failed to unlink environments", err);
                     });
-                });
                 break;
             case "listUsers": {
                 if (!user) {
