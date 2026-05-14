@@ -214,6 +214,7 @@ export class Compile extends EventEmitter {
         proc.on("exit", (exitCode) => {
             // try {
             const files: ExitEventFile[] = [];
+            let addDirError: Error | undefined;
             const addDir = (directory: string, prefix: string): void => {
                 try {
                     fs.readdirSync(directory).forEach((file: string) => {
@@ -255,24 +256,26 @@ export class Compile extends EventEmitter {
                     });
                 } catch (err: unknown) {
                     console.error("Got an error processing outputs for", sourcePath, err);
-                    assert(sourcePath !== undefined, "Must have sourcePath");
-                    const errorExitEvent: ExitEvent = {
-                        exitCode: 110,
-                        files: [],
-                        error: (err as Error).toString(),
-                        sourcePath
-                    };
-
-                    this.emit("exit", errorExitEvent);
+                    addDirError = err as Error;
                 }
             };
             if (exitCode === 0) {
                 addDir(dir, dir);
             }
+            assert(sourcePath !== undefined, "Must have sourcePath4");
+            if (addDirError) {
+                const errorExitEvent: ExitEvent = {
+                    exitCode: 110,
+                    files: [],
+                    error: addDirError.toString(),
+                    sourcePath
+                };
+                this.emit("exit", errorExitEvent);
+                return;
+            }
             if (exitCode === null) {
                 exitCode = 111;
             }
-            assert(sourcePath !== undefined, "Must have sourcePath4");
             const exitEvent: ExitEvent = { exitCode, files, sourcePath };
             this.emit("exit", exitEvent);
         });
