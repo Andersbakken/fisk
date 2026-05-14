@@ -140,9 +140,9 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                 }
                 if (!ff.size) {
                     FILE *f = fopen(ff.path.c_str(), "w");
-                    DEBUG("Opened file [%s] -> [%s] -> %p", files[0].path.c_str(), Client::realpath(files[0].path).c_str(), f);
+                    DEBUG("Opened file [%s] -> [%s] -> %p", ff.path.c_str(), Client::realpath(ff.path).c_str(), f);
                     if (!f) {
-                        ERROR("Can't open file: %s", files[0].path.c_str());
+                        ERROR("Can't open file: %s", ff.path.c_str());
                         Client::data().watchdog->stop();
                         error = "builder file open error";
                         done = true;
