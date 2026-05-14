@@ -300,7 +300,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-o") {
-            if (i + 1 < ret->commandLine.size() && ret->commandLine[i + 1] == "-") {
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("-o without an argument, building local");
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
+            if (ret->commandLine[i + 1] == "-") {
                 DEBUG("-o - This means different things for different compilers. Run local");
                 *localReason = Local_StdOutOutput;
                 return nullptr;
@@ -337,6 +342,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-MF") {
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("-MF without an argument, building local");
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
             ret->flags |= HasDashMF;
             sha1(2);
             ++i;
@@ -356,6 +366,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-MT") {
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("-MT without an argument, building local");
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
             ret->flags |= HasDashMT;
             sha1(2);
             ++i;
@@ -408,7 +423,12 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-Xclang") {
-            if (i + 1 < ret->commandLine.size() && ret->commandLine[i + 1] == "-load") {
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("-Xclang without an argument, building local");
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
+            if (ret->commandLine[i + 1] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
                 *localReason = Local_ExtraFiles;
                 return nullptr;
@@ -419,6 +439,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-arch") {
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("-arch without an argument, building local");
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
             const std::string arch = ret->commandLine[i + 1];
             if (!hasArch.empty() && hasArch != arch) {
                 DEBUG("multiple -arch options, building locally");
@@ -454,6 +479,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             // we may have to handle this differently, gcc apparently falls back
             // to not using the pch file if it can't be found. Icecream code is
             // extremely confusing.
+            if (i + 1 >= ret->commandLine.size()) {
+                DEBUG("%s without an argument, building local", arg.c_str());
+                *localReason = Local_ParseError;
+                return nullptr;
+            }
             sha1(2);
             ++i;
             continue;
