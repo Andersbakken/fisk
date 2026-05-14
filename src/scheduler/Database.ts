@@ -95,7 +95,11 @@ export class Database {
                         try {
                             resolve(JSON.parse(data));
                         } catch (error: unknown) {
-                            fs.renameSync(this.path, this.path + ".error");
+                            try {
+                                fs.renameSync(this.path, this.path + ".error");
+                            } catch (renameErr) {
+                                console.error("Failed to quarantine corrupt DB file", this.path, renameErr);
+                            }
                             reject(
                                 new Error(`Failed to parse JSON from file: ${this.path} ${(error as Error).message}`)
                             );
