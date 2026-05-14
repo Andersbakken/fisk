@@ -82,7 +82,7 @@ process.on("uncaughtException", (err: Error) => {
 const monitorsLog = option("monitor-log");
 
 server.on("error", (error) => {
-    throw new error();
+    throw error;
 });
 
 let schedulerNpmVersion: string;
