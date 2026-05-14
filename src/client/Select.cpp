@@ -9,11 +9,11 @@ Socket::~Socket()
 
 int Select::exec(int timeoutMs) const
 {
-    fd_set r, w;
-    FD_ZERO(&r);
-    FD_ZERO(&w);
+    fd_set rMaster, wMaster;
+    FD_ZERO(&rMaster);
+    FD_ZERO(&wMaster);
     int max = mPipe[0];
-    FD_SET(mPipe[0], &r);
+    FD_SET(mPipe[0], &rMaster);
     std::vector<int> timeouts;
     const unsigned long long before = Client::mono();
     for (Socket *socket : mSockets) {
@@ -29,14 +29,20 @@ int Select::exec(int timeoutMs) const
             continue;
         max = std::max(fd, max);
         if (mode & Socket::Read) {
-            FD_SET(fd, &r);
+            FD_SET(fd, &rMaster);
         }
         if (mode & Socket::Write) {
-            FD_SET(fd, &w);
+            FD_SET(fd, &wMaster);
         }
     }
+    // select() mutates the read/write fd_sets in place (and leaves them
+    // in an unspecified state on error), so retry from a fresh copy on
+    // EINTR rather than feeding the (now indeterminate) sets back in.
+    fd_set r, w;
     int ret;
     do {
+        r = rMaster;
+        w = wMaster;
         struct timeval t = {};
         struct timeval *timeout = timeoutMs == -1 ? nullptr : &t;
         if (timeout) {
