@@ -205,7 +205,7 @@ export class ObjectCacheManager extends EventEmitter {
                     data.name = key.name;
                 }
                 if (key.hostname) {
-                    data.name = key.hostname;
+                    data.hostname = key.hostname;
                 }
                 nodes[key.ip + ":" + key.port] = data;
             });
