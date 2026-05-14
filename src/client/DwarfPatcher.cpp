@@ -543,6 +543,20 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
         }
     } else {
         // --- Direct offset approach for linked binaries or non-relocated .o files ---
+        if (isCompressed) {
+            DEBUG("DwarfPatcher: .debug_str is SHF_COMPRESSED and no relocations are present in %s; "
+                  "the direct-offset patcher would write back compressed bytes from cached non-decompressed buffers. "
+                  "Skipping rather than corrupting the section.",
+                  objectFile.c_str());
+            return true;
+        }
+        if (debugInfo->get_flags() & SHF_COMPRESSED) {
+            DEBUG("DwarfPatcher: .debug_info is SHF_COMPRESSED and no relocations are present in %s; "
+                  "the direct-offset patcher would write back compressed bytes from cached non-decompressed buffers. "
+                  "Skipping rather than corrupting the section.",
+                  objectFile.c_str());
+            return true;
+        }
         size_t oldOffset = findStringInSection(debugStr->get_data(), debugStr->get_size(), oldSourcePath);
         if (oldOffset == static_cast<size_t>(-1)) {
             DEBUG("DwarfPatcher: old source path not found in .debug_str: %s", oldSourcePath.c_str());
