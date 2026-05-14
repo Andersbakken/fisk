@@ -408,7 +408,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         }
 
         if (arg == "-Xclang") {
-            if (i + 1 < ret->commandLine.size() && ret->commandLine[i] == "-load") {
+            if (i + 1 < ret->commandLine.size() && ret->commandLine[i + 1] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
                 *localReason = Local_ExtraFiles;
                 return nullptr;
