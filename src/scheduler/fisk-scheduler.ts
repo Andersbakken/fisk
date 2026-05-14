@@ -926,13 +926,14 @@ function requestEnvironment(compile: Compile): boolean {
                     }
                     return undefined;
                 })
-                .then((): void => {
+                .then((): Promise<boolean> | undefined => {
                     if (env.last) {
                         file = undefined;
                         // send any new environments to builders
                         delete pendingEnvironments[hsh];
-                        purgeEnvironmentsToMaxSize();
+                        return purgeEnvironmentsToMaxSize();
                     }
+                    return undefined;
                 })
                 .then(() => {
                     if (env.last) {
