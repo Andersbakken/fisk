@@ -180,9 +180,11 @@ export class Environments {
             delete this._links[srcHash];
         } else {
             const targets = this._links[srcHash];
-            targets.unset(targetHash);
-            if (!targets.size) {
-                delete this._links[srcHash];
+            if (targets) {
+                targets.unset(targetHash);
+                if (!targets.size) {
+                    delete this._links[srcHash];
+                }
             }
         }
         return this.syncLinks();
