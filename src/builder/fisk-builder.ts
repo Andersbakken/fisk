@@ -176,7 +176,17 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                     let sendBuffer = buffer;
                     // Decompress if client doesn't support compressed responses from cache
                     if (!sendCompressed && buffer.byteLength > 0) {
-                        sendBuffer = zlib.gunzipSync(buffer);
+                        try {
+                            sendBuffer = zlib.gunzipSync(buffer);
+                        } catch (gunzipErr: unknown) {
+                            assert(objectCache, "Must have objectCache");
+                            console.error(
+                                `Failed to gunzip ${path.join(objectCache.dir, item.response.sha1!)} for file index ${fileIdx}:`,
+                                gunzipErr
+                            );
+                            finish(gunzipErr as Error);
+                            return;
+                        }
                     }
                     job.send(sendBuffer);
                     pos += read;
