@@ -291,8 +291,15 @@ clientBox.on("select", (ev) => {
         if (jobs) {
             // clientBox.current = clientKey;
             let str = "";
-            const data: Array<[string, string, string]> = [["Source file", "Builder", "Start time"]];
-            const widest = [data[0][0].length + 1, data[0][1].length + 1];
+            const header: [string, string, string] = ["Source file", "Builder", "Start time"];
+            interface JobRow {
+                source: string;
+                builder: string;
+                humanizedAge: string;
+                ageMs: number;
+            }
+            const rows: JobRow[] = [];
+            const widest = [header[0].length + 1, header[1].length + 1];
             const now = Date.now();
             for (const [jobKey, jobValue] of jobs) {
                 if (jobKey === "total") {
@@ -300,17 +307,22 @@ clientBox.on("select", (ev) => {
                 }
                 const sourceBasename = path.basename(jobValue.sourcePath || jobValue.sourceFile || "");
                 widest[0] = Math.max(sourceBasename.length + 1, widest[0]);
-                data.push([
-                    sourceBasename,
-                    jobValue.builder.ip + ":" + jobValue.builder.port,
-                    humanizeDuration(now - jobValue.time)
-                ]);
-                widest[1] = Math.max(widest[1], data[data.length - 1][1].length + 1);
+                const ageMs = now - jobValue.time;
+                const row: JobRow = {
+                    source: sourceBasename,
+                    builder: jobValue.builder.ip + ":" + jobValue.builder.port,
+                    humanizedAge: humanizeDuration(ageMs),
+                    ageMs
+                };
+                rows.push(row);
+                widest[1] = Math.max(widest[1], row.builder.length + 1);
             }
 
-            data.sort((a: [string, string, string], b: [string, string, string]) => parseInt(a[2]) - parseInt(b[2]));
+            rows.sort((a, b) => a.ageMs - b.ageMs);
 
-            data.forEach((line, idx) => {
+            const lines: Array<[string, string, string]> = [header, ...rows.map((r) => [r.source, r.builder, r.humanizedAge] as [string, string, string])];
+
+            lines.forEach((line, idx) => {
                 if (!idx) {
                     str += "{bold}";
                 }
