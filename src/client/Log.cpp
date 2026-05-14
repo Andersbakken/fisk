@@ -127,10 +127,12 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {
         sLogFile = fopen(sLogFileName.c_str(), "a");
-        fd = fileno(sLogFile);
-        fcntl(fd, F_SETFD, FD_CLOEXEC);
-        if (fd != -1) {
-            flock(LOCK_EX, fd);
+        if (sLogFile) {
+            fd = fileno(sLogFile);
+            fcntl(fd, F_SETFD, FD_CLOEXEC);
+            if (fd != -1) {
+                flock(fd, LOCK_EX);
+            }
         }
     }
 
@@ -146,7 +148,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     if (sLogFile) {
         fflush(sLogFile);
         if (fd != -1) {
-            flock(LOCK_UN, fd);
+            flock(fd, LOCK_UN);
             int ret;
             EINTRWRAP(ret, fclose(sLogFile));
             sLogFile = nullptr;
