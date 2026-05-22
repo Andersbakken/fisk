@@ -11,6 +11,6 @@
   "dependencies": {
     "@jhanssen/options": "^1.0.18",
     "fs-extra": "^7.0.1",
-    "minimist": "^1.2.3"
+    "minimist": "^1.2.6"
   }
 }
