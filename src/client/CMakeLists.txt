@@ -65,6 +65,18 @@ target_include_directories(fiskc PRIVATE ${CMAKE_SOURCE_DIR}/3rdparty/ELFIO)
 target_compile_features(fiskc PRIVATE cxx_std_17)
 target_link_libraries(fiskc nlohmann_json::nlohmann_json pthread wslay ${OPENSSL_CRYPTO_LIBRARY} ${FISKC_OPENSSL_STATIC_EXTRA_LIBS} LUrlParser tiny-process-library dl ${ZLIB_LIBRARIES})
 
+# Strip fiskc when building in Release / MinSizeRel
+if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+    if (APPLE)
+        set(FISKC_STRIP_ARGS -x)
+    else ()
+        set(FISKC_STRIP_ARGS --strip-unneeded)
+    endif ()
+    add_custom_command(TARGET fiskc POST_BUILD
+        COMMAND ${CMAKE_STRIP} ${FISKC_STRIP_ARGS} $<TARGET_FILE:fiskc>
+        COMMENT "Stripping fiskc")
+endif ()
+
 add_custom_target(link_c++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/c++)
 add_custom_target(link_cc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/cc)
 if (APPLE)
