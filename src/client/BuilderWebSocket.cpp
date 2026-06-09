@@ -16,18 +16,24 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     }
 
     WARN("Got message from builder %s %s", url().c_str(), std::string(reinterpret_cast<const char *>(bytes), len).c_str());
-    std::string err;
     const std::string rawMsg(reinterpret_cast<const char *>(bytes), len);
-    json11::Json msg = json11::Json::parse(rawMsg, err, json11::JsonParse::COMMENTS);
-    if (!err.empty()) {
-        ERROR("Failed to parse json from builder %s: %s (raw message: %.200s%s)", url().c_str(), err.c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
+    nlohmann::json msg = nlohmann::json::parse(rawMsg, nullptr, false, true);
+    if (msg.is_discarded() || !msg.is_object()) {
+        ERROR("Failed to parse json from builder %s (raw message: %.200s%s)", url().c_str(), rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
         data.watchdog->stop();
         error = "builder json parse error";
         done = true;
         return;
     }
 
-    const std::string type = msg["type"].string_value();
+    auto jstring = [](const nlohmann::json &v) -> std::string {
+        return v.is_string() ? v.get<std::string>() : std::string();
+    };
+    auto jint = [](const nlohmann::json &v) -> int {
+        return v.is_number() ? v.get<int>() : 0;
+    };
+
+    const std::string type = jstring(msg["type"]);
 
     if (type == "resume") {
         wait = false;
@@ -42,9 +48,9 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     }
 
     if (type == "response") {
-        const auto success = msg["success"];
-        if (!success.is_bool() || !success.bool_value()) {
-            const std::string builderError = msg["error"].string_value();
+        const auto &success = msg["success"];
+        if (!success.is_boolean() || !success.get<bool>()) {
+            const std::string builderError = jstring(msg["error"]);
             ERROR("Builder %s failed to compile %s: %s", url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown", builderError.empty() ? "(no error message)" : builderError.c_str());
             data.watchdog->stop();
             error = "builder run failure";
@@ -52,10 +58,11 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
             return;
         }
 
-        json11::Json::array index = msg["index"].array_items();
-        data.exitCode = msg["exitCode"].int_value();
-        const std::string stdOut = msg["stdout"].string_value();
-        const std::string stdErr = msg["stderr"].string_value();
+        const nlohmann::json &index = msg["index"];
+        const bool hasIndex = index.is_array();
+        data.exitCode = jint(msg["exitCode"]);
+        const std::string stdOut = jstring(msg["stdout"]);
+        const std::string stdErr = jstring(msg["stderr"]);
 
         if (data.exitCode) {
             std::string uncolored;
@@ -118,18 +125,18 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
             }
         }
 
-        const auto objectCache = msg["objectCache"];
-        if (objectCache.is_bool() && objectCache.bool_value()) {
+        const auto &objectCache = msg["objectCache"];
+        if (objectCache.is_boolean() && objectCache.get<bool>()) {
             data.objectCache = true;
-            cachedSourcePath = msg["sourcePath"].string_value();
+            cachedSourcePath = jstring(msg["sourcePath"]);
         }
 
-        if (!index.empty()) {
+        if (hasIndex && !index.empty()) {
             files.reserve(index.size());
             for (size_t i = 0; i < index.size(); ++i) {
                 File ff;
-                ff.path = index[i]["path"].string_value();
-                ff.size = index[i]["bytes"].int_value();
+                ff.path = jstring(index[i]["path"]);
+                ff.size = jint(index[i]["bytes"]);
                 Client::data().totalWritten += ff.size;
                 if (ff.path.empty()) {
                     ERROR("No file for idx: %zu", i);
@@ -160,7 +167,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         return;
     }
 
-    ERROR("Unexpected message type '%s' from builder %s while compiling %s", msg["type"].string_value().c_str(), url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+    ERROR("Unexpected message type '%s' from builder %s while compiling %s", jstring(msg["type"]).c_str(), url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
     Client::data().watchdog->stop();
     error = "builder protocol error 5";
     done = true;

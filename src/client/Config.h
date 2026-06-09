@@ -3,7 +3,7 @@
 
 #include <assert.h>
 #include <cstdint>
-#include <json11.hpp>
+#include <nlohmann/json.hpp>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -49,7 +49,7 @@ public:
     }
 
     virtual bool apply(const std::string &value) = 0;
-    virtual bool apply(const json11::Json &input) = 0;
+    virtual bool apply(const nlohmann::json &input) = 0;
     virtual void flip() = 0;
 
     bool isBoolean() const
@@ -88,7 +88,7 @@ public:
         return false;
     }
 
-    virtual bool apply(const json11::Json &) override
+    virtual bool apply(const nlohmann::json &) override
     {
         return false;
     }
@@ -136,7 +136,7 @@ public:
         return applyValue(input, mValue);
     }
 
-    virtual bool apply(const json11::Json &input) override
+    virtual bool apply(const nlohmann::json &input) override
     {
         return applyJsonValue(input, mValue);
     }
@@ -233,44 +233,51 @@ private:
         return true;
     }
 
-    static bool applyJsonValue(const json11::Json &input, std::string &dest)
+    static bool applyJsonValue(const nlohmann::json &input, std::string &dest)
     {
         if (input.is_string()) {
-            dest = input.string_value();
+            dest = input.get<std::string>();
             return !dest.empty();
         }
         return false;
     }
 
-    static bool applyJsonValue(const json11::Json &input, bool &dest)
+    static bool applyJsonValue(const nlohmann::json &input, bool &dest)
     {
-        if (input.is_bool()) {
-            dest = input.bool_value();
+        if (input.is_boolean()) {
+            dest = input.get<bool>();
             return true;
         }
         return false;
     }
 
     template <typename Value>
-    static bool applyJsonValue(const json11::Json &input, Value &dest,
+    static bool applyJsonValue(const nlohmann::json &input, Value &dest,
                                typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
                                typename std::enable_if<std::is_signed<Value>::value>::type * = nullptr)
     {
-        if (input.is_number() && input.int_value() == input.number_value()) {
-            dest = input.int_value();
+        if (input.is_number_integer() || (input.is_number() && input.get<double>() == static_cast<double>(input.get<long long>()))) {
+            dest = static_cast<Value>(input.get<long long>());
             return true;
         }
         return false;
     }
 
     template <typename Value>
-    static bool applyJsonValue(const json11::Json &input, Value &dest,
+    static bool applyJsonValue(const nlohmann::json &input, Value &dest,
                                typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
                                typename std::enable_if<!std::is_signed<Value>::value>::type * = nullptr)
     {
-        if (input.is_number() && input.int_value() == input.number_value() && input.int_value() >= 0) {
-            dest = input.int_value();
+        if (input.is_number_unsigned()) {
+            dest = static_cast<Value>(input.get<unsigned long long>());
             return true;
+        }
+        if (input.is_number_integer()) {
+            const long long v = input.get<long long>();
+            if (v >= 0) {
+                dest = static_cast<Value>(v);
+                return true;
+            }
         }
         return false;
     }

@@ -1,5 +1,6 @@
 #include "DwarfPatcher.h"
 #include "Log.h"
+#include <cstdint>
 #include <cstring>
 #include <elfio/elfio.hpp>
 #include <string>

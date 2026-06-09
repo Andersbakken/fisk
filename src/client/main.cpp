@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <execinfo.h>
-#include <json11.hpp>
+#include <nlohmann/json.hpp>
 #include <unistd.h>
 #ifdef __linux__
 #include <sys/prctl.h>
@@ -479,13 +479,15 @@ int main(int argc, char **argv)
     }
 
     const bool wait = builderWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
-    json11::Json::object msg { { "commandLine", args },
-                               { "argv0", data.compiler },
-                               { "wait", wait },
-                               { "compressed", Config::compress.get() },
-                               { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) } };
+    nlohmann::json msg = {
+        { "commandLine", args },
+        { "argv0", data.compiler },
+        { "wait", wait },
+        { "compressed", Config::compress.get() },
+        { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }
+    };
 
-    const std::string json = json11::Json(msg).dump();
+    const std::string json = msg.dump();
     DEBUG("Sending to builder:\n%s\n", json.c_str());
     builderWebSocket.wait = wait;
     builderWebSocket.send(WebSocket::Text, json.c_str(), json.size());

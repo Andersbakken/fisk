@@ -11,15 +11,17 @@
 
 extern char **environ;
 
-static json11::Json value(const std::vector<json11::Json> &jsons, const std::string &key)
+static nlohmann::json value(const std::vector<nlohmann::json> &jsons, const std::string &key)
 {
-    for (const json11::Json &json : jsons) {
-        const json11::Json &value = json[key];
-        if (!value.is_null()) {
-            return value;
+    for (const nlohmann::json &json : jsons) {
+        if (json.is_object()) {
+            auto it = json.find(key);
+            if (it != json.end() && !it->is_null()) {
+                return *it;
+            }
         }
     }
-    return json11::Json();
+    return nlohmann::json();
 }
 
 namespace Config {
@@ -149,8 +151,8 @@ Getter<bool> verbose("verbose", "Set log level to \"verbose\"", false);
 
 bool Config::init(int &argc, char **&argv)
 {
-    std::vector<json11::Json> jsons;
-    auto load = [](const std::string &path, std::vector<json11::Json> &j) {
+    std::vector<nlohmann::json> jsons;
+    auto load = [](const std::string &path, std::vector<nlohmann::json> &j) {
         std::string contents;
         bool opened;
         std::string err;
@@ -162,9 +164,9 @@ bool Config::init(int &argc, char **&argv)
             return true;
         }
 
-        json11::Json parsed = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
-        if (!err.empty()) {
-            fprintf(stderr, "Failed to parse json from %s: %s\n", path.c_str(), err.c_str());
+        nlohmann::json parsed = nlohmann::json::parse(contents, nullptr, false, true);
+        if (parsed.is_discarded()) {
+            fprintf(stderr, "Failed to parse json from %s\n", path.c_str());
             return false;
         }
         j.push_back(std::move(parsed));
@@ -365,7 +367,7 @@ bool Config::init(int &argc, char **&argv)
         if (getter.second->mDone)
             continue;
         std::string key = getter.second->jsonKey();
-        json11::Json val = value(jsons, key);
+        nlohmann::json val = value(jsons, key);
         bool no = false;
         if (val.is_null() && getter.second->isBoolean()) {
             key = "no_" + key;

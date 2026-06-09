@@ -11,6 +11,23 @@ if (NOT OPENSSL_INCLUDE_DIR OR NOT OPENSSL_CRYPTO_LIBRARY)
     find_package(OpenSSL REQUIRED)
 endif ()
 
+# Static libcrypto (linux) typically requires transitive deps such as
+# libjitterentropy and libzstd. Use pkg-config to resolve these so the
+# resulting fiskc binary is portable across Ubuntu versions.
+set(FISKC_OPENSSL_STATIC_EXTRA_LIBS "")
+find_package(PkgConfig QUIET)
+if (PkgConfig_FOUND)
+    pkg_check_modules(PC_LIBCRYPTO QUIET libcrypto)
+    if (PC_LIBCRYPTO_FOUND AND PC_LIBCRYPTO_STATIC_LIBRARIES)
+        foreach (_lib IN LISTS PC_LIBCRYPTO_STATIC_LIBRARIES)
+            if (NOT _lib STREQUAL "crypto")
+                list(APPEND FISKC_OPENSSL_STATIC_EXTRA_LIBS ${_lib})
+            endif ()
+        endforeach ()
+        message(STATUS "OpenSSL static extra libs: ${FISKC_OPENSSL_STATIC_EXTRA_LIBS}")
+    endif ()
+endif ()
+
 if (NOT ZLIB_INCLUDE_DIR OR NOT ZLIB_LIBRARIES)
     find_package(ZLIB REQUIRED)
 endif ()
@@ -46,7 +63,7 @@ add_executable(fiskc
     main.cpp)
 target_include_directories(fiskc PRIVATE ${CMAKE_SOURCE_DIR}/3rdparty/ELFIO)
 target_compile_features(fiskc PRIVATE cxx_std_17)
-target_link_libraries(fiskc json11 pthread wslay ${OPENSSL_CRYPTO_LIBRARY} LUrlParser tiny-process-library dl ${ZLIB_LIBRARIES})
+target_link_libraries(fiskc nlohmann_json::nlohmann_json pthread wslay ${OPENSSL_CRYPTO_LIBRARY} ${FISKC_OPENSSL_STATIC_EXTRA_LIBS} LUrlParser tiny-process-library dl ${ZLIB_LIBRARIES})
 
 add_custom_target(link_c++ ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/c++)
 add_custom_target(link_cc ALL COMMAND ${CMAKE_COMMAND} -E create_symlink fiskc ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/cc)

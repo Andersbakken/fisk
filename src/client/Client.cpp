@@ -189,41 +189,44 @@ const std::string lineFromFile(const std::string &file, int line)
     return ref.line(line);
 }
 
-json11::Json resolve(json11::Json value, const std::vector<std::string> &children)
+nlohmann::json resolve(nlohmann::json value, const std::vector<std::string> &children)
 {
     for (size_t i = 0; i < children.size(); ++i) {
         if (value.is_object()) {
-            value = value[children[i]];
+            auto it = value.find(children[i]);
+            if (it == value.end()) {
+                return nlohmann::json();
+            }
+            value = *it;
         } else {
-            value = json11::Json();
-            break;
+            return nlohmann::json();
         }
     }
     return value;
 }
 
-std::string string(json11::Json value, const std::vector<std::string> &children)
+std::string string(nlohmann::json value, const std::vector<std::string> &children)
 {
-    value = resolve(value, children);
+    value = resolve(std::move(value), children);
     if (value.is_string())
-        return value.string_value();
+        return value.get<std::string>();
     return std::string();
 }
 
-std::string string(const json11::Json &value, const std::string &child = std::string())
+std::string string(const nlohmann::json &value, const std::string &child = std::string())
 {
     return string(value, Client::split(child, "."));
 }
 
-int integer(json11::Json value, const std::vector<std::string> &children)
+int integer(nlohmann::json value, const std::vector<std::string> &children)
 {
-    value = resolve(value, children);
+    value = resolve(std::move(value), children);
     if (value.is_number())
-        return static_cast<int>(value.number_value());
+        return static_cast<int>(value.get<double>());
     return 0;
 }
 
-int integer(const json11::Json &value, const std::string &child = std::string())
+int integer(const nlohmann::json &value, const std::string &child = std::string())
 {
     return integer(value, Client::split(child, "."));
 }
@@ -637,7 +640,7 @@ void Client::writeStatistics()
     if (file.empty())
         return;
 
-    json11::Json::object stats {
+    nlohmann::json stats = {
         { "start", static_cast<double>(Client::milliseconds_since_epoch / 1000.0) },
         { "end", static_cast<double>((Client::milliseconds_since_epoch + (Client::mono() - Client::started)) / 1000.0) }
     };
@@ -666,7 +669,7 @@ void Client::writeStatistics()
         stats["cpp_size"] = static_cast<int>(data.preprocessed->cppSize);
         stats["cpp_time"] = static_cast<int>(data.preprocessed->duration);
     }
-    const std::string json = json11::Json(stats).dump();
+    const std::string json = stats.dump();
 
     FILE *f = fopen(file.c_str(), "a+");
     if (!f) {
@@ -851,7 +854,7 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
     }
 
     std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
-    json11::Json::object json;
+    nlohmann::json json = nlohmann::json::object();
     int fd;
     if ((fd = open(cache.c_str(), O_CLOEXEC | O_RDONLY)) != -1) {
         if (flock(fd, LOCK_SH)) {
@@ -871,19 +874,20 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                 if (read != static_cast<size_t>(size)) {
                     ERROR("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
                 } else {
-                    std::string err;
-                    json11::Json obj = json11::Json::parse(contents, err, json11::JsonParse::COMMENTS);
-                    if (!err.empty()) {
-                        ERROR("Failed to parse json from %s: %s", cache.c_str(), err.c_str());
+                    nlohmann::json obj = nlohmann::json::parse(contents, nullptr, false, true);
+                    if (obj.is_discarded()) {
+                        ERROR("Failed to parse json from %s", cache.c_str());
                     }
                     if (obj.is_object()) {
-                        json11::Json version = obj["version"];
-                        if (version.int_value() != EnvironmentCacheVersion) {
-                            json = json11::Json::object();
-                            json["version"] = json11::Json(EnvironmentCacheVersion);
+                        auto versionIt = obj.find("version");
+                        const int versionVal = (versionIt != obj.end() && versionIt->is_number()) ? versionIt->get<int>() : 0;
+                        if (versionVal != EnvironmentCacheVersion) {
+                            json = nlohmann::json::object();
+                            json["version"] = EnvironmentCacheVersion;
                         } else {
-                            json11::Json value = obj[key];
-                            if (value.is_object()) {
+                            auto valueIt = obj.find(key);
+                            if (valueIt != obj.end() && valueIt->is_object()) {
+                                const nlohmann::json &value = *valueIt;
                                 DEBUG("Cache hit for compiler %s", key.c_str());
                                 CompilerInfo cacheHit;
                                 cacheHit.hash = string(value, "hash");
@@ -893,20 +897,20 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                                 } else if (type == "gcc") {
                                     cacheHit.type = CompilerType::GCC;
                                 }
-                                const json11::Json ver = value["version"];
-                                if (ver.is_object()) {
-                                    cacheHit.version.major = integer(ver, "major");
-                                    cacheHit.version.minor = integer(ver, "minor");
-                                    cacheHit.version.patch = integer(ver, "patch");
+                                auto verIt = value.find("version");
+                                if (verIt != value.end() && verIt->is_object()) {
+                                    cacheHit.version.major = integer(*verIt, "major");
+                                    cacheHit.version.minor = integer(*verIt, "minor");
+                                    cacheHit.version.patch = integer(*verIt, "patch");
                                 }
                                 // return cacheHit;
                             }
 
-                            json = obj.object_items();
-                            auto it = json.begin();
-                            while (it != json.end()) {
-                                if (it->first.size() > compiler.size() && !strncmp(it->first.c_str(), compiler.c_str(), compiler.size()) && it->first[compiler.size()] == ':') {
-                                    json.erase(it++);
+                            json = obj;
+                            for (auto it = json.begin(); it != json.end();) {
+                                const std::string &k = it.key();
+                                if (k.size() > compiler.size() && !strncmp(k.c_str(), compiler.c_str(), compiler.size()) && k[compiler.size()] == ':') {
+                                    it = json.erase(it);
                                 } else {
                                     ++it;
                                 }
@@ -921,22 +925,22 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
     }
     const CompilerInfo ret = createCompilerInfo(compiler, readSignature());
     if (!ret.hash.empty()) {
-        auto compilerJson = json11::Json::object();
+        nlohmann::json compilerJson = nlohmann::json::object();
         compilerJson["hash"] = ret.hash;
         compilerJson["type"] = compilerTypeToString(ret.type);
-        auto versionJSON = json11::Json::object();
+        nlohmann::json versionJSON = nlohmann::json::object();
         versionJSON["major"] = ret.version.major;
         versionJSON["minor"] = ret.version.minor;
         versionJSON["patch"] = ret.version.patch;
         compilerJson["version"] = std::move(versionJSON);
-        json["version"] = json11::Json(EnvironmentCacheVersion);
+        json["version"] = EnvironmentCacheVersion;
         json[key] = std::move(compilerJson);
 
         std::string dirname;
         parsePath(cache.c_str(), nullptr, &dirname);
         recursiveMkdir(dirname);
         if ((fd = open(cache.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)) != -1) {
-            std::string str = json11::Json(json).dump() + '\n';
+            std::string str = json.dump() + '\n';
             if (flock(fd, LOCK_EX | LOCK_NB)) {
                 DEBUG("Failed to flock exclusive %s (%d %s)", cache.c_str(), errno, strerror(errno));
                 ::close(fd);
@@ -1073,9 +1077,9 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         return false;
     }
     {
-        json11::Json::object msg { { "type", "uploadEnvironment" }, { "hash", data.hash }, { "bytes", static_cast<int>(st.st_size) } };
+        nlohmann::json msg = { { "type", "uploadEnvironment" }, { "hash", data.hash }, { "bytes", static_cast<int>(st.st_size) } };
 
-        std::string json = json11::Json(msg).dump();
+        std::string json = msg.dump();
         schedulerWebSocket->send(WebSocket::Text, json.c_str(), json.size());
         Select select;
         select.add(schedulerWebSocket);
@@ -1241,20 +1245,18 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
     if (Config::jsonDiagnosticsRaw) {
         return str;
     }
-    std::string err;
-    const json11::Json parsed = json11::Json::parse(str, err);
-    if (!parsed.is_array()) {
+    const nlohmann::json parsed = nlohmann::json::parse(str, nullptr, false);
+    if (parsed.is_discarded() || !parsed.is_array()) {
         return str;
     }
 
-    const std::vector<json11::Json> array = parsed.array_items();
-    if (array.empty())
+    if (parsed.empty())
         return std::string();
 
     std::string ret;
-    ret.reserve(array.size() * 256);
+    ret.reserve(parsed.size() * 256);
 
-    std::function<void(const json11::Json)> print = [&print, &ret](const json11::Json &item) {
+    std::function<void(const nlohmann::json &)> print = [&print, &ret](const nlohmann::json &item) {
         const std::string kind = string(item, "kind");
         Color color = Color::None;
         if (Config::color) {
@@ -1266,30 +1268,31 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
                 color = Color::LightPurple;
             }
         }
-        std::vector<json11::Json> locations, fixits, children;
+        std::vector<nlohmann::json> locations, fixits, children;
         {
-            json11::Json tmp = item["locations"];
-            if (tmp.is_array())
-                locations = tmp.array_items();
-            tmp = item["fixits"];
-            if (tmp.is_array())
-                fixits = tmp.array_items();
-            tmp = item["children"];
-            if (tmp.is_array()) {
-                children = tmp.array_items();
-                std::sort(children.begin(), children.end(), [](const json11::Json &l, const json11::Json &r) -> bool {
+            auto itLoc = item.is_object() ? item.find("locations") : item.end();
+            if (itLoc != item.end() && itLoc->is_array())
+                locations = std::vector<nlohmann::json>(itLoc->begin(), itLoc->end());
+            auto itFix = item.is_object() ? item.find("fixits") : item.end();
+            if (itFix != item.end() && itFix->is_array())
+                fixits = std::vector<nlohmann::json>(itFix->begin(), itFix->end());
+            auto itChild = item.is_object() ? item.find("children") : item.end();
+            if (itChild != item.end() && itChild->is_array()) {
+                children = std::vector<nlohmann::json>(itChild->begin(), itChild->end());
+                std::sort(children.begin(), children.end(), [](const nlohmann::json &l, const nlohmann::json &r) -> bool {
                     return kindScore(string(l, "kind")) > kindScore(string(r, "kind"));
                 });
             }
         }
         if (!locations.empty()) {
-            const json11::Json loc = locations[0];
+            const nlohmann::json &loc = locations[0];
             const std::string file = string(loc, "caret.file");
             const int caretLine = integer(loc, "caret.line");
             const int caretColumn = integer(loc, "caret.column");
             int finishCol = integer(loc, "finish.column");
             int startCol = 0;
-            if (loc["start"].is_object()) {
+            auto startIt = loc.is_object() ? loc.find("start") : loc.end();
+            if (startIt != loc.end() && startIt->is_object()) {
                 startCol = integer(loc, "start.column");
             }
             if (!startCol) {
@@ -1326,12 +1329,12 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
                 }
             }
         }
-        for (const json11::Json &child : children) {
+        for (const nlohmann::json &child : children) {
             print(child);
         }
     };
 
-    for (const json11::Json &item : array) {
+    for (const nlohmann::json &item : parsed) {
         print(item);
     }
 
