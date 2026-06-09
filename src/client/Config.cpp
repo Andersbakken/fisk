@@ -93,7 +93,10 @@ Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "S
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 15000);
 Getter<size_t> schedulerConnectAttempts("scheduler-connect-attempts",
                                         "Max scheduler connect attempts before falling back to local (0 means unlimited)",
-                                        1);
+                                        3);
+Getter<unsigned long long> schedulerConnectBackoff("scheduler-connect-backoff",
+                                                   "Initial backoff in ms between scheduler connect retries; doubles each retry, capped at 64x (0 disables)",
+                                                   500);
 Getter<unsigned long long> acquiredBuilderTimeout("acquire-builder-timeout", "Set acquired builder watchdog timeout", 7500);
 Getter<unsigned long long> builderConnectTimeout("builder-connect-timeout", "Set builder connect watchdog timeout", 7500);
 Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 10 * 60000);
