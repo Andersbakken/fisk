@@ -50,8 +50,8 @@ static void connectWebSocketWithRetry(Select &select,
                     shift = 6;
                 const unsigned long long delay = backoffMs << shift;
                 const int delayMs = delay > static_cast<unsigned long long>(INT_MAX)
-                                  ? INT_MAX
-                                  : static_cast<int>(delay);
+                    ? INT_MAX
+                    : static_cast<int>(delay);
                 DEBUG("Backing off %d ms before %s connect attempt %zu", delayMs, name, attempt + 1);
                 // Use select.exec so the watchdog can still fire during the sleep.
                 select.exec(delayMs);
@@ -70,10 +70,7 @@ static void connectWebSocketWithRetry(Select &select,
 
         select.add(websocketPtr.get());
         DEBUG("Starting %s websocket", name);
-        while (!isDone(websocketPtr.get())
-               && !watchdog->timedOut()
-               && websocketPtr->state() >= WebSocket::None
-               && websocketPtr->state() <= WebSocket::ConnectedWebSocket) {
+        while (!isDone(websocketPtr.get()) && !watchdog->timedOut() && websocketPtr->state() >= WebSocket::None && websocketPtr->state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
 
@@ -411,11 +408,19 @@ int main(int argc, char **argv)
 
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
     connectWebSocketWithRetry(
-        select, schedulerWebsocket,
-        []() { return std::unique_ptr<SchedulerWebSocket>(new SchedulerWebSocket); },
-        url + "/compile", headers,
-        [](SchedulerWebSocket *ws) { return ws->done; },
-        data.watchdog, runLocal, "scheduler");
+        select,
+        schedulerWebsocket,
+        []() {
+        return std::unique_ptr<SchedulerWebSocket>(new SchedulerWebSocket);
+    },
+        url + "/compile",
+        headers,
+        [](SchedulerWebSocket *ws) {
+        return ws->done;
+    },
+        data.watchdog,
+        runLocal,
+        "scheduler");
 
     if (!schedulerWebsocket->error().empty()) {
         DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error().c_str());
@@ -470,15 +475,21 @@ int main(int argc, char **argv)
 
     std::unique_ptr<BuilderWebSocket> builderWebSocketPtr;
     connectWebSocketWithRetry(
-        select, builderWebSocketPtr,
+        select,
+        builderWebSocketPtr,
         [builderHasJSONDiagnostics]() {
-            auto ws = std::unique_ptr<BuilderWebSocket>(new BuilderWebSocket);
-            ws->hasJSONDiagnostics = builderHasJSONDiagnostics;
-            return ws;
-        },
-        builderUrl, headers,
-        [](BuilderWebSocket *ws) { return ws->state() == WebSocket::ConnectedWebSocket; },
-        data.watchdog, runLocal, "builder");
+        auto ws = std::unique_ptr<BuilderWebSocket>(new BuilderWebSocket);
+        ws->hasJSONDiagnostics = builderHasJSONDiagnostics;
+        return ws;
+    },
+        builderUrl,
+        headers,
+        [](BuilderWebSocket *ws) {
+        return ws->state() == WebSocket::ConnectedWebSocket;
+    },
+        data.watchdog,
+        runLocal,
+        "builder");
     BuilderWebSocket &builderWebSocket = *builderWebSocketPtr;
     data.watchdog->transition(Watchdog::ConnectedToBuilder);
     if (!Config::objectCache) {
