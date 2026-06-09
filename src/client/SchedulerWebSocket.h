@@ -15,7 +15,6 @@ public:
     virtual void onMessage(MessageType type, const void *bytes, size_t len) override;
 
     bool done { false };
-    std::string error;
     bool needsEnvironment { false };
     int jobId { 0 };
     std::string environment;

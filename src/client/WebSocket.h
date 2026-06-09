@@ -41,6 +41,17 @@ public:
         ConnectedWebSocket
     };
 
+    std::string error() const
+    {
+        return mError;
+    }
+
+    void setError(std::string error)
+    {
+        mError = std::move(error);
+        mState = Error;
+    }
+
     std::string url() const
     {
         return mUrl;
@@ -106,6 +117,7 @@ private:
     int mFD { -1 };
     wslay_event_callbacks mCallbacks;
     wslay_event_context *mContext { nullptr };
+    std::string mError;
 
     std::vector<unsigned char> mRecvBuffer, mSendBuffer;
     size_t mSendBufferOffset { 0 };

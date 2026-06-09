@@ -195,7 +195,9 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
     if (mFD == -1) {
         ERROR("Couldn't connect to host %s", mHost.c_str());
         return false;
-    } else if (mState == ConnectingTCP) {
+    }
+
+    if (mState == ConnectingTCP) {
         return true;
     }
 
@@ -339,8 +341,7 @@ void WebSocket::onWrite()
             int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size);
 
             if (e == -1) {
-                mState = Error;
-                ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
+                setError(Client::format("Failed to getsockopt (%d %s)", errno, strerror(errno)));
                 return;
             }
         } while (err == EINTR);
@@ -349,8 +350,7 @@ void WebSocket::onWrite()
             DEBUG("Still connecting to host %s:%d", mHost.c_str(), mPort);
             return;
         } else if (err && err != EISCONN) {
-            ERROR("Failed to connect to host %s:%d (%d %s)", mHost.c_str(), mPort, err, strerror(err));
-            mState = Error;
+            setError(Client::format("Failed to connect to host %s:%d (%d %s)", mHost.c_str(), mPort, err, strerror(err)));
             return;
         }
 
@@ -377,9 +377,12 @@ void WebSocket::onRead()
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
         } else if (errno != EINTR) {
-            ERROR("Got read error: %d %s for websocket %s at stage %s", errno, strerror(errno), mUrl.c_str(), Watchdog::stageName(Client::data().watchdog->currentStage()));
+            setError(Client::format("Got read error: %d %s for websocket %s at stage %s",
+                                    errno,
+                                    strerror(errno),
+                                    mUrl.c_str(),
+                                    Watchdog::stageName(Client::data().watchdog->currentStage())));
 
-            mState = Error;
             break;
         }
     }
@@ -392,8 +395,7 @@ void WebSocket::onRead()
             const size_t last = mRecvBuffer.size();
             const int r = wslay_event_recv(mContext);
             if (r) {
-                ERROR("Got wslay_event_recv error: %d", r);
-                mState = Error;
+                setError(Client::format("Got wslay_event_recv error: %d", r));
                 return;
             }
             if (mRecvBuffer.empty() || last == mRecvBuffer.size())
@@ -420,8 +422,11 @@ void WebSocket::send()
         } else if (errno == EWOULDBLOCK || errno == EAGAIN) {
             break;
         } else if (errno != EINTR) {
-            ERROR("Got write error: %d %s for websocket %s at stage: %ss", errno, strerror(errno), mUrl.c_str(), Watchdog::stageName(Client::data().watchdog->currentStage()));
-            mState = Error;
+            setError(Client::format("Got write error: %d %s for websocket %s at stage: %ss",
+                                    errno,
+                                    strerror(errno),
+                                    mUrl.c_str(),
+                                    Watchdog::stageName(Client::data().watchdog->currentStage())));
             break;
         }
     }

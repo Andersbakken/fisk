@@ -14,7 +14,7 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
         if (msg.is_discarded() || !msg.is_object()) {
             ERROR("Failed to parse json from scheduler (raw message: %.200s%s)", rawMsg.c_str(), rawMsg.size() > 200 ? "..." : "");
             data.watchdog->stop();
-            error = "scheduler json parse error";
+            setError("scheduler json parse error");
             done = true;
             return;
         }
