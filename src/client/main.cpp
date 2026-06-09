@@ -347,11 +347,14 @@ int main(int argc, char **argv)
     }
 
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
+    const size_t maxSchedulerAttempts = Config::schedulerConnectAttempts;
+    size_t schedulerAttempt = 0;
     do {
         if (schedulerWebsocket) {
             select.remove(schedulerWebsocket.get());
         }
         schedulerWebsocket.reset(new SchedulerWebSocket);
+        ++schedulerAttempt;
         if (!schedulerWebsocket->connect(url + "/compile", headers)) {
             DEBUG("Have to run locally because no server");
             runLocal("scheduler connect error");
@@ -364,8 +367,13 @@ int main(int argc, char **argv)
         }
 
         if (data.watchdog->timedOut()) {
-            DEBUG("Have to run locally because we timed out trying to connect ro the scheduler");
+            DEBUG("Have to run locally because we timed out trying to connect to the scheduler");
             runLocal("watchdog scheduler connect");
+        }
+
+        if (!schedulerWebsocket->done && maxSchedulerAttempts && schedulerAttempt >= maxSchedulerAttempts) {
+            DEBUG("Have to run locally after %zu scheduler connect attempt%s", schedulerAttempt, schedulerAttempt == 1 ? "" : "s");
+            runLocal("scheduler connect attempts exhausted");
         }
     } while (!schedulerWebsocket->done);
 
