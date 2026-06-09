@@ -349,8 +349,7 @@ int main(int argc, char **argv)
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
     const size_t maxSchedulerAttempts = Config::schedulerConnectAttempts;
     size_t schedulerAttempt = 0;
-    std::string lastError;
-    while (true) {
+    do {
         if (schedulerWebsocket) {
             select.remove(schedulerWebsocket.get());
         }
@@ -376,14 +375,7 @@ int main(int argc, char **argv)
             DEBUG("Have to run locally after %zu scheduler connect attempt%s", schedulerAttempt, schedulerAttempt == 1 ? "" : "s");
             runLocal("scheduler connect attempts exhausted");
         }
-        if (schedulerWebsocket->done) {
-            if (schedulerWebsocket->state() == WebSocket::Error) {
-                lastError = schedulerWebsocket->error();
-                DEBUG("Scheduler websocket error: %s", lastError.c_str());
-                break;
-            }
-        }
-    }
+    } while (!schedulerWebsocket->done);
 
     if (!schedulerWebsocket->error().empty()) {
         DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error().c_str());

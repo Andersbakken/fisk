@@ -722,7 +722,7 @@ void Client::runLocal(const std::string &reason)
         argvCopy[data.argc] = nullptr;
         size_t micros = 0;
         while (true) {
-            WARN("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
+            ERROR("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
             ::execv(data.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;
