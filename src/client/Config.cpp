@@ -91,11 +91,11 @@ static Separator s5("Timeouts:");
 Getter<unsigned long long> daemonConnectTimeout("daemon-connect-timeout", "Set daemon connect timeout", 10000);
 Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "Set local compile slot acquisition timeout", 30000);
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 15000);
-Getter<size_t> schedulerConnectAttempts("scheduler-connect-attempts",
-                                        "Max scheduler connect attempts before falling back to local (0 means unlimited)",
-                                        3);
-Getter<unsigned long long> schedulerConnectBackoff("scheduler-connect-backoff",
-                                                   "Initial backoff in ms between scheduler connect retries; doubles each retry, capped at 64x (0 disables)",
+Getter<size_t> websocketConnectAttempts("websocket-connect-attempts",
+                                        "Max websocket connect attempts before falling back to local (0 means unlimited)",
+                                        1);
+Getter<unsigned long long> websocketConnectBackoff("websocket-connect-backoff",
+                                                   "Initial backoff in ms between websocket connect retries; doubles each retry, capped at 64x (0 disables)",
                                                    500);
 Getter<unsigned long long> acquiredBuilderTimeout("acquire-builder-timeout", "Set acquired builder watchdog timeout", 7500);
 Getter<unsigned long long> builderConnectTimeout("builder-connect-timeout", "Set builder connect watchdog timeout", 7500);
