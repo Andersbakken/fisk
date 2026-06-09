@@ -348,10 +348,28 @@ int main(int argc, char **argv)
 
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
     const size_t maxSchedulerAttempts = Config::schedulerConnectAttempts;
+    const unsigned long long schedulerBackoffMs = Config::schedulerConnectBackoff;
     size_t schedulerAttempt = 0;
     do {
         if (schedulerWebsocket) {
             select.remove(schedulerWebsocket.get());
+            if (schedulerBackoffMs) {
+                // Exponential backoff: base, 2x, 4x, ..., capped at 64x base.
+                size_t shift = schedulerAttempt - 1;
+                if (shift > 6)
+                    shift = 6;
+                const unsigned long long delay = schedulerBackoffMs << shift;
+                const int delayMs = delay > static_cast<unsigned long long>(INT_MAX)
+                                  ? INT_MAX
+                                  : static_cast<int>(delay);
+                DEBUG("Backing off %d ms before scheduler connect attempt %zu", delayMs, schedulerAttempt + 1);
+                // Use select.exec so the watchdog can still fire during the sleep.
+                select.exec(delayMs);
+                if (data.watchdog->timedOut()) {
+                    DEBUG("Have to run locally because we timed out during scheduler backoff");
+                    runLocal("watchdog scheduler backoff");
+                }
+            }
         }
         schedulerWebsocket.reset(new SchedulerWebSocket);
         ++schedulerAttempt;

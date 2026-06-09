@@ -293,6 +293,7 @@ extern Getter<unsigned long long> daemonConnectTimeout;
 extern Getter<unsigned long long> slotAcquisitionTimeout;
 extern Getter<unsigned long long> schedulerConnectTimeout;
 extern Getter<size_t> schedulerConnectAttempts;
+extern Getter<unsigned long long> schedulerConnectBackoff;
 extern Getter<unsigned long long> acquiredBuilderTimeout;
 extern Getter<unsigned long long> builderConnectTimeout;
 extern Getter<unsigned long long> preprocessTimeout;
