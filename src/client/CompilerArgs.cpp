@@ -194,7 +194,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                                                    LocalReason *localReason)
 {
     const bool objectCache = Config::objectCache;
-    std::shared_ptr<CompilerArgs> ret(new CompilerArgs);
+    std::shared_ptr<CompilerArgs> ret = std::make_shared<CompilerArgs>();
     ret->commandLine = std::move(arguments);
     ret->flags = None;
     ret->objectFileIndex = -1;
@@ -242,55 +242,64 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         if (arg == "-S") {
             DEBUG("-S, running local");
             *localReason = Local_DoNotAssemble;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-E") {
             DEBUG("-E, running local");
             *localReason = Local_Preprocess;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-fno-integrated-as") {
             DEBUG("-fno-integrated-as, running local");
             *localReason = Local_NoIntegratedAs;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-M" || arg == "-MM") {
             DEBUG("%s, running local", arg.c_str());
             *localReason = Local_Preprocess;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (!strncmp(arg.c_str(), "-B", 2)) {
             DEBUG("%s, running local", arg.c_str());
             *localReason = Local_BinPath;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-march=native" || arg == "-mcpu=native" || arg == "-mtune=native") {
             DEBUG("Local archicture optimizations: %s. Run local", arg.c_str());
             *localReason = Local_NativeArch;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-fexec-charset" || arg == "-fwide-exec-charset" || arg == "-finput-charset") {
             DEBUG("build environment charset conversions: %s. Run local", arg.c_str());
             *localReason = Local_Charset;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (!strncmp(arg.c_str(), "-fplugin=", 9) || !strncmp(arg.c_str(), "-fsanitize-blacklist=", 21)) {
             DEBUG("Extra files: %s. Run local", arg.c_str());
             *localReason = Local_ExtraFiles;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-") {
             DEBUG("STDIN input, building local");
             *localReason = Local_StdinInput;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         if (arg == "-c") {
@@ -303,12 +312,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("-o without an argument, building local");
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             if (ret->commandLine[i + 1] == "-") {
                 DEBUG("-o - This means different things for different compilers. Run local");
                 *localReason = Local_StdOutOutput;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             ret->flags |= HasDashO;
             ret->objectFileIndex = i + 1;
@@ -345,7 +356,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("-MF without an argument, building local");
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             ret->flags |= HasDashMF;
             sha1(2);
@@ -369,7 +381,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("-MT without an argument, building local");
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             ret->flags |= HasDashMT;
             sha1(2);
@@ -391,7 +404,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                 if (*pos == '=') {
                     DEBUG("Incompatible arg %s building local", arg.c_str());
                     *localReason = Local_ParseError;
-                    return nullptr;
+                    ret.reset();
+                    goto end;
                 }
 
                 if (!*pos) {
@@ -417,7 +431,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
 
                 DEBUG("Incompatible arg (2) %s building local", arg.c_str());
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             continue;
         }
@@ -426,12 +441,14 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("-Xclang without an argument, building local");
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             if (ret->commandLine[i + 1] == "-load") {
                 DEBUG("Extra files: %s. Run local", arg.c_str());
                 *localReason = Local_ExtraFiles;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             sha1(2);
             ++i;
@@ -442,13 +459,15 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("-arch without an argument, building local");
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             const std::string arch = ret->commandLine[i + 1];
             if (!hasArch.empty() && hasArch != arch) {
                 DEBUG("multiple -arch options, building locally");
                 *localReason = Local_MultiArch;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             hasArch = arch;
             sha1(2);
@@ -458,8 +477,11 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
 
         if (arg == "-x") {
             ret->flags |= HasDashX;
-            if (i + 1 == ret->commandLine.size())
-                return std::shared_ptr<CompilerArgs>();
+            if (i + 1 == ret->commandLine.size()) {
+                ret.reset();
+                goto end;
+            }
+
             const std::string lang = ret->commandLine.at(i + 1);
             const CompilerArgs::Flag languages[] = { CPlusPlus, C, CPreprocessed, CPlusPlusPreprocessed, ObjectiveC, ObjectiveCPreprocessed, ObjectiveCPlusPlus, ObjectiveCPlusPlusPreprocessed, AssemblerWithCpp, Assembler };
             for (size_t j = 0; j < sizeof(languages) / sizeof(languages[0]); ++j) {
@@ -482,7 +504,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
             if (i + 1 >= ret->commandLine.size()) {
                 DEBUG("%s without an argument, building local", arg.c_str());
                 *localReason = Local_ParseError;
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             sha1(2);
             ++i;
@@ -495,7 +518,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                 if (i + count >= ret->commandLine.size()) {
                     DEBUG("%s missing operand(s), building local", arg.c_str());
                     *localReason = Local_ParseError;
-                    return nullptr;
+                    ret.reset();
+                    goto end;
                 }
                 if (needSHA1)
                     sha1(count + 1);
@@ -526,7 +550,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                     DEBUG("Multiple source files %s and %s", ret->commandLine[ret->sourceFileIndex].c_str(), arg.c_str());
                     *localReason = Local_MultiSource;
                 }
-                return nullptr;
+                ret.reset();
+                goto end;
             }
             ret->sourceFileIndex = i;
             if (!(ret->flags & LanguageMask)) {
@@ -582,7 +607,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     if (ret->sourceFileIndex == std::numeric_limits<size_t>::max()) {
         DEBUG("No src file, building local");
         *localReason = Local_NoSources;
-        return nullptr;
+        ret.reset();
+        goto end;
     }
 
     // Check if this looks like a build system compile test
@@ -595,21 +621,24 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         if (basename.size() >= 10 && !strncmp(basename.c_str(), "conftest.", 9)) {
             DEBUG("Compile test (conftest): %s, building local", src.c_str());
             *localReason = Local_CompileTest;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
 
         // cmake compile tests: anything in CMakeFiles/ subdirectory
         if (src.find("/CMakeFiles/") != std::string::npos || !strncmp(src.c_str(), "CMakeFiles/", 11)) {
             DEBUG("Compile test (CMakeFiles): %s, building local", src.c_str());
             *localReason = Local_CompileTest;
-            return nullptr;
+            ret.reset();
+            goto end;
         }
     }
 
     if (!hasDashC) {
         *localReason = Local_Link;
         DEBUG("link job, building local");
-        return nullptr;
+        ret.reset();
+        goto end;
     }
 
     // #warning need to handle clang_get_default_target
@@ -617,7 +646,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     if (ret->flags & (AssemblerWithCpp | Assembler)) {
         DEBUG("Assembler, building local");
         *localReason = Local_DoNotAssemble;
-        return nullptr;
+        ret.reset();
+        goto end;
     }
 
     if (!(ret->flags & HasDashO)) {
@@ -673,6 +703,8 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     }
 
     *localReason = Remote;
+
+end:
     return ret;
 }
 
