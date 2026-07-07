@@ -38,25 +38,32 @@ export class Compile extends EventEmitter {
                     args[i] = outputFileName;
                     break;
                 }
+
                 case "-MF": {
                     args.splice(i--, 2);
                     break;
                 }
+
                 case "-MMD":
                 case "-MD":
                 case "-MM":
                 case "-M":
                     args.splice(i--, 1);
                     continue;
+
                 case "-MT":
                     args.splice(i--, 2);
                     continue;
+
                 case "-cxx-isystem":
                 case "-isysroot":
                 case "-isystem":
+                case "-iquote":
                 case "-I":
+                case "-F":
                     args.splice(i--, 2);
                     break;
+
                 case "-x":
                     hasDashX = true;
                     if (!isClang) {
@@ -80,6 +87,7 @@ export class Compile extends EventEmitter {
                         ++i;
                     }
                     break;
+
                 case "--param":
                 case "-G":
                 case "-T":
@@ -103,8 +111,20 @@ export class Compile extends EventEmitter {
                 case "-framework":
                     ++i;
                     break;
+
                 default:
-                    if (/^-mlinker-version=/.exec(args[i]) || /^-stdlib=/.exec(args[i])) {
+                    if (
+                        args[i].startsWith("-mlinker-version=") ||
+                        args[i].startsWith("-stdlib=") ||
+                        args[i].startsWith("-I") ||
+                        args[i].startsWith("-F") ||
+                        args[i].startsWith("-isystem") ||
+                        args[i].startsWith("-isysroot") ||
+                        args[i].startsWith("-cxx-isystem") ||
+                        args[i].startsWith("-iquote") ||
+                        args[i].startsWith("--sysroot=") ||
+                        args[i].startsWith("--gcc-toolchain=")
+                    ) {
                         args.splice(i--, 1);
                         break;
                     }
@@ -135,39 +155,49 @@ export class Compile extends EventEmitter {
                 case ".cxx":
                     args.unshift(isClang ? "c++" : "c++-cpp-output");
                     break;
+
                 case ".ii":
                     args.unshift("c++-cpp-output");
                     break;
+
                 case ".hh":
                 case ".hpp":
                 case ".H":
                     args.unshift("c++-header");
                     break;
+
                 case ".h":
                     args.unshift("c-header");
                     break;
+
                 case ".c":
                     args.unshift(isClang ? "c" : "cpp-output");
                     break;
+
                 case ".i":
                     args.unshift("cpp-output");
                     break;
+
                 case ".m":
                 case ".mi":
                     args.unshift(isClang ? "objective-c" : "objective-c-cpp-output");
                     break;
+
                 case ".s":
                     args.unshift("assembler");
                     break;
+
                 case ".sx":
                 case ".S":
                     args.unshift("assembler-with-cpp");
                     break;
+
                 case ".mm":
                 case ".M":
                 case ".mii":
                     args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
                     break;
+
                 default:
                     throw new Error(`Can't determine source language for file: ${sourcePath}`);
             }
