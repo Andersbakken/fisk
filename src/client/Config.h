@@ -4,14 +4,23 @@
 #include <assert.h>
 #include <cstdint>
 #include <limits>
-#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <strings.h>
 #include <type_traits>
 #include <vector>
-
 #include <functional>
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
+#endif
+
+#include <nlohmann/json.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 namespace Config {
 enum

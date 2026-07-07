@@ -13,7 +13,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <execinfo.h>
-#include <nlohmann/json.hpp>
 #include <unistd.h>
 #ifdef __linux__
 #include <sys/prctl.h>
