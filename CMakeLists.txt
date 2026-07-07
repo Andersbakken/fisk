@@ -21,9 +21,9 @@ set(TS_DEPS
     src/builder/Client.ts
     src/builder/CompileFinishedEvent.ts
     src/builder/CompileJob.ts
-    src/builder/J.ts
     src/builder/Job.ts
     src/builder/JobData.ts
+    src/builder/JobState.ts
     src/builder/ObjectCache.ts
     src/builder/ObjectCacheItem.ts
     src/builder/ObjectCachePendingItem.ts

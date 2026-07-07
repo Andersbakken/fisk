@@ -1,7 +1,7 @@
 import type { CompileJob } from "./CompileJob";
 import type { Job } from "./Job";
 
-export interface J {
+export interface JobState {
     aborted: boolean;
     done: boolean;
     heartbeatTimer: NodeJS.Timeout | undefined;

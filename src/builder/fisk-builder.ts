@@ -22,8 +22,8 @@ import type { CompileFinishedEvent, CompileFinishedEventFile } from "./CompileFi
 import type { Contents } from "./ObjectCache";
 import type { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage";
 import type { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
-import type { J } from "./J";
 import type { Job } from "./Job";
+import type { JobState } from "./JobState";
 import type { Options } from "@jhanssen/options";
 import type { Response } from "./Response";
 import type express from "express";
@@ -701,7 +701,7 @@ client.on("command", (command) => {
 });
 
 const server = new Server(option, common.Version);
-const jobQueue: J[] = [];
+const jobQueue: JobState[] = [];
 
 server.on("headers", (headers, req) => {
     // console.log("request is", req.url);
@@ -804,7 +804,7 @@ server.on("job", (job: Job) => {
     let uploadDuration: undefined | number;
 
     // console.log("sending to server");
-    const j: J = {
+    const j: JobState = {
         id: job.id,
         job: job,
         op: undefined,
