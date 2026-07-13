@@ -50,6 +50,8 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler, 
             if (arg == "-o" && args->commandLine.size() > i + 1) {
                 ++i;
                 continue;
+            } else if (arg == "-c") {
+                continue;
             }
 
             commandLine += " '";
