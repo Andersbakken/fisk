@@ -722,14 +722,14 @@ void Client::runLocal(const std::string &reason)
         argvCopy[data.argc] = nullptr;
         size_t micros = 0;
         while (true) {
-            ERROR("Running local: %s because %s", argsAsString().c_str(), reason.c_str());
+            fprintf(stderr, "Running local: %s because %s\n", argsAsString().c_str(), reason.c_str());
             ::execv(data.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;
-            ERROR("Trying execv(%s) again in %zu ms errno: %d %s", data.compiler.c_str(), micros / 1000, errno, strerror(errno));
+            fprintf(stderr, "Trying execv(%s) again in %zu ms errno: %d %s\n", data.compiler.c_str(), micros / 1000, errno, strerror(errno));
             usleep(75000);
         }
-        ERROR("fisk: Failed to exec %s (%d %s)", data.compiler.c_str(), errno, strerror(errno));
+        fprintf(stderr, "fisk: Failed to exec %s (%d %s)\n", data.compiler.c_str(), errno, strerror(errno));
     };
 
     pid_t pid;
