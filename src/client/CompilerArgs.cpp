@@ -18,11 +18,18 @@
 #include "Log.h"
 #include <string.h>
 
+enum OptionFlag
+{
+    None = 0x0,
+    Sha1 = 0x1,
+    SkipPreprocess = 0x2
+};
+
 struct OptionArg
 {
     const char *name;
     size_t args;
-    bool sha1;
+    uint32_t flags;
 
     bool operator<(const OptionArg &other) const
     {
@@ -30,162 +37,183 @@ struct OptionArg
     }
 };
 
-static const OptionArg argOptions[] = { { "--CLASSPATH", 1, true },
-                                        { "--assert", 1, true },
-                                        { "--bootclasspath", 1, true },
-                                        { "--classpath", 1, true },
-                                        { "--config", 1, true },
-                                        { "--define-macro", 1, true },
-                                        { "--dyld-prefix", 1, true },
-                                        { "--encoding", 1, true },
-                                        { "--extdirs", 1, true },
-                                        { "--for-linker", 1, true },
-                                        { "--force-link", 1, true },
-                                        { "--include-directory", 1, false },
-                                        { "--include-directory-after", 1, false },
-                                        { "--include-prefix", 1, false },
-                                        { "--include-with-prefix", 1, false },
-                                        { "--include-with-prefix-after", 1, false },
-                                        { "--include-with-prefix-before", 1, false },
-                                        { "--language", 1, true },
-                                        { "--library-directory", 1, true },
-                                        { "--mhwdiv", 1, true },
-                                        { "--output", 1, true },
-                                        { "--output-class-directory", 1, true },
-                                        { "--param", 1, true },
-                                        { "--prefix", 1, true },
-                                        { "--print-file-name", 1, true },
-                                        { "--print-prog-name", 1, true },
-                                        { "--resource", 1, false },
-                                        { "--rtlib", 1, true },
-                                        { "--serialize-diagnostics", 1, false },
-                                        { "--std", 1, true },
-                                        { "--stdlib", 1, true },
-                                        { "--sysroot", 1, false },
-                                        { "--system-header-prefix", 1, true },
-                                        { "--undefine-macro", 1, true },
-                                        { "-F", 1, false },
-                                        { "-G", 1, true },
-                                        { "-I", 1, false },
-                                        { "-MQ", 1, true },
-                                        { "-Xanalyzer", 1, true },
-                                        { "-Xarch_device", 1, true },
-                                        { "-Xarch_host", 1, true },
-                                        { "-Xassembler", 1, true },
-                                        { "-Xclang", 1, true },
-                                        { "-Xclangas", 1, true },
-                                        { "-Xcuda-fatbinary", 1, true },
-                                        { "-Xcuda-ptxas", 1, true },
-                                        { "-Xlinker", 1, true },
-                                        { "-Xopenmp-target", 1, true },
-                                        { "-Xpreprocessor", 1, true },
-                                        { "-alias_list", 1, false },
-                                        { "-allowable_client", 1, true },
-                                        { "-arch", 1, true },
-                                        { "-arch_only", 1, true },
-                                        { "-arcmt-migrate-report-output", 1, false },
-                                        { "-aux-info", 1, false },
-                                        { "-bundle_loader", 1, false },
-                                        { "-client_name", 1, true },
-                                        { "-compatibility_version", 1, true },
-                                        { "-current_version", 1, true },
-                                        { "-cxx-isystem", 1, false },
-                                        { "-darwin-target-variant", 1, true },
-                                        { "-darwin-target-variant-triple", 1, true },
-                                        { "-dependency-dot", 1, false },
-                                        { "-dependency-file", 1, false },
-                                        { "-dumpbase", 1, false },
-                                        { "-dumpbase-ext", 1, true },
-                                        { "-dumpdir", 1, false },
-                                        { "-dylib_file", 1, false },
-                                        { "-dylinker_install_name", 1, false },
-                                        { "-exported_symbols_list", 1, false },
-                                        { "-filelist", 1, false },
-                                        { "-fmodule-implementation-of", 1, true },
-                                        { "-fmodule-name", 1, true },
-                                        { "-fmodules-user-build-path", 1, false },
-                                        { "-fnew-alignment", 1, true },
-                                        { "-force_load", 1, false },
-                                        { "-framework", 1, true },
-                                        { "-frewrite-map-file", 1, false },
-                                        { "-ftrapv-handler", 1, true },
-                                        { "-gcc-toolchain", 1, false },
-                                        { "-idirafter", 1, false },
-                                        { "-iframework", 1, false },
-                                        { "-iframeworkwithsysroot", 1, false },
-                                        { "-imacros", 1, false },
-                                        { "-image_base", 1, true },
-                                        { "-imultiarch", 1, false },
-                                        { "-imultilib", 1, false },
-                                        { "-include", 1, false },
-                                        { "-include-pch", 1, false },
-                                        { "-index-store-path", 1, false },
-                                        { "-init", 1, true },
-                                        { "-install_name", 1, true },
-                                        { "-iprefix", 1, false },
-                                        { "-iquote", 1, false },
-                                        { "-isysroot", 1, false },
-                                        { "-isystem", 1, false },
-                                        { "-isystem-after", 1, false },
-                                        { "-iwithprefix", 1, false },
-                                        { "-iwithprefixbefore", 1, false },
-                                        { "-iwithsysroot", 1, false },
-                                        { "-lazy_framework", 1, true },
-                                        { "-lazy_library", 1, true },
-                                        { "-meabi", 1, true },
-                                        { "-mllvm", 1, true },
-                                        { "-mmlir", 1, true },
-                                        { "-module-dependency-dir", 1, false },
-                                        { "-mthread-model", 1, true },
-                                        { "-multiply_defined", 1, true },
-                                        { "-multiply_defined_unused", 1, true },
-                                        { "-o", 1, true },
-                                        { "-pagezero_size", 1, true },
-                                        { "-read_only_relocs", 1, true },
-                                        { "-reexport_framework", 1, true },
-                                        { "-resource-dir", 1, false },
-                                        { "-rpath", 1, true },
-                                        { "-sectalign", 3, true },
-                                        { "-sectcreate", 3, true },
-                                        { "-sectobjectsymbols", 2, true },
-                                        { "-sectorder", 3, true },
-                                        { "-seg1addr", 1, true },
-                                        { "-seg_addr_table", 1, true },
-                                        { "-seg_addr_table_filename", 1, true },
-                                        { "-segaddr", 2, true },
-                                        { "-segcreate", 3, true },
-                                        { "-segprot", 3, true },
-                                        { "-segs_read_only_addr", 1, true },
-                                        { "-segs_read_write_addr", 1, true },
-                                        { "-serialize-diagnostics", 1, false },
-                                        { "-sub_library", 1, true },
-                                        { "-sub_umbrella", 1, true },
-                                        { "-target", 1, true },
-                                        { "-umbrella", 1, true },
-                                        { "-undefined", 1, true },
-                                        { "-unexported_symbols_list", 1, false },
-                                        { "-weak_framework", 1, true },
-                                        { "-weak_library", 1, true },
-                                        { "-weak_reference_mismatches", 1, true },
-                                        { "-working-directory", 1, false },
-                                        { "-wrapper", 1, false },
-                                        { "-x", 1, true },
-                                        { "-z", 1, true } };
+static const OptionArg argOptions[] = { { "--CLASSPATH", 1, Sha1 },
+                                        { "--assert", 1, Sha1 },
+                                        { "--bootclasspath", 1, Sha1 },
+                                        { "--classpath", 1, Sha1 },
+                                        { "--config", 1, Sha1 },
+                                        { "--coverage", 0, Sha1 | SkipPreprocess },
+                                        { "--define-macro", 1, Sha1 },
+                                        { "--dyld-prefix", 1, Sha1 },
+                                        { "--encoding", 1, Sha1 },
+                                        { "--extdirs", 1, Sha1 },
+                                        { "--for-linker", 1, Sha1 | SkipPreprocess },
+                                        { "--force-link", 1, Sha1 | SkipPreprocess },
+                                        { "--include-directory", 1, None },
+                                        { "--include-directory-after", 1, None },
+                                        { "--include-prefix", 1, None },
+                                        { "--include-with-prefix", 1, None },
+                                        { "--include-with-prefix-after", 1, None },
+                                        { "--include-with-prefix-before", 1, None },
+                                        { "--language", 1, Sha1 },
+                                        { "--library-directory", 1, Sha1 },
+                                        { "--mhwdiv", 1, Sha1 },
+                                        { "--output", 1, Sha1 },
+                                        { "--output-class-directory", 1, Sha1 },
+                                        { "--param", 1, Sha1 },
+                                        { "--prefix", 1, Sha1 },
+                                        { "--print-file-name", 1, Sha1 },
+                                        { "--print-prog-name", 1, Sha1 },
+                                        { "--resource", 1, None },
+                                        { "--rtlib", 1, Sha1 },
+                                        { "--serialize-diagnostics", 1, None },
+                                        { "--std", 1, Sha1 },
+                                        { "--stdlib", 1, Sha1 },
+                                        { "--sysroot", 1, None },
+                                        { "--system-header-prefix", 1, Sha1 },
+                                        { "--undefine-macro", 1, Sha1 },
+                                        { "-F", 1, None },
+                                        { "-G", 1, Sha1 },
+                                        { "-I", 1, None },
+                                        { "-MQ", 1, Sha1 },
+                                        { "-Xanalyzer", 1, Sha1 },
+                                        { "-Xarch_device", 1, Sha1 },
+                                        { "-Xarch_host", 1, Sha1 },
+                                        { "-Xassembler", 1, Sha1 },
+                                        { "-Xclang", 1, Sha1 },
+                                        { "-Xclangas", 1, Sha1 },
+                                        { "-Xcuda-fatbinary", 1, Sha1 },
+                                        { "-Xcuda-ptxas", 1, Sha1 },
+                                        { "-Xlinker", 1, Sha1 | SkipPreprocess },
+                                        { "-Xopenmp-target", 1, Sha1 },
+                                        { "-Xpreprocessor", 1, Sha1 },
+                                        { "-alias_list", 1, None },
+                                        { "-allowable_client", 1, Sha1 },
+                                        { "-arch", 1, Sha1 },
+                                        { "-arch_only", 1, Sha1 },
+                                        { "-arcmt-migrate-report-output", 1, None },
+                                        { "-aux-info", 1, None },
+                                        { "-bundle_loader", 1, None },
+                                        { "-c", 0, Sha1 | SkipPreprocess },
+                                        { "-client_name", 1, Sha1 },
+                                        { "-compatibility_version", 1, Sha1 },
+                                        { "-current_version", 1, Sha1 },
+                                        { "-cxx-isystem", 1, None },
+                                        { "-darwin-target-variant", 1, Sha1 },
+                                        { "-darwin-target-variant-triple", 1, Sha1 },
+                                        { "-dependency-dot", 1, None },
+                                        { "-dependency-file", 1, None },
+                                        { "-dumpbase", 1, None },
+                                        { "-dumpbase-ext", 1, Sha1 },
+                                        { "-dumpdir", 1, None },
+                                        { "-dylib_file", 1, None },
+                                        { "-dylinker_install_name", 1, None },
+                                        { "-exported_symbols_list", 1, None },
+                                        { "-filelist", 1, None },
+                                        { "-fmodule-implementation-of", 1, Sha1 },
+                                        { "-fmodule-name", 1, Sha1 },
+                                        { "-fmodules-user-build-path", 1, None },
+                                        { "-fnew-alignment", 1, Sha1 },
+                                        { "-force_load", 1, None },
+                                        { "-fprofile-arcs", 0, Sha1 | SkipPreprocess },
+                                        { "-framework", 1, Sha1 | SkipPreprocess },
+                                        { "-frewrite-map-file", 1, None },
+                                        { "-ftest-coverage", 0, Sha1 | SkipPreprocess },
+                                        { "-ftrapv-handler", 1, Sha1 },
+                                        { "-gcc-toolchain", 1, None },
+                                        { "-idirafter", 1, None },
+                                        { "-iframework", 1, None },
+                                        { "-iframeworkwithsysroot", 1, None },
+                                        { "-imacros", 1, None },
+                                        { "-image_base", 1, Sha1 },
+                                        { "-imultiarch", 1, None },
+                                        { "-imultilib", 1, None },
+                                        { "-include", 1, None },
+                                        { "-include-pch", 1, None },
+                                        { "-index-store-path", 1, None },
+                                        { "-init", 1, Sha1 },
+                                        { "-install_name", 1, Sha1 },
+                                        { "-iprefix", 1, None },
+                                        { "-iquote", 1, None },
+                                        { "-isysroot", 1, None },
+                                        { "-isystem", 1, None },
+                                        { "-isystem-after", 1, None },
+                                        { "-iwithprefix", 1, None },
+                                        { "-iwithprefixbefore", 1, None },
+                                        { "-iwithsysroot", 1, None },
+                                        { "-lazy_framework", 1, Sha1 },
+                                        { "-lazy_library", 1, Sha1 },
+                                        { "-meabi", 1, Sha1 },
+                                        { "-mllvm", 1, Sha1 },
+                                        { "-mmlir", 1, Sha1 },
+                                        { "-module-dependency-dir", 1, None },
+                                        { "-mthread-model", 1, Sha1 },
+                                        { "-multiply_defined", 1, Sha1 },
+                                        { "-multiply_defined_unused", 1, Sha1 },
+                                        { "-no-pie", 0, Sha1 | SkipPreprocess },
+                                        { "-nodefaultlibs", 0, Sha1 | SkipPreprocess },
+                                        { "-nostartfiles", 0, Sha1 | SkipPreprocess },
+                                        { "-nostdlib", 0, Sha1 | SkipPreprocess },
+                                        { "-o", 1, Sha1 | SkipPreprocess },
+                                        { "-pagezero_size", 1, Sha1 },
+                                        { "-pie", 0, Sha1 | SkipPreprocess },
+                                        { "-rdynamic", 0, Sha1 | SkipPreprocess },
+                                        { "-read_only_relocs", 1, Sha1 },
+                                        { "-reexport_framework", 1, Sha1 },
+                                        { "-resource-dir", 1, None },
+                                        { "-rpath", 1, Sha1 },
+                                        { "-s", 0, Sha1 | SkipPreprocess },
+                                        { "-save-temps", 0, Sha1 | SkipPreprocess },
+                                        { "-sectalign", 3, Sha1 },
+                                        { "-sectcreate", 3, Sha1 },
+                                        { "-sectobjectsymbols", 2, Sha1 },
+                                        { "-sectorder", 3, Sha1 },
+                                        { "-seg1addr", 1, Sha1 },
+                                        { "-seg_addr_table", 1, Sha1 },
+                                        { "-seg_addr_table_filename", 1, Sha1 },
+                                        { "-segaddr", 2, Sha1 },
+                                        { "-segcreate", 3, Sha1 },
+                                        { "-segprot", 3, Sha1 },
+                                        { "-segs_read_only_addr", 1, Sha1 },
+                                        { "-segs_read_write_addr", 1, Sha1 },
+                                        { "-serialize-diagnostics", 1, None },
+                                        { "-shared", 0, Sha1 | SkipPreprocess },
+                                        { "-shared-libgcc", 0, Sha1 | SkipPreprocess },
+                                        { "-static", 0, Sha1 | SkipPreprocess },
+                                        { "-static-libgcc", 0, Sha1 | SkipPreprocess },
+                                        { "-static-libstdc++", 0, Sha1 | SkipPreprocess },
+                                        { "-sub_library", 1, Sha1 },
+                                        { "-sub_umbrella", 1, Sha1 },
+                                        { "-target", 1, Sha1 },
+                                        { "-u", 1, Sha1 | SkipPreprocess },
+                                        { "-umbrella", 1, Sha1 },
+                                        { "-undefined", 1, Sha1 },
+                                        { "-unexported_symbols_list", 1, None },
+                                        { "-weak_framework", 1, Sha1 },
+                                        { "-weak_library", 1, Sha1 },
+                                        { "-weak_reference_mismatches", 1, Sha1 },
+                                        { "-working-directory", 1, None },
+                                        { "-wrapper", 1, None },
+                                        { "-x", 1, Sha1 },
+                                        { "-z", 1, Sha1 } };
 
-// { "-Xarch_<arg1> <arg2>", 1, true },
-// { "-Xarch_<arg1> <arg2>", 1, true },
-// { // -Xopenmp-target=<triple> 1, true },
-// { // -Xopenmp-target=<triple>, 1, true },
+static inline const OptionArg *lookupOption(const std::string &arg)
+{
+    constexpr size_t count = sizeof(argOptions) / sizeof(argOptions[0]);
+    const OptionArg key { arg.c_str(), 0, 0 };
+    const OptionArg *end = argOptions + count;
+    const OptionArg *it = std::lower_bound(argOptions, end, key);
+    if (it != end && !strcmp(it->name, arg.c_str())) {
+        return it;
+    }
+    return nullptr;
+}
 
 static inline size_t hasArg(const std::string &arg, bool &sha1)
 {
-    const OptionArg a { arg.c_str(), 1, false };
-    const size_t idx = std::lower_bound(argOptions, argOptions + (sizeof(argOptions) / sizeof(argOptions[0])), a) - argOptions;
-    if (idx < sizeof(argOptions) / sizeof(argOptions[0])) {
-        if (!strcmp(arg.c_str(), argOptions[idx].name)) {
-            sha1 = argOptions[idx].sha1;
-            return argOptions[idx].args;
-        }
+    if (const OptionArg *o = lookupOption(arg)) {
+        sha1 = o->flags & Sha1;
+        return o->args;
     }
     return 0;
 }
@@ -780,6 +808,47 @@ const char *CompilerArgs::localReasonToString(LocalReason reason)
     }
     assert(0);
     return nullptr;
+}
+
+static bool skipForPreprocessPrefix(const std::string &arg)
+{
+    if (!strncmp(arg.c_str(), "-Wl,", 4))
+        return true;
+    if (!strncmp(arg.c_str(), "-fuse-ld=", 9))
+        return true;
+    if (!strncmp(arg.c_str(), "-save-temps=", 12))
+        return true;
+    if (arg.size() > 2 && arg[0] == '-' && (arg[1] == 'l' || arg[1] == 'L'))
+        return true;
+    return false;
+}
+
+std::string CompilerArgs::preprocessCommandLine(const std::string &compiler) const
+{
+    std::string ret = compiler;
+    for (size_t i = 1; i < commandLine.size(); ++i) {
+        const std::string &arg = commandLine[i];
+        if (const OptionArg *o = lookupOption(arg); o && (o->flags & SkipPreprocess)) {
+            i += std::min(o->args, commandLine.size() - i - 1);
+            continue;
+        }
+        if (skipForPreprocessPrefix(arg)) {
+            continue;
+        }
+        ret += " '";
+        ret += arg;
+        ret += '\'';
+    }
+    ret += " '-E'";
+    if (Client::data().builderCompiler.find("clang") != std::string::npos) {
+        ret += " '-frewrite-includes'";
+    } else {
+        ret += " '-fdirectives-only'";
+    }
+    if (!Config::discardComments) {
+        ret += " '-C'";
+    }
+    return ret;
 }
 
 std::string CompilerArgs::output() const

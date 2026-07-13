@@ -43,30 +43,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler, 
     ret->mThread = std::thread([ptr, args, compiler, started, daemonSocket, select] {
         std::string out, err;
         ptr->stdOut.reserve(1024 * 1024);
-        std::string commandLine = compiler;
-        const size_t count = args->commandLine.size();
-        for (size_t i = 1; i < count; ++i) {
-            const std::string arg = args->commandLine.at(i);
-            if (arg == "-o" && args->commandLine.size() > i + 1) {
-                ++i;
-                continue;
-            } else if (arg == "-c") {
-                continue;
-            }
-
-            commandLine += " '";
-            commandLine += args->commandLine.at(i);
-            commandLine += '\'';
-        }
-        commandLine += " '-E'";
-        if (Client::data().builderCompiler.find("clang") != std::string::npos) {
-            commandLine += " '-frewrite-includes'";
-        } else {
-            commandLine += " '-fdirectives-only'";
-        }
-        if (!Config::discardComments) {
-            commandLine += " '-C'";
-        }
+        std::string commandLine = args->preprocessCommandLine(compiler);
 
         DEBUG("Acquiring preprocess slot: %s", commandLine.c_str());
 

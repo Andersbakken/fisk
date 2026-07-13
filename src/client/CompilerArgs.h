@@ -93,6 +93,7 @@ struct CompilerArgs
     }
 
     std::string output() const;
+    std::string preprocessCommandLine(const std::string &compiler) const;
 };
 
 inline CompilerArgs::Flag CompilerArgs::preprocessedFlag(Flag flag)
