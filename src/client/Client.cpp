@@ -729,7 +729,6 @@ void Client::runLocal(const std::string &reason)
             fprintf(stderr, "Trying execv(%s) again in %zu ms errno: %d %s\n", data.compiler.c_str(), micros / 1000, errno, strerror(errno));
             usleep(75000);
         }
-        fprintf(stderr, "fisk: Failed to exec %s (%d %s)\n", data.compiler.c_str(), errno, strerror(errno));
     };
 
     pid_t pid;
@@ -832,20 +831,20 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
             compiler + " -v",
             std::string(),
             [&out](const char *bytes, size_t n) {
-            out.append(bytes, n);
-        },
+                out.append(bytes, n);
+            },
             [&err](const char *bytes, size_t n) {
-            err.append(bytes, n);
-        });
+                err.append(bytes, n);
+            });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
-            return std::string();
+            out.clear();
+        } else {
+            out += err;
+            filter(out);
+            VERBOSE("Signature created from %s", out.c_str());
         }
-
-        out += err;
-        filter(out);
-        VERBOSE("Signature created from %s", out.c_str());
         return out;
     };
     const std::string cache = Config::envCache();

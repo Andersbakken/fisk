@@ -2,7 +2,30 @@
 #include "Log.h"
 #include <cstdint>
 #include <cstring>
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wextra-semi"
+#pragma clang diagnostic ignored "-Wshadow-field-in-constructor"
+#pragma clang diagnostic ignored "-Wshadow-field"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wcast-qual"
+#pragma clang diagnostic ignored "-Wcast-align"
+#pragma clang diagnostic ignored "-Wnrvo"
+#pragma clang diagnostic ignored "-Wweak-vtables"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wcast-align"
+#endif
 #include <elfio/elfio.hpp>
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #include <string>
 #include <vector>
 #include <zlib.h>
@@ -258,6 +281,7 @@ struct AttrLocation
 static bool findAttrLocations(const uint8_t *infoData, size_t infoSize, const uint8_t *abbrevData, size_t abbrevSize,
                               std::vector<AttrLocation> &locations)
 {
+    (void)infoSize;
     const uint8_t *p = infoData;
 
     // Read CU header
@@ -538,9 +562,9 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
                 memcpy(&origAlign, debugStr->get_data() + 16, 8);
             }
             auto compressed = compressSection(strData, origAlign);
-            debugStr->set_data(reinterpret_cast<const char *>(compressed.data()), compressed.size());
+            debugStr->set_data(reinterpret_cast<const char *>(compressed.data()), static_cast<ELFIO::Elf_Word>(compressed.size()));
         } else {
-            debugStr->set_data(reinterpret_cast<const char *>(strData.data()), strData.size());
+            debugStr->set_data(reinterpret_cast<const char *>(strData.data()), static_cast<ELFIO::Elf_Word>(strData.size()));
         }
     } else {
         // --- Direct offset approach for linked binaries or non-relocated .o files ---
@@ -571,7 +595,7 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
             newDirOffset = newStrOffset + appendData.size();
             appendData += newDir + '\0';
         }
-        debugStr->append_data(appendData.c_str(), appendData.size());
+        debugStr->append_data(appendData.c_str(), static_cast<ELFIO::Elf_Word>(appendData.size()));
 
         // Patch .debug_info offsets directly
         std::vector<uint8_t> infoDataCopy(debugInfo->get_data(), debugInfo->get_data() + debugInfo->get_size());
@@ -596,7 +620,7 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
         }
 
         if (patched) {
-            debugInfo->set_data(reinterpret_cast<const char *>(infoDataCopy.data()), infoDataCopy.size());
+            debugInfo->set_data(reinterpret_cast<const char *>(infoDataCopy.data()), static_cast<ELFIO::Elf_Word>(infoDataCopy.size()));
         }
     }
 
