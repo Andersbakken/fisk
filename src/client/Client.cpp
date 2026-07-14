@@ -707,13 +707,14 @@ static std::string argsAsString()
 void Client::runLocal(const std::string &reason)
 {
     const Client::Data &data = Client::data();
+    DEBUG("Running local because %s\n%s", reason.c_str(), argsAsString().c_str());
 
     enum
     {
         Increment = 75000
     };
 
-    auto run = [&reason, &data]() {
+    auto run = [&data]() {
         char **argvCopy = new char *[data.argc + 1];
         argvCopy[0] = strdup(data.compiler.c_str());
         for (int i = 1; i < data.argc; ++i) {
@@ -722,7 +723,6 @@ void Client::runLocal(const std::string &reason)
         argvCopy[data.argc] = nullptr;
         size_t micros = 0;
         while (true) {
-            fprintf(stderr, "Running local: %s because %s\n", argsAsString().c_str(), reason.c_str());
             ::execv(data.compiler.c_str(), argvCopy);
             if (micros < Increment * 10)
                 micros += Increment;
