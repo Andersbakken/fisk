@@ -3,6 +3,7 @@ Version: 1.0-40
 Architecture: all
 Priority: optional
 Section: devel
-Depends: nodejs, npm
+Depends: nodejs, npm, git, g++, make, python3-setuptools
+Conflicts: fisk-client-test
 Maintainer: Anders Bakken <agbakken@gmail.com>
 Description: Fisk client package

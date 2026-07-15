@@ -1,42 +1,42 @@
 #!/usr/bin/env node
 
-const child_process = require('child_process');
+const child_process = require("child_process");
 const fs = require("fs-extra");
 const http = require("http");
-const path = require('path');
-const option = require('@jhanssen/options')({ prefix: 'fisk/scheduler',
-                                              applicationPath: false,
-                                              additionalFiles: [ "fisk/scheduler.conf.override" ] });
+const path = require("path");
+const option = require("@jhanssen/options")({
+    prefix: "fisk/scheduler",
+    applicationPath: false,
+    additionalFiles: ["fisk/scheduler.conf.override"]
+});
 
 const port = option.int("port", 8097);
 const root = option("root", "/var/fisk");
 
 try {
     fs.mkdirpSync(root);
-} catch (err) {
-}
+} catch (err) {}
 
 process.on("unhandledRejection", (reason, p) => {
     console.error("Unhandled Rejection at: Promise", p, "reason:", reason.stack);
 });
 
-process.on("unhandledException", exception => {
+process.on("unhandledException", (exception) => {
     console.error("Unhandled exception at: ", exception);
 });
 
-function npmTag()
-{
-    return option('npm-tag') || 'latest';
+function npmTag() {
+    return option("npm-tag") || "latest";
 }
 
-function npm(args, options)
-{
+function npm(args, options) {
     return new Promise((resolve, reject) => {
-        let str = `Running /usr/bin/env npm ${args}`;
-        if (options && options.cwd)
+        let str = `Running npm ${args}`;
+        if (options && options.cwd) {
             str += ` in ${options.cwd}`;
+        }
         console.log(str);
-        let proc = child_process.exec(`/usr/bin/env npm ${args}`, options, (error, stdout, stderr) => {
+        let proc = child_process.exec(`npm ${args}`, options, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
                 return;
@@ -61,8 +61,7 @@ let killed = false;
 let lastStart = 0;
 let checkForUpdateActive = false;
 
-function startFisk()
-{
+function startFisk() {
     if (!fisk) {
         if (!checkForUpdateActive) {
             checkForUpdate();
@@ -74,12 +73,12 @@ function startFisk()
         };
 
         lastStart = Date.now();
-        fisk = child_process.fork("./fisk-scheduler.js", [ "--max_old_space_size=8192" ], opts);
-        fisk.on("error", error => {
+        fisk = child_process.fork("./fisk-scheduler.js", ["--max_old_space_size=8192"], opts);
+        fisk.on("error", (error) => {
             console.log("Got error from fork", error, opts.cwd);
         });
 
-        fisk.on("exit", args => {
+        fisk.on("exit", (args) => {
             console.log("fisk exited: ", args);
             if (!killed) {
                 fisk = undefined;
@@ -88,7 +87,9 @@ function startFisk()
                     setTimeout(startFisk, 1000);
                 } else {
                     console.log("something wrong with the fisk install, lets remove it");
-                    let ret = child_process.exec(`rm -rf ${path.join(root, "prod")}`, () => setTimeout(checkForUpdate, 1000));
+                    let ret = child_process.exec(`rm -rf ${path.join(root, "prod")}`, () =>
+                        setTimeout(checkForUpdate, 1000)
+                    );
                 }
             } else {
                 killed = false;
@@ -101,8 +102,7 @@ function startFisk()
     }
 }
 
-function needsUpdate()
-{
+function needsUpdate() {
     return new Promise((resolve, reject) => {
         const packageDotJson = path.join(root, "/prod/node_modules/@andersbakken/fisk/package.json");
         if (!fs.existsSync(packageDotJson)) {
@@ -124,74 +124,80 @@ function needsUpdate()
             return;
         }
         const tag = npmTag();
-        return npm("dist-tag ls @andersbakken/fisk").then(output => {
-            try {
-                const wanted = output[0].split('\n').filter(line => { return line.lastIndexOf(tag + ": ", 0) == 0; }).map(line => /.*: (.*)/.exec(line)[1])[0];
-                console.log(`We have ${currentVersion}, need ${wanted} for tag: ${tag}`);
-                resolve(wanted != currentVersion);
-            } catch (err) {
-                console.log("got an error parsing output", output[0], err);
+
+        // Check if tag is a version number (starts with digit or contains dots like "4.0.36")
+        // If so, compare directly instead of looking up in dist-tag
+        if (/^[\d.]/.test(tag)) {
+            console.log(`We have ${currentVersion}, want ${tag} (version number)`);
+            resolve(tag !== currentVersion);
+            return;
+        }
+
+        return npm("dist-tag ls @andersbakken/fisk")
+            .then((output) => {
+                try {
+                    const wanted = output[0]
+                        .split("\n")
+                        .filter((line) => {
+                            return line.lastIndexOf(tag + ": ", 0) == 0;
+                        })
+                        .map((line) => /.*: (.*)/.exec(line)[1])[0];
+                    console.log(`We have ${currentVersion}, need ${wanted} for tag: ${tag}`);
+                    resolve(wanted != currentVersion);
+                } catch (err) {
+                    console.log("got an error parsing output", output[0], err);
+                    resolve(true);
+                }
+            })
+            .catch((error) => {
+                console.log("Got an error getting dist-tag", error);
                 resolve(true);
-            }
-        }).catch(error => {
-            console.log("Got an error getting dist-tag", error);
-            resolve(true);
-        });
+            });
     });
 }
 
-function updateFisk()
-{
+async function updateFisk() {
+    try {
+        fs.mkdirpSync(path.join(root, "/prod"));
+    } catch (err) {}
+    try {
+        fs.mkdirpSync(path.join(root, "/stage"));
+    } catch (err) {}
+
+    const update = await needsUpdate();
+    console.log("needsUpdate says", update);
+    if (!update) {
+        // No new version available, but if the scheduler file is missing
+        // something's wrong with the install -- trigger a restart anyway.
+        const schedulerFile = path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js");
+        return !fs.existsSync(schedulerFile);
+    }
+
+    await npm("cache clear --force");
+    await npm("init --yes", { cwd: path.join(root, "stage") });
+    const tag = npmTag();
+    await npm(`install --save --unsafe-perm @andersbakken/fisk@${tag} --node-gyp-version=8.4.1`, {
+        cwd: path.join(root, "stage")
+    });
+    return true;
+}
+
+function copyToProd() {
     return new Promise((resolve, reject) => {
-        try {
-            fs.mkdirpSync(path.join(root, "/prod"));
-        } catch (err) {
-        }
-        try {
-            fs.mkdirpSync(path.join(root, "/stage"));
-        } catch (err) {
-        }
-
-        needsUpdate().then(update => {
-            console.log("needsUpdate says", update);
-            if (!update) {
-                throw !fs.existsSync(path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/fisk-scheduler.js"));
-            } else {
-                return npm("cache clear --force");
+        child_process.exec(
+            `rm -rf ${path.join(root, "prod")} && mv ${path.join(root, "stage")} ${path.join(root, "prod")}`,
+            (error, stdout, stderr) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
             }
-        }).then(() => {
-            return npm("init --yes", { cwd: path.join(root, "stage") });
-        }).then(() => {
-            const tag = npmTag();
-            return npm(`install --save --unsafe-perm @andersbakken/fisk@${tag}`, { cwd: path.join(root, "stage") });
-        }).then(() => {
-            resolve(true);
-        }).catch(result => {
-            if (typeof result !== 'boolean') {
-                console.error(`Something failed ${result}`);
-                reject(result);
-            } else {
-                resolve(result);
-            }
-        });
+        );
     });
 }
 
-function copyToProd()
-{
-    return new Promise((resolve, reject) => {
-        child_process.exec(`rm -rf ${path.join(root, "prod")} && mv ${path.join(root, "stage")} ${path.join(root, "prod")}`, (error, stdout, stderr) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
-
-function killFisk(state)
-{
+function killFisk(state) {
     return new Promise((resolve, reject) => {
         if (fisk) {
             killed = true;
@@ -210,8 +216,7 @@ function killFisk(state)
     });
 }
 
-function checkForConnection()
-{
+function checkForConnection() {
     return new Promise((resolve, reject) => {
         if (!fisk) {
             resolve("not running");
@@ -224,10 +229,10 @@ function checkForConnection()
             method: "HEAD",
             timeout: 15000
         };
-        const req = http.request(options, res => {
+        const req = http.request(options, (res) => {
             resolve("connected");
         });
-        req.on("error", error => {
+        req.on("error", (error) => {
             console.error("Got error trying to connect to webserver", error);
             resolve("not connected");
         });
@@ -236,66 +241,55 @@ function checkForConnection()
 }
 
 let checkForUpdateTimer;
-function checkForUpdate()
-{
+async function checkForUpdate() {
     checkForUpdateActive = true;
     if (checkForUpdateTimer) {
         clearTimeout(checkForUpdateTimer);
         checkForUpdateTimer = undefined;
     }
-    function final() // node 8 doesn't have finally
-    {
+
+    try {
+        console.log("checking if fisk needs to be updated", typeof fisk);
+        const updated = await updateFisk();
+        console.log("needs update is", updated);
+
+        let state;
+        if (updated) {
+            console.log("fisk is updated, stopping fisk");
+            state = "updated";
+        } else {
+            console.log("checking for connection");
+            state = await checkForConnection();
+        }
+
+        if (state === "connected" || state === "not running") {
+            console.log("Nothing to update");
+        } else {
+            console.log("killing fisk");
+            await killFisk(state);
+            console.log("fisk stopped, copying to prod");
+            if (state === "updated") {
+                await copyToProd();
+            }
+            console.log("Restarting fisk");
+        }
+    } catch (error) {
+        console.error(`Got error ${error}`);
+    } finally {
         console.log("do I have fisk?", typeof fisk);
-        if (!fisk)
+        if (!fisk) {
             startFisk();
+        }
         checkForUpdateActive = false;
         checkForUpdateTimer = setTimeout(checkForUpdate, option.int("check-interval", 5 * 60000));
     }
-    console.log("checking if fisk needs to be updated", typeof fisk);
-    updateFisk().then(updated => {
-        console.log("needs update is", updated);
-        if (updated) {
-            console.log("fisk is updated, stopping fisk");
-            return "updated";
-        } else {
-            console.log("checking for connection");
-            return checkForConnection();
-        }
-    }).then(state => {
-        switch (state) {
-        case "updated":
-        case "not connected":
-            break;
-        case "connected":
-        case "not running":
-            throw false;
-        }
-        console.log("killing fisk");
-        return killFisk(state);
-    }).then(state => {
-        console.log("fisk stopped, copying to prod");
-        if (state == "updated")
-            return copyToProd();
-        return undefined;
-    }).then(() => {
-        console.log("Restarting fisk");
-        final();
-    }).catch(error => {
-        console.log("got here", error);
-        if (!error) {
-            console.log("Nothing to update");
-        } else {
-            console.error(`Got error ${error}`);
-        }
-        final();
-    });
 }
-
 
 process.on("SIGHUP", () => {
     console.log("got SIGHUP", checkForUpdateActive);
-    if (!checkForUpdateActive)
+    if (!checkForUpdateActive) {
         checkForUpdate();
+    }
 });
 
 checkForUpdate();

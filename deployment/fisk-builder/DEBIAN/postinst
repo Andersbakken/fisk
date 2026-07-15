@@ -1,7 +1,23 @@
 #!/bin/bash
 
+# Download and install Node.js v16.20.2 for this package
+cd /var/fisk/builder
+echo "Removing old Node.js installation..."
+rm -rf node
+echo "Downloading Node.js v16.20.2..."
+curl -fsSL https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-x64.tar.xz -o node.tar.xz
+echo "Extracting Node.js..."
+tar xf node.tar.xz
+mv node-v16.20.2-linux-x64 node
+rm node.tar.xz
+echo "Node.js v16.20.2 installed to /var/fisk/builder/node"
+
+# Use the bundled Node.js for npm install
+export PATH="/var/fisk/builder/node/bin:$PATH"
+
 mkdir -p /var/fisk/builder/data
-sudo -H npm install --unsafe-perm -g @andersbakken/fisk
+npm install --unsafe-perm --global @andersbakken/fisk
+
+# Enable and start the service
 sudo systemctl enable fisk-builder.service
 sudo service fisk-builder start
-

@@ -1,11 +1,22 @@
 cd /var/fisk/daemon
-sudo -H npm install --unsafe-perm @andersbakken/fisk
+sudo -H npm install --unsafe-perm @andersbakken/fisk@latest
+ln -s /var/fisk/daemon/node_modules/@andersbakken/fisk/monitor/fisk-monitor.js /usr/local/bin/fisk-monitor
 mv /usr/local/bin/fiskc.linux /usr/local/bin/fiskc
 rm /usr/local/bin/fiskc.osx
 if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
-   sudo systemctl enable fisk-daemon.service
-   sudo service fisk-daemon start
+   systemctl enable fisk-daemon.service
+   service fisk-daemon start
 fi
 
 mkdir -p /var/fisk/client/compilers
 chmod 777 /var/fisk/client/compilers
+
+if [ ! -x "/usr/local/bin/fisk-monitor" ]; then
+    MONITOR_DIR=/usr/local/fisk/monitor
+    LINK_SRC="$MONITOR_DIR/node_modules/@andersbakken/fisk/monitor/fisk-monitor.js"
+    mkdir $MONITOR_DIR
+    cd $MONITOR_DIR
+    npm init -y
+    npm install --save @andersbakken/fisk@latest
+    ln -s "$LINK_SRC" /usr/local/bin/fisk-monitor
+fi
