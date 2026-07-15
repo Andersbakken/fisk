@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
+import { createReadStream, promises as fsPromises } from "fs";
 import { execFile } from "child_process";
-import { promises as fsPromises } from "fs";
 import { promisify } from "util";
 import path from "path";
 
@@ -21,30 +21,20 @@ export interface CompilerInfo {
     version: CompilerVersion;
 }
 
-// Prefixes removed from a compiler's `-v` output before hashing / parsing.
-// Must match filter() in src/client/Client.cpp (lines 234-257).
-const FILTER_PREFIXES: readonly string[] = [
-    "COLLECT_",
-    "InstalledDir: ",
-    "Found candidate GCC installation: ",
-    "Selected GCC installation: "
-];
-
-// Remove any line that starts with one of the filter prefixes.
-// Equivalent to the C++ filter() loop that removes needle from line-starts only.
-function filterOutput(output: string): string {
-    let result = output;
-    for (const needle of FILTER_PREFIXES) {
-        const lines = result.split("\n");
-        const kept: string[] = [];
-        for (const line of lines) {
-            if (!line.startsWith(needle)) {
-                kept.push(line);
-            }
-        }
-        result = kept.join("\n");
-    }
-    return result;
+function getFileSha1(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const hash = createHash("sha1");
+        const stream = createReadStream(filePath);
+        stream.on("data", (chunk: Buffer): void => {
+            hash.update(chunk);
+        });
+        stream.on("end", (): void => {
+            resolve(hash.digest("hex"));
+        });
+        stream.on("error", (err: Error): void => {
+            reject(err);
+        });
+    });
 }
 
 // Emulate sscanf cascade "%d.%d.%d" -> "%d.%d" -> "%d".
@@ -69,7 +59,7 @@ function parseVersion(suffix: string): CompilerVersion {
 }
 
 // Byte-for-byte port of createCompilerInfo() in src/client/Client.cpp (lines 290-341).
-export function createCompilerInfo(exec: string, versionInfo: string): CompilerInfo {
+export async function createCompilerInfo(exec: string, versionInfo: string): Promise<CompilerInfo> {
     let type: CompilerType = "unknown";
     let input = "";
     let version: CompilerVersion = { major: 0, minor: 0, patch: 0 };
@@ -77,17 +67,17 @@ export function createCompilerInfo(exec: string, versionInfo: string): CompilerI
 
     const lines = versionInfo.split("\n");
     for (const line of lines) {
-        if (line.startsWith("gcc version ")) {
-            type = "gcc";
-            const suffix = line.substring(12);
-            input += suffix;
-            version = parseVersion(suffix);
-            foundVersion = true;
-        } else if (line.startsWith("clang version ")) {
-            type = "clang";
-            const suffix = line.substring(14);
-            input += suffix;
-            version = parseVersion(suffix);
+        const versionMatch = /(clang|gcc) version *?(\d+\.\d+\.\d+).*?/.exec(line);
+        if (versionMatch) {
+            switch (versionMatch[1]) {
+                case "clang":
+                    type = "clang";
+                    break;
+                case "gcc":
+                    type = "gcc";
+                    break;
+            }
+            version = parseVersion(versionMatch[2]);
             foundVersion = true;
         } else if (line.startsWith("Target: ")) {
             const suffix = line.substring(8);
@@ -104,7 +94,7 @@ export function createCompilerInfo(exec: string, versionInfo: string): CompilerI
         }
     }
 
-    const hash = createHash("sha1").update(input).digest("hex").toUpperCase();
+    const hash = await getFileSha1(exec);
     return { hash, input, type, version };
 }
 
@@ -157,7 +147,6 @@ export class CompilerInfoCache {
             maxBuffer: 4 * 1024 * 1024
         });
         const combined = `${stdout}${stderr}`;
-        const filtered = filterOutput(combined);
-        return createCompilerInfo(absPath, filtered);
+        return createCompilerInfo(absPath, combined);
     }
 }
