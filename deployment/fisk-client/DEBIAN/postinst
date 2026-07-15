@@ -4,8 +4,14 @@ ln -s /var/fisk/daemon/node_modules/@andersbakken/fisk/monitor/fisk-monitor.js /
 mv /usr/local/bin/fiskc.linux /usr/local/bin/fiskc
 rm /usr/local/bin/fiskc.osx
 if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
+   systemctl daemon-reload
+   systemctl enable fisk-daemon.socket
    systemctl enable fisk-daemon.service
-   service fisk-daemon start
+   # Start (or restart) the socket first so the listening fd survives
+   # daemon upgrades. Existing clients (including bind-mounted docker
+   # containers) keep working across restarts of fisk-daemon.service.
+   systemctl restart fisk-daemon.socket
+   systemctl restart fisk-daemon.service
 fi
 
 mkdir -p /var/fisk/client/compilers

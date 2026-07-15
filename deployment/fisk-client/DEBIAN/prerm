@@ -1,8 +1,12 @@
 #!/bin/bash
 
 if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
-    sudo service fisk-daemon stop
-    sudo systemctl disable fisk-daemon.service
+    if [ "$1" != "upgrade" ]; then
+        sudo systemctl stop fisk-daemon.service
+        sudo systemctl stop fisk-daemon.socket
+        sudo systemctl disable fisk-daemon.service
+        sudo systemctl disable fisk-daemon.socket
+    fi
 fi
 if [ "$1" != "upgrade" ]; then
     rm -rf /var/fisk/client/compilers

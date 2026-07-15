@@ -1,5 +1,7 @@
 [Unit]
 Description=Fisk daemon, the distributed compile system
+Requires=fisk-daemon.socket
+After=fisk-daemon.socket network.target
 Wants=network.target
 
 [Service]
@@ -9,5 +11,3 @@ ExecStart=/var/fisk/daemon/run-fisk-daemon.sh
 
 [Install]
 WantedBy=multi-user.target
-
-
