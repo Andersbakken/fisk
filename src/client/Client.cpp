@@ -853,159 +853,6 @@ const char *Client::compilerTypeToString(CompilerType type)
     return "";
 }
 
-enum
-{
-    EnvironmentCacheVersion = 4
-};
-
-Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
-{
-    struct stat st;
-    if (::stat(compiler.c_str(), &st)) {
-        return {};
-    }
-
-    auto readSignature = [&compiler]() -> std::string {
-        std::string out, err;
-        TinyProcessLib::Process proc(
-            compiler + " -v",
-            std::string(),
-            [&out](const char *bytes, size_t n) {
-            out.append(bytes, n);
-        },
-            [&err](const char *bytes, size_t n) {
-            err.append(bytes, n);
-        });
-        const int exit_status = proc.get_exit_status();
-        if (exit_status) {
-            ERROR("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
-            out.clear();
-        } else {
-            out += err;
-            filter(out);
-            VERBOSE("Signature created from %s", out.c_str());
-        }
-        return out;
-    };
-    const std::string cache = Config::envCache();
-    if (cache.empty()) {
-        return createCompilerInfo(compiler, readSignature());
-    }
-
-    std::string key = Client::format("%s:%llu", compiler.c_str(), static_cast<unsigned long long>(st.st_mtime));
-    nlohmann::json json = nlohmann::json::object();
-    int fd;
-    if ((fd = open(cache.c_str(), O_CLOEXEC | O_RDONLY)) != -1) {
-        if (flock(fd, LOCK_SH)) {
-            ERROR("Failed to flock shared %s (%d %s)", cache.c_str(), errno, strerror(errno));
-            ::close(fd);
-        } else if (fstat(fd, &st)) {
-            ERROR("Failed to fstat %s (%d %s)", cache.c_str(), errno, strerror(errno));
-            flock(fd, LOCK_UN);
-            ::close(fd);
-        } else {
-            const size_t size = static_cast<size_t>(st.st_size);
-            if (size) {
-                std::string contents(size, ' ');
-                const size_t read = ::read(fd, &contents[0], size);
-                flock(fd, LOCK_UN);
-                ::close(fd);
-                if (read != static_cast<size_t>(size)) {
-                    ERROR("Failed to read from file: %s (%d %s)", cache.c_str(), errno, strerror(errno));
-                } else {
-                    nlohmann::json obj = nlohmann::json::parse(contents, nullptr, false, true);
-                    if (obj.is_discarded()) {
-                        ERROR("Failed to parse json from %s", cache.c_str());
-                    }
-                    if (obj.is_object()) {
-                        auto versionIt = obj.find("version");
-                        const int versionVal = (versionIt != obj.end() && versionIt->is_number()) ? versionIt->get<int>() : 0;
-                        if (versionVal != EnvironmentCacheVersion) {
-                            json = nlohmann::json::object();
-                            json["version"] = EnvironmentCacheVersion;
-                        } else {
-                            auto valueIt = obj.find(key);
-                            if (valueIt != obj.end() && valueIt->is_object()) {
-                                const nlohmann::json &value = *valueIt;
-                                DEBUG("Cache hit for compiler %s", key.c_str());
-                                CompilerInfo cacheHit;
-                                cacheHit.hash = string(value, "hash");
-                                cacheHit.input = string(value, "input");
-                                const std::string type = string(value, "type");
-                                if (type == "clang") {
-                                    cacheHit.type = CompilerType::Clang;
-                                } else if (type == "gcc") {
-                                    cacheHit.type = CompilerType::GCC;
-                                }
-                                auto verIt = value.find("version");
-                                if (verIt != value.end() && verIt->is_object()) {
-                                    cacheHit.version.major = integer(*verIt, "major");
-                                    cacheHit.version.minor = integer(*verIt, "minor");
-                                    cacheHit.version.patch = integer(*verIt, "patch");
-                                }
-                                if (!cacheHit.hash.empty() && cacheHit.type != CompilerType::Unknown) {
-                                    return cacheHit;
-                                }
-                            }
-
-                            json = obj;
-                            for (auto it = json.begin(); it != json.end();) {
-                                const std::string &k = it.key();
-                                if (k.size() > compiler.size() && !strncmp(k.c_str(), compiler.c_str(), compiler.size()) && k[compiler.size()] == ':') {
-                                    it = json.erase(it);
-                                } else {
-                                    ++it;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        DEBUG("Can't open %s for reading (%d %s)", cache.c_str(), errno, strerror(errno));
-    }
-    const CompilerInfo ret = createCompilerInfo(compiler, readSignature());
-    if (!ret.hash.empty()) {
-        nlohmann::json compilerJson = nlohmann::json::object();
-        compilerJson["hash"] = ret.hash;
-        compilerJson["input"] = ret.input;
-        compilerJson["type"] = compilerTypeToString(ret.type);
-        nlohmann::json versionJSON = nlohmann::json::object();
-        versionJSON["major"] = ret.version.major;
-        versionJSON["minor"] = ret.version.minor;
-        versionJSON["patch"] = ret.version.patch;
-        compilerJson["version"] = std::move(versionJSON);
-        json["version"] = EnvironmentCacheVersion;
-        json[key] = std::move(compilerJson);
-
-        std::string dirname;
-        parsePath(cache.c_str(), nullptr, &dirname);
-        recursiveMkdir(dirname);
-        if ((fd = open(cache.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)) != -1) {
-            std::string str = json.dump() + '\n';
-            if (flock(fd, LOCK_EX | LOCK_NB)) {
-                DEBUG("Failed to flock exclusive %s (%d %s)", cache.c_str(), errno, strerror(errno));
-                ::close(fd);
-                return ret;
-            }
-            if (write(fd, str.c_str(), str.size()) != static_cast<ssize_t>(str.size())) {
-                ERROR("Failed to write to file %s - %d %s", cache.c_str(), errno, strerror(errno));
-                unlink(cache.c_str());
-            } else {
-                if (ftruncate(fd, str.size())) {
-                    ERROR("Failed to truncate file %s (%d %s)", cache.c_str(), errno, strerror(errno));
-                }
-            }
-            flock(fd, LOCK_UN);
-            ::close(fd);
-        } else {
-            ERROR("Failed to open %s for writing %d %s", cache.c_str(), errno, strerror(errno));
-        }
-    }
-    return ret;
-}
-
 std::string Client::realpath(const std::string &path)
 {
     char buf[PATH_MAX + 1];
@@ -1395,9 +1242,32 @@ int Client::dumpSha1()
             args[i] = data.argv[i];
         }
 
-        info = Client::compilerInfo(data.resolvedCompiler);
+        struct stat st;
+        if (!::stat(data.resolvedCompiler.c_str(), &st)) {
+            std::string out, err;
+            TinyProcessLib::Process proc(
+                data.resolvedCompiler + " -v",
+                std::string(),
+                [&out](const char *bytes, size_t n) {
+                out.append(bytes, n);
+            },
+                [&err](const char *bytes, size_t n) {
+                err.append(bytes, n);
+            });
+            const int exit_status = proc.get_exit_status();
+            if (exit_status) {
+                ERROR("Failed to run %s -v\n%s\n", data.resolvedCompiler.c_str(), err.c_str());
+            } else {
+                out += err;
+                filter(out);
+                VERBOSE("Signature created from %s", out.c_str());
+                info = createCompilerInfo(data.resolvedCompiler, out);
+            }
+        }
         data.hash = info.hash;
-        data.compilerArgs = CompilerArgs::create(info, std::move(args), &data.localReason);
+        data.compilerArgs = CompilerArgs::create(std::move(args), &data.localReason);
+        if (data.compilerArgs)
+            data.compilerArgs->finalize(info);
     }
     if (!data.compilerArgs) {
         ERROR("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason));

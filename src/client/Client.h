@@ -348,7 +348,6 @@ struct CompilerInfo
     } version;
 };
 
-CompilerInfo compilerInfo(const std::string &compiler);
 bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();

@@ -326,16 +326,6 @@ extern Getter<bool> version;
 extern Getter<bool> dumpSha1;
 extern Getter<std::string> statisticsLog;
 
-inline std::string envCache()
-{
-    std::string ret = cacheDir;
-    if (!ret.empty()) {
-        assert(ret[ret.size() - 1] == '/');
-        ret += "environment_cache.json";
-    }
-    return ret;
-}
-
 extern Getter<size_t> compileSlots;
 extern Getter<size_t> cppSlots;
 extern Getter<std::string> releaseCppSlotMode;

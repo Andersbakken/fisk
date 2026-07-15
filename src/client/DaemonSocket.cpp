@@ -205,6 +205,14 @@ void DaemonSocket::send(const std::string &json)
     DEBUG("DaemonSocket send message: %s", json.c_str());
 }
 
+void DaemonSocket::sendAcquireSlot(const std::string &compiler)
+{
+    nlohmann::json obj = nlohmann::json::object();
+    obj["type"] = "acquireSlot";
+    obj["compiler"] = compiler;
+    send(obj.dump());
+}
+
 bool DaemonSocket::hasCppSlot() const
 {
     std::unique_lock<std::mutex> lock(mMutex);
@@ -306,7 +314,56 @@ size_t DaemonSocket::processMessage(const char *const msg, const size_t len)
 
 void DaemonSocket::processJSON(const std::string &json)
 {
-    fwrite(json.c_str(), 1, json.size(), stdout);
-    fflush(stdout);
-    close();
+    nlohmann::json obj = nlohmann::json::parse(json, nullptr, false);
+    if (obj.is_discarded()) {
+        ERROR("Failed to parse JSON message from daemon: %s", json.c_str());
+        return;
+    }
+
+    const std::string type = obj.value("type", std::string());
+    if (type != "slotAcquired") {
+        fwrite(json.c_str(), 1, json.size(), stdout);
+        fflush(stdout);
+        return;
+    }
+
+    auto ciIt = obj.find("compilerInfo");
+    const bool haveCompilerInfo = (ciIt != obj.end() && ciIt->is_object());
+    if (haveCompilerInfo) {
+        const nlohmann::json &ci = *ciIt;
+        mCompilerInfo.hash = ci.value("hash", std::string());
+        mCompilerInfo.input = ci.value("input", std::string());
+        const std::string t = ci.value("type", std::string("unknown"));
+        if (t == "clang") {
+            mCompilerInfo.type = Client::CompilerType::Clang;
+        } else if (t == "gcc") {
+            mCompilerInfo.type = Client::CompilerType::GCC;
+        } else {
+            mCompilerInfo.type = Client::CompilerType::Unknown;
+        }
+        auto verIt = ci.find("version");
+        if (verIt != ci.end() && verIt->is_object()) {
+            mCompilerInfo.version.major = verIt->value("major", 0);
+            mCompilerInfo.version.minor = verIt->value("minor", 0);
+            mCompilerInfo.version.patch = verIt->value("patch", 0);
+        }
+    }
+
+    const bool hasError = obj.contains("error");
+    if (hasError) {
+        WARN("Daemon reported slot acquisition error: %s", obj["error"].dump().c_str());
+    }
+    if (!haveCompilerInfo) {
+        WARN("slotAcquired message missing compilerInfo");
+    }
+
+    const std::string slot = obj.value("slot", std::string());
+    if (slot == "local") {
+        mHasLocalSlot = true;
+        mCond.notify_one();
+    } else if (slot == "cpp") {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mHasCppSlot = true;
+        mCond.notify_one();
+    }
 }

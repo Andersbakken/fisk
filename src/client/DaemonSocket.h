@@ -1,6 +1,7 @@
 #ifndef DAEMONSOCKET_H
 #define DAEMONSOCKET_H
 
+#include "Client.h"
 #include "Select.h"
 #include <condition_variable>
 #include <mutex>
@@ -44,8 +45,14 @@ public:
 
     void send(const std::string &json);
     void send(Command cmd);
+    void sendAcquireSlot(const std::string &compiler);
     bool hasCppSlot() const;
     bool waitForCppSlot();
+
+    const Client::CompilerInfo &compilerInfo() const
+    {
+        return mCompilerInfo;
+    }
 
     bool hasCompileSlot() const
     {
@@ -111,6 +118,7 @@ private:
     bool mHasCompileSlot { false };
     bool mHasLocalSlot { false };
     std::string mError;
+    Client::CompilerInfo mCompilerInfo;
     mutable std::mutex mMutex;
     std::condition_variable mCond;
 };

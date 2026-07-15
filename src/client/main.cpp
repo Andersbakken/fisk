@@ -272,14 +272,12 @@ int main(int argc, char **argv)
         daemonSocket.waitForCompileSlot(select);
         Client::runLocal(reason);
     };
-
     if (Config::disabled) {
         DEBUG("Have to run locally because we're disabled");
         runLocal("disabled");
         return 0; // unreachable
     }
 
-    Client::CompilerInfo info;
     {
         std::vector<std::string> args(data.argc);
         for (int i = 0; i < data.argc; ++i) {
@@ -287,9 +285,7 @@ int main(int argc, char **argv)
             args[i] = data.argv[i];
         }
 
-        info = Client::compilerInfo(data.resolvedCompiler);
-        data.hash = info.hash;
-        data.compilerArgs = CompilerArgs::create(info, std::move(args), &data.localReason);
+        data.compilerArgs = CompilerArgs::create(std::move(args), &data.localReason);
     }
     if (!data.compilerArgs) {
         DEBUG("Have to run locally");
@@ -297,9 +293,21 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    // Send unified slot request - daemon decides local vs remote
-    daemonSocket.send(DaemonSocket::AcquireSlot);
+    daemonSocket.sendAcquireSlot(data.resolvedCompiler);
     daemonSocket.waitForSlot(select);
+
+    if (daemonSocket.compilerInfo().hash.empty()) {
+        DEBUG("Daemon returned no compiler info, running locally");
+        runLocal("no compiler info from daemon");
+    }
+
+    // CompilerInfo now comes from the daemon (no more client-side disk cache).
+    const Client::CompilerInfo &info = daemonSocket.compilerInfo();
+    data.hash = info.hash;
+    // CONTRACT (see CompilerArgs.cpp): finalize(info) MUST run after CompilerArgs::create and
+    // BEFORE any preprocess-side sha1Update. Preprocessed::create below is what starts the
+    // preprocess pipeline, so finalize has to happen here.
+    data.compilerArgs->finalize(info);
 
     if (daemonSocket.hasLocalSlot()) {
         DEBUG("Got local compile slot, running locally");
@@ -330,7 +338,7 @@ int main(int argc, char **argv)
         }
     }
 
-    headers["x-fisk-environments"] = data.hash; // always a single one but fisk-builder sends multiple so we'll just keep it like this for now
+    headers["x-fisk-environments"] = data.hash;
     headers["x-fisk-sourcefile"] = data.compilerArgs->sourceFile();
     headers["x-fisk-client-name"] = Config::name;
     headers["x-fisk-config-version"] = std::to_string(Config::Version);

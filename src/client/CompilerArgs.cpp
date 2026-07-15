@@ -218,7 +218,11 @@ static inline size_t hasArg(const std::string &arg, bool &sha1)
     return 0;
 }
 
-std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &info, std::vector<std::string> &&arguments,
+// Caller contract for the object-cache SHA1 chain (must not be reordered):
+//   create() -> finalize(info) -> preprocess-driven sha1Update -> sha1Final.
+// finalize() applies the compiler-info-gated arg tweaks and their sha1Update
+// calls; running finalize() out of order corrupts the cache key.
+std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> &&arguments,
                                                    LocalReason *localReason)
 {
     const bool objectCache = Config::objectCache;
@@ -230,10 +234,9 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
     std::string hasArch;
     bool hasProfileDir = false;
     bool hasProfiling = false;
-    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
 
     size_t i;
-    if (Log::minLogLevel <= Log::Verbose || !Config::color || hasJSONDiagnostics) {
+    if (Log::minLogLevel <= Log::Verbose || !Config::color) {
         i = 0;
         while (i < ret->commandLine.size()) {
             std::string &arg = ret->commandLine[i];
@@ -245,12 +248,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
                     arg = "-fdiagnostics-color=never";
                 }
             }
-
-            if (hasJSONDiagnostics && arg == "-fdiagnostics-parseable-fixits") {
-                ret->commandLine.erase(ret->commandLine.begin() + i);
-            } else {
-                ++i;
-            }
+            ++i;
         }
     }
 
@@ -716,24 +714,45 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(const Client::CompilerInfo &i
         ret->commandLine.push_back(std::move(dfile));
     }
 
-    if (hasJSONDiagnostics) {
-        std::string arg = "-fdiagnostics-format=json";
-        Client::data().sha1Update(arg.c_str(), arg.size());
-        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
-        ret->commandLine.push_back(std::move(arg));
-    }
-
-    if (info.type == Client::CompilerType::Clang && info.version.major >= 15) {
-        const std::string arg = "-Wno-gnu-line-marker";
-        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
-        Client::data().sha1Update(arg.c_str(), arg.size());
-        ret->commandLine.push_back(std::move(arg));
-    }
-
     *localReason = Remote;
 
 end:
     return ret;
+}
+
+void CompilerArgs::finalize(const Client::CompilerInfo &info)
+{
+    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
+                                     && info.type == Client::CompilerType::GCC
+                                     && info.version.major >= 10);
+
+    if (hasJSONDiagnostics) {
+        for (size_t i = 0; i < commandLine.size();) {
+            if (commandLine[i] == "-fdiagnostics-parseable-fixits") {
+                commandLine.erase(commandLine.begin() + i);
+                if (sourceFileIndex != std::numeric_limits<size_t>::max() && sourceFileIndex > i) {
+                    --sourceFileIndex;
+                }
+                if (objectFileIndex != std::numeric_limits<size_t>::max() && objectFileIndex > i) {
+                    --objectFileIndex;
+                }
+            } else {
+                ++i;
+            }
+        }
+
+        std::string arg = "-fdiagnostics-format=json";
+        Client::data().sha1Update(arg.c_str(), arg.size());
+        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
+        commandLine.push_back(std::move(arg));
+    }
+
+    if (info.type == Client::CompilerType::Clang && info.version.major >= 15) {
+        std::string arg = "-Wno-gnu-line-marker";
+        VERBOSE("SHA1'ing arg [%s]", arg.c_str());
+        Client::data().sha1Update(arg.c_str(), arg.size());
+        commandLine.push_back(std::move(arg));
+    }
 }
 
 const char *CompilerArgs::languageName(Flag flag, bool preprocessed)

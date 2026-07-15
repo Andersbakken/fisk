@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { CompilerInfoCache } from "./CompilerInfoCache";
 import { Constants } from "./Constants";
 import { Server } from "./Server";
 import { Slots } from "./Slots";
@@ -8,6 +9,7 @@ import assert from "assert";
 import createOptions from "@jhanssen/options";
 import os from "os";
 import type { Compile } from "./Compile";
+import type { CompilerInfo } from "./CompilerInfoCache";
 import type { Options } from "@jhanssen/options";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -65,6 +67,13 @@ const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)
 const localSlotCount = option.int("local-slots", 0);
 const localSlots = new Slots(localSlotCount, "local", debug);
 const localSlotsMaxLoad = (option("local-slots-max-load") as number) || 0;
+
+const compilerInfoCache = new CompilerInfoCache();
+
+interface CompilerInfoResult {
+    info: CompilerInfo | null;
+    error: string | null;
+}
 
 interface SlotSubscriber {
     compile: Compile;
@@ -158,6 +167,7 @@ server.on("compile", (compile) => {
     });
     let requestedCppSlot = false;
     let requestedLocalSlot = false;
+    let compileClosed = false;
     compile.on("acquireCppSlot", () => {
         if (debug) {
             console.log("acquireCppSlot");
@@ -209,27 +219,65 @@ server.on("compile", (compile) => {
         }
     });
 
-    compile.on("acquireSlot", () => {
+    compile.on("acquireSlot", (msg?: { type?: string; compiler?: unknown }) => {
         if (debug) {
-            console.log("acquireSlot");
+            console.log("acquireSlot", msg);
         }
 
-        if (canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
-            if (debug) {
-                console.log("acquireSlot -> local slot granted");
-            }
-            requestedLocalSlot = true;
-            compile.send(Constants.LocalSlotAcquired);
-        } else {
-            if (debug) {
-                console.log("acquireSlot -> falling back to cpp slot");
-            }
-            assert(!requestedCppSlot);
-            requestedCppSlot = true;
-            cppSlots.acquire(compile.id, { pid: compile.pid }, () => {
-                compile.send(Constants.CppSlotAcquired);
+        const compilerPath: string | null =
+            msg && typeof msg.compiler === "string" && msg.compiler.length > 0 ? msg.compiler : null;
+
+        const infoResult: Promise<CompilerInfoResult> = compilerPath
+            ? compilerInfoCache.get(compilerPath).then(
+                  (info: CompilerInfo): CompilerInfoResult => ({ info, error: null }),
+                  (err: unknown): CompilerInfoResult => {
+                      const message = err instanceof Error ? err.message : String(err);
+                      if (debug) {
+                          console.log("acquireSlot -> compilerInfoCache failed", compilerPath, message);
+                      }
+                      return { info: null, error: message };
+                  }
+              )
+            : Promise.resolve<CompilerInfoResult>({ info: null, error: "acquireSlot missing compiler path" });
+
+        infoResult
+            .then(({ info, error }) => {
+                if (compileClosed) {
+                    return;
+                }
+                const respond = (slot: "local" | "cpp"): void => {
+                    const response: Record<string, unknown> = {
+                        type: "slotAcquired",
+                        slot,
+                        compilerInfo: info
+                    };
+                    if (error) {
+                        response.error = error;
+                    }
+                    compile.send(response);
+                };
+
+                if (canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
+                    if (debug) {
+                        console.log("acquireSlot -> local slot granted");
+                    }
+                    requestedLocalSlot = true;
+                    respond("local");
+                } else {
+                    if (debug) {
+                        console.log("acquireSlot -> falling back to cpp slot");
+                    }
+                    assert(!requestedCppSlot);
+                    requestedCppSlot = true;
+                    cppSlots.acquire(compile.id, { pid: compile.pid }, () => {
+                        respond("cpp");
+                    });
+                }
+            })
+            .catch((err: unknown) => {
+                // Defensive: the process-wide unhandledRejection handler calls process.exit().
+                console.error("acquireSlot handler failed unexpectedly", err);
             });
-        }
     });
 
     compile.on("releaseLocalSlot", () => {
@@ -248,6 +296,7 @@ server.on("compile", (compile) => {
         if (debug) {
             console.error("Got error from fiskc", compile.id, compile.pid, err);
         }
+        compileClosed = true;
         if (requestedCppSlot) {
             requestedCppSlot = false;
             cppSlots.release(compile.id);
@@ -266,6 +315,7 @@ server.on("compile", (compile) => {
         if (debug) {
             console.log("got end from", compile.id, compile.pid);
         }
+        compileClosed = true;
         if (requestedCppSlot) {
             requestedCppSlot = false;
             cppSlots.release(compile.id);
