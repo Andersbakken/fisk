@@ -290,7 +290,6 @@ std::string resolveSymlink(const std::string &link, const std::function<CheckRes
 Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::string &versionInfo)
 {
     Client::CompilerInfo info {};
-    std::string data;
     size_t last = 0;
     bool foundVersion = false;
     while (true) {
@@ -311,12 +310,12 @@ Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::stri
             versionOffset = 14;
             version = versionInfo.c_str() + last + versionOffset;
         } else if (!strncmp(versionInfo.c_str() + last, "Target: ", 8)) {
-            data += versionInfo.substr(last + 8, idx - last - 8);
+            info.input += versionInfo.substr(last + 8, idx - last - 8);
         }
 
         if (version) {
             foundVersion = true;
-            data += versionInfo.substr(last + versionOffset, idx - last - versionOffset);
+            info.input += versionInfo.substr(last + versionOffset, idx - last - versionOffset);
             if (sscanf(version, "%d.%d.%d", &info.version.major, &info.version.minor, &info.version.patch) != 3) {
                 if (sscanf(version, "%d.%d", &info.version.major, &info.version.minor) != 2) {
                     if (sscanf(version, "%d", &info.version.major) != 1) {
@@ -341,7 +340,7 @@ Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::stri
         }
     }
 
-    info.hash = Client::toHex(Client::sha1(data));
+    info.hash = Client::toHex(Client::sha1(info.input));
     DEBUG("Got compiler info for %s\n"
           "Type: %s\n"
           "Version: %d.%d.%d\n"
@@ -355,7 +354,7 @@ Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::stri
           info.version.minor,
           info.version.patch,
           info.hash.c_str(),
-          data.c_str(),
+          info.input.c_str(),
           versionInfo.c_str());
     return info;
 }
@@ -931,6 +930,7 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                                 DEBUG("Cache hit for compiler %s", key.c_str());
                                 CompilerInfo cacheHit;
                                 cacheHit.hash = string(value, "hash");
+                                cacheHit.input = string(value, "input");
                                 const std::string type = string(value, "type");
                                 if (type == "clang") {
                                     cacheHit.type = CompilerType::Clang;
@@ -943,7 +943,9 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
                                     cacheHit.version.minor = integer(*verIt, "minor");
                                     cacheHit.version.patch = integer(*verIt, "patch");
                                 }
-                                // return cacheHit;
+                                if (!cacheHit.hash.empty() && cacheHit.type != CompilerType::Unknown) {
+                                    return cacheHit;
+                                }
                             }
 
                             json = obj;
@@ -967,6 +969,7 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
     if (!ret.hash.empty()) {
         nlohmann::json compilerJson = nlohmann::json::object();
         compilerJson["hash"] = ret.hash;
+        compilerJson["input"] = ret.input;
         compilerJson["type"] = compilerTypeToString(ret.type);
         nlohmann::json versionJSON = nlohmann::json::object();
         versionJSON["major"] = ret.version.major;

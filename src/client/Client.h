@@ -337,6 +337,7 @@ const char *compilerTypeToString(CompilerType type);
 struct CompilerInfo
 {
     std::string hash;
+    std::string input;
     CompilerType type { CompilerType::Unknown };
 
     struct Version
