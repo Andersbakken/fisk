@@ -7,27 +7,42 @@ import type { Common } from "../common";
 import type { Options } from "@jhanssen/options";
 
 // systemd socket activation: the first passed fd is at SD_LISTEN_FDS_START (3).
-// See sd_listen_fds(3). When LISTEN_PID matches our pid and LISTEN_FDS >= 1,
-// listen on the inherited fd instead of creating a new socket. This lets
-// systemd own the socket file, so its inode survives daemon restarts and any
-// bind-mount of the socket (e.g. docker -v /tmp/fisk.socket:/tmp/fisk.socket)
-// keeps working across upgrades.
+// See sd_listen_fds(3). systemd sets LISTEN_PID to the PID it should be
+// consumed by; a child process must be exec'd (not fork+exec of a wrapper)
+// so its own pid matches. We fail hard on any mismatch rather than silently
+// falling back to path binding, because that fallback would unlink the
+// systemd-owned socket file and re-create a new inode, defeating the whole
+// point of activation (and breaking every docker container that bind-mounted
+// the socket file).
 const SD_LISTEN_FDS_START = 3;
 
-function systemdListenFd(): number | undefined {
-    const pid = process.env.LISTEN_PID;
-    const fds = process.env.LISTEN_FDS;
-    if (!pid || !fds) {
-        return undefined;
+type ActivationResult = { fd: number } | "none" | "mismatch";
+
+function systemdListenFd(): ActivationResult {
+    const pidRaw = process.env.LISTEN_PID;
+    const fdsRaw = process.env.LISTEN_FDS;
+    // Consume the activation env so any subprocess we spawn does not inherit
+    // stale LISTEN_PID/LISTEN_FDS. sd_listen_fds_with_names(3) recommends
+    // unsetenv after use.
+    delete process.env.LISTEN_PID;
+    delete process.env.LISTEN_FDS;
+    delete process.env.LISTEN_FDNAMES;
+
+    if (!pidRaw && !fdsRaw) {
+        return "none";
     }
-    if (parseInt(pid, 10) !== process.pid) {
-        return undefined;
+    if (!pidRaw || !fdsRaw) {
+        return "mismatch";
     }
-    const count = parseInt(fds, 10);
-    if (!count || count < 1) {
-        return undefined;
+    const pid = Number(pidRaw);
+    const count = Number(fdsRaw);
+    if (!Number.isInteger(pid) || !Number.isInteger(count) || count < 1) {
+        return "mismatch";
     }
-    return SD_LISTEN_FDS_START;
+    if (pid !== process.pid) {
+        return "mismatch";
+    }
+    return { fd: SD_LISTEN_FDS_START };
 }
 
 export class Server extends EventEmitter {
@@ -69,8 +84,15 @@ export class Server extends EventEmitter {
     }
 
     listen(): Promise<void> {
-        const inheritedFd = systemdListenFd();
-        if (inheritedFd !== undefined) {
+        const activation = systemdListenFd();
+        if (activation === "mismatch") {
+            console.error(
+                "fisk-daemon: LISTEN_FDS/LISTEN_PID present but do not match our pid. Refusing to fall back to path binding -- exiting so systemd can restart us with correct activation."
+            );
+            process.exit(1);
+        }
+        if (activation !== "none") {
+            const inheritedFd = activation.fd;
             this._activated = true;
             if (this.debug) {
                 console.log("Server::listen using systemd-activated fd", inheritedFd);

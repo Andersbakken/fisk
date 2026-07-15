@@ -7,10 +7,12 @@ if [ -x "`which systemctl`" ] && ! uname -r | grep -i microsoft; then
    systemctl daemon-reload
    systemctl enable fisk-daemon.socket
    systemctl enable fisk-daemon.service
-   # Start (or restart) the socket first so the listening fd survives
-   # daemon upgrades. Existing clients (including bind-mounted docker
-   # containers) keep working across restarts of fisk-daemon.service.
-   systemctl restart fisk-daemon.socket
+   # CRITICAL: never `restart` the socket unit here. Restarting the socket
+   # unlinks /tmp/fisk.socket and creates a new inode, which breaks every
+   # docker container that bind-mounted the old socket path -- exactly the
+   # bug this whole change exists to fix. `start` is idempotent (no-op if
+   # already active) and preserves the inode across daemon upgrades.
+   systemctl start fisk-daemon.socket
    systemctl restart fisk-daemon.service
 fi
 

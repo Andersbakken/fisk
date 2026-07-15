@@ -12,14 +12,16 @@ if [ "$1" != "upgrade" ]; then
     rm -rf /var/fisk/client/compilers
     rm -rf /usr/local/bin/fiskc
 fi
-rm -f /usr/local/bin/fisk-monitor
-rm -rf /var/fisk/daemon/node_modules
-rm -rf /var/fisk/daemon/data
-rm -f /var/fisk/daemon/package-lock.json
-
-MONITOR_DIR=/usr/local/fisk/monitor
-LINK_SRC="$MONITOR_DIR/node_modules/@andersbakken/fisk/monitor/fisk-monitor.js"
-if [ -L /usr/local/bin/fisk-monitor ] && [ "$(readlink /usr/local/bin/fisk-monitor)" = "$LINK_SRC" ]; then
+if [ "$1" != "upgrade" ]; then
     rm -f /usr/local/bin/fisk-monitor
+    rm -rf /var/fisk/daemon/node_modules
+    rm -rf /var/fisk/daemon/data
+    rm -f /var/fisk/daemon/package-lock.json
+
+    MONITOR_DIR=/usr/local/fisk/monitor
+    LINK_SRC="$MONITOR_DIR/node_modules/@andersbakken/fisk/monitor/fisk-monitor.js"
+    if [ -L /usr/local/bin/fisk-monitor ] && [ "$(readlink /usr/local/bin/fisk-monitor)" = "$LINK_SRC" ]; then
+        rm -f /usr/local/bin/fisk-monitor
+    fi
+    rm -rf $MONITOR_DIR
 fi
-rm -rf $MONITOR_DIR

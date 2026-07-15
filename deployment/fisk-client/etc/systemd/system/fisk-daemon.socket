@@ -1,6 +1,5 @@
 [Unit]
 Description=Fisk daemon socket
-PartOf=fisk-daemon.service
 
 [Socket]
 ListenStream=/tmp/fisk.socket

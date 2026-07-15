@@ -7,6 +7,7 @@ Wants=network.target
 [Service]
 User=root
 Restart=always
+RestartSec=5
 ExecStart=/var/fisk/daemon/run-fisk-daemon.sh
 
 [Install]
