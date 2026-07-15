@@ -52,7 +52,7 @@ try {
     console.log("Chrooting to", argv.root);
     chroot(argv.root);
 } catch (err) {
-    console.error("Changing root or user failed", err);
+    console.error("Changing root or user failed", { root: argv.root }, err);
     process.exit(1);
 }
 
