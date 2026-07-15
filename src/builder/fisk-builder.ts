@@ -575,7 +575,7 @@ client.on("getEnvironments", (message) => {
                 return;
             }
             console.log("Got finish", env);
-            exec("tar xf '" + file + "'", { cwd: dir })
+            exec("tar xf env.tar.gz", { cwd: dir })
                 .then(() => {
                     const json = path.join(dir, "environment.json");
                     console.log("Writing json file", json);
