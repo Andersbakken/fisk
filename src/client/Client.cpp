@@ -287,35 +287,76 @@ std::string resolveSymlink(const std::string &link, const std::function<CheckRes
     return l;
 }
 
-Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::string &version)
+Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::string &versionInfo)
 {
     Client::CompilerInfo info {};
-    info.hash = Client::toHex(Client::sha1(version));
-    size_t idx = std::string::npos;
-    if (exec.find("clang") != std::string::npos || exec.find("CLANG") != std::string::npos || exec.find("Clang") != std::string::npos || version.find("clang") != std::string::npos || version.find("CLANG") != std::string::npos || version.find("Clang") != std::string::npos) {
-        info.type = Client::CompilerType::Clang;
-        idx = version.find("clang version ");
-    } else if (exec.find("gcc") != std::string::npos || exec.find("GCC") != std::string::npos || version.find("gcc") != std::string::npos || version.find("GCC") != std::string::npos) {
-        info.type = Client::CompilerType::GCC;
-        idx = version.find("gcc version ");
-    }
-
-    if (idx != std::string::npos) {
-        while (idx != version.size() && !std::isdigit(version[idx])) {
-            ++idx;
+    std::string data;
+    size_t last = 0;
+    bool foundVersion = false;
+    while (true) {
+        size_t idx = versionInfo.find('\n', last);
+        bool done = false;
+        if (idx == std::string::npos) {
+            idx = versionInfo.size();
+            done = true;
         }
-        const char *str = version.c_str() + idx;
-        char *endPtr;
-        info.version.major = static_cast<int>(strtoul(str, &endPtr, 10));
-        if (*endPtr == '.') {
-            str = endPtr + 1;
-            info.version.minor = static_cast<int>(strtoul(str, &endPtr, 10));
-            if (*endPtr == '.') {
-                str = endPtr + 1;
-                info.version.patch = static_cast<int>(strtoul(str, &endPtr, 10));
+        const char *version = nullptr;
+        size_t versionOffset = 0;
+        if (!strncmp(versionInfo.c_str() + last, "gcc version ", 12)) {
+            info.type = Client::CompilerType::GCC;
+            versionOffset = 12;
+            version = versionInfo.c_str() + last + versionOffset;
+        } else if (!strncmp(versionInfo.c_str() + last, "clang version ", 14)) {
+            info.type = Client::CompilerType::Clang;
+            versionOffset = 14;
+            version = versionInfo.c_str() + last + versionOffset;
+        } else if (!strncmp(versionInfo.c_str() + last, "Target: ", 8)) {
+            data += versionInfo.substr(last + 8, idx - last - 8);
+        }
+
+        if (version) {
+            foundVersion = true;
+            data += versionInfo.substr(last + versionOffset, idx - last - versionOffset);
+            if (sscanf(version, "%d.%d.%d", &info.version.major, &info.version.minor, &info.version.patch) != 3) {
+                if (sscanf(version, "%d.%d", &info.version.major, &info.version.minor) != 2) {
+                    if (sscanf(version, "%d", &info.version.major) != 1) {
+                        ERROR("Failed to parse version from %s", version);
+                    }
+                }
             }
         }
+
+        if (done) {
+            break;
+        }
+        last = idx + 1;
     }
+
+    if (!foundVersion) {
+        ERROR("Failed to find version in %s", versionInfo.c_str());
+        if (exec.find("clang") != std::string::npos || exec.find("CLANG") != std::string::npos || exec.find("Clang") != std::string::npos) {
+            info.type = Client::CompilerType::Clang;
+        } else if (exec.find("gcc") != std::string::npos || exec.find("GCC") != std::string::npos) {
+            info.type = Client::CompilerType::GCC;
+        }
+    }
+
+    info.hash = Client::toHex(Client::sha1(data));
+    DEBUG("Got compiler info for %s\n"
+          "Type: %s\n"
+          "Version: %d.%d.%d\n"
+          "Hash: %s\n"
+          "HashInput: %s\n"
+          "VersionInfo: %s",
+          exec.c_str(),
+          info.type == Client::CompilerType::GCC ? "GCC" : info.type == Client::CompilerType::Clang ? "Clang"
+                                                                                                    : "Unknown",
+          info.version.major,
+          info.version.minor,
+          info.version.patch,
+          info.hash.c_str(),
+          data.c_str(),
+          versionInfo.c_str());
     return info;
 }
 } // anonymous namespace
@@ -815,7 +856,7 @@ const char *Client::compilerTypeToString(CompilerType type)
 
 enum
 {
-    EnvironmentCacheVersion = 3
+    EnvironmentCacheVersion = 4
 };
 
 Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
@@ -831,11 +872,11 @@ Client::CompilerInfo Client::compilerInfo(const std::string &compiler)
             compiler + " -v",
             std::string(),
             [&out](const char *bytes, size_t n) {
-                out.append(bytes, n);
-            },
+            out.append(bytes, n);
+        },
             [&err](const char *bytes, size_t n) {
-                err.append(bytes, n);
-            });
+            err.append(bytes, n);
+        });
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s\n", compiler.c_str(), err.c_str());
