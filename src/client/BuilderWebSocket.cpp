@@ -67,7 +67,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         if (data.exitCode) {
             std::string uncolored;
             const std::string *haystack;
-            if (stdErr.size() < 128 * 1024 && !hasJSONDiagnostics) {
+            if (stdErr.size() < 128 * 1024 && !Client::data().builderHasJSONDiagnostics) {
                 uncolored = Client::uncolor(stdErr);
                 haystack = &uncolored;
             } else {
@@ -101,7 +101,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         }
 
         if (!data.preprocessed->stdErr.empty()) {
-            if (hasJSONDiagnostics) {
+            if (Client::data().builderHasJSONDiagnostics) {
                 const std::string formatted = Client::formatJSONDiagnostics(data.preprocessed->stdErr);
                 if (!formatted.empty()) {
                     fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
@@ -115,7 +115,7 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
             fwrite(stdOut.c_str(), 1, stdOut.size(), stdout);
         }
         if (!stdErr.empty()) {
-            if (hasJSONDiagnostics) {
+            if (Client::data().builderHasJSONDiagnostics) {
                 const std::string formatted = Client::formatJSONDiagnostics(stdErr);
                 if (!formatted.empty()) {
                     fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
@@ -171,6 +171,11 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
     Client::data().watchdog->stop();
     error = "builder protocol error 5";
     done = true;
+}
+
+bool BuilderWebSocket::connectFinished()
+{
+    return state() == WebSocket::ConnectedWebSocket;
 }
 
 void BuilderWebSocket::handleFileContents(const void *data, size_t len)

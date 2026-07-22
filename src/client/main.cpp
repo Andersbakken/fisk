@@ -1,23 +1,25 @@
-#include "BuilderWebSocket.h"
-#include "Client.h"
-#include "CompilerArgs.h"
-#include "Config.h"
-#include "Log.h"
-#include "Preprocessed.h"
-#include "SchedulerWebSocket.h"
-#include "Select.h"
-#include "Watchdog.h"
-#include "WebSocket.h"
 #include <climits>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <execinfo.h>
 #include <unistd.h>
+#include <variant>
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+
+#include "BuilderWebSocket.h"
+#include "Client.h"
+#include "CompilerArgs.h"
+#include "Config.h"
 #include "DaemonSocket.h"
+#include "Log.h"
+#include "Preprocessed.h"
+#include "SchedulerWebSocket.h"
+#include "Select.h"
+#include "Watchdog.h"
+#include "WebSocket.h"
 
 static unsigned long long preprocessedDuration = 0;
 static unsigned long long preprocessedSlotDuration = 0;
@@ -25,23 +27,21 @@ extern "C" const char *npm_version;
 static std::string schedulerUrl();
 static int clientVerify();
 
-template <typename WebSocketT, typename Factory, typename DonePred, typename RunLocal>
-static void connectWebSocketWithRetry(Select &select,
-                                      std::unique_ptr<WebSocketT> &websocketPtr,
-                                      const Factory &factory,
-                                      const std::string &url,
-                                      const std::map<std::string, std::string> &headers,
-                                      const DonePred &isDone,
-                                      Watchdog *watchdog,
-                                      const RunLocal &runLocal,
-                                      const char *name)
+template <typename T>
+static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(Select &select,
+                                                                               const std::string &url,
+                                                                               const std::string &iface,
+                                                                               const std::map<std::string, std::string> &headers,
+                                                                               const char *name)
 {
+    Watchdog *watchdog = Client::data().watchdog;
     const size_t maxAttempts = Config::websocketConnectAttempts;
     const unsigned long long backoffMs = Config::websocketConnectBackoff;
     size_t attempt = 0;
+    std::unique_ptr<T> websocket;
     do {
-        if (websocketPtr) {
-            select.remove(websocketPtr.get());
+        if (websocket) {
+            select.remove(websocket.get());
             if (backoffMs) {
                 // Exponential backoff: base, 2x, 4x, ..., capped at 64x base.
                 size_t shift = attempt - 1;
@@ -56,33 +56,34 @@ static void connectWebSocketWithRetry(Select &select,
                 select.exec(delayMs);
                 if (watchdog->timedOut()) {
                     DEBUG("Have to run locally because we timed out during %s backoff", name);
-                    runLocal(std::string("watchdog ") + name + " backoff");
+                    return std::string("watchdog ") + name + " backoff";
                 }
             }
         }
-        websocketPtr.reset(factory().release());
+        websocket = std::make_unique<T>();
         ++attempt;
-        if (!websocketPtr->connect(url, headers)) {
+        if (!websocket->connect(url, headers, iface)) {
             DEBUG("Have to run locally because %s connect failed", name);
-            runLocal(std::string(name) + " connect error");
+            return std::string(name) + " connect error";
         }
 
-        select.add(websocketPtr.get());
+        select.add(websocket.get());
         DEBUG("Starting %s websocket", name);
-        while (!isDone(websocketPtr.get()) && !watchdog->timedOut() && websocketPtr->state() >= WebSocket::None && websocketPtr->state() <= WebSocket::ConnectedWebSocket) {
+        while (!websocket->connectFinished() && !watchdog->timedOut() && websocket->state() >= WebSocket::None && websocket->state() <= WebSocket::ConnectedWebSocket) {
             select.exec();
         }
 
         if (watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out trying to connect to %s", name);
-            runLocal(std::string("watchdog ") + name + " connect");
+            return std::string("watchdog ") + name + " connect";
         }
 
-        if (!isDone(websocketPtr.get()) && maxAttempts && attempt >= maxAttempts) {
+        if (!websocket->connectFinished() && maxAttempts && attempt >= maxAttempts) {
             DEBUG("Have to run locally after %zu %s connect attempt%s", attempt, name, attempt == 1 ? "" : "s");
-            runLocal(std::string(name) + " connect attempts exhausted");
+            return std::string(name) + " connect attempts exhausted";
         }
-    } while (!isDone(websocketPtr.get()));
+    } while (!websocket->connectFinished());
+    return websocket;
 }
 
 int main(int argc, char **argv)
@@ -413,21 +414,18 @@ int main(int argc, char **argv)
         headers["x-fisk-sha1"] = std::move(sha1);
     }
 
-    std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
-    connectWebSocketWithRetry(
+    std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> schedulerWebsocketResult = connectWebSocketWithRetry<SchedulerWebSocket>(
         select,
-        schedulerWebsocket,
-        []() {
-        return std::unique_ptr<SchedulerWebSocket>(new SchedulerWebSocket);
-    },
         url + "/compile",
+        Config::schedulerInterface,
         headers,
-        [](SchedulerWebSocket *ws) {
-        return ws->done;
-    },
-        data.watchdog,
-        runLocal,
         "scheduler");
+
+    if (std::holds_alternative<std::string>(schedulerWebsocketResult)) {
+        DEBUG("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
+        runLocal(std::get<std::string>(schedulerWebsocketResult));
+    }
+    std::unique_ptr<SchedulerWebSocket> schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(schedulerWebsocketResult));
 
     if (!schedulerWebsocket->error().empty()) {
         DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error().c_str());
@@ -465,7 +463,7 @@ int main(int argc, char **argv)
 
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredBuilder);
-    const bool builderHasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
+    Client::data().builderHasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
     headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
 
@@ -480,24 +478,19 @@ int main(int argc, char **argv)
         data.builderPort);
     DEBUG("Connecting to builder %s", builderUrl.c_str());
 
-    std::unique_ptr<BuilderWebSocket> builderWebSocketPtr;
-    connectWebSocketWithRetry(
+    std::variant<std::unique_ptr<BuilderWebSocket>, std::string> builderWebSocketResult = connectWebSocketWithRetry<BuilderWebSocket>(
         select,
-        builderWebSocketPtr,
-        [builderHasJSONDiagnostics]() {
-        auto ws = std::unique_ptr<BuilderWebSocket>(new BuilderWebSocket);
-        ws->hasJSONDiagnostics = builderHasJSONDiagnostics;
-        return ws;
-    },
         builderUrl,
+        Config::builderInterface,
         headers,
-        [](BuilderWebSocket *ws) {
-        return ws->state() == WebSocket::ConnectedWebSocket;
-    },
-        data.watchdog,
-        runLocal,
         "builder");
-    BuilderWebSocket &builderWebSocket = *builderWebSocketPtr;
+
+    if (std::holds_alternative<std::string>(builderWebSocketResult)) {
+        DEBUG("Have to run locally because builder connect failed: %s", std::get<std::string>(builderWebSocketResult).c_str());
+        runLocal(std::get<std::string>(builderWebSocketResult));
+    }
+    std::unique_ptr<BuilderWebSocket> builderWebSocket = std::get<std::unique_ptr<BuilderWebSocket>>(std::move(builderWebSocketResult));
+
     data.watchdog->transition(Watchdog::ConnectedToBuilder);
     if (!Config::objectCache) {
         DEBUG("Waiting for preprocessed");
@@ -537,7 +530,7 @@ int main(int argc, char **argv)
         schedulerWebsocket->extraArguments.clear(); // since we moved it out
     }
 
-    const bool wait = builderWebSocket.handshakeResponseHeader("x-fisk-wait") == "true";
+    const bool wait = builderWebSocket->handshakeResponseHeader("x-fisk-wait") == "true";
     nlohmann::json msg = {
         { "commandLine", args },
         { "argv0", data.compiler },
@@ -548,16 +541,16 @@ int main(int argc, char **argv)
 
     const std::string json = msg.dump();
     DEBUG("Sending to builder:\n%s\n", json.c_str());
-    builderWebSocket.wait = wait;
-    builderWebSocket.send(WebSocket::Text, json.c_str(), json.size());
+    builderWebSocket->wait = wait;
+    builderWebSocket->send(WebSocket::Text, json.c_str(), json.size());
     if (wait) {
-        while (!builderWebSocket.done && !data.watchdog->timedOut() && (builderWebSocket.hasPendingSendData() || builderWebSocket.wait) && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+        while (!builderWebSocket->done && !data.watchdog->timedOut() && (builderWebSocket->hasPendingSendData() || builderWebSocket->wait) && builderWebSocket->state() == WebSocket::ConnectedWebSocket) {
             select.exec();
         }
-        if (builderWebSocket.done) {
-            if (builderWebSocket.error.empty()) {
+        if (builderWebSocket->done) {
+            if (builderWebSocket->error.empty()) {
                 if (!data.preprocessed->stdErr.empty()) {
-                    if (builderWebSocket.hasJSONDiagnostics) {
+                    if (Client::data().builderHasJSONDiagnostics) {
                         const std::string formatted = Client::formatJSONDiagnostics(data.preprocessed->stdErr);
                         if (!formatted.empty()) {
                             fwrite(formatted.c_str(), sizeof(char), formatted.size(), stderr);
@@ -574,7 +567,7 @@ int main(int argc, char **argv)
                 Client::writeStatistics();
                 return data.exitCode;
             } else {
-                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket.error.c_str());
+                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket->error.c_str());
 
                 runLocal("error");
             }
@@ -583,18 +576,18 @@ int main(int argc, char **argv)
             DEBUG("Have to run locally because we timed out waiting for builder");
             runLocal("watchdog");
         }
-        if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
+        if (builderWebSocket->state() != WebSocket::ConnectedWebSocket) {
             DEBUG("Have to run locally because something went wrong with the builder");
             runLocal("builder protocol error 6");
         }
     }
 
-    assert(!builderWebSocket.wait);
-    builderWebSocket.send(WebSocket::Binary, data.preprocessed->stdOut.data(), data.preprocessed->stdOut.size());
+    assert(!builderWebSocket->wait);
+    builderWebSocket->send(WebSocket::Binary, data.preprocessed->stdOut.data(), data.preprocessed->stdOut.size());
     if (!Config::storePreprocessedDataOnError)
         data.preprocessed->stdOut.clear();
 
-    while (!data.watchdog->timedOut() && builderWebSocket.hasPendingSendData() && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+    while (!data.watchdog->timedOut() && builderWebSocket->hasPendingSendData() && builderWebSocket->state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -603,7 +596,7 @@ int main(int argc, char **argv)
         runLocal("watchdog upload");
     }
 
-    if (builderWebSocket.state() != WebSocket::ConnectedWebSocket) {
+    if (builderWebSocket->state() != WebSocket::ConnectedWebSocket) {
         DEBUG("Have to run locally because something went wrong with the builder");
         runLocal("builder connect error 3");
     }
@@ -613,7 +606,7 @@ int main(int argc, char **argv)
         daemonSocket.send(DaemonSocket::ReleaseCppSlot);
     }
 
-    while (!data.watchdog->timedOut() && !builderWebSocket.done && builderWebSocket.state() == WebSocket::ConnectedWebSocket) {
+    while (!data.watchdog->timedOut() && !builderWebSocket->done && builderWebSocket->state() == WebSocket::ConnectedWebSocket) {
         select.exec();
     }
 
@@ -622,13 +615,13 @@ int main(int argc, char **argv)
         runLocal("watchdog builder");
     }
 
-    if (!builderWebSocket.done) {
+    if (!builderWebSocket->done) {
         DEBUG("Have to run locally because something went wrong with the builder, part deux");
         runLocal("builder network error");
     }
 
-    if (!builderWebSocket.error.empty()) {
-        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket.error.c_str());
+    if (!builderWebSocket->error.empty()) {
+        DEBUG("Have to run locally because something went wrong with the builder, part trois: %s", builderWebSocket->error.c_str());
         runLocal("builder error");
     }
 
@@ -653,8 +646,9 @@ static std::string schedulerUrl()
             ++colon;
         }
     }
-    if (colon != url.size())
+    if (colon != url.size()) {
         url.append(":8097");
+    }
     return url;
 }
 
@@ -677,7 +671,7 @@ static int clientVerify()
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
     SchedulerWebSocket schedulerWebsocket;
-    if (!schedulerWebsocket.connect(schedulerUrl() + "/client_verify", headers)) {
+    if (!schedulerWebsocket.connect(schedulerUrl() + "/client_verify", headers, Config::schedulerInterface)) {
         FATAL("Failed to connect to scheduler %s", schedulerWebsocket.url().c_str());
         return 109;
     }

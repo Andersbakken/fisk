@@ -13,6 +13,7 @@ class SchedulerWebSocket : public WebSocket
 public:
     virtual void onConnected() override;
     virtual void onMessage(MessageType type, const void *bytes, size_t len) override;
+    virtual bool connectFinished() override;
 
     bool done { false };
     bool needsEnvironment { false };

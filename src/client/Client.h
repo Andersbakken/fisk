@@ -58,6 +58,7 @@ struct Data
     bool objectCache { false };
     int exitCode { 0 };
     size_t totalWritten { 0 };
+    bool builderHasJSONDiagnostics { false };
 
     std::unique_ptr<Preprocessed> preprocessed;
     std::shared_ptr<CompilerArgs> compilerArgs;

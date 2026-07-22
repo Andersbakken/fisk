@@ -12,10 +12,9 @@ extern "C" const char *npm_version;
 class BuilderWebSocket : public WebSocket
 {
 public:
-    bool wait { false };
-    bool hasJSONDiagnostics { false };
     virtual void onConnected() override;
     virtual void onMessage(MessageType messageType, const void *bytes, size_t len) override;
+    virtual bool connectFinished() override;
     void handleFileContents(const void *data, size_t len);
 
     struct File
@@ -24,6 +23,7 @@ public:
         size_t size;
     };
 
+    bool wait { false };
     std::vector<File> files;
     bool done { false };
     std::string error;

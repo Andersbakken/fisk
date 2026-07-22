@@ -21,7 +21,9 @@ public:
         Binary
     };
 
-    bool connect(const std::string &url, const std::map<std::string, std::string> &headers);
+    bool connect(const std::string &url,
+                 const std::map<std::string, std::string> &headers,
+                 const std::string &iface);
     bool send(MessageType mode, const void *data, size_t len);
     void close(const char *reason);
 
@@ -81,6 +83,8 @@ public:
         }
         return std::string();
     }
+
+    virtual bool connectFinished() = 0;
 
 protected:
     virtual void onMessage(MessageType mode, const void *data, size_t len) = 0;

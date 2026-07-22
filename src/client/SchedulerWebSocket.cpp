@@ -69,3 +69,8 @@ void SchedulerWebSocket::onMessage(MessageType type, const void *bytes, size_t l
         //     printf("Got binary message: %zu bytes\n", len);
     }
 }
+
+bool SchedulerWebSocket::connectFinished()
+{
+    return done;
+}

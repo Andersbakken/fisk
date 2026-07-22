@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -91,9 +92,11 @@ WebSocket::~WebSocket()
     }
 }
 
-bool WebSocket::connect(const std::string &uniformResourceLocator, const std::map<std::string, std::string> &hdrs)
+bool WebSocket::connect(const std::string &url,
+                        const std::map<std::string, std::string> &hdrs,
+                        const std::string &iface)
 {
-    mUrl = uniformResourceLocator;
+    mUrl = url;
     mHeaders = hdrs;
     mParsedUrl = LUrlParser::ParseURL::parseURL(mUrl);
     if (!mParsedUrl.isValid()) {
@@ -166,6 +169,24 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
             ::close(mFD);
             mFD = -1;
             continue;
+        }
+
+        if (!iface.empty()) {
+            DEBUG("Binding socket %s (%d) to interface %s",
+                  mHost.c_str(),
+                  mFD,
+                  iface.c_str());
+            if (setsockopt(mFD, SOL_SOCKET, SO_BINDTODEVICE, iface.c_str(), iface.size()) != 0) {
+                ERROR("Failed to bind socket %s (%d) %d %s for interface %s",
+                      mHost.c_str(),
+                      mFD,
+                      errno,
+                      strerror(errno),
+                      iface.c_str());
+                ::close(mFD);
+                mFD = -1;
+                continue;
+            }
         }
 
         EINTRWRAP(ret, ::connect(mFD, addr->ai_addr, addr->ai_addrlen));

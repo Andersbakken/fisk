@@ -296,6 +296,7 @@ private:
 };
 
 extern Getter<std::string> scheduler;
+extern Getter<std::string> schedulerInterface;
 extern Getter<std::string> socket;
 extern Getter<bool> dumpSlots;
 extern Getter<unsigned long long> daemonConnectTimeout;
@@ -311,6 +312,7 @@ extern Getter<unsigned long long> responseTimeout;
 extern Getter<std::string> compiler;
 extern Getter<std::string> cacheDir;
 extern Getter<std::string> builder;
+extern Getter<std::string> builderInterface;
 extern Getter<std::string> labels;
 extern Getter<bool> color;
 extern Getter<bool> jsonDiagnostics;
