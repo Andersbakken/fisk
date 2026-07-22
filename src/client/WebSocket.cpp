@@ -34,9 +34,8 @@ static inline size_t random(void *data, size_t len)
         ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
         return 0;
     }
-    const size_t r = ret;
-    EINTRWRAP(ret, fclose(f));
-    return r;
+    fclose(f);
+    return ret;
 }
 
 WebSocket::WebSocket()
@@ -88,8 +87,7 @@ WebSocket::~WebSocket()
     if (mContext)
         wslay_event_context_free(mContext);
     if (mFD != -1) {
-        int ret;
-        EINTRWRAP(ret, ::close(mFD));
+        ::close(mFD);
     }
 }
 
@@ -165,8 +163,7 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
 
         if (!Client::setFlag(mFD, O_NONBLOCK | O_CLOEXEC)) {
             ERROR("Failed to make socket non blocking %d %s", errno, strerror(errno));
-            int cret;
-            EINTRWRAP(cret, ::close(mFD));
+            ::close(mFD);
             mFD = -1;
             continue;
         }
@@ -178,8 +175,7 @@ bool WebSocket::connect(const std::string &uniformResourceLocator, const std::ma
             mState = ConnectedTCP;
             break;
         } else if (errno != EINPROGRESS) {
-            int cret;
-            EINTRWRAP(cret, ::close(mFD));
+            ::close(mFD);
             ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(), inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort, errno, strerror(errno));
             mFD = -1;
             mState = Error;

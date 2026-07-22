@@ -723,14 +723,14 @@ void Client::writeStatistics()
     EINTRWRAP(ret, flock(fd, LOCK_EX));
     if (ret) {
         ERROR("Failed to lock %s for writing %d %s", file.c_str(), errno, strerror(errno));
-        EINTRWRAP(ret, fclose(f));
+        fclose(f);
         return;
     }
 
     EINTRWRAP(ret, fwrite(json.c_str(), 1, json.size(), f));
     EINTRWRAP(ret, fwrite("\n", 1, 1, f));
     EINTRWRAP(ret, flock(fd, LOCK_UN));
-    EINTRWRAP(ret, fclose(f));
+    fclose(f);
 }
 
 static std::string argsAsString()
@@ -962,8 +962,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
     struct stat st;
     if (stat(tarball.c_str(), &st)) {
         ERROR("Failed to stat %s: %d %s", tarball.c_str(), errno, strerror(errno));
-        int ret;
-        EINTRWRAP(ret, fclose(f));
+        fclose(f);
         return false;
     }
     {
@@ -979,8 +978,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             const size_t chunkSize = std::min(static_cast<size_t>(st.st_size - sent), sizeof(buf));
             if (fread(buf, 1, chunkSize, f) != chunkSize) {
                 ERROR("Failed to read from %s: %d %s", tarball.c_str(), errno, strerror(errno));
-                int ret;
-                EINTRWRAP(ret, fclose(f));
+                fclose(f);
                 return false;
             }
             schedulerWebSocket->send(WebSocket::Binary, buf, chunkSize);
@@ -990,8 +988,7 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
             sent += chunkSize;
         } while (sent < static_cast<size_t>(st.st_size) && schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket);
     }
-    int ret;
-    EINTRWRAP(ret, fclose(f));
+    fclose(f);
     return schedulerWebSocket->state() == SchedulerWebSocket::ConnectedWebSocket;
 }
 
@@ -1035,8 +1032,7 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         const int exit_status = proc.get_exit_status();
         if (exit_status) {
             ERROR("Failed to run %s -v\n%s", data.resolvedCompiler.c_str(), stdErr.c_str());
-            int ret;
-            EINTRWRAP(ret, fclose(f));
+            fclose(f);
             return std::string();
         }
         stdOut += stdErr;
@@ -1046,10 +1042,10 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {
             ERROR("Failed to write to %s: %d %s", info.c_str(), errno, strerror(errno));
-            EINTRWRAP(ret, fclose(f));
+            fclose(f);
             return std::string();
         }
-        EINTRWRAP(ret, fclose(f));
+        fclose(f);
     }
 
     std::string stdOut, stdErr;

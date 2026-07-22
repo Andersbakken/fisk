@@ -273,8 +273,7 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
             ERROR(__VA_ARGS__); \
         } \
         if (f) { \
-            int r; \
-            EINTRWRAP(r, fclose(f)); \
+            fclose(f); \
         } \
         return false; \
     } while (false)
@@ -317,10 +316,7 @@ inline bool readFile(const std::string &fileName, T &t, bool *opened = nullptr, 
     if (read != size)
         READFILE_ERR("Failed to read from %s (%d %s)", fileName.c_str(), errno, strerror(errno));
 
-    {
-        int ret;
-        EINTRWRAP(ret, fclose(f));
-    }
+    fclose(f);
 
     return true;
 }

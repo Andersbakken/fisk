@@ -51,8 +51,7 @@ void Log::init(Log::Level level, std::string &&file, LogFileMode mode)
 void Log::shutdown()
 {
     if (sLogFile) {
-        int ret;
-        EINTRWRAP(ret, fclose(sLogFile));
+        fclose(sLogFile);
         sLogFile = nullptr;
     }
 }
@@ -149,8 +148,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
         fflush(sLogFile);
         if (fd != -1) {
             flock(fd, LOCK_UN);
-            int ret;
-            EINTRWRAP(ret, fclose(sLogFile));
+            fclose(sLogFile);
             sLogFile = nullptr;
         }
     }
