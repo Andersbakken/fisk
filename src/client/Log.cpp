@@ -5,7 +5,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-static Log::Level sLevel = Log::Fatal;
+static Log::Level sLevel = Log::Error;
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
 static const unsigned long long sPid = getpid();
