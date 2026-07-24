@@ -217,30 +217,56 @@ bool Config::init(int &argc, char **&argv)
         consumeArg(0);
     }
 
+    int dashdash = -1;
+    for (i = 1; i < argc; ++i) {
+        if (!strcmp("--", argv[i])) {
+            dashdash = i;
+            consumeArg(0);
+            break;
+        }
+    }
+
+    int originalOffset = 0;
+    i = 1;
     while (i < argc) {
-        if (!strcmp("--help", argv[i])) {
+        ++originalOffset;
+        char *arg = argv[i];
+        if (!strcmp("--help", arg)) {
             gotHelp = true;
+            help.apply(true);
+            if (originalOffset > dashdash) {
+                help.mAmbiguous = true;
+            }
             ++i;
             continue;
         }
 
-        if (!strcmp("--version", argv[i])) {
+        if (!strcmp("--version", arg)) {
             gotVersion = true;
+            version.apply(true);
+            if (originalOffset >= dashdash) {
+                version.mAmbiguous = true;
+            }
             ++i;
             continue;
         }
 
-        if (strncmp("--fisk-", argv[i], 7)) {
-            ++i;
-            continue;
+        int argOffset = 7;
+        if (strncmp("--fisk-", arg, 7)) {
+            if (originalOffset < dashdash) {
+                argOffset = 2;
+            } else {
+                ++i;
+                continue;
+            }
         }
 
         std::string key;
-        char *eq = strchr(argv[i] + 7, '=');
+        char *eq = strchr(arg + argOffset, '=');
         if (eq) {
-            key.assign(argv[i] + 7, eq);
+            key.assign(arg + argOffset, eq);
         } else {
-            key = argv[i] + 7;
+            key = arg + argOffset;
         }
         auto it = sGetters.find(key);
         bool no = false;
@@ -249,7 +275,7 @@ bool Config::init(int &argc, char **&argv)
             no = true;
         }
         if (it == sGetters.end() || (no && !it->second->isBoolean())) {
-            fprintf(stderr, "Unknown argument %s\n", argv[i]);
+            fprintf(stderr, "Unknown argument %s\n", arg);
             // for (auto foo : sGetters) {
             //     fprintf(stderr, "Balls: %s\n", foo.first.c_str());
             // }
@@ -285,20 +311,20 @@ bool Config::init(int &argc, char **&argv)
                 continue;
             } else {
                 usage(stderr);
-                fprintf(stderr, "Can't parse argument %s\n", argv[i]);
+                fprintf(stderr, "Can't parse argument %s\n", arg);
                 return false;
             }
         }
 
         if (i + 1 >= argc) {
             usage(stderr);
-            fprintf(stderr, "Missing argument for \"%s\"\n", argv[i]);
+            fprintf(stderr, "Missing argument for \"%s\"\n", arg);
             return false;
         }
 
         if (!it->second->apply(std::string(argv[i + 1]))) {
             usage(stderr);
-            fprintf(stderr, "Can't parse argument %s %s\n", argv[i], argv[i + 1]);
+            fprintf(stderr, "Can't parse argument %s %s\n", arg, argv[i + 1]);
             return false;
         }
         consumeArg(1);
@@ -439,6 +465,7 @@ void Config::usage(FILE *f)
     }
     fprintf(f, "  --help%*s%s (false)\n", max - 11, "", "Display this help (if argv0 is fiskc)");
     fprintf(f, "  --version%*s%s (false)\n", max - 14, "", "Display version information (if argv0 is fiskc)");
+    fprintf(f, "  --%*s%s\n", max - 7, "", "Treat all arguments before this as fiskc options. E.g. --scheduler=... -- = --fisk-scheduler=...");
 
     for (const GetterBase *getter : sOrderedGetters) {
         if (getter->jsonKey().empty()) {
