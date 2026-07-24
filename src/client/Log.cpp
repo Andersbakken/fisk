@@ -5,7 +5,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-static Log::Level sLevel = Log::Error;
+static Log::Level sLevel = {};
 static FILE *sLogFile = nullptr;
 static Log::LogFileMode sLogFileMode = Log::Overwrite;
 static const unsigned long long sPid = getpid();
@@ -91,6 +91,7 @@ static void logTime(FILE *f, unsigned long long elapsed)
 static void writeWithPrefix(FILE *f, const std::string &string, bool addPrefix, unsigned long long elapsed)
 {
     if (!addPrefix) {
+        fwrite("fiskc: ", 1, 7, f);
         fwrite(string.c_str(), 1, string.size(), f);
         return;
     }
@@ -121,7 +122,7 @@ void Log::log(Level level, const std::string &string, unsigned int flags)
     assert(!string.empty());
     const unsigned long long elapsed = Client::mono() - Client::started;
     if (level >= sLevel) {
-        writeWithPrefix(f, string, Config::logTimePrefix, elapsed);
+        writeWithPrefix(f, string, sLevel < Log::Error && Config::logTimePrefix, elapsed);
     }
     int fd = -1;
     if (!sLogFileName.empty() && sLogFileMode == Append) {

@@ -150,7 +150,7 @@ Getter<bool> logStdOut("log-stdout", "Write logs to stdout (rather than stderr t
 Getter<std::string> logFile("log-file", "Log file");
 Getter<bool> logFileAppend("log-file-append", "Append to log file (rather than overwriting)", false);
 Getter<std::string> logLevel("log-level", "Log level (Level can be: \"verbose\", \"debug\", \"warn\", \"error\", \"fatal\" or \"silent\")",
-                             "fatal");
+                             "error");
 
 Getter<bool> logTimePrefix("log-time-prefix", "Add a time prefix to logs", true);
 Getter<bool> debug("debug", "Set log level to \"debug\"", false);

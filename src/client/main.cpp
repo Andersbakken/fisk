@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 
     std::string clientName = Config::name;
 
-    Log::Level level = Log::Fatal;
+    Log::Level level = Log::Error;
     const std::string logLevel = Config::logLevel;
     if (!logLevel.empty()) {
         bool ok;
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
             select.exec();
         }
         if (data.watchdog->timedOut()) {
-            DEBUG("Have to run locally because we timed out waiting for preprocessing");
+            ERROR("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
         }
         if (releaseCppSlotOnCppFinished)
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
         "scheduler");
 
     if (std::holds_alternative<std::string>(schedulerWebsocketResult)) {
-        DEBUG("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
+        ERROR("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
         runLocal(std::get<std::string>(schedulerWebsocketResult));
     }
     std::unique_ptr<SchedulerWebSocket> schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(schedulerWebsocketResult));
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
         "builder");
 
     if (std::holds_alternative<std::string>(builderWebSocketResult)) {
-        DEBUG("Have to run locally because builder connect failed: %s", std::get<std::string>(builderWebSocketResult).c_str());
+        ERROR("Have to run locally because builder connect failed: %s", std::get<std::string>(builderWebSocketResult).c_str());
         runLocal(std::get<std::string>(builderWebSocketResult));
     }
     std::unique_ptr<BuilderWebSocket> builderWebSocket = std::get<std::unique_ptr<BuilderWebSocket>>(std::move(builderWebSocketResult));
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
             select.exec();
         }
         if (data.watchdog->timedOut()) {
-            DEBUG("Have to run locally because we timed out waiting for preprocessing");
+            ERROR("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
         }
 
