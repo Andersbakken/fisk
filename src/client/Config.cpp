@@ -220,14 +220,12 @@ bool Config::init(int &argc, char **&argv)
     while (i < argc) {
         if (!strcmp("--help", argv[i])) {
             gotHelp = true;
-            help.mAmbiguous = true;
             ++i;
             continue;
         }
 
         if (!strcmp("--version", argv[i])) {
             gotVersion = true;
-            version.mAmbiguous = true;
             ++i;
             continue;
         }
@@ -356,16 +354,18 @@ bool Config::init(int &argc, char **&argv)
         }
     }
 
-    if ((gotHelp || gotVersion) && static_cast<std::string>(compiler).empty()) {
+    if ((gotHelp || gotVersion) && compiler.get().empty()) {
         std::string file;
         Client::parsePath(argv[0], &file, nullptr);
         if (file == "fiskc") {
             if (gotHelp) {
-                help.apply(std::string());
+                help.apply(true);
+                help.mAmbiguous = false;
             }
 
             if (gotVersion) {
-                version.apply(std::string());
+                version.apply(true);
+                version.mAmbiguous = false;
             }
         }
     }

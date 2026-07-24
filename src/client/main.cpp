@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         return 105;
     }
 
-    if (Config::help && !Config::version.isAmbiguous()) {
+    if (Config::help && !Config::help.isAmbiguous()) {
         Config::usage(stdout);
         return 0;
     }
