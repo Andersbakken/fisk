@@ -14,6 +14,7 @@
 #ifdef __linux__
 #include <sys/inotify.h>
 #endif
+#include <ifaddrs.h>
 #include <process.hpp>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -746,6 +747,7 @@ static std::string argsAsString()
 
 void Client::runLocal(const std::string &reason)
 {
+    checkInterfaces();
     const Client::Data &data = Client::data();
     DEBUG("Running local because %s\n%s", reason.c_str(), argsAsString().c_str());
 
@@ -918,6 +920,51 @@ bool Client::uncompressToFile(const std::string &fileName, FILE *f, const void *
     return true;
 }
 
+void Client::checkInterfaces()
+{
+    if ((*Config::schedulerInterface).empty() && (*Config::builderInterface).empty()) {
+        return;
+    }
+
+    std::string schedulerInterface = Config::schedulerInterface;
+    std::string builderInterface = Config::builderInterface;
+
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == -1) {
+        ERROR("Failed to get network interfaces: %d %s", errno, strerror(errno));
+        return;
+    }
+
+    for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) {
+            continue;
+        }
+
+        if (ifa->ifa_name == nullptr) {
+            continue;
+        }
+
+        if (schedulerInterface == ifa->ifa_name) {
+            schedulerInterface.clear();
+        } else if (builderInterface == ifa->ifa_name) {
+            builderInterface.clear();
+        }
+        if (schedulerInterface.empty() && builderInterface.empty()) {
+            break;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+
+    if (!schedulerInterface.empty()) {
+        ERROR("Scheduler interface %s not found", schedulerInterface.c_str());
+    }
+
+    if (!builderInterface.empty()) {
+        ERROR("Builder interface %s not found", builderInterface.c_str());
+    }
+}
+
 std::string Client::base64(const std::string &src)
 {
     BIO *b64 = BIO_new(BIO_f_base64());
@@ -1037,7 +1084,6 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         }
         stdOut += stdErr;
         filter(stdOut);
-        int ret;
         ssize_t w;
         EINTRWRAP(w, fwrite(stdOut.c_str(), 1, stdOut.size(), f));
         if (w != static_cast<int>(stdOut.size())) {

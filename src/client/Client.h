@@ -129,6 +129,7 @@ bool recursiveRmdir(const std::string &path);
 std::string realpath(const std::string &path);
 std::string cwd();
 bool uncompressToFile(const std::string &fileName, FILE *f, const void *bytes, size_t len);
+void checkInterfaces();
 
 template <size_t StaticBufSize = 4096>
 inline static std::string vformat(const char *format, va_list args)

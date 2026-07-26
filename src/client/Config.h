@@ -172,6 +172,11 @@ public:
         return mGetter(mValue);
     }
 
+    T operator*() const
+    {
+        return mGetter(mValue);
+    }
+
     virtual void flip() override
     {
         assert(isBoolean());
