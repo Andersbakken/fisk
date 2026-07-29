@@ -18,10 +18,18 @@ void Watchdog::transition(Stage stage)
 {
     if (mState != Running)
         return;
-    Watchdog::timings[mStage + 1] = Client::mono();
     std::unique_lock<std::mutex> lock(Client::mutex());
-    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(stages[mStage]), stageName(stage), Watchdog::timings[mStage + 1] - Watchdog::timings[mStage]);
+    // Validate before writing: timings has Finished + 1 entries, so an unexpected
+    // or repeated transition would write past the end, and asserts are compiled
+    // out in release builds.
+    assert(mStage + 1 < stages.size());
     assert(stages[mStage + 1] == stage);
+    if (mStage + 1 >= stages.size() || stages[mStage + 1] != stage) {
+        ERROR("Unexpected watchdog transition to %s from stage %zu (%s)", stageName(stage), mStage, stageName(stages[mStage]));
+        return;
+    }
+    Watchdog::timings[mStage + 1] = Client::mono();
+    DEBUG("Watchdog transition from %s to %s (stage took %llu)", stageName(stages[mStage]), stageName(stage), Watchdog::timings[mStage + 1] - Watchdog::timings[mStage]);
     ++mStage;
     mTransitionTime = Client::mono();
 }
