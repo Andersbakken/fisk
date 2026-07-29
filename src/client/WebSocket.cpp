@@ -23,20 +23,25 @@ static inline std::string create_acceptkey(const std::string &clientkey)
 
 static inline size_t random(void *data, size_t len)
 {
-    FILE *f = fopen("/dev/urandom", "r");
-    if (!f) {
+    // Called for every outgoing frame's mask, so keep the descriptor rather than
+    // reopening /dev/urandom each time.
+    static int fd = ::open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+    if (fd == -1) {
         ERROR("Can't open /dev/urandom for reading %d %s", errno, strerror(errno));
         return 0;
     }
 
-    ssize_t ret;
-    EINTRWRAP(ret, read(fileno(f), data, len));
-    if (ret != static_cast<int>(len)) {
-        ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
-        return 0;
+    size_t got = 0;
+    while (got < len) {
+        ssize_t ret;
+        EINTRWRAP(ret, ::read(fd, static_cast<unsigned char *>(data) + got, len - got));
+        if (ret <= 0) {
+            ERROR("Can't read from /dev/urandom %d %s", errno, strerror(errno));
+            return 0;
+        }
+        got += static_cast<size_t>(ret);
     }
-    fclose(f);
-    return ret;
+    return got;
 }
 
 WebSocket::WebSocket()
