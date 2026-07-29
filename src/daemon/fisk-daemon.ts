@@ -38,7 +38,7 @@ const common = commonFunc(option);
 const debug = option("debug") as boolean;
 
 process.on("unhandledRejection", (reason: Error, p: Promise<unknown>) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason?.stack);
+    console.error("Unhandled Rejection at: Promise", p, "reason:", reason?.stack);
     process.exit();
     // if (client)
     //     client.send('log', { message: `Unhandled Rejection at: Promise ${p}, reason: ${reason.stack}` });
@@ -67,6 +67,10 @@ const compileSlots = new Slots(option.int("slots", Math.max(os.cpus().length, 1)
 const localSlotCount = option.int("local-slots", 0);
 const localSlots = new Slots(localSlotCount, "local", debug);
 const localSlotsMaxLoad = (option("local-slots-max-load") as number) || 0;
+
+console.log(
+    `cpp slots: ${cppSlots.capacity}, compile slots: ${compileSlots.capacity}, local slots: ${localSlots.capacity}, local max load: ${localSlotsMaxLoad}`
+);
 
 const compilerInfoCache = new CompilerInfoCache();
 
@@ -220,9 +224,7 @@ server.on("compile", (compile) => {
     });
 
     compile.on("acquireSlot", (msg?: { type?: string; compiler?: unknown }) => {
-        if (debug) {
-            console.log("acquireSlot", msg);
-        }
+        console.log("acquireSlot", msg);
 
         const compilerPath: string | null =
             msg && typeof msg.compiler === "string" && msg.compiler.length > 0 ? msg.compiler : null;
