@@ -380,16 +380,14 @@ unsigned int WebSocket::mode() const
 void WebSocket::onWrite()
 {
     if (mState == ConnectingTCP) {
-        int err;
-        do {
-            socklen_t size = sizeof(err);
-            int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size);
-
-            if (e == -1) {
-                setError(Client::format("Failed to getsockopt (%d %s)", errno, strerror(errno)));
-                return;
-            }
-        } while (err == EINTR);
+        int err = 0;
+        socklen_t size = sizeof(err);
+        int e;
+        EINTRWRAP(e, ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size));
+        if (e == -1) {
+            setError(Client::format("Failed to getsockopt (%d %s)", errno, strerror(errno)));
+            return;
+        }
 
         if (err == EINPROGRESS) {
             DEBUG("Still connecting to host %s:%d", mHost.c_str(), mPort);

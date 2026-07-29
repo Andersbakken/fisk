@@ -86,17 +86,15 @@ unsigned int DaemonSocket::mode() const
 void DaemonSocket::onWrite()
 {
     if (mState == Connecting) {
-        int err;
-        do {
-            socklen_t size = sizeof(err);
-            int e = ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size);
-
-            if (e == -1) {
-                mState = Error;
-                ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
-                return;
-            }
-        } while (err == EINTR);
+        int err = 0;
+        socklen_t size = sizeof(err);
+        int e;
+        EINTRWRAP(e, ::getsockopt(mFD, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&err), &size));
+        if (e == -1) {
+            mState = Error;
+            ERROR("Failed to getsockopt (%d %s)", errno, strerror(errno));
+            return;
+        }
 
         if (err == EINPROGRESS) {
             DEBUG("Still connecting to socket %s", Config::socket.get().c_str());
