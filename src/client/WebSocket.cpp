@@ -262,43 +262,60 @@ bool WebSocket::requestUpgrade()
 void WebSocket::acceptUpgrade()
 {
     DEBUG("Accept upgrade %zu bytes", mRecvBuffer.size());
-    char *ch = reinterpret_cast<char *>(&mRecvBuffer[0]);
-    std::string headers;
-    for (size_t i = 0; i < mRecvBuffer.size() - 3; ++i) {
-        if (!strncmp(ch, "\r\n\r\n", 4)) {
-            headers.assign(reinterpret_cast<char *>(&mRecvBuffer[0]), i + 4);
-            mRecvBuffer.erase(mRecvBuffer.begin(), mRecvBuffer.begin() + i + 4);
+    // Must stay in WaitingForUpgrade until the whole header block has arrived:
+    // declaring success on a partial read would skip validation entirely and feed
+    // the rest of the HTTP response to wslay as if it were websocket frames.
+    if (mRecvBuffer.size() < 4) {
+        return;
+    }
+
+    const char *const base = reinterpret_cast<const char *>(&mRecvBuffer[0]);
+    size_t headerEnd = std::string::npos;
+    for (size_t i = 0; i + 4 <= mRecvBuffer.size(); ++i) {
+        if (!memcmp(base + i, "\r\n\r\n", 4)) {
+            headerEnd = i + 4;
             break;
         }
-        ++ch;
     }
-    if (!headers.empty()) {
-        mHandshakeResponseHeaders = Client::split(headers, "\r\n");
-        // for (size_t i=0; i<mHandshakeResponseHeaders.size(); ++i) {
-        //     printf("%zu/%zu: %s\n", i, mHandshakeResponseHeaders.size(), mHandshakeResponseHeaders[i].c_str());
-        // }
-
-        DEBUG("Got response headers %zu bytes", headers.size());
-
-        size_t keyhdstart;
-        if ((keyhdstart = headers.find("Sec-WebSocket-Accept: ")) == std::string::npos) {
-            ERROR("http_upgrade: missing required headers");
-            mState = Error;
-            return;
-        }
-        keyhdstart += 22;
-        const size_t keyhdend = headers.find("\r\n", keyhdstart);
-        const std::string accept_key = headers.substr(keyhdstart, keyhdend - keyhdstart);
-        if (accept_key != create_acceptkey(mClientKey)) {
-            ERROR("Invalid accept key, expected %s, got %s", create_acceptkey(mClientKey).c_str(), accept_key.c_str());
-            mState = Error;
-            return;
-        }
+    if (headerEnd == std::string::npos) {
+        DEBUG("Incomplete HTTP response headers (%zu bytes so far), waiting for more", mRecvBuffer.size());
+        return;
     }
+
+    const std::string headers(base, headerEnd);
+    mRecvBuffer.erase(mRecvBuffer.begin(), mRecvBuffer.begin() + headerEnd);
+
+    mHandshakeResponseHeaders = Client::split(headers, "\r\n");
+    DEBUG("Got response headers %zu bytes", headers.size());
+
+    const size_t statusLineEnd = headers.find("\r\n");
+    const std::string statusLine = headers.substr(0, statusLineEnd);
+    if (statusLine.compare(0, 5, "HTTP/") || statusLine.find(" 101 ") == std::string::npos) {
+        setError(Client::format("http_upgrade: expected \"101 Switching Protocols\" from %s, got \"%s\"",
+                                mUrl.c_str(),
+                                statusLine.c_str()));
+        return;
+    }
+
+    size_t keyhdstart = headers.find("Sec-WebSocket-Accept: ");
+    if (keyhdstart == std::string::npos) {
+        setError(Client::format("http_upgrade: missing required headers from %s", mUrl.c_str()));
+        return;
+    }
+    keyhdstart += 22;
+    const size_t keyhdend = headers.find("\r\n", keyhdstart);
+    const std::string accept_key = headers.substr(keyhdstart, keyhdend - keyhdstart);
+    if (accept_key != create_acceptkey(mClientKey)) {
+        setError(Client::format("Invalid accept key from %s, expected %s, got %s",
+                                mUrl.c_str(),
+                                create_acceptkey(mClientKey).c_str(),
+                                accept_key.c_str()));
+        return;
+    }
+
     const int ret = wslay_event_context_client_init(&mContext, &mCallbacks, this);
     if (ret != 0) {
-        ERROR("Failed to initialize wslay context: %d", ret);
-        mState = Error;
+        setError(Client::format("Failed to initialize wslay context: %d", ret));
         return;
     }
     assert(mContext);

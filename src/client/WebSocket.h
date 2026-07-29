@@ -50,6 +50,7 @@ public:
 
     void setError(std::string error)
     {
+        ERROR("%s", error.c_str());
         mError = std::move(error);
         mState = Error;
     }
