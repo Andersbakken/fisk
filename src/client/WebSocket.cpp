@@ -335,6 +335,12 @@ bool WebSocket::send(MessageType type, const void *msg, size_t len)
 
 void WebSocket::close(const char *reason)
 {
+    // mContext only exists once the handshake completed, and close() is reachable
+    // before that, notably from the connect timeout paths.
+    if (!mContext) {
+        mState = Closed;
+        return;
+    }
     wslay_event_queue_close(mContext, 1000, reinterpret_cast<const uint8_t *>(reason), reason ? strlen(reason) : 0);
     wslay_event_send(mContext);
 }
