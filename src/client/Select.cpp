@@ -59,7 +59,6 @@ int Select::exec(int timeoutMs) const
     const unsigned long long after = Client::mono();
     VERBOSE("Woke up from select timeout %dms after %llums with %d sockets fired", timeoutMs, after - before, ret);
 
-    size_t idx = 0;
     if (FD_ISSET(mPipe[0], &r)) {
         --ret;
         char ch;
@@ -68,21 +67,39 @@ int Select::exec(int timeoutMs) const
             readRet = ::read(mPipe[0], &ch, 1);
         } while (readRet == -1 && errno == EINTR);
     }
-    for (Socket *socket : mSockets) {
-        if (!ret) {
-            if (timeouts[idx] >= 0) {
-                const unsigned long long socketTimeout = timeouts[idx] + before;
-                if (after >= socketTimeout)
-                    socket->onTimeout();
+
+    // Snapshot before dispatching: a callback may destroy a Socket, and ~Socket
+    // erases itself from mSockets, which would invalidate the iterator underneath
+    // us and desynchronise the parallel timeouts vector.
+    const std::vector<Socket *> sockets(mSockets.begin(), mSockets.end());
+    assert(sockets.size() == timeouts.size());
+    for (size_t idx = 0; idx < sockets.size() && idx < timeouts.size(); ++idx) {
+        Socket *socket = sockets[idx];
+        if (!mSockets.count(socket)) {
+            continue;
+        }
+        // Timeouts have to be evaluated whether or not any fd fired. Only the
+        // Watchdog reports a timeout and it has no fd, so gating this on ret == 0
+        // meant a single readable or writable socket could starve it forever, and
+        // once its timeout hit zero select() returned immediately every time.
+        if (timeouts[idx] >= 0 && after >= static_cast<unsigned long long>(timeouts[idx]) + before) {
+            socket->onTimeout();
+            if (!mSockets.count(socket)) {
+                continue;
             }
-            ++idx;
-        } else {
+        }
+        if (ret > 0) {
             const int fd = socket->fd();
             if (fd != -1) {
-                if (FD_ISSET(fd, &r))
+                if (FD_ISSET(fd, &r)) {
                     socket->onRead();
-                if (FD_ISSET(fd, &w))
+                    if (!mSockets.count(socket)) {
+                        continue;
+                    }
+                }
+                if (FD_ISSET(fd, &w)) {
                     socket->onWrite();
+                }
             }
         }
     }
