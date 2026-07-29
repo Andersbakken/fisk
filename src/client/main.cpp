@@ -27,6 +27,11 @@ extern "C" const char *npm_version;
 static std::string schedulerUrl();
 static int clientVerify();
 
+static int clampToInt(unsigned long long value)
+{
+    return value > static_cast<unsigned long long>(INT_MAX) ? INT_MAX : static_cast<int>(value);
+}
+
 template <typename T>
 static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(Select &select,
                                                                                const std::string &url,
@@ -69,13 +74,36 @@ static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(S
 
         select.add(websocket.get());
         DEBUG("Starting %s websocket", name);
+        // Separate from the stage watchdog on purpose: a dropped SYN just retransmits
+        // (1s, 3s, 7s, 15s), so the coarse stage budget gets burned in full, per
+        // translation unit, before we fall back to compiling locally.
+        const unsigned long long handshakeTimeout = Config::websocketHandshakeTimeout;
+        const unsigned long long handshakeDeadline = handshakeTimeout ? Client::mono() + handshakeTimeout : 0;
+        bool handshakeTimedOut = false;
         while (!websocket->connectFinished() && !watchdog->timedOut() && websocket->state() >= WebSocket::None && websocket->state() <= WebSocket::ConnectedWebSocket) {
-            select.exec();
+            int timeout = -1;
+            if (handshakeDeadline && websocket->state() != WebSocket::ConnectedWebSocket) {
+                const unsigned long long now = Client::mono();
+                if (now >= handshakeDeadline) {
+                    handshakeTimedOut = true;
+                    break;
+                }
+                timeout = clampToInt(handshakeDeadline - now);
+            }
+            select.exec(timeout);
         }
 
         if (watchdog->timedOut()) {
             DEBUG("Have to run locally because we timed out trying to connect to %s", name);
             return std::string("watchdog ") + name + " connect";
+        }
+
+        if (handshakeTimedOut) {
+            WARN("Timed out after %llums waiting for the %s websocket handshake (attempt %zu), state %d",
+                 handshakeTimeout,
+                 name,
+                 attempt,
+                 static_cast<int>(websocket->state()));
         }
 
         if (!websocket->connectFinished() && maxAttempts && attempt >= maxAttempts) {

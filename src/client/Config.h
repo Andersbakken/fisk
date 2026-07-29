@@ -309,6 +309,7 @@ extern Getter<unsigned long long> slotAcquisitionTimeout;
 extern Getter<unsigned long long> schedulerConnectTimeout;
 extern Getter<size_t> websocketConnectAttempts;
 extern Getter<unsigned long long> websocketConnectBackoff;
+extern Getter<unsigned long long> websocketHandshakeTimeout;
 extern Getter<unsigned long long> acquiredBuilderTimeout;
 extern Getter<unsigned long long> builderConnectTimeout;
 extern Getter<unsigned long long> preprocessTimeout;

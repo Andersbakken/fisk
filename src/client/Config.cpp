@@ -99,6 +99,9 @@ Getter<size_t> websocketConnectAttempts("websocket-connect-attempts",
 Getter<unsigned long long> websocketConnectBackoff("websocket-connect-backoff",
                                                    "Initial backoff in ms between websocket connect retries; doubles each retry, capped at 64x (0 disables)",
                                                    500);
+Getter<unsigned long long> websocketHandshakeTimeout("websocket-handshake-timeout",
+                                                     "Max ms to wait for the TCP connect and websocket handshake to complete before retrying or falling back to a local compile (0 disables)",
+                                                     1500);
 Getter<unsigned long long> acquiredBuilderTimeout("acquire-builder-timeout", "Set acquired builder watchdog timeout", 7500);
 Getter<unsigned long long> builderConnectTimeout("builder-connect-timeout", "Set builder connect watchdog timeout", 7500);
 Getter<unsigned long long> preprocessTimeout("preprocess-timeout", "Set preprocess watchdog timeout", 10 * 60000);
