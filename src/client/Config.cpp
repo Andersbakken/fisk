@@ -95,7 +95,7 @@ Getter<unsigned long long> slotAcquisitionTimeout("slot-acquisition-timeout", "S
 Getter<unsigned long long> schedulerConnectTimeout("scheduler-connect-timeout", "Set scheduler connect watchdog timeout", 15000);
 Getter<size_t> websocketConnectAttempts("websocket-connect-attempts",
                                         "Max websocket connect attempts before falling back to local (0 means unlimited)",
-                                        1);
+                                        3);
 Getter<unsigned long long> websocketConnectBackoff("websocket-connect-backoff",
                                                    "Initial backoff in ms between websocket connect retries; doubles each retry, capped at 64x (0 disables)",
                                                    500);

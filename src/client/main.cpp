@@ -47,18 +47,20 @@ static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(S
     do {
         if (websocket) {
             select.remove(websocket.get());
+            websocket.reset();
             if (backoffMs) {
                 // Exponential backoff: base, 2x, 4x, ..., capped at 64x base.
                 size_t shift = attempt - 1;
                 if (shift > 6)
                     shift = 6;
                 const unsigned long long delay = backoffMs << shift;
-                const int delayMs = delay > static_cast<unsigned long long>(INT_MAX)
-                    ? INT_MAX
-                    : static_cast<int>(delay);
-                DEBUG("Backing off %d ms before %s connect attempt %zu", delayMs, name, attempt + 1);
-                // Use select.exec so the watchdog can still fire during the sleep.
-                select.exec(delayMs);
+                const unsigned long long deadline = Client::mono() + delay;
+                DEBUG("Backing off %llu ms before %s connect attempt %zu", delay, name, attempt + 1);
+                // Loop because select.exec returns as soon as any fd fires; going
+                // through select at all is what keeps the watchdog able to fire.
+                for (unsigned long long now = Client::mono(); now < deadline && !watchdog->timedOut(); now = Client::mono()) {
+                    select.exec(clampToInt(deadline - now));
+                }
                 if (watchdog->timedOut()) {
                     DEBUG("Have to run locally because we timed out during %s backoff", name);
                     return std::string("watchdog ") + name + " backoff";
@@ -98,12 +100,15 @@ static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(S
             return std::string("watchdog ") + name + " connect";
         }
 
+        // A handshake timeout means our packets are being dropped rather than
+        // rejected, so retrying just black-holes another handshake budget. Retries
+        // are for failures that come back fast (a RST while the scheduler restarts).
         if (handshakeTimedOut) {
-            WARN("Timed out after %llums waiting for the %s websocket handshake (attempt %zu), state %d",
+            WARN("Timed out after %llums waiting for the %s websocket handshake, state %d, running locally",
                  handshakeTimeout,
                  name,
-                 attempt,
                  static_cast<int>(websocket->state()));
+            return std::string(name) + " handshake timeout";
         }
 
         if (!websocket->connectFinished() && maxAttempts && attempt >= maxAttempts) {
