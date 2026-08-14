@@ -706,7 +706,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> &&ar
         ret->commandLine.push_back("-MF");
         std::string dfile = out.substr(0, out.find_last_of('.')) + ".d";
         if (objectCache) {
-            Client::data().sha1Update("-MF", 2);
+            Client::data().sha1Update("-MF", 3);
             Client::data().sha1Update(dfile.c_str(), dfile.size());
             VERBOSE("SHA1'ing arg [-MF]");
             VERBOSE("SHA1'ing arg [%s]", dfile.c_str());
