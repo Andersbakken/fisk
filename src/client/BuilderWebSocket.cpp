@@ -232,11 +232,12 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
 
     if (clientData.compilerArgs && (Client::endsWith(front.path, ".o") || Client::endsWith(front.path, ".dwo"))) {
         const std::string &sourceFile = clientData.compilerArgs->sourceFile();
+        const std::string compilationDir = Client::cwd();
         if (!cachedSourcePath.empty() && cachedSourcePath != sourceFile) {
-            patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile);
+            patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile, compilationDir);
         }
         if (!cachedOriginalSourcePath.empty() && cachedOriginalSourcePath != sourceFile && cachedOriginalSourcePath != cachedSourcePath) {
-            patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile);
+            patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile, compilationDir);
         }
     }
 

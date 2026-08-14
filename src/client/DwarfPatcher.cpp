@@ -680,7 +680,10 @@ struct DeadString
     size_t length = 0;
 };
 
-bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldSourcePath, const std::string &newSourcePath)
+bool patchDwarfSourcePath(const std::string &objectFile,
+                          const std::string &oldSourcePath,
+                          const std::string &newSourcePath,
+                          const std::string &compilationDir)
 {
     ELFIO::elfio elf;
     if (!elf.load(objectFile)) {
@@ -744,16 +747,18 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
         return true;
     }
 
-    // Compute old/new directory paths
-    std::string oldDir, newDir;
+    // The builder compiles in the directory holding its copy of the source, so
+    // the stale DW_AT_comp_dir is the directory part of oldSourcePath. Its
+    // replacement is the directory the client is compiling in, which is where a
+    // local compile would have put it -- deriving it from newSourcePath instead
+    // would describe the source tree rather than the build tree.
+    std::string oldDir;
     {
-        size_t lastSlash = oldSourcePath.rfind('/');
+        const size_t lastSlash = oldSourcePath.rfind('/');
         if (lastSlash != std::string::npos)
             oldDir = oldSourcePath.substr(0, lastSlash);
-        lastSlash = newSourcePath.rfind('/');
-        if (lastSlash != std::string::npos)
-            newDir = newSourcePath.substr(0, lastSlash);
     }
+    const std::string &newDir = compilationDir;
 
     SectionBuffer strBuf, lineStrBuf, strOffsetsBuf;
     strBuf.load(elfClass, debugStr);
