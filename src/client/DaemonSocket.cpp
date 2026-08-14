@@ -208,6 +208,9 @@ void DaemonSocket::sendAcquireSlot(const std::string &compiler)
     nlohmann::json obj = nlohmann::json::object();
     obj["type"] = "acquireSlot";
     obj["compiler"] = compiler;
+    if (!Config::localSlot) {
+        obj["no-local"] = true;
+    }
     send(obj.dump());
 }
 

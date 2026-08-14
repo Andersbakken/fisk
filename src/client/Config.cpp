@@ -66,10 +66,9 @@ Getter<bool> color("color", "Set to false to disable colorized output", true);
 Getter<bool> jsonDiagnostics("json-diagnostics",
                              "Use json-diagnostics (-fdignostics-format=json) when possible to print proper carets for warnings and errors",
                              false);
-Getter<bool>
-    jsonDiagnosticsRaw("json-diagnostics-raw",
-                       "Use json-diagnostics (-fdignostics-format=json) when possible but print the json directly without transforming it",
-                       false);
+Getter<bool> jsonDiagnosticsRaw("json-diagnostics-raw",
+                                "Use json-diagnostics (-fdignostics-format=json) when possible but print the json directly without transforming it",
+                                false);
 
 Getter<bool> dumpSlots("dump-slots", "Dump slots info for fisk-daemon", false);
 Getter<bool> syncFileSystem("sync-file-system", "Call sync(2) after all writes", false);
@@ -130,6 +129,7 @@ Getter<size_t> cppSlots("cpp-slots", "Number of preprocess slots", std::thread::
                         [](const size_t &value) {
                             return std::max<size_t>(1, value);
                         });
+Getter<bool> localSlot("local-slot", "Whether local slots are allowed", true);
 Getter<std::string> releaseCppSlotMode("release-cpp-slot-mode", "Release cpp slot mode: cpp-finished or upload-finished", "cpp-finished");
 
 static Separator s8;

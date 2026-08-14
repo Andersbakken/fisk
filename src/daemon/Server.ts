@@ -147,6 +147,7 @@ export class Server extends EventEmitter {
             });
         });
     }
+
     _onConnection(conn: net.Socket): void {
         const compile = new Compile(conn, ++this._connectionId, this.option);
         if (this.debug) {

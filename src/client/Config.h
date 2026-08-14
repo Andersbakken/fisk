@@ -336,6 +336,7 @@ extern Getter<std::string> statisticsLog;
 
 extern Getter<size_t> compileSlots;
 extern Getter<size_t> cppSlots;
+extern Getter<bool> localSlot;
 extern Getter<std::string> releaseCppSlotMode;
 extern Getter<bool> watchdog;
 extern Getter<bool> verify;

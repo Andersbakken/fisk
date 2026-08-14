@@ -223,7 +223,7 @@ server.on("compile", (compile) => {
         }
     });
 
-    compile.on("acquireSlot", (msg?: { type?: string; compiler?: unknown }) => {
+    compile.on("acquireSlot", (msg?: { type?: string; compiler?: unknown; "no-local"?: boolean }) => {
         console.log("acquireSlot", msg);
 
         const compilerPath: string | null =
@@ -259,7 +259,7 @@ server.on("compile", (compile) => {
                     compile.send(response);
                 };
 
-                if (canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
+                if (!msg?.["no-local"] && canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
                     if (debug) {
                         console.log("acquireSlot -> local slot granted");
                     }
