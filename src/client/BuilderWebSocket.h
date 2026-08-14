@@ -28,6 +28,7 @@ public:
     bool done { false };
     std::string error;
     std::string cachedSourcePath;
+    std::string cachedOriginalSourcePath;
 };
 
 #endif /* BUILDERWEBSOCKET_H */

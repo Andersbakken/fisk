@@ -133,6 +133,10 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         if (sourcePath.is_string()) {
             cachedSourcePath = jstring(sourcePath);
         }
+        const auto &originalSourcePath = msg["originalSourcePath"];
+        if (originalSourcePath.is_string()) {
+            cachedOriginalSourcePath = jstring(originalSourcePath);
+        }
 
         if (hasIndex && !index.empty()) {
             files.reserve(index.size());
@@ -226,8 +230,14 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
         return;
     }
 
-    if (!cachedSourcePath.empty() && clientData.compilerArgs && (Client::endsWith(front.path, ".o") || Client::endsWith(front.path, ".dwo")) && cachedSourcePath != clientData.compilerArgs->sourceFile()) {
-        patchDwarfSourcePath(front.path, cachedSourcePath, clientData.compilerArgs->sourceFile());
+    if (clientData.compilerArgs && (Client::endsWith(front.path, ".o") || Client::endsWith(front.path, ".dwo"))) {
+        const std::string &sourceFile = clientData.compilerArgs->sourceFile();
+        if (!cachedSourcePath.empty() && cachedSourcePath != sourceFile) {
+            patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile);
+        }
+        if (!cachedOriginalSourcePath.empty() && cachedOriginalSourcePath != sourceFile && cachedOriginalSourcePath != cachedSourcePath) {
+            patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile);
+        }
     }
 
     files.erase(files.begin());

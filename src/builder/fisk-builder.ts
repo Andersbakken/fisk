@@ -961,6 +961,7 @@ server.on("job", (job: Job) => {
                     exitCode: event.exitCode,
                     sha1: jobJob.sha1,
                     sourcePath: path.join(j.op!.vmDir, "sourcefile"),
+                    originalSourcePath: jobJob.sourcePath,
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
