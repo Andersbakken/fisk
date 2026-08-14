@@ -87,6 +87,14 @@ enum
     ELFCOMPRESS_ZLIB = 1,
 };
 
+// How a DW_AT_name / DW_AT_comp_dir attribute references its string.
+enum
+{
+    STR_STRP = 0,      // offset into .debug_str
+    STR_STRX = 1,      // index into .debug_str_offsets (string in .debug_str)
+    STR_LINESTRP = 2,  // offset into .debug_line_str
+};
+
 static uint64_t readULEB128(const uint8_t *&p)
 {
     uint64_t result = 0;
@@ -212,31 +220,59 @@ static size_t findStringInSection(const char *sectionData, size_t sectionSize, c
     return static_cast<size_t>(-1);
 }
 
+// The ELF compression header (Chdr) has a different layout for ELF32 and ELF64:
+//   ELF32: ch_type(4), ch_size(4), ch_addralign(4)  = 12 bytes
+//   ELF64: ch_type(4), ch_reserved(4), ch_size(8), ch_addralign(8) = 24 bytes
+// Everything here must be driven by the ELF class of the file being patched,
+// not the host that happens to be running the patcher.
+static size_t chdrHeaderSize(int elfClass)
+{
+    return elfClass == ELFIO::ELFCLASS32 ? 12 : 24;
+}
+
+static uint64_t readChdrUncompressedSize(ELFIO::section *sec, int elfClass)
+{
+    const char *data = sec->get_data();
+    if (elfClass == ELFIO::ELFCLASS32) {
+        uint32_t chSize;
+        memcpy(&chSize, data + 4, 4);
+        return chSize;
+    }
+    uint64_t chSize;
+    memcpy(&chSize, data + 8, 8);
+    return chSize;
+}
+
+static uint64_t readChdrAlign(ELFIO::section *sec, int elfClass)
+{
+    const char *data = sec->get_data();
+    if (elfClass == ELFIO::ELFCLASS32) {
+        uint32_t chAlign;
+        memcpy(&chAlign, data + 8, 4);
+        return chAlign;
+    }
+    uint64_t chAlign;
+    memcpy(&chAlign, data + 16, 8);
+    return chAlign;
+}
+
 // Decompress a SHF_COMPRESSED section. Returns false on failure.
-static bool decompressSection(ELFIO::section *sec, std::vector<uint8_t> &out)
+static bool decompressSection(ELFIO::section *sec, int elfClass, std::vector<uint8_t> &out)
 {
     const char *data = sec->get_data();
     size_t dataSize = sec->get_size();
 
-    // Parse Elf64_Chdr or Elf32_Chdr
-    // For ELF64: ch_type(4), ch_reserved(4), ch_size(8), ch_addralign(8) = 24 bytes
-    // For ELF32: ch_type(4), ch_size(4), ch_addralign(4) = 12 bytes
-    // We detect based on section's owner ELF class
     uint32_t chType;
-    uint64_t uncompressedSize;
-    size_t headerSize;
-
     memcpy(&chType, data, 4);
     if (chType != ELFCOMPRESS_ZLIB) {
         DEBUG("DwarfPatcher: unsupported compression type %u", chType);
         return false;
     }
 
-    // Assume ELF64 since we're on x86_64
-    headerSize = 24;
-    memcpy(&uncompressedSize, data + 8, 8);
+    const uint64_t uncompressedSize = readChdrUncompressedSize(sec, elfClass);
+    const size_t headerSize = chdrHeaderSize(elfClass);
 
-    out.resize(uncompressedSize);
+    out.resize(static_cast<size_t>(uncompressedSize));
     uLongf destLen = uncompressedSize;
     int ret = uncompress(out.data(), &destLen, reinterpret_cast<const Bytef *>(data + headerSize), dataSize - headerSize);
     if (ret != Z_OK) {
@@ -247,34 +283,203 @@ static bool decompressSection(ELFIO::section *sec, std::vector<uint8_t> &out)
     return true;
 }
 
-// Compress data back into SHF_COMPRESSED format with Elf64_Chdr header.
-static std::vector<uint8_t> compressSection(const std::vector<uint8_t> &uncompressed, uint64_t alignment)
+// Compress data back into SHF_COMPRESSED format with a Chdr header matching the ELF class.
+static std::vector<uint8_t> compressSection(int elfClass, const std::vector<uint8_t> &uncompressed, uint64_t alignment)
 {
     uLongf compBound = compressBound(uncompressed.size());
-    std::vector<uint8_t> result(24 + compBound);
+    const size_t headerSize = chdrHeaderSize(elfClass);
+    std::vector<uint8_t> result(headerSize + compBound);
 
-    // Write Elf64_Chdr
-    uint32_t chType = ELFCOMPRESS_ZLIB;
-    uint32_t chReserved = 0;
-    uint64_t chSize = uncompressed.size();
-    uint64_t chAlign = alignment;
-    memcpy(result.data(), &chType, 4);
-    memcpy(result.data() + 4, &chReserved, 4);
-    memcpy(result.data() + 8, &chSize, 8);
-    memcpy(result.data() + 16, &chAlign, 8);
+    if (elfClass == ELFIO::ELFCLASS32) {
+        uint32_t chType = ELFCOMPRESS_ZLIB;
+        uint32_t chSize = static_cast<uint32_t>(uncompressed.size());
+        uint32_t chAlign = static_cast<uint32_t>(alignment);
+        memcpy(result.data(), &chType, 4);
+        memcpy(result.data() + 4, &chSize, 4);
+        memcpy(result.data() + 8, &chAlign, 4);
+    } else {
+        uint32_t chType = ELFCOMPRESS_ZLIB;
+        uint32_t chReserved = 0;
+        uint64_t chSize = uncompressed.size();
+        uint64_t chAlign = alignment;
+        memcpy(result.data(), &chType, 4);
+        memcpy(result.data() + 4, &chReserved, 4);
+        memcpy(result.data() + 8, &chSize, 8);
+        memcpy(result.data() + 16, &chAlign, 8);
+    }
 
     uLongf destLen = compBound;
-    compress(result.data() + 24, &destLen, uncompressed.data(), uncompressed.size());
-    result.resize(24 + destLen);
+    compress(result.data() + headerSize, &destLen, uncompressed.data(), uncompressed.size());
+    result.resize(headerSize + destLen);
     return result;
 }
+
+// Holds a possibly SHF_COMPRESSED section in a decompressed, modifiable buffer.
+// Nothing is written back to the ELF unless modified.
+struct SectionBuffer
+{
+    ELFIO::section *sec = nullptr;
+    std::vector<uint8_t> data;
+    bool compressed = false;
+    uint64_t origAlign = 1;
+    bool modified = false;
+
+    bool load(int elfClass, ELFIO::section *s)
+    {
+        sec = s;
+        if (!s)
+            return false;
+        compressed = (s->get_flags() & SHF_COMPRESSED) != 0;
+        if (compressed) {
+            origAlign = readChdrAlign(s, elfClass);
+            return decompressSection(s, elfClass, data);
+        }
+        data.assign(s->get_data(), s->get_data() + s->get_size());
+        return true;
+    }
+
+    void save(int elfClass)
+    {
+        if (!sec || !modified)
+            return;
+        if (compressed) {
+            auto compressedData = compressSection(elfClass, data, origAlign);
+            sec->set_data(reinterpret_cast<const char *>(compressedData.data()), static_cast<ELFIO::Elf_Word>(compressedData.size()));
+        } else {
+            sec->set_data(reinterpret_cast<const char *>(data.data()), static_cast<ELFIO::Elf_Word>(data.size()));
+        }
+    }
+
+    bool readOffset(size_t pos, uint8_t size, size_t &out) const
+    {
+        if (pos + size > data.size())
+            return false;
+        if (size == 4) {
+            uint32_t v;
+            memcpy(&v, data.data() + pos, 4);
+            out = v;
+            return true;
+        }
+        if (size == 8) {
+            uint64_t v;
+            memcpy(&v, data.data() + pos, 8);
+            out = v;
+            return true;
+        }
+        return false;
+    }
+
+    bool writeOffset(size_t pos, uint8_t size, size_t val)
+    {
+        if (pos + size > data.size())
+            return false;
+        if (size == 4) {
+            uint32_t v = static_cast<uint32_t>(val);
+            memcpy(data.data() + pos, &v, 4);
+            modified = true;
+            return true;
+        }
+        if (size == 8) {
+            uint64_t v = static_cast<uint64_t>(val);
+            memcpy(data.data() + pos, &v, 8);
+            modified = true;
+            return true;
+        }
+        return false;
+    }
+
+    size_t find(const std::string &str) const
+    {
+        return findStringInSection(reinterpret_cast<const char *>(data.data()), data.size(), str);
+    }
+
+    // Return the offset of str, appending it (with NUL) if not present.
+    size_t append(const std::string &str)
+    {
+        size_t off = find(str);
+        if (off != static_cast<size_t>(-1))
+            return off;
+        off = data.size();
+        data.insert(data.end(), str.begin(), str.end());
+        data.push_back('\0');
+        modified = true;
+        return off;
+    }
+};
 
 // Structure to track which .debug_info offsets need relocation patching
 struct AttrLocation
 {
-    size_t infoOffset; // offset within .debug_info where the strp value is
+    size_t infoOffset; // offset within .debug_info where the attribute value is
     bool isName; // true = DW_AT_name, false = DW_AT_comp_dir
+    uint8_t strForm; // STR_STRP / STR_STRX / STR_LINESTRP
+    uint8_t offsetSize; // CU offset size: 4 (DWARF32) or 8 (DWARF64)
 };
+
+static uint8_t attributeStrForm(uint16_t form)
+{
+    switch (form) {
+        case DW_FORM_strp:
+            return STR_STRP;
+        case DW_FORM_line_strp:
+            return STR_LINESTRP;
+        case DW_FORM_strx:
+        case DW_FORM_strx1:
+        case DW_FORM_strx2:
+        case DW_FORM_strx3:
+        case DW_FORM_strx4:
+            return STR_STRX;
+        default:
+            return 0xff;
+    }
+}
+
+// Read the strx index value stored at p for a given strx form.
+static uint64_t readStrxIndex(const uint8_t *p, uint8_t form)
+{
+    switch (form) {
+        case DW_FORM_strx1:
+            return *p;
+        case DW_FORM_strx2: {
+            uint16_t v = 0;
+            memcpy(&v, p, 2);
+            return v;
+        }
+        case DW_FORM_strx3: {
+            uint32_t v = 0;
+            memcpy(&v, p, 3);
+            return v;
+        }
+        case DW_FORM_strx4: {
+            uint32_t v = 0;
+            memcpy(&v, p, 4);
+            return v;
+        }
+        default: { // DW_FORM_strx is a ULEB128
+            const uint8_t *q = p;
+            return readULEB128(q);
+        }
+    }
+}
+
+// Size of the DWARF5 .debug_str_offsets contribution header, and the size of
+// each entry (matches the CU offset size). Returns 0 on failure.
+static size_t strOffsetsHeaderSize(const uint8_t *data, size_t size, uint8_t &entrySize)
+{
+    if (size < 8)
+        return 0;
+    uint32_t unitLength;
+    memcpy(&unitLength, data, 4);
+    size_t header = 4;
+    uint8_t es = 4;
+    if (unitLength == 0xffffffffu) { // DWARF64
+        es = 8;
+        header += 8;
+    }
+    header += 4; // version + padding
+    entrySize = es;
+    return header;
+}
 
 // Parse the first CU's first DIE to find DW_AT_name and DW_AT_comp_dir positions.
 // Takes decompressed data buffers.
@@ -350,8 +555,11 @@ static bool findAttrLocations(const uint8_t *infoData, size_t infoSize, const ui
 
                 size_t attrOffset = p - infoData;
 
-                if ((attrName == DW_AT_name || attrName == DW_AT_comp_dir) && (attrForm == DW_FORM_strp || attrForm == DW_FORM_line_strp)) {
-                    locations.push_back({ attrOffset, attrName == DW_AT_name });
+                if (attrName == DW_AT_name || attrName == DW_AT_comp_dir) {
+                    uint8_t strForm = attributeStrForm(static_cast<uint16_t>(attrForm));
+                    if (strForm != 0xff) {
+                        locations.push_back({ attrOffset, attrName == DW_AT_name, strForm, offsetSize });
+                    }
                 }
 
                 // Advance past attribute value
@@ -377,6 +585,27 @@ static bool findAttrLocations(const uint8_t *infoData, size_t infoSize, const ui
     return false;
 }
 
+// Find the relocation entry whose r_offset equals targetOffset.
+static bool findRelocation(ELFIO::const_relocation_section_accessor &acc, ELFIO::Elf64_Addr targetOffset,
+                           ELFIO::Elf_Xword &index, ELFIO::Elf_Word &symbol, unsigned &type, ELFIO::Elf_Sxword &addend)
+{
+    for (ELFIO::Elf_Xword i = 0; i < acc.get_entries_num(); ++i) {
+        ELFIO::Elf64_Addr offset;
+        ELFIO::Elf_Word sym;
+        unsigned rtype;
+        ELFIO::Elf_Sxword ad;
+        acc.get_entry(i, offset, sym, rtype, ad);
+        if (offset == targetOffset) {
+            index = i;
+            symbol = sym;
+            type = rtype;
+            addend = ad;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldSourcePath, const std::string &newSourcePath)
 {
     ELFIO::elfio elf;
@@ -384,12 +613,16 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
         DEBUG("DwarfPatcher: failed to load ELF: %s", objectFile.c_str());
         return false;
     }
+    const int elfClass = elf.get_class();
 
     // Find sections
     ELFIO::section *debugInfo = nullptr;
     ELFIO::section *debugAbbrev = nullptr;
     ELFIO::section *debugStr = nullptr;
+    ELFIO::section *debugLineStr = nullptr;
+    ELFIO::section *debugStrOffsets = nullptr;
     ELFIO::section *relaDebugInfo = nullptr;
+    ELFIO::section *relaDebugStrOffsets = nullptr;
 
     for (auto &sec : elf.sections) {
         const std::string &name = sec->get_name();
@@ -399,8 +632,14 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
             debugAbbrev = sec.get();
         else if (name == ".debug_str" || name == ".debug_str.dwo")
             debugStr = sec.get();
-        else if (name == ".rela.debug_info")
+        else if (name == ".debug_line_str" || name == ".debug_line_str.dwo")
+            debugLineStr = sec.get();
+        else if (name == ".debug_str_offsets" || name == ".debug_str_offsets.dwo")
+            debugStrOffsets = sec.get();
+        else if (name == ".rela.debug_info" || name == ".rel.debug_info")
             relaDebugInfo = sec.get();
+        else if (name == ".rela.debug_str_offsets" || name == ".rel.debug_str_offsets")
+            relaDebugStrOffsets = sec.get();
     }
 
     if (!debugInfo || !debugAbbrev) {
@@ -408,45 +647,25 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
         return true;
     }
 
-    if (!debugStr) {
-        DEBUG("DwarfPatcher: no .debug_str in %s", objectFile.c_str());
+    if (!debugStr && !debugLineStr && !debugStrOffsets) {
+        DEBUG("DwarfPatcher: no string sections (.debug_str/.debug_line_str/.debug_str_offsets) in %s", objectFile.c_str());
         return true;
     }
 
-    // Decompress .debug_info and .debug_abbrev if compressed
-    std::vector<uint8_t> infoDecompressed, abbrevDecompressed;
-    const uint8_t *infoData;
-    size_t infoSize;
-    const uint8_t *abbrevDataPtr;
-    size_t abbrevSize;
-
-    if (debugInfo->get_flags() & SHF_COMPRESSED) {
-        if (!decompressSection(debugInfo, infoDecompressed)) {
-            DEBUG("DwarfPatcher: failed to decompress .debug_info in %s", objectFile.c_str());
-            return false;
-        }
-        infoData = infoDecompressed.data();
-        infoSize = infoDecompressed.size();
-    } else {
-        infoData = reinterpret_cast<const uint8_t *>(debugInfo->get_data());
-        infoSize = debugInfo->get_size();
+    // Decompress .debug_info and .debug_abbrev so they can be parsed (and patched).
+    SectionBuffer infoBuf, abbrevBuf;
+    if (!infoBuf.load(elfClass, debugInfo)) {
+        DEBUG("DwarfPatcher: failed to decompress .debug_info in %s", objectFile.c_str());
+        return false;
     }
-
-    if (debugAbbrev->get_flags() & SHF_COMPRESSED) {
-        if (!decompressSection(debugAbbrev, abbrevDecompressed)) {
-            DEBUG("DwarfPatcher: failed to decompress .debug_abbrev in %s", objectFile.c_str());
-            return false;
-        }
-        abbrevDataPtr = abbrevDecompressed.data();
-        abbrevSize = abbrevDecompressed.size();
-    } else {
-        abbrevDataPtr = reinterpret_cast<const uint8_t *>(debugAbbrev->get_data());
-        abbrevSize = debugAbbrev->get_size();
+    if (!abbrevBuf.load(elfClass, debugAbbrev)) {
+        DEBUG("DwarfPatcher: failed to decompress .debug_abbrev in %s", objectFile.c_str());
+        return false;
     }
 
     // Find DW_AT_name and DW_AT_comp_dir positions in .debug_info
     std::vector<AttrLocation> attrLocations;
-    if (!findAttrLocations(infoData, infoSize, abbrevDataPtr, abbrevSize, attrLocations) || attrLocations.empty()) {
+    if (!findAttrLocations(infoBuf.data.data(), infoBuf.data.size(), abbrevBuf.data.data(), abbrevBuf.data.size(), attrLocations) || attrLocations.empty()) {
         DEBUG("DwarfPatcher: could not find DW_AT_name/DW_AT_comp_dir in %s", objectFile.c_str());
         return true;
     }
@@ -462,167 +681,122 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
             newDir = newSourcePath.substr(0, lastSlash);
     }
 
-    // Check if .debug_str is compressed (SHF_COMPRESSED)
-    bool isCompressed = (debugStr->get_flags() & SHF_COMPRESSED) != 0;
-    bool hasRelocations = (relaDebugInfo != nullptr);
+    SectionBuffer strBuf, lineStrBuf, strOffsetsBuf;
+    strBuf.load(elfClass, debugStr);
+    lineStrBuf.load(elfClass, debugLineStr);
+    strOffsetsBuf.load(elfClass, debugStrOffsets);
 
-    DEBUG("DwarfPatcher: .debug_str compressed=%d, has_relocations=%d", isCompressed, hasRelocations);
+    // For RELA relocation sections the string offset lives in the relocation's
+    // addend, which ELFIO can rewrite. For REL sections the addend lives in the
+    // target section data itself (ELFIO's set_entry ignores the addend for REL),
+    // so we patch the decompressed target data directly instead.
+    const bool infoUsesRela = relaDebugInfo && relaDebugInfo->get_type() == ELFIO::SHT_RELA;
+    const bool strOffsetsUsesRela = relaDebugStrOffsets && relaDebugStrOffsets->get_type() == ELFIO::SHT_RELA;
 
-    if (hasRelocations) {
-        // --- Relocation-based approach for relocatable .o files ---
+    DEBUG("DwarfPatcher: .debug_str compressed=%d, .debug_info relocations=%s, .debug_str_offsets relocations=%s",
+          strBuf.compressed ? 1 : 0, infoUsesRela ? "rela" : (relaDebugInfo ? "rel" : "none"),
+          strOffsetsUsesRela ? "rela" : (relaDebugStrOffsets ? "rel" : "none"));
 
-        // Get the uncompressed .debug_str content
-        std::vector<uint8_t> strData;
-        if (isCompressed) {
-            if (!decompressSection(debugStr, strData)) {
-                DEBUG("DwarfPatcher: failed to decompress .debug_str in %s", objectFile.c_str());
-                return false;
-            }
-        } else {
-            strData.assign(debugStr->get_data(), debugStr->get_data() + debugStr->get_size());
-        }
+    bool patched = false;
 
-        // Use ELFIO's relocation accessor
-        ELFIO::const_relocation_section_accessor rela(elf, relaDebugInfo);
-        ELFIO::Elf64_Addr offset;
-        ELFIO::Elf_Word symbol;
-        unsigned rtype;
-        ELFIO::Elf_Sxword addend;
+    for (const auto &loc : attrLocations) {
+        const std::string &expected = loc.isName ? oldSourcePath : oldDir;
+        const std::string &replacement = loc.isName ? newSourcePath : newDir;
+        if (expected.empty() || replacement.empty() || expected == replacement)
+            continue;
 
-        // Find the .debug_str section index for matching relocations
-        ELFIO::Elf_Half debugStrIdx = debugStr->get_index();
+        SectionBuffer *strSection = nullptr;
+        SectionBuffer *owningBuf = nullptr;
+        size_t valuePos = 0;
+        ELFIO::section *relSec = nullptr;
+        bool usesRela = false;
 
-        bool patched = false;
-
-        for (const auto &loc : attrLocations) {
-            // Find the relocation entry for this .debug_info offset
-            for (ELFIO::Elf_Xword i = 0; i < rela.get_entries_num(); ++i) {
-                rela.get_entry(i, offset, symbol, rtype, addend);
-
-                if (static_cast<size_t>(offset) != loc.infoOffset)
+        switch (loc.strForm) {
+            case STR_STRP:
+                strSection = &strBuf;
+                owningBuf = &infoBuf;
+                valuePos = loc.infoOffset;
+                relSec = relaDebugInfo;
+                usesRela = infoUsesRela;
+                break;
+            case STR_LINESTRP:
+                strSection = &lineStrBuf;
+                owningBuf = &infoBuf;
+                valuePos = loc.infoOffset;
+                relSec = relaDebugInfo;
+                usesRela = infoUsesRela;
+                break;
+            case STR_STRX: {
+                strSection = &strBuf;
+                owningBuf = &strOffsetsBuf;
+                relSec = relaDebugStrOffsets;
+                usesRela = strOffsetsUsesRela;
+                uint8_t entrySize = 0;
+                size_t headerSize = strOffsetsHeaderSize(strOffsetsBuf.data.data(), strOffsetsBuf.data.size(), entrySize);
+                if (!headerSize)
                     continue;
-
-                // Verify this relocation targets .debug_str
-                std::string symName;
-                ELFIO::Elf64_Addr symValue;
-                ELFIO::Elf_Xword symSize;
-                unsigned char symBind, symType, symOther;
-                ELFIO::Elf_Half symSection;
-
-                // Get the symbol table section
-                ELFIO::section *symtab = elf.sections[relaDebugInfo->get_link()];
-                ELFIO::const_symbol_section_accessor syma(elf, symtab);
-                syma.get_symbol(symbol, symName, symValue, symSize, symBind, symType, symSection, symOther);
-
-                if (symSection != debugStrIdx) {
-                    DEBUG("DwarfPatcher: relocation at 0x%zx targets section %d, not .debug_str (%d)", loc.infoOffset, symSection, debugStrIdx);
-                    continue;
-                }
-
-                // The addend is the offset into the uncompressed .debug_str
-                size_t strOffset = static_cast<size_t>(addend);
-                if (strOffset >= strData.size()) {
-                    DEBUG("DwarfPatcher: addend 0x%zx beyond .debug_str size 0x%zx", strOffset, strData.size());
-                    continue;
-                }
-
-                const char *currentStr = reinterpret_cast<const char *>(strData.data() + strOffset);
-
-                if (loc.isName && strcmp(currentStr, oldSourcePath.c_str()) == 0) {
-                    // Append new source path to .debug_str
-                    size_t newOffset = strData.size();
-                    strData.insert(strData.end(), newSourcePath.begin(), newSourcePath.end());
-                    strData.push_back('\0');
-                    // Update the relocation addend
-                    rela.set_entry(i, offset, symbol, rtype, static_cast<ELFIO::Elf_Sxword>(newOffset));
-                    patched = true;
-                    DEBUG("DwarfPatcher: patched DW_AT_name relocation addend 0x%zx -> 0x%zx", strOffset, newOffset);
-                } else if (!loc.isName && !oldDir.empty() && strcmp(currentStr, oldDir.c_str()) == 0) {
-                    size_t newOffset = strData.size();
-                    strData.insert(strData.end(), newDir.begin(), newDir.end());
-                    strData.push_back('\0');
-                    rela.set_entry(i, offset, symbol, rtype, static_cast<ELFIO::Elf_Sxword>(newOffset));
-                    patched = true;
-                    DEBUG("DwarfPatcher: patched DW_AT_comp_dir relocation addend 0x%zx -> 0x%zx", strOffset, newOffset);
-                }
+                uint64_t index = readStrxIndex(infoBuf.data.data() + loc.infoOffset, loc.strForm);
+                valuePos = headerSize + static_cast<size_t>(index) * entrySize;
                 break;
             }
+            default:
+                continue;
         }
 
-        if (!patched) {
-            DEBUG("DwarfPatcher: no matching relocations found to patch in %s", objectFile.c_str());
-            return true;
-        }
+        if (!strSection || !owningBuf)
+            continue;
 
-        // Write back the (possibly modified) .debug_str
-        if (isCompressed) {
-            uint64_t origAlign = 1;
-            // Read alignment from original compression header
-            if (debugStr->get_size() >= 24) {
-                memcpy(&origAlign, debugStr->get_data() + 16, 8);
-            }
-            auto compressed = compressSection(strData, origAlign);
-            debugStr->set_data(reinterpret_cast<const char *>(compressed.data()), static_cast<ELFIO::Elf_Word>(compressed.size()));
-        } else {
-            debugStr->set_data(reinterpret_cast<const char *>(strData.data()), static_cast<ELFIO::Elf_Word>(strData.size()));
-        }
-    } else {
-        // --- Direct offset approach for linked binaries or non-relocated .o files ---
-        if (isCompressed) {
-            DEBUG("DwarfPatcher: .debug_str is SHF_COMPRESSED and no relocations are present in %s; "
-                  "the direct-offset patcher would write back compressed bytes from cached non-decompressed buffers. "
-                  "Skipping rather than corrupting the section.",
-                  objectFile.c_str());
-            return true;
-        }
-        if (debugInfo->get_flags() & SHF_COMPRESSED) {
-            DEBUG("DwarfPatcher: .debug_info is SHF_COMPRESSED and no relocations are present in %s; "
-                  "the direct-offset patcher would write back compressed bytes from cached non-decompressed buffers. "
-                  "Skipping rather than corrupting the section.",
-                  objectFile.c_str());
-            return true;
-        }
-        size_t oldOffset = findStringInSection(debugStr->get_data(), debugStr->get_size(), oldSourcePath);
-        if (oldOffset == static_cast<size_t>(-1)) {
-            DEBUG("DwarfPatcher: old source path not found in .debug_str: %s", oldSourcePath.c_str());
-            return true;
-        }
+        // Offset of the old string inside the string section.
+        size_t oldOffset = strSection->find(expected);
+        if (oldOffset == static_cast<size_t>(-1))
+            continue;
 
-        size_t newStrOffset = debugStr->get_size();
-        std::string appendData = newSourcePath + '\0';
-        size_t newDirOffset = static_cast<size_t>(-1);
-        if (!oldDir.empty() && !newDir.empty() && oldDir != newDir) {
-            newDirOffset = newStrOffset + appendData.size();
-            appendData += newDir + '\0';
-        }
-        debugStr->append_data(appendData.c_str(), static_cast<ELFIO::Elf_Word>(appendData.size()));
+        bool matched = false;
 
-        // Patch .debug_info offsets directly
-        std::vector<uint8_t> infoDataCopy(debugInfo->get_data(), debugInfo->get_data() + debugInfo->get_size());
-        bool patched = false;
-
-        for (const auto &loc : attrLocations) {
-            uint32_t currentOffset;
-            memcpy(&currentOffset, &infoDataCopy[loc.infoOffset], 4);
-
-            if (loc.isName && currentOffset == oldOffset) {
-                uint32_t val = static_cast<uint32_t>(newStrOffset);
-                memcpy(&infoDataCopy[loc.infoOffset], &val, 4);
-                patched = true;
-            } else if (!loc.isName && !oldDir.empty()) {
-                size_t oldDirOffset = findStringInSection(debugStr->get_data(), debugStr->get_size(), oldDir);
-                if (currentOffset == oldDirOffset && newDirOffset != static_cast<size_t>(-1)) {
-                    uint32_t val = static_cast<uint32_t>(newDirOffset);
-                    memcpy(&infoDataCopy[loc.infoOffset], &val, 4);
-                    patched = true;
+        if (usesRela && relSec) {
+            // Rewrite the relocation addend to point at the new string.
+            ELFIO::const_relocation_section_accessor relacc(elf, relSec);
+            ELFIO::Elf_Xword idx;
+            ELFIO::Elf_Word symbol;
+            unsigned rtype;
+            ELFIO::Elf_Sxword addend;
+            if (findRelocation(relacc, static_cast<ELFIO::Elf64_Addr>(valuePos), idx, symbol, rtype, addend)) {
+                if (addend >= 0 && static_cast<size_t>(addend) < strSection->data.size()) {
+                    const char *currentStr = reinterpret_cast<const char *>(strSection->data.data() + addend);
+                    if (strcmp(currentStr, expected.c_str()) == 0) {
+                        size_t newOffset = strSection->append(replacement);
+                        relacc.set_entry(idx, static_cast<ELFIO::Elf64_Addr>(valuePos), symbol, rtype, static_cast<ELFIO::Elf_Sxword>(newOffset));
+                        matched = true;
+                        DEBUG("DwarfPatcher: patched %s relocation addend 0x%zx -> 0x%zx", loc.isName ? "DW_AT_name" : "DW_AT_comp_dir", addend, newOffset);
+                    }
                 }
             }
+        } else {
+            // Patch the string offset value in place (REL addend, or a linked file).
+            size_t currentOffset = 0;
+            if (owningBuf->readOffset(valuePos, loc.offsetSize, currentOffset) && currentOffset == oldOffset) {
+                size_t newOffset = strSection->append(replacement);
+                owningBuf->writeOffset(valuePos, loc.offsetSize, newOffset);
+                matched = true;
+                DEBUG("DwarfPatcher: patched %s offset 0x%zx -> 0x%zx", loc.isName ? "DW_AT_name" : "DW_AT_comp_dir", currentOffset, newOffset);
+            }
         }
 
-        if (patched) {
-            debugInfo->set_data(reinterpret_cast<const char *>(infoDataCopy.data()), static_cast<ELFIO::Elf_Word>(infoDataCopy.size()));
-        }
+        if (matched)
+            patched = true;
     }
+
+    if (!patched) {
+        DEBUG("DwarfPatcher: no matching strings found to patch in %s", objectFile.c_str());
+        return true;
+    }
+
+    // Write back sections that were actually modified. Compressed sections are
+    // recompressed; untouched ones are left alone (never recompress blindly).
+    infoBuf.save(elfClass);
+    strOffsetsBuf.save(elfClass);
+    strBuf.save(elfClass);
+    lineStrBuf.save(elfClass);
 
     if (!elf.save(objectFile)) {
         ERROR("DwarfPatcher: failed to save patched ELF: %s", objectFile.c_str());
