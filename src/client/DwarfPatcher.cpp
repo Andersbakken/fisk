@@ -405,6 +405,17 @@ struct SectionBuffer
         modified = true;
         return off;
     }
+
+    // NUL out len bytes at off. Offsets of every other string are preserved, so
+    // no relocation or in-section offset needs rewriting; the string simply
+    // becomes empty. Only safe once the range is known to be unreferenced.
+    void blank(size_t off, size_t len)
+    {
+        if (!len || off + len > data.size())
+            return;
+        memset(data.data() + off, 0, len);
+        modified = true;
+    }
 };
 
 // Structure to track which .debug_info offsets need relocation patching
@@ -606,6 +617,69 @@ static bool findRelocation(ELFIO::const_relocation_section_accessor &acc, ELFIO:
     return false;
 }
 
+// Collect every offset into the section with index strSectionIndex that is
+// still reachable through a relocation, so a candidate byte range can be
+// proven dead before it is blanked.
+//
+// .debug_str is SHF_MERGE|SHF_STRINGS, so the linker lets one string be the
+// tail of another: a reference to offset 0x70 of "/compiles/3/sourcefile" is a
+// live reference to "sourcefile". Interior offsets therefore matter just as
+// much as the start, which is why whole ranges are tested rather than exact
+// starts.
+static void collectStringRefs(ELFIO::elfio &elf, ELFIO::Elf_Half strSectionIndex, std::vector<size_t> &refs)
+{
+    for (const auto &sec : elf.sections) {
+        if (sec->get_type() != ELFIO::SHT_RELA && sec->get_type() != ELFIO::SHT_REL)
+            continue;
+
+        ELFIO::section *symSec = elf.sections[sec->get_link()];
+        if (!symSec)
+            continue;
+        ELFIO::const_symbol_section_accessor symbols(elf, symSec);
+        ELFIO::const_relocation_section_accessor relocations(elf, sec.get());
+
+        for (ELFIO::Elf_Xword i = 0; i < relocations.get_entries_num(); ++i) {
+            ELFIO::Elf64_Addr offset;
+            ELFIO::Elf_Word symbol;
+            unsigned type;
+            ELFIO::Elf_Sxword addend;
+            if (!relocations.get_entry(i, offset, symbol, type, addend))
+                continue;
+
+            std::string name;
+            ELFIO::Elf64_Addr value;
+            ELFIO::Elf_Xword size;
+            unsigned char bind;
+            unsigned char symType;
+            ELFIO::Elf_Half sectionIndex;
+            unsigned char other;
+            if (!symbols.get_symbol(symbol, name, value, size, bind, symType, sectionIndex, other))
+                continue;
+            if (sectionIndex != strSectionIndex)
+                continue;
+            if (addend >= 0)
+                refs.push_back(static_cast<size_t>(addend));
+        }
+    }
+}
+
+static bool rangeIsReferenced(const std::vector<size_t> &refs, size_t offset, size_t length)
+{
+    for (size_t ref : refs) {
+        if (ref >= offset && ref < offset + length)
+            return true;
+    }
+    return false;
+}
+
+// A string that has been replaced and whose bytes are candidates for removal.
+struct DeadString
+{
+    SectionBuffer *section = nullptr;
+    size_t offset = 0;
+    size_t length = 0;
+};
+
 bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldSourcePath, const std::string &newSourcePath)
 {
     ELFIO::elfio elf;
@@ -698,6 +772,7 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
           strOffsetsUsesRela ? "rela" : (relaDebugStrOffsets ? "rel" : "none"));
 
     bool patched = false;
+    std::vector<DeadString> deadStrings;
 
     for (const auto &loc : attrLocations) {
         const std::string &expected = loc.isName ? oldSourcePath : oldDir;
@@ -764,21 +839,30 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
                 if (addend >= 0 && static_cast<size_t>(addend) < strSection->data.size()) {
                     const char *currentStr = reinterpret_cast<const char *>(strSection->data.data() + addend);
                     if (strcmp(currentStr, expected.c_str()) == 0) {
+                        const size_t deadOffset = static_cast<size_t>(addend);
                         size_t newOffset = strSection->append(replacement);
                         relacc.set_entry(idx, static_cast<ELFIO::Elf64_Addr>(valuePos), symbol, rtype, static_cast<ELFIO::Elf_Sxword>(newOffset));
                         matched = true;
+                        deadStrings.push_back({ strSection, deadOffset, expected.size() });
                         DEBUG("DwarfPatcher: patched %s relocation addend 0x%zx -> 0x%zx", loc.isName ? "DW_AT_name" : "DW_AT_comp_dir", addend, newOffset);
                     }
                 }
             }
         } else {
             // Patch the string offset value in place (REL addend, or a linked file).
+            // Validate by comparing the string actually referenced rather than the
+            // first copy of it in the section: the compiler may emit the same text
+            // more than once, in which case the referenced copy is not oldOffset.
             size_t currentOffset = 0;
-            if (owningBuf->readOffset(valuePos, loc.offsetSize, currentOffset) && currentOffset == oldOffset) {
-                size_t newOffset = strSection->append(replacement);
-                owningBuf->writeOffset(valuePos, loc.offsetSize, newOffset);
-                matched = true;
-                DEBUG("DwarfPatcher: patched %s offset 0x%zx -> 0x%zx", loc.isName ? "DW_AT_name" : "DW_AT_comp_dir", currentOffset, newOffset);
+            if (owningBuf->readOffset(valuePos, loc.offsetSize, currentOffset) && currentOffset < strSection->data.size()) {
+                const char *currentStr = reinterpret_cast<const char *>(strSection->data.data() + currentOffset);
+                if (strcmp(currentStr, expected.c_str()) == 0) {
+                    size_t newOffset = strSection->append(replacement);
+                    owningBuf->writeOffset(valuePos, loc.offsetSize, newOffset);
+                    matched = true;
+                    deadStrings.push_back({ strSection, currentOffset, expected.size() });
+                    DEBUG("DwarfPatcher: patched %s offset 0x%zx -> 0x%zx", loc.isName ? "DW_AT_name" : "DW_AT_comp_dir", currentOffset, newOffset);
+                }
             }
         }
 
@@ -789,6 +873,32 @@ bool patchDwarfSourcePath(const std::string &objectFile, const std::string &oldS
     if (!patched) {
         DEBUG("DwarfPatcher: no matching strings found to patch in %s", objectFile.c_str());
         return true;
+    }
+
+    // Erase the strings that were just orphaned, so the chroot path no longer
+    // appears in the object at all. Skipped unless the string section is
+    // addressed purely by relocations, because in a file that references it
+    // with plain in-section offsets those references cannot be enumerated here
+    // and a live string could be destroyed.
+    for (const auto &dead : deadStrings) {
+        if (!dead.section || !dead.section->sec)
+            continue;
+
+        std::vector<size_t> refs;
+        collectStringRefs(elf, dead.section->sec->get_index(), refs);
+        if (refs.empty()) {
+            DEBUG("DwarfPatcher: not blanking 0x%zx, %s has no relocation references to verify against",
+                  dead.offset, dead.section->sec->get_name().c_str());
+            continue;
+        }
+
+        if (rangeIsReferenced(refs, dead.offset, dead.length)) {
+            DEBUG("DwarfPatcher: not blanking 0x%zx (%zu bytes), still referenced", dead.offset, dead.length);
+            continue;
+        }
+
+        dead.section->blank(dead.offset, dead.length);
+        DEBUG("DwarfPatcher: blanked orphaned string at 0x%zx (%zu bytes)", dead.offset, dead.length);
     }
 
     // Write back sections that were actually modified. Compressed sections are
