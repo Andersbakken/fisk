@@ -1,4 +1,5 @@
 #include "DwarfPatcher.h"
+#include "Config.h"
 #include "Log.h"
 #include <cstdint>
 #include <cstring>
@@ -680,16 +681,12 @@ struct DeadString
     size_t length = 0;
 };
 
-bool patchDwarfSourcePath(const std::string &objectFile,
-                          const std::string &oldSourcePath,
-                          const std::string &newSourcePath,
-                          const std::string &compilationDir)
+static bool patchLoadedElf(ELFIO::elfio &elf,
+                           const std::string &objectFile,
+                           const std::string &oldSourcePath,
+                           const std::string &newSourcePath,
+                           const std::string &compilationDir)
 {
-    ELFIO::elfio elf;
-    if (!elf.load(objectFile)) {
-        DEBUG("DwarfPatcher: failed to load ELF: %s", objectFile.c_str());
-        return false;
-    }
     const int elfClass = elf.get_class();
 
     // Find sections
@@ -920,4 +917,85 @@ bool patchDwarfSourcePath(const std::string &objectFile,
 
     DEBUG("DwarfPatcher: patched source path in %s: %s -> %s", objectFile.c_str(), oldSourcePath.c_str(), newSourcePath.c_str());
     return true;
+}
+
+static bool sectionContains(const std::vector<uint8_t> &data, const std::string &needle)
+{
+    if (needle.empty() || data.size() < needle.size())
+        return false;
+    const void *hit = memmem(data.data(), data.size(), needle.c_str(), needle.size());
+    return hit != nullptr;
+}
+
+// Report any section still holding a path that patching was supposed to remove.
+//
+// This deliberately walks *every* section rather than the handful the patcher
+// understands, because its purpose is to catch debug data a newer compiler
+// started emitting that nothing patches yet. Compressed sections are inflated
+// first: a plain byte scan silently finds nothing under -gz, which would make
+// the check report success precisely when it is least able to see.
+static void reportLeakedPaths(ELFIO::elfio &elf, const std::string &objectFile, const std::vector<std::string> &needles)
+{
+    if (needles.empty())
+        return;
+
+    const int elfClass = elf.get_class();
+    for (const auto &sec : elf.sections) {
+        if (sec->get_type() == ELFIO::SHT_NOBITS || !sec->get_size())
+            continue;
+
+        std::vector<uint8_t> data;
+        if (sec->get_flags() & SHF_COMPRESSED) {
+            if (!decompressSection(sec.get(), elfClass, data))
+                continue;
+        } else {
+            data.assign(sec->get_data(), sec->get_data() + sec->get_size());
+        }
+
+        // The needles overlap by construction (the directory is a prefix of the
+        // source path), so stop at the first hit to keep one report per section.
+        for (const std::string &needle : needles) {
+            if (sectionContains(data, needle)) {
+                ERROR("DwarfPatcher: %s still contains builder path \"%s\" in section %s after patching. A newer compiler may be "
+                      "emitting debug data that fisk does not patch yet",
+                      objectFile.c_str(),
+                      needle.c_str(),
+                      sec->get_name().c_str());
+                break;
+            }
+        }
+    }
+}
+
+bool patchDwarfSourcePath(const std::string &objectFile,
+                          const std::string &oldSourcePath,
+                          const std::string &newSourcePath,
+                          const std::string &compilationDir)
+{
+    ELFIO::elfio elf;
+    if (!elf.load(objectFile)) {
+        DEBUG("DwarfPatcher: failed to load ELF: %s", objectFile.c_str());
+        return false;
+    }
+
+    const bool ret = patchLoadedElf(elf, objectFile, oldSourcePath, newSourcePath, compilationDir);
+
+    if (ret && Config::verifyPatchedPaths) {
+        std::vector<std::string> needles;
+        needles.push_back(oldSourcePath);
+
+        // The directory is only a leak if the replacements did not legitimately
+        // put it back: a client compiling inside the old source's directory, or
+        // one whose new source lives there, is expected to still reference it.
+        size_t lastSlash = oldSourcePath.rfind('/');
+        if (lastSlash != std::string::npos && lastSlash > 0) {
+            const std::string oldDir = oldSourcePath.substr(0, lastSlash);
+            if (compilationDir != oldDir && newSourcePath.compare(0, oldDir.size(), oldDir) != 0)
+                needles.push_back(oldDir);
+        }
+
+        reportLeakedPaths(elf, objectFile, needles);
+    }
+
+    return ret;
 }
