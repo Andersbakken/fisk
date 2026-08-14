@@ -960,6 +960,7 @@ server.on("job", (job: Job) => {
                     success: event.success,
                     exitCode: event.exitCode,
                     sha1: jobJob.sha1,
+                    sourcePath: path.join(j.op!.vmDir, "sourcefile"),
                     stderr: j.stderr,
                     stdout: j.stdout
                 };
@@ -989,7 +990,6 @@ server.on("job", (job: Job) => {
                             };
                         })
                     };
-                    cacheResponse.sourcePath = jobJob.sourcePath;
                     cacheResponse.commandLine = jobJob.commandLine;
                     cacheResponse.environment = jobJob.hash;
                     objectCache.add(cacheResponse, contents);

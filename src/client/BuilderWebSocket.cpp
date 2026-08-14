@@ -128,7 +128,10 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const auto &objectCache = msg["objectCache"];
         if (objectCache.is_boolean() && objectCache.get<bool>()) {
             data.objectCache = true;
-            cachedSourcePath = jstring(msg["sourcePath"]);
+        }
+        const auto &sourcePath = msg["sourcePath"];
+        if (sourcePath.is_string()) {
+            cachedSourcePath = jstring(sourcePath);
         }
 
         if (hasIndex && !index.empty()) {
