@@ -5,8 +5,9 @@
 #include <vector>
 
 // Keep in sync with FISK_PAD_LENGTH / FISK_NAME_PAD / FISK_CDIR_PAD
-// in src/builder/VM_runtime/Compile.ts.
-static constexpr size_t FISK_PAD_LENGTH = 1024;
+// in src/builder/VM_runtime/Compile.ts. PATH_MAX, so any path the client can
+// legally have fits in the padded region without truncation.
+static constexpr size_t FISK_PAD_LENGTH = 4096;
 static constexpr const char FISK_NAME_PREFIX[] = "/fisk-name";
 static constexpr const char FISK_CDIR_PREFIX[] = "/fisk-cdir";
 static constexpr char FISK_PAD_CHAR = '_';
@@ -20,12 +21,21 @@ static std::vector<uint8_t> makePad(const char *prefix)
     return pad;
 }
 
-static std::vector<uint8_t> makeReplacement(const std::string &path)
+// Build the byte block that overwrites a pad: the path, then NUL fill. The
+// trailing NULs terminate the string and blank the rest of the padded region.
+// A path that does not fit would be silently corrupted, so refuse instead --
+// a wrong path in a backtrace is worse than an unpatched one.
+static bool makeReplacement(const std::string &path, const char *what, std::vector<uint8_t> &out)
 {
-    std::vector<uint8_t> rep(FISK_PAD_LENGTH, 0);
-    const size_t len = std::min(path.size(), FISK_PAD_LENGTH - 1);
-    memcpy(rep.data(), path.data(), len);
-    return rep;
+    if (path.size() >= FISK_PAD_LENGTH) {
+        ERROR("FiskPathPatcher: %s path is %zu bytes, does not fit in the %zu byte padded region, "
+              "leaving it unpatched: %s",
+              what, path.size(), FISK_PAD_LENGTH, path.c_str());
+        return false;
+    }
+    out.assign(FISK_PAD_LENGTH, 0);
+    memcpy(out.data(), path.data(), path.size());
+    return true;
 }
 
 static size_t scanAndReplace(std::vector<uint8_t> &data,
@@ -77,15 +87,15 @@ bool patchFiskPaths(const std::string &objectFile,
     }
     fclose(f);
 
-    const std::vector<uint8_t> namePad = makePad(FISK_NAME_PREFIX);
-    const std::vector<uint8_t> cdirPad = makePad(FISK_CDIR_PREFIX);
-
-    const std::vector<uint8_t> nameRep = makeReplacement(sourceFile);
-    const std::vector<uint8_t> cdirRep = makeReplacement(compilationDir);
+    std::vector<uint8_t> nameRep, cdirRep;
+    const bool haveName = makeReplacement(sourceFile, "source file", nameRep);
+    const bool haveCdir = makeReplacement(compilationDir, "compilation dir", cdirRep);
 
     size_t total = 0;
-    total += scanAndReplace(data, namePad, nameRep, "DW_AT_name");
-    total += scanAndReplace(data, cdirPad, cdirRep, "DW_AT_comp_dir");
+    if (haveName)
+        total += scanAndReplace(data, makePad(FISK_NAME_PREFIX), nameRep, "DW_AT_name");
+    if (haveCdir)
+        total += scanAndReplace(data, makePad(FISK_CDIR_PREFIX), cdirRep, "DW_AT_comp_dir");
 
     if (!total)
         return false;

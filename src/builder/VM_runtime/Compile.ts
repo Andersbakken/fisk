@@ -8,17 +8,27 @@ import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 // Padded canonical prefixes for DWARF path patching. The fisk client scans
 // compiled objects for these byte patterns and overwrites them in-place with
 // the real paths. Because the replacement is always shorter, a NUL terminator
-// followed by NUL fill fits inside the original 1024-byte region. This works
-// on both ELF objects and LTO bitcode.
-// Keep in sync with FISK_NAME_PAD / FISK_CDIR_PAD in src/client/FiskPathPatcher.cpp.
-const FISK_PAD_LENGTH = 1024;
+// followed by NUL fill fits inside the original region. This works on both ELF
+// objects and LTO bitcode.
+//
+// The length is PATH_MAX so any path the client could legally hand us fits
+// without truncation.
+// Keep in sync with FISK_PAD_LENGTH in src/client/FiskPathPatcher.cpp.
+const FISK_PAD_LENGTH = 4096;
 const FISK_NAME_PAD = "/fisk-name" + "_".repeat(FISK_PAD_LENGTH - "/fisk-name".length);
 const FISK_CDIR_PAD = "/fisk-cdir" + "_".repeat(FISK_PAD_LENGTH - "/fisk-cdir".length);
 
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
 
-    constructor(args: string[], argv0: string, dir: string, debug: boolean, sourceFileName?: string, paddedPaths?: boolean) {
+    constructor(
+        args: string[],
+        argv0: string,
+        dir: string,
+        debug: boolean,
+        sourceFileName?: string,
+        paddedPaths?: boolean
+    ) {
         super();
 
         if (!args || !args.length || !dir || !argv0) {
@@ -159,6 +169,23 @@ export class Compile extends EventEmitter {
 
         const sourceFileInDir = path.join(dir, sourceFileName || path.basename(sourcePath));
         if (paddedPaths) {
+            // -grecord-command-line embeds our own argv verbatim into
+            // DW_AT_producer, which would (a) add two PATH_MAX pads to every CU
+            // and (b) leave the builder's /compiles path in the producer, where
+            // the client's byte scan would hit the embedded pad and NUL-truncate
+            // the rest of the recorded command line. The recorded line would be
+            // the builder's rewritten argv anyway -- not the client's -- so drop
+            // it rather than record something both wrong and mangled.
+            for (let i = args.length - 1; i >= 0; --i) {
+                if (args[i] === "-grecord-command-line" || args[i] === "-frecord-command-line") {
+                    args.splice(i, 1);
+                }
+            }
+            args.push("-gno-record-command-line");
+
+            // The more specific source-file rule must come last: both clang and
+            // gcc let a later -fdebug-prefix-map win over an earlier one, and
+            // the directory rule is a prefix of the source-file rule.
             args.push(`-fdebug-prefix-map=${dir}=${FISK_CDIR_PAD}`);
             args.push(`-fdebug-prefix-map=${sourceFileInDir}=${FISK_NAME_PAD}`);
         }
@@ -241,7 +268,16 @@ export class Compile extends EventEmitter {
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
-        console.log(`Compiling source file: ${sourcePath}\n${[compiler, ...args].join(" ")}`);
+        console.log(
+            `Compiling source file: ${sourcePath}\n${[compiler, ...args]
+                .map((x) => {
+                    if (x.startsWith("-fdebug-prefix-map=")) {
+                        x = x.replace(/_+$/, "___");
+                    }
+                    return x;
+                })
+                .join(" ")}`
+        );
         // const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
         const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, args, {
             /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
