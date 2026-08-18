@@ -18,6 +18,17 @@ const FISK_PAD_LENGTH = 4096;
 const FISK_NAME_PAD = "/fisk-name" + "_".repeat(FISK_PAD_LENGTH - "/fisk-name".length);
 const FISK_CDIR_PAD = "/fisk-cdir" + "_".repeat(FISK_PAD_LENGTH - "/fisk-cdir".length);
 
+// Flags asking the compiler to record its own argv, mapped to the negation the
+// same compiler spells it with. -g* forms land in DW_AT_producer, -f* forms in a
+// .GCC.command.line section; clang uses the command-line names and also accepts
+// the gcc-switches ones as aliases.
+const RECORD_FLAG_NEGATIONS: Record<string, string | undefined> = {
+    "-grecord-command-line": "-gno-record-command-line",
+    "-frecord-command-line": "-fno-record-command-line",
+    "-grecord-gcc-switches": "-gno-record-gcc-switches",
+    "-frecord-gcc-switches": "-fno-record-gcc-switches"
+};
+
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
 
@@ -168,20 +179,60 @@ export class Compile extends EventEmitter {
         }
 
         const sourceFileInDir = path.join(dir, sourceFileName || path.basename(sourcePath));
+
+        // Padding only pays off where the client's byte scan can reach the pads,
+        // and it is only *needed* for LLVM bitcode, which DwarfPatcher cannot
+        // load. Everywhere else DwarfPatcher already works, and padding actively
+        // breaks it: it matches on the old /compiles path still being in
+        // .debug_str, so once the pads have replaced it there is nothing for the
+        // fallback to match and the pads stay in the debug info.
+        //
+        //   - non-clang: gcc never emits bitcode, and some gcc builds (the nrdp
+        //     desktop toolchain, for one) compress .debug_str by default with no
+        //     flag asking for it, which the byte scan cannot see into.
+        //   - -gz: same problem, explicitly requested. -Wl, forms are link-time
+        //     and do not affect the object we hand back, so they do not count.
+        const wantsCompressedDebug = args.some((arg) => {
+            if (arg.startsWith("-Wl,")) {
+                return false;
+            }
+            return (arg.startsWith("-gz") && arg !== "-gz=none") || arg.includes("compress-debug-sections");
+        });
+        if (paddedPaths && (!isClang || wantsCompressedDebug)) {
+            if (debug) {
+                console.log(
+                    "Not padding paths, leaving them to DwarfPatcher:",
+                    "isClang",
+                    isClang,
+                    "wantsCompressedDebug",
+                    wantsCompressedDebug
+                );
+            }
+            paddedPaths = false;
+        }
+
         if (paddedPaths) {
-            // -grecord-command-line embeds our own argv verbatim into
-            // DW_AT_producer, which would (a) add two PATH_MAX pads to every CU
-            // and (b) leave the builder's /compiles path in the producer, where
-            // the client's byte scan would hit the embedded pad and NUL-truncate
-            // the rest of the recorded command line. The recorded line would be
-            // the builder's rewritten argv anyway -- not the client's -- so drop
-            // it rather than record something both wrong and mangled.
-            for (let i = args.length - 1; i >= 0; --i) {
-                if (args[i] === "-grecord-command-line" || args[i] === "-frecord-command-line") {
-                    args.splice(i, 1);
+            // -grecord-command-line (clang) / -frecord-gcc-switches (gcc) embed
+            // our own argv verbatim into DW_AT_producer or .GCC.command.line,
+            // which would (a) add two PATH_MAX pads to every CU and (b) leave
+            // the builder's /compiles path in there, where the client's byte
+            // scan would hit the embedded pad and NUL-truncate the rest of the
+            // recorded command line. The recorded line would be the builder's
+            // rewritten argv anyway -- not the client's -- so turn it off rather
+            // than record something both wrong and mangled.
+            //
+            // Negate each flag in place instead of dropping it and appending one
+            // fixed negation: whichever compiler accepted the positive spelling
+            // necessarily accepts its own negation, whereas a fixed flag is a
+            // guess about the compiler. That guess is what put
+            // -gno-record-command-line (clang 11+, and gcc spells it
+            // -gno-record-gcc-switches) on gcc command lines.
+            for (let i = 0; i < args.length; ++i) {
+                const negation = RECORD_FLAG_NEGATIONS[args[i]];
+                if (negation) {
+                    args[i] = negation;
                 }
             }
-            args.push("-gno-record-command-line");
 
             // The more specific source-file rule must come last: both clang and
             // gcc let a later -fdebug-prefix-map win over an earlier one, and

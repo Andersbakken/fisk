@@ -68,7 +68,31 @@ let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
 
-const clientMinimumVersion = "5.0.6";
+// 5.0.11 is the first client that asks for padded paths and can patch them out
+// of LTO bitcode. An older client silently produces objects with the builder's
+// /compiles paths baked into the debug info -- and because paddedPaths is not
+// part of the object cache key, those objects are then served to up-to-date
+// clients too, so one stale client poisons everyone's backtraces.
+const clientMinimumVersion = "5.0.11";
+
+// compareVersions throws on an empty or malformed version rather than returning
+// an ordering, and npmVersion is "" for any client that sends no
+// x-fisk-npm-version header. Thrown out of the compile handler that would be a
+// silent hang: uncaughtException keeps the scheduler up, but the request is
+// abandoned half-handled, so the client waits for a reply that never comes
+// instead of being told to update. A version we cannot read is not >= the
+// minimum, so treat it as too old and reject it properly.
+function clientTooOld(npmVersion: string): boolean {
+    if (!npmVersion) {
+        return true;
+    }
+    try {
+        return compareVersions(clientMinimumVersion, npmVersion) >= 1;
+    } catch (err) {
+        console.error(`Unparseable client npm version: "${npmVersion}"`, err);
+        return true;
+    }
+}
 const serverStartTime = Date.now();
 
 // A stalled event loop stops calling accept(), the listen backlog fills and the
@@ -1017,7 +1041,7 @@ function requestEnvironment(compile: Compile): boolean {
 }
 
 server.on("clientVerify", (clientVerify: Client) => {
-    if (compareVersions(clientMinimumVersion, clientVerify.npmVersion) >= 1) {
+    if (clientTooOld(clientVerify.npmVersion)) {
         clientVerify.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
     } else {
         clientVerify.send("version_verified", { minimum_version: `${clientMinimumVersion}` });
@@ -1029,7 +1053,7 @@ server.on("compile", (compile: Compile) => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
 
-    if (compareVersions(clientMinimumVersion, compile.npmVersion) >= 1) {
+    if (clientTooOld(compile.npmVersion)) {
         ++jobsFailed;
         compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
         return;
