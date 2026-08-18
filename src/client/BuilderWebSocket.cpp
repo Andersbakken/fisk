@@ -1,5 +1,6 @@
 #include "BuilderWebSocket.h"
 #include "DwarfPatcher.h"
+#include "FiskPathPatcher.h"
 
 void BuilderWebSocket::onConnected()
 {
@@ -233,11 +234,15 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
     if (clientData.compilerArgs && (Client::endsWith(front.path, ".o") || Client::endsWith(front.path, ".dwo"))) {
         const std::string &sourceFile = clientData.compilerArgs->sourceFile();
         const std::string compilationDir = Client::cwd();
-        if (!cachedSourcePath.empty() && cachedSourcePath != sourceFile) {
-            patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile, compilationDir);
-        }
-        if (!cachedOriginalSourcePath.empty() && cachedOriginalSourcePath != sourceFile && cachedOriginalSourcePath != cachedSourcePath) {
-            patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile, compilationDir);
+        if (!patchFiskPaths(front.path, sourceFile, compilationDir)) {
+            // Fall back to the ELF-only DWARF patcher for objects from
+            // builders that predate the padded-prefix approach.
+            if (!cachedSourcePath.empty() && cachedSourcePath != sourceFile) {
+                patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile, compilationDir);
+            }
+            if (!cachedOriginalSourcePath.empty() && cachedOriginalSourcePath != sourceFile && cachedOriginalSourcePath != cachedSourcePath) {
+                patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile, compilationDir);
+            }
         }
     }
 

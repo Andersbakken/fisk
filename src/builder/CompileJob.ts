@@ -8,16 +8,18 @@ import type { VMCompileFinished } from "./VMMessage";
 export class CompileJob extends EventEmitter {
     dir: string;
     vmDir: string;
+    sourceFileName: string;
     cppSize: number;
     startCompile?: number;
     fd?: number;
 
-    constructor(readonly commandLine: string[], readonly argv0: string, readonly id: number, readonly vm: VM) {
+    constructor(readonly commandLine: string[], readonly argv0: string, readonly id: number, readonly vm: VM, sourcePath?: string, readonly paddedPaths?: boolean) {
         super();
         this.dir = path.join(vm.root, "compiles", String(this.id));
         this.vmDir = path.join("/", "compiles", String(this.id));
+        this.sourceFileName = sourcePath ? path.basename(sourcePath) : "sourcefile";
         fs.mkdirpSync(this.dir);
-        this.fd = fs.openSync(path.join(this.dir, "sourcefile"), "w");
+        this.fd = fs.openSync(path.join(this.dir, this.sourceFileName), "w");
         this.cppSize = 0;
         this.startCompile = undefined;
     }
@@ -46,7 +48,7 @@ export class CompileJob extends EventEmitter {
         fs.closeSync(this.fd);
         this.fd = undefined;
         this.vm.child.send(
-            { type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir },
+            { type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir, sourceFileName: this.sourceFileName, paddedPaths: this.paddedPaths },
             this.sendCallback.bind(this)
         );
     }

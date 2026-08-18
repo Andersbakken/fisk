@@ -5,10 +5,20 @@ import fs from "fs-extra";
 import path from "path";
 import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 
+// Padded canonical prefixes for DWARF path patching. The fisk client scans
+// compiled objects for these byte patterns and overwrites them in-place with
+// the real paths. Because the replacement is always shorter, a NUL terminator
+// followed by NUL fill fits inside the original 1024-byte region. This works
+// on both ELF objects and LTO bitcode.
+// Keep in sync with FISK_NAME_PAD / FISK_CDIR_PAD in src/client/FiskPathPatcher.cpp.
+const FISK_PAD_LENGTH = 1024;
+const FISK_NAME_PAD = "/fisk-name" + "_".repeat(FISK_PAD_LENGTH - "/fisk-name".length);
+const FISK_CDIR_PAD = "/fisk-cdir" + "_".repeat(FISK_PAD_LENGTH - "/fisk-cdir".length);
+
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
 
-    constructor(args: string[], argv0: string, dir: string, debug: boolean) {
+    constructor(args: string[], argv0: string, dir: string, debug: boolean, sourceFileName?: string, paddedPaths?: boolean) {
         super();
 
         if (!args || !args.length || !dir || !argv0) {
@@ -135,13 +145,22 @@ export class Compile extends EventEmitter {
                             throw new Error("More than one source file");
                         }
                         sourcePath = args[i];
-                        args[i] = path.join(dir, "sourcefile");
+                        if (!sourceFileName) {
+                            sourceFileName = path.basename(sourcePath);
+                        }
+                        args[i] = path.join(dir, sourceFileName);
                     }
                     break;
             }
         }
         if (!sourcePath) {
             throw new Error("No sourcefile");
+        }
+
+        const sourceFileInDir = path.join(dir, sourceFileName || path.basename(sourcePath));
+        if (paddedPaths) {
+            args.push(`-fdebug-prefix-map=${dir}=${FISK_CDIR_PAD}`);
+            args.push(`-fdebug-prefix-map=${sourceFileInDir}=${FISK_NAME_PAD}`);
         }
 
         if (!hasDashX) {
@@ -247,8 +266,9 @@ export class Compile extends EventEmitter {
             let addDirError: Error | undefined;
             const addDir = (directory: string, prefix: string): void => {
                 try {
+                    const sourceBaseName = sourceFileName || path.basename(sourcePath!);
                     fs.readdirSync(directory).forEach((file: string) => {
-                        if (file === "sourcefile") {
+                        if (file === sourceBaseName) {
                             return;
                         }
                         try {

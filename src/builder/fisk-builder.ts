@@ -879,7 +879,7 @@ server.on("job", (job: Job) => {
             console.log("Starting job", j.id, jobJob.sourcePath, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
             assert(jobJob.commandLine, "Must have commandLine");
             assert(jobJob.argv0, "Must have argv0");
-            j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id);
+            j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id, jobJob.sourcePath, jobJob.paddedPaths);
             if (j.buffer) {
                 j.op.feed(j.buffer);
                 j.buffer = undefined;
@@ -960,7 +960,7 @@ server.on("job", (job: Job) => {
                     success: event.success,
                     exitCode: event.exitCode,
                     sha1: jobJob.sha1,
-                    sourcePath: path.join(j.op!.vmDir, "sourcefile"),
+                    sourcePath: path.join(j.op!.vmDir, j.op!.sourceFileName),
                     originalSourcePath: jobJob.sourcePath,
                     stderr: j.stderr,
                     stdout: j.stdout

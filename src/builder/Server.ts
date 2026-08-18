@@ -110,6 +110,7 @@ export class Server extends EventEmitter {
                     sourcePath: String(req.headers["x-fisk-sourcefile"]),
                     user: String(req.headers["x-fisk-user"]),
                     supportsCompressedResponse: req.headers["x-fisk-supports-compressed-response"] === "true",
+                    paddedPaths: req.headers["x-fisk-padded-paths"] === "true",
                     ws
                 });
 

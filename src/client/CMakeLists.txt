@@ -53,6 +53,7 @@ add_executable(fiskc
     Config.cpp
     DaemonSocket.cpp
     DwarfPatcher.cpp
+    FiskPathPatcher.cpp
     Log.cpp
     Preprocessed.cpp
     SchedulerWebSocket.cpp

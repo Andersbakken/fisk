@@ -12,5 +12,6 @@ export interface JobData {
     priority?: number;
     id: number;
     builderIp?: string;
+    paddedPaths?: boolean;
     supportsCompressedResponse?: boolean;
 }

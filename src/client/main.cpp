@@ -378,6 +378,7 @@ int main(int argc, char **argv)
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
     headers["x-fisk-supports-compressed-response"] = "true";
+    headers["x-fisk-padded-paths"] = "true";
     {
         std::string builder = Config::builder;
         if (!builder.empty())
