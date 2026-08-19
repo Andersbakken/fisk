@@ -325,7 +325,6 @@ extern Getter<bool> jsonDiagnostics;
 extern Getter<bool> jsonDiagnosticsRaw;
 extern Getter<bool> objectCache;
 extern Getter<std::string> objectCacheTag;
-extern Getter<bool> verifyPatchedPaths;
 extern Getter<bool> storePreprocessedDataOnError;
 extern Getter<bool> disabled;
 extern Getter<int> priority;

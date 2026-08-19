@@ -5,18 +5,14 @@ import fs from "fs-extra";
 import path from "path";
 import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 
-// Padded canonical prefixes for DWARF path patching. The fisk client scans
-// compiled objects for these byte patterns and overwrites them in-place with
-// the real paths. Because the replacement is always shorter, a NUL terminator
-// followed by NUL fill fits inside the original region. This works on both ELF
-// objects and LTO bitcode.
-//
-// The length is PATH_MAX so any path the client could legally hand us fits
-// without truncation.
-// Keep in sync with FISK_PAD_LENGTH in src/client/FiskPathPatcher.cpp.
-const FISK_PAD_LENGTH = 4096;
-const FISK_NAME_PAD = "/fisk-name" + "_".repeat(FISK_PAD_LENGTH - "/fisk-name".length);
-const FISK_CDIR_PAD = "/fisk-cdir" + "_".repeat(FISK_PAD_LENGTH - "/fisk-cdir".length);
+// The client's real paths, which we bake into the object rather than emitting
+// our own /compiles paths for the client to rewrite. That is the only approach
+// that works for LTO, where the output is bitcode no ELF patcher can touch.
+// Absent for a client too old to send them, in which case nothing is baked.
+export interface ClientPaths {
+    clientSourcePath?: string;
+    clientCwd?: string;
+}
 
 // Flags asking the compiler to record its own argv, mapped to the negation the
 // same compiler spells it with. -g* forms land in DW_AT_producer, -f* forms in a
@@ -38,7 +34,7 @@ export class Compile extends EventEmitter {
         dir: string,
         debug: boolean,
         sourceFileName?: string,
-        paddedPaths?: boolean
+        { clientSourcePath, clientCwd }: ClientPaths = {}
     ) {
         super();
 
@@ -180,53 +176,26 @@ export class Compile extends EventEmitter {
 
         const sourceFileInDir = path.join(dir, sourceFileName || path.basename(sourcePath));
 
-        // Padding only pays off where the client's byte scan can reach the pads,
-        // and it is only *needed* for LLVM bitcode, which DwarfPatcher cannot
-        // load. Everywhere else DwarfPatcher already works, and padding actively
-        // breaks it: it matches on the old /compiles path still being in
-        // .debug_str, so once the pads have replaced it there is nothing for the
-        // fallback to match and the pads stay in the debug info.
+        // Bake the client's real paths into the object instead of emitting the
+        // builder's /compiles path for the client to rewrite afterwards. The
+        // client folds these paths into its object-cache key, so a cached object
+        // is only ever handed to a client that wants exactly these values.
         //
-        //   - non-clang: gcc never emits bitcode, and some gcc builds (the nrdp
-        //     desktop toolchain, for one) compress .debug_str by default with no
-        //     flag asking for it, which the byte scan cannot see into.
-        //   - -gz: same problem, explicitly requested. -Wl, forms are link-time
-        //     and do not affect the object we hand back, so they do not count.
-        const wantsCompressedDebug = args.some((arg) => {
-            if (arg.startsWith("-Wl,")) {
-                return false;
-            }
-            return (arg.startsWith("-gz") && arg !== "-gz=none") || arg.includes("compress-debug-sections");
-        });
-        if (paddedPaths && (!isClang || wantsCompressedDebug)) {
-            if (debug) {
-                console.log(
-                    "Not padding paths, leaving them to DwarfPatcher:",
-                    "isClang",
-                    isClang,
-                    "wantsCompressedDebug",
-                    wantsCompressedDebug
-                );
-            }
-            paddedPaths = false;
-        }
-
-        if (paddedPaths) {
+        // This is the only approach that covers LTO: with -flto the output is
+        // bitcode, which no ELF-level patcher can load. It also needs no help
+        // for compressed debug sections or for gcc, both of which defeat a byte
+        // scan over the finished object.
+        if (clientSourcePath && clientCwd) {
             // -grecord-command-line (clang) / -frecord-gcc-switches (gcc) embed
             // our own argv verbatim into DW_AT_producer or .GCC.command.line,
-            // which would (a) add two PATH_MAX pads to every CU and (b) leave
-            // the builder's /compiles path in there, where the client's byte
-            // scan would hit the embedded pad and NUL-truncate the rest of the
-            // recorded command line. The recorded line would be the builder's
-            // rewritten argv anyway -- not the client's -- so turn it off rather
-            // than record something both wrong and mangled.
+            // which would leave the builder's /compiles path in there. The
+            // recorded line is our rewritten argv rather than the client's
+            // anyway, so it is misleading as well as leaky -- turn it off.
             //
-            // Negate each flag in place instead of dropping it and appending one
+            // Negate each flag in place rather than dropping it and appending one
             // fixed negation: whichever compiler accepted the positive spelling
             // necessarily accepts its own negation, whereas a fixed flag is a
-            // guess about the compiler. That guess is what put
-            // -gno-record-command-line (clang 11+, and gcc spells it
-            // -gno-record-gcc-switches) on gcc command lines.
+            // guess about the compiler.
             for (let i = 0; i < args.length; ++i) {
                 const negation = RECORD_FLAG_NEGATIONS[args[i]];
                 if (negation) {
@@ -234,11 +203,22 @@ export class Compile extends EventEmitter {
                 }
             }
 
-            // The more specific source-file rule must come last: both clang and
-            // gcc let a later -fdebug-prefix-map win over an earlier one, and
-            // the directory rule is a prefix of the source-file rule.
-            args.push(`-fdebug-prefix-map=${dir}=${FISK_CDIR_PAD}`);
-            args.push(`-fdebug-prefix-map=${sourceFileInDir}=${FISK_NAME_PAD}`);
+            // -fdebug-prefix-map only, for both compilers. clang also has
+            // -Xclang -main-file-name / -Xclang -fdebug-compilation-dir, which
+            // set the two values outright with no rule-precedence subtlety, but
+            // those are cc1 internals reached through -Xclang and carry no
+            // cross-version compatibility guarantee. -fdebug-prefix-map is a
+            // driver flag that predates every compiler fisk supports (gcc 4.3,
+            // clang 3.8), so it cannot fail on an older toolchain.
+            //
+            // The directory rule comes first and the more specific source-file
+            // rule last: both compilers let a later mapping win, and the
+            // directory is a prefix of the file. On gcc the file rule is inert --
+            // gcc takes DW_AT_name from the #line markers in the preprocessed
+            // source, which already name the client's file -- but it is harmless
+            // there and needed for clang.
+            args.push(`-fdebug-prefix-map=${dir}=${clientCwd}`);
+            args.push(`-fdebug-prefix-map=${sourceFileInDir}=${clientSourcePath}`);
         }
 
         if (!hasDashX) {

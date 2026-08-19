@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Watchdog.h"
 #include <arpa/inet.h>
+#include <process.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -203,15 +204,107 @@ void DaemonSocket::send(const std::string &json)
     DEBUG("DaemonSocket send message: %s", json.c_str());
 }
 
+// Key identifying "this exact compiler binary" for the daemon's fingerprint
+// cache. The daemon cannot compute this itself: the compiler usually lives in
+// our container and its path does not resolve in the daemon's mount namespace.
+//
+// It hashes the driver's bytes rather than using path+mtime, because one daemon
+// can serve several containers and two images can ship the same path with the
+// same mtime and size while holding different compilers. This is only a local
+// "same file?" key -- the fingerprint the scheduler matches on still comes from
+// the probes, precisely because driver bytes differ between machines that
+// installed the same compiler package.
+std::string DaemonSocket::compilerKey(const std::string &compiler)
+{
+    std::string contents;
+    if (!Client::readFile(compiler, contents)) {
+        DEBUG("Can't read compiler %s to key it", compiler.c_str());
+        return std::string();
+    }
+    return Client::toHex(Client::sha1(contents));
+}
+
 void DaemonSocket::sendAcquireSlot(const std::string &compiler)
 {
+    mCompiler = compiler;
     nlohmann::json obj = nlohmann::json::object();
     obj["type"] = "acquireSlot";
     obj["compiler"] = compiler;
+    obj["compilerKey"] = compilerKey(compiler);
     if (!Config::localSlot) {
         obj["no-local"] = true;
     }
     send(obj.dump());
+}
+
+// Run the probes the daemon asked for and report the raw output back. The
+// daemon does the parsing and hashing so there is exactly one implementation of
+// the fingerprint; we are merely the process that can see the compiler.
+void DaemonSocket::handleCompilerInfoRequest(const nlohmann::json &obj)
+{
+    const std::string key = obj.value("key", std::string());
+    nlohmann::json response = nlohmann::json::object();
+    response["type"] = "compilerInfoResponse";
+    response["key"] = key;
+
+    const auto probesIt = obj.find("probes");
+    if (key.empty() || probesIt == obj.end() || !probesIt->is_array()) {
+        response["error"] = "malformed compilerInfoRequest";
+        send(response.dump());
+        return;
+    }
+    if (mCompiler.empty()) {
+        response["error"] = "no compiler to probe";
+        send(response.dump());
+        return;
+    }
+
+    nlohmann::json results = nlohmann::json::object();
+    for (const auto &probe : *probesIt) {
+        const std::string label = probe.value("label", std::string());
+        const bool required = probe.value("required", false);
+        const auto argsIt = probe.find("args");
+        if (label.empty() || argsIt == probe.end() || !argsIt->is_array()) {
+            continue;
+        }
+
+        std::vector<std::string> argv;
+        argv.reserve(argsIt->size() + 1);
+        argv.push_back(mCompiler);
+        for (const auto &arg : *argsIt) {
+            if (arg.is_string()) {
+                argv.push_back(arg.get<std::string>());
+            }
+        }
+
+        std::string out, err;
+        TinyProcessLib::Process proc(
+            argv,
+            std::string(),
+            [&out](const char *bytes, size_t n) {
+            out.append(bytes, n);
+        },
+            [&err](const char *bytes, size_t n) {
+            err.append(bytes, n);
+        });
+        if (proc.get_exit_status()) {
+            DEBUG("Probe %s failed for %s: %s", label.c_str(), mCompiler.c_str(), err.c_str());
+            if (required) {
+                response["error"] = "probe '" + label + "' failed: " + err;
+                send(response.dump());
+                return;
+            }
+            // A failing optional probe is reported as absent rather than as an
+            // error; the daemon decides which probes it can live without.
+            results[label] = nullptr;
+            continue;
+        }
+        results[label] = out + err;
+    }
+
+    response["results"] = std::move(results);
+    DEBUG("Reporting compiler info for %s (key %s)", mCompiler.c_str(), key.c_str());
+    send(response.dump());
 }
 
 bool DaemonSocket::hasCppSlot() const
@@ -322,6 +415,10 @@ void DaemonSocket::processJSON(const std::string &json)
     }
 
     const std::string type = obj.value("type", std::string());
+    if (type == "compilerInfoRequest") {
+        handleCompilerInfoRequest(obj);
+        return;
+    }
     if (type != "slotAcquired") {
         fwrite(json.c_str(), 1, json.size(), stdout);
         fflush(stdout);

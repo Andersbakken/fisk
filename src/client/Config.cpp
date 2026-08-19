@@ -79,10 +79,6 @@ Getter<bool> objectCache("object-cache",
                          "configured with --object-cache and the builders to have --object-cache-size",
                          true);
 Getter<std::string> objectCacheTag("object-cache-tag", "Additional tag that gets sha1'ed into the cache key");
-Getter<bool> verifyPatchedPaths("verify-patched-paths",
-                                "After patching an object, scan every section (decompressing as needed) for leftover builder paths "
-                                "and log an error naming the section. Catches debug data a new compiler emits that we don't patch yet",
-                                false);
 Getter<bool> storePreprocessedDataOnError("store-preprocessed-data-on-error", "Set to true to store the preprocessed data on errors",
                                           false);
 Getter<bool> watchdog("watchdog", "Whether watchdog is enabled", true);

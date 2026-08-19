@@ -22,7 +22,7 @@ export class Job extends EventEmitter implements JobData {
     connectTime?: number;
     wait?: boolean;
     objectcache?: boolean;
-    paddedPaths?: boolean;
+    cwd?: string;
     supportsCompressedResponse?: boolean;
     heartbeatTimer?: NodeJS.Timeout;
 
@@ -39,7 +39,6 @@ export class Job extends EventEmitter implements JobData {
         this.sha1 = data.sha1;
         this.id = data.id;
         this.builderIp = data.builderIp;
-        this.paddedPaths = data.paddedPaths;
         this.supportsCompressedResponse = data.supportsCompressedResponse;
     }
 

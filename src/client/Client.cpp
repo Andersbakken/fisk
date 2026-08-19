@@ -288,77 +288,6 @@ std::string resolveSymlink(const std::string &link, const std::function<CheckRes
     return l;
 }
 
-Client::CompilerInfo createCompilerInfo(const std::string &exec, const std::string &versionInfo)
-{
-    Client::CompilerInfo info {};
-    size_t last = 0;
-    bool foundVersion = false;
-    while (true) {
-        size_t idx = versionInfo.find('\n', last);
-        bool done = false;
-        if (idx == std::string::npos) {
-            idx = versionInfo.size();
-            done = true;
-        }
-        const char *version = nullptr;
-        size_t versionOffset = 0;
-        if (!strncmp(versionInfo.c_str() + last, "gcc version ", 12)) {
-            info.type = Client::CompilerType::GCC;
-            versionOffset = 12;
-            version = versionInfo.c_str() + last + versionOffset;
-        } else if (!strncmp(versionInfo.c_str() + last, "clang version ", 14)) {
-            info.type = Client::CompilerType::Clang;
-            versionOffset = 14;
-            version = versionInfo.c_str() + last + versionOffset;
-        } else if (!strncmp(versionInfo.c_str() + last, "Target: ", 8)) {
-            info.input += versionInfo.substr(last + 8, idx - last - 8);
-        }
-
-        if (version) {
-            foundVersion = true;
-            info.input += versionInfo.substr(last + versionOffset, idx - last - versionOffset);
-            if (sscanf(version, "%d.%d.%d", &info.version.major, &info.version.minor, &info.version.patch) != 3) {
-                if (sscanf(version, "%d.%d", &info.version.major, &info.version.minor) != 2) {
-                    if (sscanf(version, "%d", &info.version.major) != 1) {
-                        ERROR("Failed to parse version from %s", version);
-                    }
-                }
-            }
-        }
-
-        if (done) {
-            break;
-        }
-        last = idx + 1;
-    }
-
-    if (!foundVersion) {
-        ERROR("Failed to find version in %s", versionInfo.c_str());
-        if (exec.find("clang") != std::string::npos || exec.find("CLANG") != std::string::npos || exec.find("Clang") != std::string::npos) {
-            info.type = Client::CompilerType::Clang;
-        } else if (exec.find("gcc") != std::string::npos || exec.find("GCC") != std::string::npos) {
-            info.type = Client::CompilerType::GCC;
-        }
-    }
-
-    info.hash = Client::toHex(Client::sha1(info.input));
-    DEBUG("Got compiler info for %s\n"
-          "Type: %s\n"
-          "Version: %d.%d.%d\n"
-          "Hash: %s\n"
-          "HashInput: %s\n"
-          "VersionInfo: %s",
-          exec.c_str(),
-          info.type == Client::CompilerType::GCC ? "GCC" : info.type == Client::CompilerType::Clang ? "Clang"
-                                                                                                    : "Unknown",
-          info.version.major,
-          info.version.minor,
-          info.version.patch,
-          info.hash.c_str(),
-          info.input.c_str(),
-          versionInfo.c_str());
-    return info;
-}
 } // anonymous namespace
 
 std::string Client::findInPath(const std::string &fn)
@@ -537,45 +466,6 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-const char *Client::trimSourceRoot(const std::string &str, size_t *len)
-{
-    const char *cstr = str.c_str();
-
-    // Strip conan home prefix if present, so that builds under
-    // ~/.conan2/... produce the same hash on every machine.
-    static const char conanMarker[] = "/.conan2/";
-    const char *conan = strstr(cstr, conanMarker);
-    if (conan) {
-        const char *trimmed = conan + 1; // points at ".conan2/..."
-        *len = str.size() - (trimmed - cstr);
-        return trimmed;
-    }
-
-    char buf[PATH_MAX];
-    // strcpy
-    size_t idx = 0;
-    struct stat st;
-    static const char *files[] = { ".git", "CMakeLists.txt", "configure" };
-    while (true) {
-        const size_t tmp = str.find('/', idx) + 1;
-        if (!tmp)
-            break;
-        memcpy(buf + idx, cstr + idx, tmp - idx);
-        for (const char *file : files) {
-            strncpy(buf + tmp, file, sizeof(buf) - tmp - strlen(file));
-            // ERROR("TESTING %s\n", buf);
-            if (!::stat(buf, &st)) {
-                // ERROR("Found it at %s -> %s", buf, cstr + tmp);
-                *len = str.size() - tmp;
-                return cstr + tmp;
-            }
-        }
-        buf[tmp + 1] = '\0';
-        idx = tmp;
-    }
-    *len = str.size();
-    return str.c_str();
-}
 
 bool Client::setFlag(int fd, uint32_t flag)
 {
@@ -1273,55 +1163,3 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
     return ret;
 }
 
-int Client::dumpSha1()
-{
-    Client::Data &data = Client::data();
-    Client::CompilerInfo info;
-    {
-        std::vector<std::string> args(data.argc);
-        for (int i = 0; i < data.argc; ++i) {
-            // printf("%zu: %s\n", i, argv[i]);
-            args[i] = data.argv[i];
-        }
-
-        struct stat st;
-        if (!::stat(data.resolvedCompiler.c_str(), &st)) {
-            std::string out, err;
-            TinyProcessLib::Process proc(
-                data.resolvedCompiler + " -v",
-                std::string(),
-                [&out](const char *bytes, size_t n) {
-                out.append(bytes, n);
-            },
-                [&err](const char *bytes, size_t n) {
-                err.append(bytes, n);
-            });
-            const int exit_status = proc.get_exit_status();
-            if (exit_status) {
-                ERROR("Failed to run %s -v\n%s\n", data.resolvedCompiler.c_str(), err.c_str());
-            } else {
-                out += err;
-                filter(out);
-                VERBOSE("Signature created from %s", out.c_str());
-                info = createCompilerInfo(data.resolvedCompiler, out);
-            }
-        }
-        data.hash = info.hash;
-        data.compilerArgs = CompilerArgs::create(std::move(args), &data.localReason);
-        if (data.compilerArgs)
-            data.compilerArgs->finalize(info);
-    }
-    if (!data.compilerArgs) {
-        ERROR("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason));
-        return 1;
-    }
-
-    data.preprocessed = Preprocessed::create(data.compiler, data.compilerArgs, nullptr, nullptr);
-    assert(data.preprocessed);
-    data.preprocessed->wait();
-    unsigned char sha1Buf[SHA_DIGEST_LENGTH];
-    Client::data().sha1Final(sha1Buf);
-    std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
-    printf("%s\n", sha1.c_str());
-    return 0;
-}

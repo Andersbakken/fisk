@@ -86,6 +86,7 @@ struct CompilerArgs
     static const char *localReasonToString(LocalReason reason);
     static std::shared_ptr<CompilerArgs> create(std::vector<std::string> &&args, LocalReason *reason);
     void finalize(const Client::CompilerInfo &info);
+    bool hasDebugInfo() const;
 
     std::string sourceFile() const
     {

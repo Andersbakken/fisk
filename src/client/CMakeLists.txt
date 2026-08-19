@@ -52,8 +52,6 @@ add_executable(fiskc
     CompilerArgs.cpp
     Config.cpp
     DaemonSocket.cpp
-    DwarfPatcher.cpp
-    FiskPathPatcher.cpp
     Log.cpp
     Preprocessed.cpp
     SchedulerWebSocket.cpp
@@ -62,7 +60,6 @@ add_executable(fiskc
     Watchdog.cpp
     WebSocket.cpp
     main.cpp)
-target_include_directories(fiskc PRIVATE ${CMAKE_SOURCE_DIR}/3rdparty/ELFIO)
 target_compile_features(fiskc PRIVATE cxx_std_17)
 target_link_libraries(fiskc nlohmann_json::nlohmann_json pthread wslay ${OPENSSL_CRYPTO_LIBRARY} ${FISKC_OPENSSL_STATIC_EXTRA_LIBS} LUrlParser tiny-process-library dl ${ZLIB_LIBRARIES})
 

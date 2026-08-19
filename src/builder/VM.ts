@@ -121,8 +121,8 @@ export class VM extends EventEmitter {
         });
     }
 
-    startCompile(commandLine: string[], argv0: string, id: number, sourcePath?: string, paddedPaths?: boolean): CompileJob {
-        const compile = new CompileJob(commandLine, argv0, id, this, sourcePath, paddedPaths);
+    startCompile(commandLine: string[], argv0: string, id: number, sourcePath?: string, cwd?: string): CompileJob {
+        const compile = new CompileJob(commandLine, argv0, id, this, sourcePath, cwd);
         this.compiles[compile.id] = compile;
         // console.log("startCompile " + compile.id);
         return compile;

@@ -33,25 +33,25 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(`Usage: fisk-builder [options]
 
 Options:
-  --scheduler=URL              Scheduler URL (default: localhost:8097)
-  --port=PORT                  Listen port (default: 8096)
-  --slots=N                    Number of compile slots
-  --debug                      Enable debug logging
-  --object-cache-size=SIZE     Object cache size (e.g. "10gb")
-  --object-cache-dir=PATH      Object cache directory
-  --object-cache-purge-size=N  Size to purge cache down to
+  --scheduler=URL                Scheduler URL (default: localhost:8097)
+  --port=PORT                    Listen port (default: 8096)
+  --slots=N                      Number of compile slots
+  --debug                        Enable debug logging
+  --object-cache-size=SIZE       Object cache size (e.g. "10gb")
+  --object-cache-dir=PATH        Object cache directory
+  --object-cache-purge-size=N    Size to purge cache down to
   --restart-on-new-environments  Restart when new environments arrive
-  --name=NAME                  Builder name
-  --hostname=HOST              Builder hostname (default: os.hostname())
-  --labels=LABELS              Builder labels
-  --npm-version-file=PATH      Path to npm version file
-  --keep-compiles              Keep compile directories after completion
-  --vm-user=USER               User for VM processes
-  --inform-delay=MS            Delay before informing scheduler (default: 5000)
-  --quit-on-error-delay=MS     Delay before quitting on error
-  --loadInterval=MS            Load reporting interval (default: 1000)
-  --backlog=N                  Listen backlog (default: 50)
-  --cache-dir=PATH             Cache directory (default: ~/.cache/fisk/builder)
+  --name=NAME                    Builder name
+  --hostname=HOST                Builder hostname (default: os.hostname())
+  --labels=LABELS                Builder labels
+  --npm-version-file=PATH        Path to npm version file
+  --keep-compiles                Keep compile directories after completion
+  --vm-user=USER                 User for VM processes
+  --inform-delay=MS              Delay before informing scheduler (default: 5000)
+  --quit-on-error-delay=MS       Delay before quitting on error
+  --loadInterval=MS              Load reporting interval (default: 1000)
+  --backlog=N                    Listen backlog (default: 50)
+  --cache-dir=PATH               Cache directory (default: ~/.cache/fisk/builder)
 
 Config files: ~/.config/fisk/builder.conf, /etc/xdg/fisk/builder.conf
 Environment variables: FISK_BUILDER_SCHEDULER, FISK_BUILDER_PORT, etc.`);
@@ -64,7 +64,7 @@ const option: Options = createOptions({
     additionalFiles: ["fisk/builder.conf.override"]
 });
 
-const common = commonFunc(option);
+const common = commonFunc(option, true);
 
 if (process.getuid() !== 0) {
     console.error("fisk builder needs to run as root to be able to chroot");
@@ -181,7 +181,10 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                         } catch (gunzipErr: unknown) {
                             assert(objectCache, "Must have objectCache");
                             console.error(
-                                `Failed to gunzip ${path.join(objectCache.dir, item.response.sha1!)} for file index ${fileIdx}:`,
+                                `Failed to gunzip ${path.join(
+                                    objectCache.dir,
+                                    item.response.sha1!
+                                )} for file index ${fileIdx}:`,
                                 gunzipErr
                             );
                             finish(gunzipErr as Error);
@@ -879,7 +882,13 @@ server.on("job", (job: Job) => {
             console.log("Starting job", j.id, jobJob.sourcePath, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
             assert(jobJob.commandLine, "Must have commandLine");
             assert(jobJob.argv0, "Must have argv0");
-            j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id, jobJob.sourcePath, jobJob.paddedPaths);
+            j.op = vm.startCompile(
+                jobJob.commandLine,
+                jobJob.argv0,
+                jobJob.id,
+                jobJob.sourcePath,
+                jobJob.cwd
+            );
             if (j.buffer) {
                 j.op.feed(j.buffer);
                 j.buffer = undefined;
@@ -960,8 +969,13 @@ server.on("job", (job: Job) => {
                     success: event.success,
                     exitCode: event.exitCode,
                     sha1: jobJob.sha1,
-                    sourcePath: path.join(j.op!.vmDir, j.op!.sourceFileName),
-                    originalSourcePath: jobJob.sourcePath,
+                    // Just the basename. This goes into the object cache and is
+                    // replayed on every hit, so it has to still mean something
+                    // later: the /compiles/<id> directory belongs to this one
+                    // job's chroot, and the requesting client's own path belongs
+                    // to whichever client happened to compile it first. Only the
+                    // file name survives being shared.
+                    sourcePath: j.op!.sourceFileName,
                     stderr: j.stderr,
                     stdout: j.stdout
                 };

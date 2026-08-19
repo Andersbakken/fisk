@@ -73,6 +73,9 @@ public:
     }
 
     void processJSON(const std::string &json);
+    // Runs the daemon's probes against our compiler and reports the raw output.
+    void handleCompilerInfoRequest(const nlohmann::json &obj);
+    static std::string compilerKey(const std::string &compiler);
 
 protected:
     // Socket
@@ -119,6 +122,8 @@ private:
     bool mHasLocalSlot { false };
     std::string mError;
     Client::CompilerInfo mCompilerInfo;
+    // Remembered from sendAcquireSlot so we can probe it if the daemon asks.
+    std::string mCompiler;
     mutable std::mutex mMutex;
     std::condition_variable mCond;
 };

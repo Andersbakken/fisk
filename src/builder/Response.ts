@@ -12,7 +12,6 @@ export interface Response {
     exitCode: number;
     success: boolean;
     sourcePath?: string;
-    originalSourcePath?: string;
     environment?: string;
     commandLine?: string[];
     stderr?: string;

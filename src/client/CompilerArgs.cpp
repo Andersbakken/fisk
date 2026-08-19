@@ -619,10 +619,10 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> &&ar
                 }
             }
 
-            size_t len = 0;
-            const char *fn = Client::trimSourceRoot(arg, &len);
-            Client::data().sha1Update(fn, len);
-            VERBOSE("SHA1'ing arg %zu [%.*s]", i, static_cast<int>(len), fn);
+            // Hashed as given, absolute path and all. It lands in the object's
+            // debug info, so two checkouts must not share a cache entry for it.
+            Client::data().sha1Update(arg.c_str(), arg.size());
+            VERBOSE("SHA1'ing arg %zu [%s]", i, arg.c_str());
             continue;
         }
 
@@ -753,6 +753,39 @@ void CompilerArgs::finalize(const Client::CompilerInfo &info)
         Client::data().sha1Update(arg.c_str(), arg.size());
         commandLine.push_back(std::move(arg));
     }
+
+    // The source path reaches the key on its own -- as an argument above, and
+    // through the #line markers in the preprocessed source -- but the working
+    // directory does not, and the builder bakes it in as DW_AT_comp_dir. Without
+    // it two build directories over one checkout would share a key and the second
+    // would get the first one's comp_dir.
+    //
+    // Only with debug info: otherwise the object has no paths in it and can be
+    // shared by anyone who compiles the same source with the same flags.
+    if (Config::objectCache && hasDebugInfo()) {
+        const std::string cwd = Client::cwd();
+        Client::data().sha1Update("-fisk-comp-dir=", 15);
+        Client::data().sha1Update(cwd.c_str(), cwd.size());
+        VERBOSE("SHA1'ing compilation dir [%s]", cwd.c_str());
+    }
+}
+
+// Whether the command line asks for debug info. -g0 turns it back off and the
+// last -g* wins, matching how gcc and clang resolve them. -gno-* switches only
+// tweak debug info, they do not enable it.
+bool CompilerArgs::hasDebugInfo() const
+{
+    bool ret = false;
+    for (const std::string &arg : commandLine) {
+        if (arg.size() < 2 || arg[0] != '-' || arg[1] != 'g')
+            continue;
+        if (arg == "-g0") {
+            ret = false;
+        } else if (arg.compare(0, 5, "-gno-") != 0) {
+            ret = true;
+        }
+    }
+    return ret;
 }
 
 const char *CompilerArgs::languageName(Flag flag, bool preprocessed)

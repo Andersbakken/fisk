@@ -244,10 +244,6 @@ int main(int argc, char **argv)
         }
     }
 
-    if (Config::dumpSha1) {
-        return Client::dumpSha1();
-    }
-
     if (!Config::dumpSlots) {
         if (!Client::findCompiler(preresolved)) {
             FATAL("Can't find executable for %s %s", data.argv[0], preresolved.c_str());
@@ -378,7 +374,6 @@ int main(int argc, char **argv)
     headers["x-fisk-config-version"] = std::to_string(Config::Version);
     headers["x-fisk-npm-version"] = npm_version;
     headers["x-fisk-supports-compressed-response"] = "true";
-    headers["x-fisk-padded-paths"] = "true";
     {
         std::string builder = Config::builder;
         if (!builder.empty())
@@ -408,7 +403,9 @@ int main(int argc, char **argv)
         }
     }
 
-    if (Config::objectCache) {
+    // --fisk-dump-sha1 needs the same sha1 the object cache would use, so it
+    // takes this path too even when the cache is off.
+    if (Config::objectCache || Config::dumpSha1) {
         DEBUG("Waiting for preprocessed");
         while (!data.preprocessed->done() && daemonSocket.state() == DaemonSocket::Connected && !data.watchdog->timedOut()) {
             select.exec();
@@ -445,6 +442,15 @@ int main(int argc, char **argv)
         Client::data().sha1Final(sha1Buf);
         std::string sha1 = Client::toHex(sha1Buf, sizeof(sha1Buf));
         WARN("Got sha1: %s", sha1.c_str());
+        if (Config::dumpSha1) {
+            // The point of --fisk-dump-sha1 is "what object-cache key would this
+            // compile use", so it has to be the key this path computes: the
+            // daemon's CompilerInfo (via finalize), the compiler hash and the
+            // cache tag all feed it. Computing it separately, as this option used
+            // to, produced a different number than the build actually used.
+            printf("%s\n", sha1.c_str());
+            return 0;
+        }
         headers["x-fisk-sha1"] = std::move(sha1);
     }
 
@@ -568,6 +574,7 @@ int main(int argc, char **argv)
     nlohmann::json msg = {
         { "commandLine", args },
         { "argv0", data.compiler },
+        { "cwd", Client::cwd() },
         { "wait", wait },
         { "compressed", Config::compress.get() },
         { "bytes", static_cast<int>(data.preprocessed->stdOut.size()) }

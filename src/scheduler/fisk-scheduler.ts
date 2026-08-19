@@ -68,12 +68,13 @@ let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
 
-// 5.0.11 is the first client that asks for padded paths and can patch them out
-// of LTO bitcode. An older client silently produces objects with the builder's
-// /compiles paths baked into the debug info -- and because paddedPaths is not
-// part of the object cache key, those objects are then served to up-to-date
-// clients too, so one stale client poisons everyone's backtraces.
-const clientMinimumVersion = "5.0.11";
+// 5.0.14 is the first client that folds its debug paths into the object cache
+// key and asks the builder to bake those paths in at compile time. An older
+// client produces objects carrying the builder's /compiles paths -- unpatchable
+// for LTO bitcode -- and, because it does not key on those paths, stores them
+// under a key up-to-date clients also use. One stale client therefore poisons
+// everyone's backtraces, so it is refused rather than allowed to contribute.
+const clientMinimumVersion = "5.0.14";
 
 // compareVersions throws on an empty or malformed version rather than returning
 // an ordering, and npmVersion is "" for any client that sends no

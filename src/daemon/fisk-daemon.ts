@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { CompilerInfoCache } from "./CompilerInfoCache";
+import { CompilerInfoStore } from "./CompilerInfoCache";
 import { Constants } from "./Constants";
 import { Server } from "./Server";
 import { Slots } from "./Slots";
@@ -9,7 +9,7 @@ import assert from "assert";
 import createOptions from "@jhanssen/options";
 import os from "os";
 import type { Compile } from "./Compile";
-import type { CompilerInfo } from "./CompilerInfoCache";
+import type { CompilerInfo, Probe } from "./CompilerInfoCache";
 import type { Options } from "@jhanssen/options";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
@@ -72,7 +72,9 @@ console.log(
     `cpp slots: ${cppSlots.capacity}, compile slots: ${compileSlots.capacity}, local slots: ${localSlots.capacity}, local max load: ${localSlotsMaxLoad}`
 );
 
-const compilerInfoCache = new CompilerInfoCache();
+const compilerInfoStore = new CompilerInfoStore(undefined, (...args: unknown[]) => {
+    console.log("compilerInfo:", ...args);
+});
 
 interface CompilerInfoResult {
     info: CompilerInfo | null;
@@ -223,24 +225,34 @@ server.on("compile", (compile) => {
         }
     });
 
-    compile.on("acquireSlot", (msg?: { type?: string; compiler?: unknown; "no-local"?: boolean }) => {
+    // The daemon cannot see, let alone run, the compiler: it usually lives in
+    // the client's container. Clients identify it with a key they compute
+    // themselves and run the probes on our behalf when asked.
+    const requester = {
+        id: compile.id,
+        requestCompilerInfo(key: string, probes: readonly Probe[], timeoutMs: number): void {
+            compile.send({ type: "compilerInfoRequest", key, probes, timeoutMs });
+        }
+    };
+
+    compile.on("acquireSlot", (msg?: { type?: string; compilerKey?: unknown; "no-local"?: boolean }) => {
         console.log("acquireSlot", msg);
 
-        const compilerPath: string | null =
-            msg && typeof msg.compiler === "string" && msg.compiler.length > 0 ? msg.compiler : null;
+        const compilerKey: string | null =
+            msg && typeof msg.compilerKey === "string" && msg.compilerKey.length > 0 ? msg.compilerKey : null;
 
-        const infoResult: Promise<CompilerInfoResult> = compilerPath
-            ? compilerInfoCache.get(compilerPath).then(
+        const infoResult: Promise<CompilerInfoResult> = compilerKey
+            ? compilerInfoStore.get(compilerKey, requester).then(
                   (info: CompilerInfo): CompilerInfoResult => ({ info, error: null }),
                   (err: unknown): CompilerInfoResult => {
                       const message = err instanceof Error ? err.message : String(err);
                       if (debug) {
-                          console.log("acquireSlot -> compilerInfoCache failed", compilerPath, message);
+                          console.log("acquireSlot -> compilerInfoStore failed", compilerKey, message);
                       }
                       return { info: null, error: message };
                   }
               )
-            : Promise.resolve<CompilerInfoResult>({ info: null, error: "acquireSlot missing compiler path" });
+            : Promise.resolve<CompilerInfoResult>({ info: null, error: "acquireSlot missing compiler key" });
 
         infoResult
             .then(({ info, error }) => {
@@ -282,6 +294,26 @@ server.on("compile", (compile) => {
             });
     });
 
+    compile.on(
+        "compilerInfoResponse",
+        (msg?: { key?: unknown; results?: unknown; error?: unknown }) => {
+            const key = msg && typeof msg.key === "string" ? msg.key : "";
+            if (!key) {
+                console.error("compilerInfoResponse without a key from", compile.id);
+                return;
+            }
+            if (typeof msg?.error === "string" && msg.error.length) {
+                compilerInfoStore.fail(key, msg.error);
+                return;
+            }
+            if (!msg?.results || typeof msg.results !== "object") {
+                compilerInfoStore.fail(key, "compilerInfoResponse without results");
+                return;
+            }
+            compilerInfoStore.provide(key, msg.results as Record<string, string | null>);
+        }
+    );
+
     compile.on("releaseLocalSlot", () => {
         if (debug) {
             console.log("releaseLocalSlot");
@@ -299,6 +331,8 @@ server.on("compile", (compile) => {
             console.error("Got error from fiskc", compile.id, compile.pid, err);
         }
         compileClosed = true;
+        // If this client owed us compiler info, hand the job to another waiter.
+        compilerInfoStore.clientGone(requester);
         if (requestedCppSlot) {
             requestedCppSlot = false;
             cppSlots.release(compile.id);
@@ -318,6 +352,8 @@ server.on("compile", (compile) => {
             console.log("got end from", compile.id, compile.pid);
         }
         compileClosed = true;
+        // If this client owed us compiler info, hand the job to another waiter.
+        compilerInfoStore.clientGone(requester);
         if (requestedCppSlot) {
             requestedCppSlot = false;
             cppSlots.release(compile.id);

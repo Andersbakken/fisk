@@ -115,30 +115,7 @@ std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler, 
                 }
                 DEBUG("Preprocess got status %d", ptr->exitStatus);
                 if (Config::objectCache || Config::dumpSha1) {
-                    // FILE *f = fopen("/tmp/preproc.i", "w");
-                    const unsigned char *ch = ptr->stdOut.data();
-                    const unsigned char *last = ch;
-                    while (*ch) {
-                        // VERBOSE("GETTING CHAR [%c]", *ch);
-                        if (*ch == '#' && ch[1] == ' ' && std::isdigit(ch[2])) {
-                            if (ch > last) {
-                                VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
-                                Client::data().sha1Update(last, ch - last);
-                                // fwrite(last, 1, ch - last, f);
-                            }
-                            while (*ch && *ch != '\n')
-                                ++ch;
-                            last = ch;
-                        } else {
-                            ++ch;
-                        }
-                    }
-                    if (last < ch) {
-                        VERBOSE("Adding to SHA1:\n%.*s\n", static_cast<int>(ch - last), last);
-                        Client::data().sha1Update(last, ch - last);
-                        // fwrite(last, 1, ch - last, f);
-                    }
-                    // fclose(f);
+                    Client::data().sha1Update(ptr->stdOut.data(), ptr->stdOut.size());
                 }
                 if (Config::compress) {
                     ptr->stdOut = std::move(compressed);

@@ -110,7 +110,6 @@ export class Server extends EventEmitter {
                     sourcePath: String(req.headers["x-fisk-sourcefile"]),
                     user: String(req.headers["x-fisk-user"]),
                     supportsCompressedResponse: req.headers["x-fisk-supports-compressed-response"] === "true",
-                    paddedPaths: req.headers["x-fisk-padded-paths"] === "true",
                     ws
                 });
 
@@ -146,6 +145,7 @@ export class Server extends EventEmitter {
                     client.compressed = json.compressed;
                     client.commandLine = json.commandLine;
                     client.argv0 = json.argv0;
+                    client.cwd = json.cwd;
                     client.connectTime = connectTime;
                     client.wait = json.wait;
                     this.emit("job", client);

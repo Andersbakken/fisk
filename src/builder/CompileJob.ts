@@ -13,7 +13,7 @@ export class CompileJob extends EventEmitter {
     startCompile?: number;
     fd?: number;
 
-    constructor(readonly commandLine: string[], readonly argv0: string, readonly id: number, readonly vm: VM, sourcePath?: string, readonly paddedPaths?: boolean) {
+    constructor(readonly commandLine: string[], readonly argv0: string, readonly id: number, readonly vm: VM, readonly sourcePath?: string, readonly clientCwd?: string) {
         super();
         this.dir = path.join(vm.root, "compiles", String(this.id));
         this.vmDir = path.join("/", "compiles", String(this.id));
@@ -48,7 +48,16 @@ export class CompileJob extends EventEmitter {
         fs.closeSync(this.fd);
         this.fd = undefined;
         this.vm.child.send(
-            { type: "compile", commandLine: this.commandLine, argv0: this.argv0, id: this.id, dir: this.vmDir, sourceFileName: this.sourceFileName, paddedPaths: this.paddedPaths },
+            {
+                type: "compile",
+                commandLine: this.commandLine,
+                argv0: this.argv0,
+                id: this.id,
+                dir: this.vmDir,
+                sourceFileName: this.sourceFileName,
+                clientSourcePath: this.sourcePath,
+                clientCwd: this.clientCwd
+            },
             this.sendCallback.bind(this)
         );
     }

@@ -1,6 +1,4 @@
 #include "BuilderWebSocket.h"
-#include "DwarfPatcher.h"
-#include "FiskPathPatcher.h"
 
 void BuilderWebSocket::onConnected()
 {
@@ -130,15 +128,6 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         if (objectCache.is_boolean() && objectCache.get<bool>()) {
             data.objectCache = true;
         }
-        const auto &sourcePath = msg["sourcePath"];
-        if (sourcePath.is_string()) {
-            cachedSourcePath = jstring(sourcePath);
-        }
-        const auto &originalSourcePath = msg["originalSourcePath"];
-        if (originalSourcePath.is_string()) {
-            cachedOriginalSourcePath = jstring(originalSourcePath);
-        }
-
         if (hasIndex && !index.empty()) {
             files.reserve(index.size());
             for (size_t i = 0; i < index.size(); ++i) {
@@ -231,21 +220,9 @@ void BuilderWebSocket::handleFileContents(const void *data, size_t len)
         return;
     }
 
-    if (clientData.compilerArgs && (Client::endsWith(front.path, ".o") || Client::endsWith(front.path, ".dwo"))) {
-        const std::string &sourceFile = clientData.compilerArgs->sourceFile();
-        const std::string compilationDir = Client::cwd();
-        if (!patchFiskPaths(front.path, sourceFile, compilationDir)) {
-            // Fall back to the ELF-only DWARF patcher for objects from
-            // builders that predate the padded-prefix approach.
-            if (!cachedSourcePath.empty() && cachedSourcePath != sourceFile) {
-                patchDwarfSourcePath(front.path, cachedSourcePath, sourceFile, compilationDir);
-            }
-            if (!cachedOriginalSourcePath.empty() && cachedOriginalSourcePath != sourceFile && cachedOriginalSourcePath != cachedSourcePath) {
-                patchDwarfSourcePath(front.path, cachedOriginalSourcePath, sourceFile, compilationDir);
-            }
-        }
-    }
-
+    // Nothing to rewrite: the builder bakes our real source path and compilation
+    // directory in at compile time, which is the only thing that works for LTO
+    // bitcode and for the .debug_line file table anyway.
     files.erase(files.begin());
     done = files.empty();
 }

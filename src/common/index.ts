@@ -4,7 +4,10 @@ import path from "path";
 import type { Options } from "@jhanssen/options";
 
 const Version = 5;
-const ObjectCacheFormatVersion = 5;
+// 6: objects now carry the client's real source path and compilation dir,
+// baked in at compile time instead of the builder's /compiles paths, and the
+// stored response no longer keeps the paths the client used to patch with.
+const ObjectCacheFormatVersion = 6;
 
 function cacheDir(option: Options): string {
     let dir = option("cache-dir");
@@ -66,9 +69,16 @@ export interface Common {
     ObjectCacheFormatVersion: number;
 }
 
-export function common(option: Options): Common {
+// Only the builder keeps an object cache on disk. The scheduler tracks which
+// builder holds which sha1 in memory, and the daemon uses cacheDir purely for
+// the default socket path -- validating an object cache for either created a
+// directory they never read and, on a format bump, tried to destroy one they do
+// not necessarily own.
+export function common(option: Options, hasObjectCache: boolean = false): Common {
     validateCache(option);
-    validateObjectCache(option);
+    if (hasObjectCache) {
+        validateObjectCache(option);
+    }
     return {
         cacheDir: cacheDir.bind(undefined, option),
         Version,

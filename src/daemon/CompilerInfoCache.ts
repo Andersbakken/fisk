@@ -1,10 +1,4 @@
 import { createHash } from "crypto";
-import { execFile } from "child_process";
-import { promises as fsPromises } from "fs";
-import { promisify } from "util";
-import path from "path";
-
-const execFileAsync = promisify(execFile);
 
 export type CompilerType = "clang" | "gcc" | "unknown";
 
@@ -48,18 +42,28 @@ export interface CompilerInfo {
 // macros. Those strings are frozen at compiler-build time, not install
 // time, so they are identical across machines that installed the same
 // compiler package.
+//
+// Who runs the probes:
+//
+// The daemon never executes a compiler. The compiler generally lives inside
+// the client's container and its path does not resolve in the daemon's mount
+// namespace, so the daemon cannot stat it let alone run it. Instead the daemon
+// asks one client to run the probes and send the raw output back, and the
+// daemon does the parsing and hashing here. Keeping canonicalisation on this
+// side means there is exactly one implementation of it -- a second one in the
+// client would eventually diverge and silently break client/builder matching.
 
-const PROBE_TIMEOUT_MS = 10000;
-const PROBE_MAX_BUFFER = 4 * 1024 * 1024;
+export const PROBE_TIMEOUT_MS = 10000;
 
-interface Probe {
+export interface Probe {
     label: string;
     args: readonly string[];
-    // If true, a non-zero exit or missing feature is fatal (probe is required).
+    // If false, the probe may fail (or the feature may be missing) without
+    // failing the whole fingerprint.
     required: boolean;
 }
 
-const PROBES: readonly Probe[] = [
+export const PROBES: readonly Probe[] = [
     { label: "dumpmachine", args: ["-dumpmachine"], required: true },
     { label: "dumpversion", args: ["-dumpversion"], required: true },
     { label: "dumpfullversion", args: ["-dumpfullversion"], required: false },
@@ -67,22 +71,9 @@ const PROBES: readonly Probe[] = [
     { label: "builtins-cxx", args: ["-x", "c++", "-E", "-dM", "/dev/null"], required: true }
 ];
 
-async function runProbe(exec: string, probe: Probe): Promise<string | null> {
-    try {
-        const { stdout, stderr } = await execFileAsync(exec, [...probe.args], {
-            timeout: PROBE_TIMEOUT_MS,
-            maxBuffer: PROBE_MAX_BUFFER
-        });
-        return `${stdout}${stderr}`;
-    } catch (err) {
-        if (probe.required) {
-            throw new Error(
-                `Probe '${probe.label}' failed for ${exec}: ${err instanceof Error ? err.message : String(err)}`
-            );
-        }
-        return null;
-    }
-}
+// Raw probe output as reported by a client: label -> combined stdout+stderr,
+// or null when a non-required probe did not run.
+export type ProbeResults = Record<string, string | null>;
 
 // Emulate the C++ sscanf cascade "%d.%d.%d" -> "%d.%d" -> "%d".
 function parseVersion(text: string): CompilerVersion {
@@ -168,16 +159,25 @@ interface ProbeOutputs {
     builtinsCxx: string;
 }
 
-async function gatherProbes(exec: string): Promise<ProbeOutputs> {
-    const results = await Promise.all(PROBES.map((p) => runProbe(exec, p)));
-    const [dumpmachine, dumpversion, dumpfullversion, builtinsC, builtinsCxx] = results;
-    // The required probes cannot be null because runProbe would have thrown.
+// Turn a client's reported results into the shape the fingerprint wants,
+// failing if a required probe is missing. A client that reports nothing for a
+// required probe is telling us it could not identify the compiler, which must
+// not silently become a fingerprint of empty strings -- every such compiler
+// would hash the same.
+function toProbeOutputs(results: ProbeResults): ProbeOutputs {
+    for (const probe of PROBES) {
+        if (probe.required && !results[probe.label]) {
+            throw new Error(`Required probe '${probe.label}' produced no output`);
+        }
+    }
+    const value = (label: string): string => results[label] ?? "";
+    const full = results.dumpfullversion;
     return {
-        dumpmachine: (dumpmachine ?? "").trim(),
-        dumpversion: (dumpversion ?? "").trim(),
-        dumpfullversion: dumpfullversion === null ? null : dumpfullversion.trim(),
-        builtinsC: builtinsC ?? "",
-        builtinsCxx: builtinsCxx ?? ""
+        dumpmachine: value("dumpmachine").trim(),
+        dumpversion: value("dumpversion").trim(),
+        dumpfullversion: full ? full.trim() : null,
+        builtinsC: value("builtins-c"),
+        builtinsCxx: value("builtins-cxx")
     };
 }
 
@@ -203,8 +203,8 @@ function canonicalFingerprint(p: ProbeOutputs): Buffer {
     return Buffer.from(parts.join("\0"), "utf8");
 }
 
-export async function createCompilerInfo(exec: string): Promise<CompilerInfo> {
-    const probes = await gatherProbes(exec);
+export function createCompilerInfo(results: ProbeResults): CompilerInfo {
+    const probes = toProbeOutputs(results);
 
     const type = detectTypeFromMacros(probes.builtinsC);
     const versionFromMac = versionFromMacros(probes.builtinsC, type);
@@ -232,50 +232,172 @@ export async function createCompilerInfo(exec: string): Promise<CompilerInfo> {
     return { hash, input, type, version };
 }
 
-export class CompilerInfoCache {
-    private readonly cache: Map<string, CompilerInfo> = new Map<string, CompilerInfo>();
-    private readonly pending: Map<string, Promise<CompilerInfo>> = new Map<string, Promise<CompilerInfo>>();
+// A client that can be asked to run the probes on our behalf.
+export interface CompilerInfoRequester {
+    readonly id: number;
+    requestCompilerInfo(key: string, probes: readonly Probe[], timeoutMs: number): void;
+}
 
-    async get(compilerPath: string): Promise<CompilerInfo> {
-        if (typeof compilerPath !== "string" || compilerPath.length === 0) {
-            throw new Error("CompilerInfoCache.get: compilerPath must be a non-empty string");
+// A client-supplied key must not be trusted to be small: it lands in a Map
+// that lives as long as the daemon.
+const MAX_KEY_LENGTH = 256;
+
+interface Waiter {
+    requester: CompilerInfoRequester;
+    resolve: (info: CompilerInfo) => void;
+    reject: (err: Error) => void;
+}
+
+function clearTimer(entry: Pending): void {
+    if (entry.timer) {
+        clearTimeout(entry.timer);
+        entry.timer = undefined;
+    }
+}
+
+interface Pending {
+    waiters: Waiter[];
+    // Client currently asked to probe, if any.
+    electedId?: number;
+    // Clients already asked and found wanting, so re-election makes progress
+    // instead of cycling.
+    triedIds: Set<number>;
+    timer?: NodeJS.Timeout;
+}
+
+// Caches compiler fingerprints, obtaining them from clients rather than by
+// running anything.
+//
+// The key is opaque here and comes from the client -- it identifies "the same
+// compiler file" well enough to decide whether to re-probe. It deliberately is
+// not the fingerprint: we need something cheap to compute *before* probing.
+//
+// Only one client is asked per key. Everyone else waits on the same answer,
+// which is what keeps a cold parallel build from probing the same compiler
+// once per job. Callers get a promise, so the daemon's existing "await the
+// info, then hand back a slot" flow already holds those clients' slots for
+// the duration without any extra slot bookkeeping.
+export class CompilerInfoStore {
+    private readonly cache: Map<string, CompilerInfo> = new Map<string, CompilerInfo>();
+    private readonly pending: Map<string, Pending> = new Map<string, Pending>();
+
+    constructor(
+        private readonly timeoutMs: number = PROBE_TIMEOUT_MS * 2,
+        private readonly log: (...args: unknown[]) => void = (): void => {
+            /* quiet by default */
         }
-        // Resolve symlinks so that /usr/bin/clang and /usr/bin/clang-18
-        // (when the former is a symlink to the latter) share a cache entry.
-        const absPath = await fsPromises.realpath(path.resolve(compilerPath));
-        const stat = await fsPromises.stat(absPath);
-        const key = `${absPath}:${stat.mtimeMs}`;
+    ) {}
+
+    get(key: string, requester: CompilerInfoRequester): Promise<CompilerInfo> {
+        if (typeof key !== "string" || key.length === 0 || key.length > MAX_KEY_LENGTH) {
+            return Promise.reject(new Error("compiler key must be a non-empty string of sane length"));
+        }
 
         const cached = this.cache.get(key);
         if (cached) {
-            return cached;
+            return Promise.resolve(cached);
         }
 
-        const inflight = this.pending.get(key);
-        if (inflight) {
-            return inflight;
-        }
+        return new Promise<CompilerInfo>((resolve, reject) => {
+            let entry = this.pending.get(key);
+            if (!entry) {
+                entry = { waiters: [], triedIds: new Set<number>() };
+                this.pending.set(key, entry);
+            }
+            entry.waiters.push({ requester, resolve, reject });
 
-        const compute = CompilerInfoCache.compute(absPath).then((info) => {
-            this.cache.set(key, info);
-            return info;
+            // Someone is already probing this compiler; just wait for them.
+            if (entry.electedId === undefined) {
+                this.elect(key, entry);
+            }
         });
-        this.pending.set(key, compute);
-
-        // Clean up the pending map on both success and failure so a failed
-        // lookup doesn't wedge the key forever.
-        compute
-            .finally(() => {
-                this.pending.delete(key);
-            })
-            .catch(() => {
-                /* rejection observed by caller via the returned promise */
-            });
-
-        return compute;
     }
 
-    private static async compute(absPath: string): Promise<CompilerInfo> {
-        return createCompilerInfo(absPath);
+    // The elected client reported probe output.
+    provide(key: string, results: ProbeResults): void {
+        const entry = this.pending.get(key);
+        let info: CompilerInfo;
+        try {
+            info = createCompilerInfo(results);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log("compilerInfo for", key, "was unusable:", message);
+            if (entry) {
+                this.reelect(key, entry, message);
+            }
+            return;
+        }
+
+        this.cache.set(key, info);
+        if (!entry) {
+            return;
+        }
+        this.finish(key, entry);
+        for (const waiter of entry.waiters) {
+            waiter.resolve(info);
+        }
+    }
+
+    // The elected client could not probe the compiler.
+    fail(key: string, error: string): void {
+        const entry = this.pending.get(key);
+        if (entry) {
+            this.reelect(key, entry, error);
+        }
+    }
+
+    // A client went away. If it owed us an answer, ask someone else.
+    clientGone(requester: CompilerInfoRequester): void {
+        for (const [key, entry] of this.pending) {
+            entry.waiters = entry.waiters.filter((w) => w.requester.id !== requester.id);
+            if (entry.electedId === requester.id) {
+                this.reelect(key, entry, "client disconnected before reporting compiler info");
+            } else if (!entry.waiters.length) {
+                this.finish(key, entry);
+            }
+        }
+    }
+
+    private elect(key: string, entry: Pending): void {
+        const next = entry.waiters.find((w) => !entry.triedIds.has(w.requester.id));
+        if (!next) {
+            // Nobody left who has not already failed us.
+            const waiters = entry.waiters;
+            this.finish(key, entry);
+            const err = new Error("no client could provide compiler info");
+            for (const waiter of waiters) {
+                waiter.reject(err);
+            }
+            return;
+        }
+
+        entry.electedId = next.requester.id;
+        entry.triedIds.add(next.requester.id);
+        entry.timer = setTimeout(() => {
+            this.log("compilerInfo probe timed out for", key, "client", next.requester.id);
+            this.reelect(key, entry, "timed out waiting for compiler info");
+        }, this.timeoutMs);
+        // Do not let a pending probe hold the process open.
+        entry.timer.unref?.();
+
+        this.log("asking client", next.requester.id, "to probe compiler", key);
+        try {
+            next.requester.requestCompilerInfo(key, PROBES, PROBE_TIMEOUT_MS);
+        } catch (err) {
+            this.log("failed to ask client", next.requester.id, err);
+            this.reelect(key, entry, "could not ask client to probe");
+        }
+    }
+
+    private reelect(key: string, entry: Pending, why: string): void {
+        this.log("re-electing for", key, "-", why);
+        clearTimer(entry);
+        entry.electedId = undefined;
+        this.elect(key, entry);
+    }
+
+    private finish(key: string, entry: Pending): void {
+        clearTimer(entry);
+        this.pending.delete(key);
     }
 }

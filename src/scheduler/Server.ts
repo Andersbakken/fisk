@@ -167,6 +167,9 @@ export class Server extends EventEmitter {
             return;
         }
 
+        // Exact match: this is a wire format, not a compatibility surface. A peer
+        // on a different version is not something to negotiate with, and NaN from
+        // a missing or unparseable header fails this comparison too.
         const configVersion = parseInt(header(req, "x-fisk-config-version") || "");
         if (configVersion !== this.configVersion) {
             ws.send(`{"error": "Bad config version, expected ${this.configVersion}, got ${configVersion}"}`);

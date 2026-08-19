@@ -113,7 +113,6 @@ std::mutex &mutex();
 bool findCompiler(const std::string &preresolved);
 std::string findInPath(const std::string &fn);
 void parsePath(const char *path, std::string *basename, std::string *dirname);
-const char *trimSourceRoot(const std::string &str, size_t *len);
 
 inline void parsePath(const std::string &path, std::string *basename, std::string *dirname)
 {
@@ -350,7 +349,6 @@ bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string
 std::string prepareEnvironmentForUpload(std::string *dir);
 bool isAtty();
 std::string formatJSONDiagnostics(const std::string &json);
-int dumpSha1();
 } // namespace Client
 
 #endif /* CLIENT_H */
