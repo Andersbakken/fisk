@@ -754,11 +754,37 @@ std::string Client::realpath(const std::string &path)
     return std::string();
 }
 
+// The logical working directory, preferring $PWD over getcwd() when the two
+// name the same directory.
+//
+// getcwd() always returns the path with symlinks resolved, so a build that cds
+// into a stable alias -- say builds/flavor -> builds/linux-x86_64-VULKAN-Coverage
+// -- still sees the flavor-specific name here. That name becomes DW_AT_comp_dir
+// and part of the object-cache key, so two builds that differ only by which
+// directory they ran in stop sharing cache entries and their debug info names a
+// directory particular to one of them.
+//
+// $PWD is only trusted after confirming it refers to the same directory: it is
+// inherited from the environment, so a stale or hostile value must not be able
+// to claim we compiled somewhere we did not. Comparing st_dev/st_ino means we
+// accept it exactly when it is a genuine alias -- a different path for the
+// directory we are actually in.
 std::string Client::cwd()
 {
     char buf[PATH_MAX];
     const char *ret = getcwd(buf, sizeof(buf));
-    return ret ? std::string(ret) : std::string();
+    const std::string physical = ret ? std::string(ret) : std::string();
+
+    const char *pwd = getenv("PWD");
+    if (pwd && pwd[0] == '/' && physical != pwd) {
+        struct stat pwdStat, dotStat;
+        if (!stat(pwd, &pwdStat) && !stat(".", &dotStat) && pwdStat.st_dev == dotStat.st_dev
+            && pwdStat.st_ino == dotStat.st_ino) {
+            DEBUG("Using logical cwd %s instead of %s", pwd, physical.c_str());
+            return pwd;
+        }
+    }
+    return physical;
 }
 
 bool Client::uncompressToFile(const std::string &fileName, FILE *f, const void *bytes, size_t len)
