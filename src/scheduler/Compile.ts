@@ -1,12 +1,18 @@
 import { Client, ClientType } from "./Client";
+import type { ClientSocket } from "./Client";
 import type { Options } from "@jhanssen/options";
-import type WebSocket from "ws";
+
 
 export class Compile extends Client {
     builder?: string;
 
+    // A job relayed by a daemon cannot stream an environment tarball to us: it is
+    // one multiplexed stream on a connection shared with every other compile on
+    // that host. Such a client reconnects directly to upload instead.
+    canUploadEnvironment: boolean = true;
+
     constructor(
-        ws: WebSocket,
+        ws: ClientSocket,
         ip: string,
         readonly environment: string,
         readonly sourcePath: string,

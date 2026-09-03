@@ -1,6 +1,7 @@
 import { Builder } from "./Builder";
 import { Client, ClientType } from "./Client";
 import { Compile } from "./Compile";
+import { DaemonConnection } from "./DaemonConnection";
 import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
@@ -224,18 +225,21 @@ export class Server extends EventEmitter {
         }
         this.emit("compile", client);
         const remaining: { bytes?: number; type?: string } = {};
-        client.ws.on("error", (err) => client.emit("error", err));
-        client.ws.on("close", (code, reason) => {
+        ws.on("pong", () => {
+            client.notePong();
+        });
+        ws.on("error", (err) => client.emit("error", err));
+        ws.on("close", (code, reason) => {
             if (remaining.bytes) {
                 client.emit("error", "Got close while reading a binary message");
             }
             if (client) {
                 client.emit("close", { code: code, reason: reason });
             }
-            client.ws.removeAllListeners();
+            ws.removeAllListeners();
         });
 
-        client.ws.on("message", (msg) => {
+        ws.on("message", (msg) => {
             switch (typeof msg) {
                 case "string": {
                     if (remaining.bytes) {
@@ -309,15 +313,20 @@ export class Server extends EventEmitter {
         });
     }
 
-    _handleBuilder(req: express.Request, client: Builder): void {
-        client.ws.on("close", (code, reason) => {
+    _handleBuilder(req: express.Request, ws: WebSocket, ip: string): void {
+        const client = new Builder(ws, ip);
+
+        ws.on("pong", () => {
+            client.notePong();
+        });
+        ws.on("close", (code, reason) => {
             client.emit("close", { code: code, reason: reason });
-            client.ws.removeAllListeners();
+            ws.removeAllListeners();
         });
 
-        client.ws.on("error", () => {
+        ws.on("error", () => {
             client.emit("close", { code: 1005, reason: "unknown" });
-            client.ws.removeAllListeners();
+            ws.removeAllListeners();
         });
 
         if (!("x-fisk-port" in req.headers)) {
@@ -359,7 +368,7 @@ export class Server extends EventEmitter {
                     client.environments[env] = true;
                 }
             });
-        client.ws.on("message", (msg) => {
+        ws.on("message", (msg) => {
             // console.log("Got message from builder", typeof msg, msg.length);
             switch (typeof msg) {
                 case "string": {
@@ -397,32 +406,136 @@ export class Server extends EventEmitter {
         this.emit("builder", client);
     }
 
-    _handleMonitor(req: express.Request, client: Client): void {
+    _handleMonitor(req: express.Request, ws: WebSocket, ip: string): void {
+        const client = new Client(ClientType.Monitor, ws, ip);
         client.nonce = this.nonces.get(req);
         // console.log("Got nonce", req.nonce);
-        client.ws.on("message", (message) => client.emit("message", message));
+        ws.on("pong", () => {
+            client.notePong();
+        });
+        ws.on("message", (message) => client.emit("message", message));
         this.emit("monitor", client);
-        client.ws.on("close", (code, reason) => {
-            client.ws.removeAllListeners();
+        ws.on("close", (code, reason) => {
+            ws.removeAllListeners();
             client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on("error", (err) => client.emit("error", err));
+        ws.on("error", (err) => client.emit("error", err));
     }
 
-    _handleClientVerify(req: express.Request, client: Client): void {
+    _handleClientVerify(req: express.Request, ws: WebSocket, ip: string): void {
+        const client = new Client(ClientType.ClientVerify, ws, ip);
         Object.assign(client, { npmVersion: header(req, "x-fisk-npm-version") });
         this.emit("clientVerify", client);
-        client.ws.on("close", (code, reason) => {
-            client.ws.removeAllListeners();
+        ws.on("pong", () => {
+            client.notePong();
+        });
+        ws.on("close", (code, reason) => {
+            ws.removeAllListeners();
             client.emit("close", { code: code, reason: reason });
         });
 
-        client.ws.on("error", (err) => client.emit("error", err));
+        ws.on("error", (err) => client.emit("error", err));
+    }
+
+    // One connection per host, shared by every fiskc process on it. fiskc used to
+    // open its own websocket per translation unit, which is a TCP connect plus an
+    // HTTP upgrade per compile; when this scheduler's event loop stalls the listen
+    // backlog fills, SYNs get dropped and those clients time out and compile
+    // locally instead. Jobs are multiplexed here as messages tagged with the
+    // daemon's request id, and each one gets a Compile that behaves like any other
+    // client so the scheduling and accounting code below stays untouched.
+    _handleDaemon(req: express.Request, ws: WebSocket, ip: string): void {
+        const configVersion = parseInt(header(req, "x-fisk-config-version") || "");
+        if (configVersion !== this.configVersion) {
+            ws.send(`{"error": "Bad config version, expected ${this.configVersion}, got ${configVersion}"}`);
+            ws.close();
+            return;
+        }
+
+        const connection = new DaemonConnection(ws, ip, this.option);
+        connection.name = header(req, "x-fisk-daemon-name") || "";
+        connection.hostname = header(req, "x-fisk-daemon-hostname") || "";
+        connection.npmVersion = header(req, "x-fisk-npm-version") || "";
+
+        ws.on("pong", () => {
+            connection.notePong();
+        });
+        ws.on("close", (code, reason) => {
+            connection.finishAllJobs(`daemon ${ip} disconnected: ${code} ${String(reason)}`);
+            ws.removeAllListeners();
+            connection.emit("close", { code: code, reason: reason });
+        });
+        ws.on("error", (err) => {
+            connection.finishAllJobs(`daemon ${ip} error: ${err.message}`);
+            connection.emit("error", err);
+        });
+        ws.on("message", (msg) => {
+            if (typeof msg !== "string") {
+                console.error("Unexpected binary message from daemon", ip);
+                return;
+            }
+            let json: Record<string, unknown> | undefined;
+            try {
+                json = JSON.parse(msg);
+            } catch (err) {
+                console.error(`Unable to parse message from daemon ${ip} as JSON`, err);
+                return;
+            }
+            if (!json || typeof json.id !== "number") {
+                console.error("Message from daemon without a job id", ip, json);
+                return;
+            }
+            const id = json.id;
+            switch (json.type) {
+                case "compileRequest": {
+                    if (typeof json.environment !== "string" || !json.environment) {
+                        connection.send({ type: "jobMessage", id, message: { error: "No environment" } });
+                        return;
+                    }
+                    if (typeof json.sourceFile !== "string" || !json.sourceFile) {
+                        connection.send({ type: "jobMessage", id, message: { error: "No sourceFile" } });
+                        return;
+                    }
+                    const sha1 = typeof json.sha1 === "string" ? json.sha1 : undefined;
+                    if (sha1 && sha1.length !== 40) {
+                        connection.send({ type: "jobMessage", id, message: { error: `Bad sha1 sum: ${sha1}` } });
+                        return;
+                    }
+                    const labels =
+                        typeof json.labels === "string" ? json.labels.split(/ +/).filter((x) => x) : undefined;
+                    const compile = connection.createJob({
+                        id,
+                        environment: json.environment,
+                        sourcePath: json.sourceFile,
+                        sha1,
+                        name: typeof json.name === "string" ? json.name : undefined,
+                        user: typeof json.user === "string" ? json.user : undefined,
+                        hostname: typeof json.hostname === "string" ? json.hostname : undefined,
+                        builder: typeof json.builder === "string" ? json.builder : undefined,
+                        labels,
+                        npmVersion: typeof json.npmVersion === "string" ? json.npmVersion : undefined
+                    });
+                    if (!compile) {
+                        connection.send({ type: "jobMessage", id, message: { error: `Duplicate job id ${id}` } });
+                        return;
+                    }
+                    this.emit("compile", compile);
+                    break;
+                }
+                case "compileDone":
+                    connection.finishJob(id, typeof json.reason === "string" ? json.reason : "done", false);
+                    break;
+                default:
+                    console.error("Unexpected message type from daemon", ip, json.type);
+                    break;
+            }
+        });
+
+        this.emit("daemon", connection);
     }
 
     _handleConnection(ws: WebSocket, req: express.Request): void {
-        let client = undefined;
         let ip = req.connection.remoteAddress;
         // console.log("_handleConnection", ip);
 
@@ -440,18 +553,23 @@ export class Server extends EventEmitter {
             case "/compile":
                 this._handleCompile(req, ws, ip);
                 break;
+
             case "/builder":
-                client = new Builder(ws, ip);
-                this._handleBuilder(req, client);
+                this._handleBuilder(req, ws, ip);
                 break;
+
             case "/monitor":
-                client = new Client(ClientType.Monitor, ws, ip);
-                this._handleMonitor(req, client);
+                this._handleMonitor(req, ws, ip);
                 break;
+
             case "/client_verify":
-                client = new Client(ClientType.ClientVerify, ws, ip);
-                this._handleClientVerify(req, client);
+                this._handleClientVerify(req, ws, ip);
                 break;
+
+            case "/daemon":
+                this._handleDaemon(req, ws, ip);
+                break;
+
             default:
                 console.error(`Invalid pathname ${url.pathname} from: ${ip}`);
                 ws.close();

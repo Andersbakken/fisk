@@ -20,6 +20,7 @@ import type { BuilderAddedMessage, BuilderRemovedMessage } from "../common/Build
 import type { CacheHitMessage } from "./CacheHitMessage";
 import type { Client } from "./Client";
 import type { Compile } from "./Compile";
+import type { DaemonConnection } from "./DaemonConnection";
 import type { File } from "./File";
 import type { JobFinishedMessage } from "./JobFinishedMessage";
 import type { JobMonitorMessage } from "../common/JobMonitorMessage";
@@ -164,10 +165,10 @@ try {
     process.exit();
 }
 
-const builders: Record<string, Builder> = {};
+const builders: Set<Builder> = new Set();
+const daemons: Set<DaemonConnection> = new Set();
 
 const monitors: Client[] = [];
-let builderCount = 0;
 let activeJobs = 0;
 let capacity = 0;
 let jobsFailed = 0;
@@ -327,13 +328,6 @@ function jobFinished(builder: Builder, job: JobFinishedMessage): void {
     }
 }
 
-function builderKey(ip: string | Builder, port?: number): string {
-    if (typeof ip === "object") {
-        return ip.ip + " " + ip.port;
-    }
-    return ip + " " + port;
-}
-
 function builderToMonitorInfo(
     builder: Builder,
     type: "builderAdded" | "builderRemoved"
@@ -357,8 +351,7 @@ function builderToMonitorInfo(
 }
 
 function insertBuilder(builder: Builder): void {
-    builders[builderKey(builder)] = builder;
-    ++builderCount;
+    builders.add(builder);
     assert(typeof builder.slots === "number");
     capacity += builder.slots;
     if (monitors.length) {
@@ -373,8 +366,8 @@ function insertBuilder(builder: Builder): void {
 }
 
 function forEachBuilder(cb: (builder: Builder) => void): void {
-    for (const key in builders) {
-        cb(builders[key]);
+    for (const builder of builders) {
+        cb(builder);
     }
 }
 
@@ -410,10 +403,9 @@ if (option("object-cache")) {
 }
 
 function removeBuilder(builder: Builder): void {
-    --builderCount;
     assert(typeof builder.slots === "number");
     capacity -= builder.slots;
-    delete builders[builderKey(builder)];
+    builders.delete(builder);
 
     if (monitors.length) {
         const info = builderToMonitorInfo(builder, "builderRemoved");
@@ -569,27 +561,45 @@ server.on("listen", (app: express.Application) => {
     app.get("/builders", (req: express.Request, res: express.Response) => {
         const ret = [];
         const now = Date.now();
-        for (const bKey in builders) {
-            const s: Builder = builders[bKey];
+        for (const builder of builders) {
             ret.push({
-                ip: s.ip,
-                name: s.name,
-                labels: s.labels,
-                slots: s.slots,
-                port: s.port,
-                activeClients: s.activeClients,
-                jobsScheduled: s.jobsScheduled,
-                lastJob: s.lastJob ? new Date(s.lastJob).toString() : "",
-                jobsPerformed: s.jobsPerformed,
-                compileSpeed: s.jobsPerformed / s.totalCompileSpeed || 0,
-                uploadSpeed: s.jobsPerformed / s.totalUploadSpeed || 0,
-                hostname: s.hostname,
-                system: s.system,
-                created: s.created,
-                load: s.load,
-                uptime: now - s.created.valueOf(),
-                npmVersion: s.npmVersion,
-                environments: Object.keys(s.environments)
+                ip: builder.ip,
+                name: builder.name,
+                labels: builder.labels,
+                slots: builder.slots,
+                port: builder.port,
+                activeClients: builder.activeClients,
+                jobsScheduled: builder.jobsScheduled,
+                lastJob: builder.lastJob ? new Date(builder.lastJob).toString() : "",
+                jobsPerformed: builder.jobsPerformed,
+                compileSpeed: builder.jobsPerformed / builder.totalCompileSpeed || 0,
+                uploadSpeed: builder.jobsPerformed / builder.totalUploadSpeed || 0,
+                hostname: builder.hostname,
+                system: builder.system,
+                created: builder.created,
+                load: builder.load,
+                uptime: now - builder.created.valueOf(),
+                npmVersion: builder.npmVersion,
+                environments: Object.keys(builder.environments)
+            });
+        }
+        const pretty = req.query && req.query.unpretty ? undefined : 4;
+        res.send(JSON.stringify(ret, null, pretty) + "\n");
+    });
+
+    app.get("/daemons", (req: express.Request, res: express.Response) => {
+        const ret = [];
+        const now = Date.now();
+        for (const daemon of daemons) {
+            ret.push({
+                ip: daemon.ip,
+                name: daemon.name,
+                labels: daemon.labels,
+                port: daemon.port,
+                hostname: daemon.hostname,
+                created: daemon.created,
+                uptime: now - daemon.created.valueOf(),
+                npmVersion: daemon.npmVersion
             });
         }
         const pretty = req.query && req.query.unpretty ? undefined : 4;
@@ -604,17 +614,18 @@ server.on("listen", (app: express.Application) => {
         }
 
         const obj = {
-            builderCount: Object.keys(builders).length,
+            builderCount: builders.size,
+            daemonCount: daemons.size,
             npmVersion: schedulerNpmVersion,
             environments: environmentsInfo(),
             configVersion: common.Version,
-            capacity: capacity,
-            activeJobs: activeJobs,
+            capacity,
+            activeJobs,
             peaks: peakData(),
             jobsFailed: percentage(jobsFailed),
-            jobsStarted: jobsStarted,
-            jobs: jobs,
-            jobsScheduled: jobsScheduled,
+            jobsStarted,
+            jobs,
+            jobsScheduled,
             jobsFinished: percentage(jobsFinished),
             cacheHits: percentage(objectCache ? objectCache.hits : 0),
             uptimeMS: now - serverStartTime,
@@ -665,9 +676,9 @@ server.on("listen", (app: express.Application) => {
             code: req.query.code || 0,
             purgeEnvironments: "purge_environments" in req.query
         };
-        console.log("Sending quit message to builders", msg, Object.keys(builders));
-        for (const ip in builders) {
-            builders[ip].send(msg);
+        console.log("Sending quit message to builders", msg, builders.size);
+        for (const builder of builders) {
+            builder.send(msg);
         }
     });
 
@@ -714,8 +725,7 @@ server.on("listen", (app: express.Application) => {
         }
         let found: Builder | undefined;
 
-        for (const key in builders) {
-            const builder = builders[key];
+        for (const builder of builders) {
             console.log(builder.ip, builder.name, builder.hostname, req.body.builder);
             if (
                 builder.ip === req.body.builder ||
@@ -880,7 +890,7 @@ server.on("builder", (builder: Builder) => {
         builder.hostname || "",
         Object.keys(builder.environments),
         "builderCount is",
-        builderCount
+        builders.size
     );
     syncEnvironments(builder);
 
@@ -922,7 +932,7 @@ server.on("builder", (builder: Builder) => {
             objectCache.removeNode(builder);
         }
         console.log(
-            `builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builderCount}`
+            `builder disconnected ${builder.ip}:${builder.port} ${builder.name} ${builder.hostname} builderCount is ${builders.size}`
         );
         builder.removeAllListeners();
     });
@@ -962,6 +972,20 @@ const pendingEnvironments: Record<string, boolean> = {};
 function requestEnvironment(compile: Compile): boolean {
     if (compile.environment in pendingEnvironments) {
         return false;
+    }
+    if (!compile.canUploadEnvironment) {
+        // Tell it what we are missing but leave the pending slot open: this client
+        // is going to reconnect with a websocket of its own to do the upload, and
+        // that connection is the one that has to claim the slot and get the
+        // listeners below.
+        console.log(`Asking ${compile.name} ${compile.ip} to upload ${compile.environment} over a direct connection`);
+        compile.send({ type: "needsEnvironment" });
+        // Nothing further will ever happen on this job -- the upload arrives on a
+        // new connection -- so release it now rather than holding it for the whole
+        // local compile fiskc does in the meantime. The direct branch below must
+        // NOT do this: that client uploads over this very socket.
+        compile.close();
+        return true;
     }
     pendingEnvironments[compile.environment] = true;
 
@@ -1049,14 +1073,37 @@ server.on("clientVerify", (clientVerify: Client) => {
     }
 });
 
+// Also gives the connection an "error" listener: EventEmitter throws on an
+// unhandled "error" event, and this one would take the scheduler down with it.
+server.on("daemon", (daemon: DaemonConnection) => {
+    console.log(`daemon connected ${daemon.ip} ${daemon.name} ${daemon.hostname} version ${daemon.npmVersion}`);
+    daemon.on("error", (err: Error | string) => {
+        console.error(`daemon error ${daemon.ip}: ${typeof err === "string" ? err : err.message}`);
+        // ### do I get a close if I get an error?
+        daemons.delete(daemon);
+    });
+    daemon.on("close", () => {
+        console.log(`daemon disconnected ${daemon.ip} ${daemon.name}`);
+        daemon.removeAllListeners();
+        daemons.delete(daemon);
+    });
+    daemons.add(daemon);
+});
+
 server.on("compile", (compile: Compile) => {
     compile.on("log", (event: { message: string }) => {
         addLogFile({ source: "client", ip: compile.ip, contents: event.message });
     });
 
+    // Every dead end below closes the client. On a real websocket fiskc did that
+    // for us by disconnecting; a job relayed by a daemon has no socket to drop, so
+    // without this it sits in DaemonConnection.jobs holding a Compile until the
+    // daemon notices fiskc exit -- which for these paths means all the way through
+    // the local compile fiskc falls back to.
     if (clientTooOld(compile.npmVersion)) {
         ++jobsFailed;
         compile.send("version_mismatch", { minimum_version: `${clientMinimumVersion}` });
+        compile.close();
         return;
     }
 
@@ -1071,6 +1118,7 @@ server.on("compile", (compile: Compile) => {
     if (!usableEnvs.length) {
         console.log(`We're already waiting for ${compile.environment} and we don't have any compatible ones`);
         compile.send("builder", {});
+        compile.close();
         ++jobsFailed;
         return;
     }
@@ -1164,6 +1212,7 @@ server.on("compile", (compile: Compile) => {
                 `Specific builder "${compile.builder}" was requested and we couldn't find a builder with that ${compile.environment}`
             );
             compile.send("builder", {});
+            compile.close();
             return;
         }
 
@@ -1173,11 +1222,13 @@ server.on("compile", (compile: Compile) => {
                 `Specific labels "${compile.labels}" were specified we couldn't match ${compile.environment} with any builder with those labels`
             );
             compile.send("builder", {});
+            compile.close();
             return;
         }
         ++jobsFailed;
         console.log("No builder for you", compile.ip);
         compile.send("builder", {});
+        compile.close();
         return;
     }
 
@@ -1634,9 +1685,14 @@ Environments.instance
     .then(() => {
         setInterval(() => {
             // console.log("sending pings");
-            for (const key in builders) {
-                const builder = builders[key];
+            for (const builder of builders) {
                 builder.ping();
+            }
+            // A daemon holds every job on its host, so a silently dead one pins
+            // activeJobs and activeClients until the kernel gives up on the TCP
+            // connection. Pinging is what makes Client.ping close it instead.
+            for (const daemon of daemons) {
+                daemon.ping();
             }
         }, option.int("ping-interval", 20000));
     })

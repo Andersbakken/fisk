@@ -7,8 +7,16 @@ export const enum ClientType {
     Compile = 1,
     UploadEnvironment = 2,
     Monitor = 3,
-    ClientVerify = 4
+    ClientVerify = 4,
+    Daemon = 5
 }
+
+// A fiskc process reaching us through its host daemon has no socket of its own:
+// it is one multiplexed stream on that daemon's single connection (see
+// DaemonJobSocket). Narrowing the transport to what Client actually calls is
+// what lets it and a real websocket be the same kind of client. Event wiring
+// stays in Server, where the real websocket is in scope and fully typed.
+export type ClientSocket = Pick<WebSocket, "send" | "close" | "ping" | "terminate">;
 
 export class Client extends EventEmitter {
     created: Date;
@@ -21,7 +29,7 @@ export class Client extends EventEmitter {
     labels?: string[];
     npmVersion: string;
 
-    constructor(readonly type: ClientType, readonly ws: WebSocket, readonly ip: string, readonly option?: Options) {
+    constructor(readonly type: ClientType, readonly ws: ClientSocket, readonly ip: string, readonly option?: Options) {
         super();
         this.created = new Date();
         this.hostname = "";
@@ -29,11 +37,10 @@ export class Client extends EventEmitter {
         this.npmVersion = "";
         this.user = "";
         this.port = 0;
+    }
 
-        this.ws.on("pong", () => {
-            // console.log("got pong", this.name);
-            this.pingSent = undefined;
-        });
+    notePong(): void {
+        this.pingSent = undefined;
     }
 
     send(type: unknown, msg?: Record<string, unknown>): void {
@@ -75,8 +82,12 @@ export class Client extends EventEmitter {
     error(message: string): void {
         try {
             this.ws.send(`{"error": "${message}"}`);
-            this.ws.close();
+            // Emit before closing. A real websocket closes asynchronously, but a
+            // DaemonJobSocket does it synchronously and tears the job down -- and
+            // removes these listeners -- so closing first means nobody ever hears
+            // this, including whoever releases the job's counters.
             this.emit("error", message);
+            this.ws.close();
         } catch (err) {
             /* */
         }

@@ -1,6 +1,7 @@
 import { Client, ClientType } from "./Client";
+import type { ClientSocket } from "./Client";
 import type { Options } from "@jhanssen/options";
-import type WebSocket from "ws";
+
 
 export class Builder extends Client {
     jobsPerformed: number;
@@ -14,7 +15,7 @@ export class Builder extends Client {
     jobsScheduled: number;
     environments: Record<string, boolean | number>;
 
-    constructor(ws: WebSocket, ip: string, option?: Options) {
+    constructor(ws: ClientSocket, ip: string, option?: Options) {
         super(ClientType.Builder, ws, ip, option);
         this.jobsPerformed = 0;
         this.totalCompileSpeed = 0;
