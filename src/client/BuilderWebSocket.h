@@ -12,6 +12,7 @@ extern "C" const char *npm_version;
 class BuilderWebSocket : public WebSocket
 {
 public:
+    virtual std::string type() const override;
     virtual void onConnected() override;
     virtual void onMessage(MessageType messageType, const void *bytes, size_t len) override;
     virtual bool connectFinished() override;

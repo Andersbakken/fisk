@@ -119,6 +119,39 @@ static std::variant<std::unique_ptr<T>, std::string> connectWebSocketWithRetry(S
     return websocket;
 }
 
+// Built from the very headers the direct connection would have sent, so the two
+// ways of asking for a builder cannot drift apart.
+static nlohmann::json builderRequest(const std::map<std::string, std::string> &headers, const std::string &schedulerUrl)
+{
+    auto header = [&headers](const char *name) -> std::string {
+        const auto it = headers.find(name);
+        return it == headers.end() ? std::string() : it->second;
+    };
+
+    nlohmann::json request = nlohmann::json::object();
+    request["scheduler"] = schedulerUrl;
+    request["configVersion"] = static_cast<int>(Config::Version);
+    request["environment"] = header("x-fisk-environments");
+    request["sourceFile"] = header("x-fisk-sourcefile");
+    request["npmVersion"] = header("x-fisk-npm-version");
+
+    static const std::pair<const char *, const char *> optional[] = {
+        { "sha1", "x-fisk-sha1" },
+        { "name", "x-fisk-client-name" },
+        { "user", "x-fisk-user" },
+        { "hostname", "x-fisk-client-hostname" },
+        { "builder", "x-fisk-builder" },
+        { "labels", "x-fisk-builder-labels" }
+    };
+    for (const auto &pair : optional) {
+        const std::string value = header(pair.second);
+        if (!value.empty()) {
+            request[pair.first] = value;
+        }
+    }
+    return request;
+}
+
 int main(int argc, char **argv)
 {
     if (getenv("FISKC_INVOKED")) {
@@ -454,44 +487,111 @@ int main(int argc, char **argv)
         headers["x-fisk-sha1"] = std::move(sha1);
     }
 
-    std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> schedulerWebsocketResult = connectWebSocketWithRetry<SchedulerWebSocket>(
-        select,
-        url + "/compile",
-        Config::schedulerInterface,
-        headers,
-        "scheduler");
+    // Only used when we talk to the scheduler ourselves: either because
+    // --fisk-no-daemon-scheduler was passed, or to upload an environment, which
+    // the daemon cannot do for us since the compiler lives in our container.
+    std::unique_ptr<SchedulerWebSocket> schedulerWebsocket;
+    SchedulerResponse schedulerResponse;
+    bool objectCache = false;
 
-    if (std::holds_alternative<std::string>(schedulerWebsocketResult)) {
-        ERROR("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
-        runLocal(std::get<std::string>(schedulerWebsocketResult));
+    auto connectToSchedulerDirectly = [&select, &headers, &url]() -> std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> {
+        return connectWebSocketWithRetry<SchedulerWebSocket>(
+            select,
+            url + "/compile",
+            Config::schedulerInterface,
+            headers,
+            "scheduler");
+    };
+
+    bool askDaemonForBuilder = Config::daemonScheduler && daemonSocket.schedulerProxyAvailable();
+    if (Config::daemonScheduler && !askDaemonForBuilder) {
+        DEBUG("Daemon can't ask the scheduler for us, connecting to it directly");
     }
-    std::unique_ptr<SchedulerWebSocket> schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(schedulerWebsocketResult));
 
-    if (!schedulerWebsocket->error().empty()) {
-        DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error().c_str());
-        runLocal(schedulerWebsocket->error());
-    }
-
-    if (schedulerWebsocket->needsEnvironment) {
-        data.watchdog->stop();
-        std::string dir;
-        const std::string tarball = Client::prepareEnvironmentForUpload(&dir);
-        // printf("GOT TARBALL %s\n", tarball.c_str());
-        if (!tarball.empty()) {
-            select.remove(schedulerWebsocket.get());
-            Client::uploadEnvironment(schedulerWebsocket.get(), tarball);
+    if (askDaemonForBuilder) {
+        daemonSocket.requestBuilder(builderRequest(headers, url));
+        if (daemonSocket.waitForBuilderResponse(select)) {
+            // Transitioned here rather than before the request because the direct
+            // path below transitions on connect, and doing both trips the
+            // watchdog's stage assertion.
+            data.watchdog->transition(Watchdog::ConnectedToScheduler);
+            schedulerResponse = daemonSocket.builderResponse();
+            objectCache = daemonSocket.schedulerHasObjectCache();
+        } else if (daemonSocket.shouldFallBackToScheduler()) {
+            WARN("Asking the scheduler ourselves because the daemon couldn't: %s",
+                 daemonSocket.builderResponse().error.c_str());
+            askDaemonForBuilder = false;
+        } else {
+            ERROR("Have to run locally because the daemon couldn't get us a builder: %s",
+                  daemonSocket.builderResponse().error.c_str());
+            runLocal(daemonSocket.builderResponse().error);
         }
-        Client::recursiveRmdir(dir);
+    }
+
+    if (!askDaemonForBuilder) {
+        std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> schedulerWebsocketResult = connectToSchedulerDirectly();
+
+        if (std::holds_alternative<std::string>(schedulerWebsocketResult)) {
+            ERROR("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
+            runLocal(std::get<std::string>(schedulerWebsocketResult));
+        }
+        schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(schedulerWebsocketResult));
+
+        if (!schedulerWebsocket->error().empty()) {
+            DEBUG("Have to run locally because no server: %s", schedulerWebsocket->error().c_str());
+            runLocal(schedulerWebsocket->error());
+        }
+
+        schedulerResponse.needsEnvironment = schedulerWebsocket->needsEnvironment;
+        schedulerResponse.jobId = schedulerWebsocket->jobId;
+        schedulerResponse.environment = schedulerWebsocket->environment;
+        schedulerResponse.extraArguments = schedulerWebsocket->extraArguments;
+        objectCache = schedulerWebsocket->handshakeResponseHeader("x-fisk-object-cache") == "true";
+    }
+
+    if (schedulerResponse.needsEnvironment) {
+        data.watchdog->stop();
+        if (!schedulerWebsocket) {
+            // Uploading takes a websocket of our own. This happens once per new
+            // environment, not once per translation unit, so paying for a connect
+            // here is fine.
+            std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> uploadWebsocket = connectToSchedulerDirectly();
+            if (std::holds_alternative<std::unique_ptr<SchedulerWebSocket>>(uploadWebsocket)) {
+                schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(uploadWebsocket));
+            } else {
+                ERROR("Couldn't connect to the scheduler to upload our environment: %s", std::get<std::string>(uploadWebsocket).c_str());
+            }
+        }
+        // Only the connection the scheduler asked has somewhere to put the
+        // tarball; if it told this one to go compile instead, someone else is
+        // already uploading and building 37MB of environment would be wasted.
+        if (schedulerWebsocket && schedulerWebsocket->needsEnvironment) {
+            std::string dir;
+            const std::string tarball = Client::prepareEnvironmentForUpload(&dir);
+            // printf("GOT TARBALL %s\n", tarball.c_str());
+            if (!tarball.empty()) {
+                select.remove(schedulerWebsocket.get());
+                Client::uploadEnvironment(schedulerWebsocket.get(), tarball);
+            }
+            Client::recursiveRmdir(dir);
+        }
         runLocal("needs environment");
     }
 
-    const bool objectCache = schedulerWebsocket->handshakeResponseHeader("x-fisk-object-cache") == "true";
     if (!objectCache && Config::objectCache) {
         const auto it = headers.find("x-fisk-sha1");
         if (it != headers.end()) {
             headers.erase(it);
         }
     }
+
+    // In daemon mode there is nothing to close: the daemon tells the scheduler the
+    // job is done when our unix socket goes away, which happens as we exit.
+    auto closeSchedulerConnection = [&schedulerWebsocket](const char *reason) {
+        if (schedulerWebsocket) {
+            schedulerWebsocket->close(reason);
+        }
+    };
 
     if ((data.builderHostname.empty() && data.builderIp.empty()) || !data.builderPort) {
         ERROR("No builder available for environment %s (source: %s). "
@@ -504,13 +604,13 @@ int main(int argc, char **argv)
     // usleep(1000 * 1000 * 16);
     data.watchdog->transition(Watchdog::AcquiredBuilder);
     Client::data().builderHasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
-    headers["x-fisk-job-id"] = std::to_string(schedulerWebsocket->jobId);
+    headers["x-fisk-job-id"] = std::to_string(schedulerResponse.jobId);
     headers["x-fisk-builder-ip"] = data.builderIp;
 
     headers["x-fisk-priority"] = std::to_string(Config::priority);
-    if (!schedulerWebsocket->environment.empty()) {
-        DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerWebsocket->environment.c_str());
-        headers["x-fisk-environments"] = schedulerWebsocket->environment;
+    if (!schedulerResponse.environment.empty()) {
+        DEBUG("Changing our environment from %s to %s", data.hash.c_str(), schedulerResponse.environment.c_str());
+        headers["x-fisk-environments"] = schedulerResponse.environment;
     }
     const std::string builderUrl = Client::format(
         "ws://%s:%d/compile",
@@ -562,12 +662,12 @@ int main(int argc, char **argv)
 
     std::vector<std::string> args = data.compilerArgs->commandLine;
     args[0] = data.builderCompiler;
-    if (!schedulerWebsocket->extraArguments.empty()) {
-        args.reserve(args.size() + schedulerWebsocket->extraArguments.size());
-        for (std::string &arg : schedulerWebsocket->extraArguments) {
+    if (!schedulerResponse.extraArguments.empty()) {
+        args.reserve(args.size() + schedulerResponse.extraArguments.size());
+        for (std::string &arg : schedulerResponse.extraArguments) {
             args.push_back(std::move(arg));
         }
-        schedulerWebsocket->extraArguments.clear(); // since we moved it out
+        schedulerResponse.extraArguments.clear(); // since we moved it out
     }
 
     const bool wait = builderWebSocket->handshakeResponseHeader("x-fisk-wait") == "true";
@@ -603,7 +703,7 @@ int main(int argc, char **argv)
                 data.watchdog->transition(Watchdog::UploadedJob);
                 data.watchdog->transition(Watchdog::Finished);
                 data.watchdog->stop();
-                schedulerWebsocket->close("cachehit");
+                closeSchedulerConnection("cachehit");
 
                 Client::writeStatistics();
                 return data.exitCode;
@@ -668,7 +768,7 @@ int main(int argc, char **argv)
 
     data.watchdog->transition(Watchdog::Finished);
     data.watchdog->stop();
-    schedulerWebsocket->close("builderd");
+    closeSchedulerConnection("builderd");
 
     Client::writeStatistics();
     return data.exitCode;

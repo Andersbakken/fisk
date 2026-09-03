@@ -2,6 +2,7 @@
 #define DAEMONSOCKET_H
 
 #include "Client.h"
+#include "SchedulerResponse.h"
 #include "Select.h"
 #include <condition_variable>
 #include <mutex>
@@ -67,6 +68,35 @@ public:
     bool waitForCompileSlot(Select &select);
     bool waitForSlot(Select &select);
 
+    // Ask the daemon to get us a builder over the connection it already holds to
+    // the scheduler, rather than connecting (and handshaking) ourselves for this
+    // one translation unit.
+    void requestBuilder(const nlohmann::json &request);
+    bool waitForBuilderResponse(Select &select);
+
+    const SchedulerResponse &builderResponse() const
+    {
+        return mBuilderResponse;
+    }
+
+    // Only daemons that know about requestBuilder advertise this; older ones would
+    // silently drop the request and leave us waiting for the watchdog.
+    bool schedulerProxyAvailable() const
+    {
+        return mSchedulerProxy;
+    }
+
+    // The daemon couldn't serve us, but says the scheduler itself could.
+    bool shouldFallBackToScheduler() const
+    {
+        return mBuilderResponseFallback;
+    }
+
+    bool schedulerHasObjectCache() const
+    {
+        return mSchedulerObjectCache;
+    }
+
     std::string error() const
     {
         return mError;
@@ -120,6 +150,10 @@ private:
     bool mHasCppSlot { false };
     bool mHasCompileSlot { false };
     bool mHasLocalSlot { false };
+    bool mSchedulerObjectCache { false };
+    bool mSchedulerProxy { false };
+    bool mBuilderResponseFallback { false };
+    SchedulerResponse mBuilderResponse;
     std::string mError;
     Client::CompilerInfo mCompilerInfo;
     // Remembered from sendAcquireSlot so we can probe it if the daemon asks.

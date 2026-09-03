@@ -2,15 +2,15 @@
 #define SCHEDULERWEBSOCKET_H
 
 #include "Client.h"
+#include "SchedulerResponse.h"
 #include "Watchdog.h"
 #include "WebSocket.h"
 #include <string>
 
-extern "C" const char *npm_version;
-
 class SchedulerWebSocket : public WebSocket
 {
 public:
+    virtual std::string type() const override;
     virtual void onConnected() override;
     virtual void onMessage(MessageType type, const void *bytes, size_t len) override;
     virtual bool connectFinished() override;
