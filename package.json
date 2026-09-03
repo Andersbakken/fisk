@@ -7,6 +7,8 @@
         "rollup": "rollup -c",
         "tsc": "tsc -p .",
         "build": "npm run clean:dist && mkdir -p dist && run-p lint rollup",
+        "verify-package-files": "node scripts/verify-package-files.js",
+        "prepublishOnly": "npm run build && npm run verify-package-files",
         "clean:dist": "del-cli dist/*",
         "clean:cache": "del-cli .cache/*",
         "clean": "run-p clean:dist clean:cache"
