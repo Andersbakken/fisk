@@ -88,7 +88,6 @@ public:
     virtual bool connectFinished() = 0;
 
 protected:
-    virtual std::string type() const = 0;
     virtual void onMessage(MessageType mode, const void *data, size_t len) = 0;
     virtual void onConnected() = 0;
 

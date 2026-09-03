@@ -106,7 +106,7 @@ void DaemonSocket::onWrite()
             return;
         }
 
-        DEBUG("Asynchronously connected to daemon socket %s", Config::socket.get().c_str());
+        DEBUG("Asynchronously connected to socket %s", Config::socket.get().c_str());
         mState = Connected;
         if (mSendBuffer.size() - mSendBufferOffset == 0)
             return;
@@ -340,30 +340,6 @@ bool DaemonSocket::waitForSlot(Select &select)
     return mHasCppSlot || mHasLocalSlot;
 }
 
-void DaemonSocket::requestBuilder(const nlohmann::json &request)
-{
-    nlohmann::json obj = request;
-    obj["type"] = "requestBuilder";
-    send(obj.dump());
-}
-
-bool DaemonSocket::waitForBuilderResponse(Select &select)
-{
-    Watchdog *watchdog = Client::data().watchdog;
-    while (!mBuilderResponse.finished() && mState == Connected && !watchdog->timedOut()) {
-        select.exec();
-    }
-    if (!mBuilderResponse.finished()) {
-        // The daemon went away or the watchdog fired; either way nobody is going
-        // to tell us about a builder.
-        if (mBuilderResponse.error.empty()) {
-            mBuilderResponse.error = watchdog->timedOut() ? "watchdog builder request" : "daemon connection lost";
-        }
-        return false;
-    }
-    return mBuilderResponse.error.empty();
-}
-
 void DaemonSocket::close(std::string &&err)
 {
     if (mFD != -1) {
@@ -443,37 +419,11 @@ void DaemonSocket::processJSON(const std::string &json)
         handleCompilerInfoRequest(obj);
         return;
     }
-    if (type == "builderResponse") {
-        // The scheduler answers a job and then closes it, and the daemon relays
-        // both. A needsEnvironment we are about to act on must not be overwritten
-        // by the close that follows it, so the first terminal answer wins.
-        if (mBuilderResponse.finished()) {
-            return;
-        }
-        mSchedulerObjectCache = obj.value("objectCache", false);
-        mBuilderResponseFallback = obj.value("fallback", false);
-        const std::string error = obj.value("error", std::string());
-        if (!error.empty()) {
-            mBuilderResponse.error = error;
-            mBuilderResponse.done = true;
-            return;
-        }
-        const auto messageIt = obj.find("message");
-        if (messageIt == obj.end() || !messageIt->is_object()) {
-            mBuilderResponse.error = "malformed builderResponse from daemon";
-            mBuilderResponse.done = true;
-            return;
-        }
-        mBuilderResponse.apply(*messageIt);
-        return;
-    }
     if (type != "slotAcquired") {
         fwrite(json.c_str(), 1, json.size(), stdout);
         fflush(stdout);
         return;
     }
-
-    mSchedulerProxy = obj.value("schedulerProxy", false);
 
     auto ciIt = obj.find("compilerInfo");
     const bool haveCompilerInfo = (ciIt != obj.end() && ciIt->is_object());

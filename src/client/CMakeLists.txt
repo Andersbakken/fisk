@@ -54,7 +54,6 @@ add_executable(fiskc
     DaemonSocket.cpp
     Log.cpp
     Preprocessed.cpp
-    SchedulerResponse.cpp
     SchedulerWebSocket.cpp
     Select.cpp
     BuilderWebSocket.cpp

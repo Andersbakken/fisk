@@ -2,19 +2,15 @@
 
 import { CompilerInfoStore } from "./CompilerInfoCache";
 import { Constants } from "./Constants";
-import { SchedulerConnection } from "./SchedulerConnection";
 import { Server } from "./Server";
 import { Slots } from "./Slots";
 import { common as commonFunc } from "../common";
 import assert from "assert";
 import createOptions from "@jhanssen/options";
-import fs from "fs";
 import os from "os";
-import path from "path";
 import type { Compile } from "./Compile";
 import type { CompilerInfo, Probe } from "./CompilerInfoCache";
 import type { Options } from "@jhanssen/options";
-import type { SchedulerJobUpdate } from "./SchedulerConnection";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(`Usage: fisk-daemon [options]
@@ -27,10 +23,6 @@ Options:
   --local-slots=N        Local compile slot count (default: 0, disabled)
   --local-slots-max-load=N  Max system load average (1-min) to allow local compiles (default: 0, no limit)
   --cache-dir=PATH       Cache directory (default: ~/.cache/fisk/daemon)
-  --scheduler=URL        Scheduler to keep a connection to on behalf of fiskc
-                         (default: whatever url the clients ask for)
-  --name=NAME            Name reported to the scheduler (default: hostname)
-  --hostname=NAME        Hostname reported to the scheduler (default: os.hostname())
 
 Config files: ~/.config/fisk/daemon.conf, /etc/xdg/fisk/daemon.conf
 Environment variables: FISK_DAEMON_DEBUG, FISK_DAEMON_SLOTS, etc.`);
@@ -83,48 +75,6 @@ console.log(
 const compilerInfoStore = new CompilerInfoStore(undefined, (...args: unknown[]) => {
     console.log("compilerInfo:", ...args);
 });
-
-function daemonNpmVersion(): string {
-    try {
-        return String(JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).version);
-    } catch (err) {
-        return "";
-    }
-}
-
-function normalizeSchedulerUrl(url: string): string {
-    let ret = url;
-    if (ret.indexOf("://") === -1) {
-        ret = "ws://" + ret;
-    }
-    if (!/:[0-9]+$/.exec(ret)) {
-        ret += ":8097";
-    }
-    return ret;
-}
-
-const daemonHostname = option.string("hostname") || os.hostname();
-const daemonName = option.string("name") || daemonHostname;
-
-let scheduler: SchedulerConnection | undefined;
-
-function connectToScheduler(url: string): SchedulerConnection {
-    const connection = new SchedulerConnection(
-        url,
-        common.Version,
-        daemonNpmVersion(),
-        daemonName,
-        daemonHostname,
-        debug
-    );
-    connection.connect();
-    return connection;
-}
-
-const configuredScheduler = option.string("scheduler");
-if (configuredScheduler) {
-    scheduler = connectToScheduler(normalizeSchedulerUrl(configuredScheduler));
-}
 
 interface CompilerInfoResult {
     info: CompilerInfo | null;
@@ -224,119 +174,6 @@ server.on("compile", (compile) => {
     let requestedCppSlot = false;
     let requestedLocalSlot = false;
     let compileClosed = false;
-
-    // fiskc no longer talks to the scheduler itself; it asks us, and we answer
-    // over the connection we already hold. Its process only lives for one
-    // translation unit, so a request belongs to exactly one fiskc and dies with it.
-    let builderRequestId: number | undefined;
-    let builderRequestScheduler: SchedulerConnection | undefined;
-
-    const finishBuilderRequest = (reason: string): void => {
-        if (builderRequestId !== undefined && builderRequestScheduler) {
-            builderRequestScheduler.finishJob(builderRequestId, reason);
-        }
-        builderRequestId = undefined;
-        builderRequestScheduler = undefined;
-    };
-
-    compile.on("requestBuilder", (msg?: Record<string, unknown>) => {
-        const str = (key: string): string | undefined => {
-            const value = msg?.[key];
-            return typeof value === "string" && value ? value : undefined;
-        };
-        // fallback means "we cannot serve this, but the scheduler probably can":
-        // fiskc then connects directly. A scheduler that is down or not keeping up
-        // is deliberately not one of those cases -- having every fiskc on the host
-        // pile onto it is exactly what this whole path exists to stop.
-        const respond = (update: SchedulerJobUpdate, objectCache: boolean, fallback: boolean = false): void => {
-            compile.send({
-                type: "builderResponse",
-                objectCache,
-                fallback,
-                message: update.message,
-                error: update.error
-            });
-        };
-
-        if (builderRequestId !== undefined) {
-            respond({ error: "Already requested a builder" }, false);
-            return;
-        }
-
-        const configVersion = typeof msg?.configVersion === "number" ? msg.configVersion : -1;
-        if (configVersion !== common.Version) {
-            respond(
-                { error: `Bad config version, daemon has ${common.Version}, fiskc has ${configVersion}` },
-                false,
-                true
-            );
-            return;
-        }
-
-        const environment = str("environment");
-        const sourceFile = str("sourceFile");
-        if (!environment || !sourceFile) {
-            respond({ error: "requestBuilder needs an environment and a sourceFile" }, false);
-            return;
-        }
-
-        const requestedUrl = str("scheduler");
-        if (!scheduler && requestedUrl) {
-            // Nothing in daemon.conf: adopt the scheduler our clients are
-            // configured with, so existing deployments keep working untouched.
-            console.log("adopting scheduler url from", compile.id, requestedUrl);
-            scheduler = connectToScheduler(requestedUrl);
-        }
-        const connection = scheduler;
-        if (!connection) {
-            respond({ error: "No scheduler configured for this daemon" }, false, true);
-            return;
-        }
-        if (requestedUrl && requestedUrl !== connection.url) {
-            respond(
-                { error: `fiskc wants scheduler ${requestedUrl}, daemon is connected to ${connection.url}` },
-                false,
-                true
-            );
-            return;
-        }
-
-        const id = connection.requestBuilder(
-            {
-                environment,
-                sourceFile,
-                sha1: str("sha1"),
-                name: str("name"),
-                user: str("user"),
-                hostname: str("hostname"),
-                builder: str("builder"),
-                labels: str("labels"),
-                npmVersion: str("npmVersion")
-            },
-            (update: SchedulerJobUpdate) => {
-                respond(update, connection.objectCache);
-            }
-        );
-        if (id === undefined) {
-            // Disconnected is not the same failure as backed up. A scheduler that
-            // is merely restarting is still reachable by fiskc, whose direct path
-            // retries across exactly that RST, so let it. Only refuse fallback
-            // when the scheduler is up but not keeping up.
-            const backedUp = connection.isConnected;
-            respond(
-                {
-                    error: backedUp
-                        ? `Scheduler ${connection.url} is not keeping up`
-                        : `Not connected to scheduler ${connection.url}`
-                },
-                false,
-                !backedUp
-            );
-            return;
-        }
-        builderRequestId = id;
-        builderRequestScheduler = connection;
-    });
     compile.on("acquireCppSlot", () => {
         if (debug) {
             console.log("acquireCppSlot");
@@ -426,12 +263,7 @@ server.on("compile", (compile) => {
                     const response: Record<string, unknown> = {
                         type: "slotAcquired",
                         slot,
-                        compilerInfo: info,
-                        // Tells fiskc it can ask us for a builder. A daemon too old to
-                        // know about requestBuilder says nothing here, and fiskc then
-                        // connects to the scheduler itself like it always did instead
-                        // of waiting out its watchdog for an answer we never send.
-                        schedulerProxy: true
+                        compilerInfo: info
                     };
                     if (error) {
                         response.error = error;
@@ -439,11 +271,7 @@ server.on("compile", (compile) => {
                     compile.send(response);
                 };
 
-                if (
-                    !msg?.["no-local"] &&
-                    canAcquireLocalSlot() &&
-                    localSlots.tryAcquire(compile.id, { pid: compile.pid })
-                ) {
+                if (!msg?.["no-local"] && canAcquireLocalSlot() && localSlots.tryAcquire(compile.id, { pid: compile.pid })) {
                     if (debug) {
                         console.log("acquireSlot -> local slot granted");
                     }
@@ -466,22 +294,25 @@ server.on("compile", (compile) => {
             });
     });
 
-    compile.on("compilerInfoResponse", (msg?: { key?: unknown; results?: unknown; error?: unknown }) => {
-        const key = msg && typeof msg.key === "string" ? msg.key : "";
-        if (!key) {
-            console.error("compilerInfoResponse without a key from", compile.id);
-            return;
+    compile.on(
+        "compilerInfoResponse",
+        (msg?: { key?: unknown; results?: unknown; error?: unknown }) => {
+            const key = msg && typeof msg.key === "string" ? msg.key : "";
+            if (!key) {
+                console.error("compilerInfoResponse without a key from", compile.id);
+                return;
+            }
+            if (typeof msg?.error === "string" && msg.error.length) {
+                compilerInfoStore.fail(key, msg.error);
+                return;
+            }
+            if (!msg?.results || typeof msg.results !== "object") {
+                compilerInfoStore.fail(key, "compilerInfoResponse without results");
+                return;
+            }
+            compilerInfoStore.provide(key, msg.results as Record<string, string | null>);
         }
-        if (typeof msg?.error === "string" && msg.error.length) {
-            compilerInfoStore.fail(key, msg.error);
-            return;
-        }
-        if (!msg?.results || typeof msg.results !== "object") {
-            compilerInfoStore.fail(key, "compilerInfoResponse without results");
-            return;
-        }
-        compilerInfoStore.provide(key, msg.results as Record<string, string | null>);
-    });
+    );
 
     compile.on("releaseLocalSlot", () => {
         if (debug) {
@@ -500,7 +331,6 @@ server.on("compile", (compile) => {
             console.error("Got error from fiskc", compile.id, compile.pid, err);
         }
         compileClosed = true;
-        finishBuilderRequest("fiskc gone");
         // If this client owed us compiler info, hand the job to another waiter.
         compilerInfoStore.clientGone(requester);
         if (requestedCppSlot) {
@@ -522,7 +352,6 @@ server.on("compile", (compile) => {
             console.log("got end from", compile.id, compile.pid);
         }
         compileClosed = true;
-        finishBuilderRequest("fiskc gone");
         // If this client owed us compiler info, hand the job to another waiter.
         compilerInfoStore.clientGone(requester);
         if (requestedCppSlot) {
@@ -542,11 +371,40 @@ server.on("compile", (compile) => {
 
 process.on("exit", () => {
     server.close();
-    scheduler?.close();
 });
 
 process.on("SIGINT", () => {
     server.close();
-    scheduler?.close();
     process.exit();
 });
+
+/*
+  const client = new Client(option, common.Version);
+
+let connectInterval;
+client.on('quit', message => {
+    process.exit(message.code);
+});
+
+client.on('connect', () => {
+    console.log('connected');
+    if (connectInterval) {
+        clearInterval(connectInterval);
+        connectInterval = undefined;
+    }
+});
+
+client.on('error', err => {
+    console.error('client error', err);
+});
+
+client.on('close', () => {
+    console.log('client closed');
+    if (!connectInterval) {
+        connectInterval = setInterval(() => {
+            console.log('Reconnecting...');
+            client.connect();
+        }, 1000);
+    }
+});
+*/

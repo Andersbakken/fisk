@@ -302,7 +302,6 @@ private:
 
 extern Getter<std::string> scheduler;
 extern Getter<std::string> schedulerInterface;
-extern Getter<bool> daemonScheduler;
 extern Getter<std::string> socket;
 extern Getter<bool> dumpSlots;
 extern Getter<unsigned long long> daemonConnectTimeout;

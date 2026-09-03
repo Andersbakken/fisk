@@ -397,7 +397,7 @@ void WebSocket::onWrite()
             return;
         }
 
-        DEBUG("Asynchronously connected to %s %s:%d", type().c_str(), mHost.c_str(), mPort);
+        DEBUG("Asynchronously connected to host %s:%d", mHost.c_str(), mPort);
         mState = ConnectedTCP;
         if (!requestUpgrade())
             return;
