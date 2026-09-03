@@ -56,6 +56,10 @@ Getter<bool> dumpSha1("dump-sha1", "Only dump sha1 of file", false);
 static Separator s1;
 Getter<std::string> scheduler("scheduler", "Set fiskc's scheduler url", "ws://localhost:8097");
 Getter<std::string> schedulerInterface("scheduler-interface", "Bind to this interface specifically for the scheduler websocket", std::string());
+Getter<bool> daemonScheduler("daemon-scheduler",
+                             "Ask fisk-daemon for a builder over the connection it keeps to the scheduler instead of connecting to the "
+                             "scheduler ourselves. Pass --fisk-no-daemon-scheduler to connect directly",
+                             true);
 Getter<std::string> socket("socket", "Set fiskc's socket file", "/var/fisk/daemon/data/socket");
 Getter<std::string> builder("builder", "Set to hostname, name or ip if you have a preferred builder");
 Getter<std::string> builderInterface("builder-interface", "Bind to this interface specifically for the builder websocket", std::string());
