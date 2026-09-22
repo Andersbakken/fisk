@@ -88,6 +88,28 @@ export class VM extends EventEmitter {
             console.error("Got some error", msg.error);
         }
         const now = Date.now();
+        const dir = this.compiles[msg.id].dir;
+        let released = false;
+        const release = (): void => {
+            if (released) {
+                return;
+            }
+            released = true;
+            clearTimeout(leakTimer);
+            if (!this.keepCompiles) {
+                fs.remove(dir).catch((err: unknown) => {
+                    console.error(`Failed to remove compile directory ${dir}`, err);
+                });
+            }
+        };
+        // A handler that throws before releasing would keep the directory
+        // until the builder restarts and cleared its whole compiles root. The
+        // reads it is holding the directory for take milliseconds, so anything
+        // still outstanding this much later is a bug, not slow disk.
+        const leakTimer = setTimeout(() => {
+            console.error(`Compile directory ${dir} was never released, removing it anyway`);
+            release();
+        }, 5 * 60000).unref();
         const finishedEvent: CompileFinishedEvent = {
             cppSize: compile.cppSize,
             compileDuration: now - (compile.startCompile || 0),
@@ -100,15 +122,20 @@ export class VM extends EventEmitter {
                     path: file.path,
                     absolute: path.join(this.root, file.mapped ? file.mapped : file.path)
                 };
-            })
+            }),
+            release
         };
 
-        compile.emit("finished", finishedEvent);
-
-        if (!this.keepCompiles) {
-            fs.remove(this.compiles[msg.id].dir);
-        }
         delete this.compiles[msg.id];
+
+        // The directory used to be removed right here, which forced the
+        // handler to read and compress every output file synchronously to beat
+        // the cleanup. It owns the directory now and releases it when done.
+        if (compile.listenerCount("finished")) {
+            compile.emit("finished", finishedEvent);
+        } else {
+            release();
+        }
     }
 
     destroy(): void {

@@ -7,6 +7,7 @@ import { VM } from "./VM";
 import { common as commonFunc } from "../common";
 import { default as createOptions } from "@jhanssen/options";
 import { load } from "./load";
+import { promisify } from "util";
 import { quitOnError } from "./quitOnError";
 import Url from "url-parse";
 import assert from "assert";
@@ -784,6 +785,21 @@ server.on("listen", (app: express.Express) => {
     });
 });
 
+const gzip = promisify(zlib.gzip);
+
+// Always compressed, because that is the form the object cache stores. The
+// uncompressed buffer is kept alongside it since the response index reports
+// both sizes and a client that cannot take compressed data gets that one.
+async function readAndCompress(files: CompileFinishedEventFile[]): Promise<Contents[]> {
+    return Promise.all(
+        files.map(async (f: CompileFinishedEventFile) => {
+            const uncompressed = await fs.promises.readFile(f.absolute);
+            const contents = uncompressed.byteLength > 0 ? await gzip(uncompressed) : uncompressed;
+            return { contents, uncompressed, path: f.path };
+        })
+    );
+}
+
 function startPending(): void {
     // console.log(`startPending called ${jobQueue.length}`);
     for (let idx = 0; idx < jobQueue.length; ++idx) {
@@ -905,6 +921,7 @@ server.on("job", (job: Job) => {
             j.op.on("finished", (event: CompileFinishedEvent) => {
                 j.done = true;
                 if (j.aborted) {
+                    event.release();
                     return;
                 }
                 const end = Date.now();
@@ -927,116 +944,139 @@ server.on("job", (job: Job) => {
                     jobQueue.splice(idx, 1);
                 } else {
                     console.error("Can't find j?");
+                    event.release();
                     return;
                 }
 
-                // this can't be async, the directory is removed after the event is fired
-                // Always compress for cache storage, but send based on client preference
-                const contents: Contents[] = event.files.map((f: CompileFinishedEventFile) => {
-                    const uncompressed = fs.readFileSync(f.absolute);
-                    const compressed = uncompressed.byteLength > 0 ? zlib.gzipSync(uncompressed) : uncompressed;
-                    return {
-                        contents: compressed, // Always store compressed for cache
-                        uncompressed,
-                        path: f.path
-                    };
-                });
+                // Reading and gzipping every output file synchronously blocked
+                // the event loop once per finished job, which on a full builder
+                // is once per core per compile wave, and that is what stopped
+                // handshakes from being answered. The compile directory is ours
+                // until we release it, so this can take as long as it needs to.
+                readAndCompress(event.files)
+                    .then((contents: Contents[]) => {
+                        if (j.aborted) {
+                            return;
+                        }
+                        respond(contents);
+                    })
+                    .catch((err: unknown) => {
+                        console.error(`Failed to collect output for job ${j.id}`, err);
+                        if (!j.aborted) {
+                            jobJob.send({
+                                type: "response",
+                                index: [],
+                                success: false,
+                                exitCode: 1,
+                                error: `Failed to collect output: ${(err as Error).message}`,
+                                sha1: jobJob.sha1,
+                                sourcePath: j.op!.sourceFileName,
+                                stderr: j.stderr,
+                                stdout: j.stdout
+                            });
+                        }
+                    })
+                    .finally(() => {
+                        event.release();
+                        startPending();
+                    });
 
-                // Prepare data to send to client (compressed or uncompressed based on preference and capability)
-                // Only send compressed if client wants it AND supports compressed responses
-                const sendCompressed = j.job.compressed && j.job.supportsCompressedResponse;
-                const toSend = contents.map((item) => {
-                    assert(item.uncompressed, "Must have uncompressed data");
-                    return {
-                        contents: sendCompressed ? item.contents : item.uncompressed,
-                        path: item.path
-                    };
-                });
-
-                const response: Response = {
-                    type: "response",
-                    index: toSend.map((item) => {
-                        const original = contents.find((c) => c.path === item.path);
-                        assert(original, "Must have original contents");
-                        assert(original.uncompressed, "Must have uncompressed data");
-                        const ret = {
-                            path: item.path,
-                            bytes: item.contents.length,
-                            uncompressedSize: original.uncompressed.byteLength
+                function respond(contents: Contents[]): void {
+                    // Prepare data to send to client (compressed or uncompressed based on preference and capability)
+                    // Only send compressed if client wants it AND supports compressed responses
+                    const sendCompressed = j.job.compressed && j.job.supportsCompressedResponse;
+                    const toSend = contents.map((item) => {
+                        assert(item.uncompressed, "Must have uncompressed data");
+                        return {
+                            contents: sendCompressed ? item.contents : item.uncompressed,
+                            path: item.path
                         };
-                        return ret;
-                    }),
-                    success: event.success,
-                    exitCode: event.exitCode,
-                    sha1: jobJob.sha1,
-                    // Just the basename. This goes into the object cache and is
-                    // replayed on every hit, so it has to still mean something
-                    // later: the /compiles/<id> directory belongs to this one
-                    // job's chroot, and the requesting client's own path belongs
-                    // to whichever client happened to compile it first. Only the
-                    // file name survives being shared.
-                    sourcePath: j.op!.sourceFileName,
-                    stderr: j.stderr,
-                    stdout: j.stdout
-                };
-                if (event.error) {
-                    response.error = event.error;
-                }
-                if (debug) {
-                    console.log("Sending response", jobJob.ip, jobJob.hostname, response);
-                }
-                jobJob.send(response);
-                if (
-                    response.exitCode === 0 &&
-                    event.success &&
-                    objectCache &&
-                    response.sha1 &&
-                    objectCache.state(response.sha1) === "none"
-                ) {
-                    // Cache metadata needs to reflect compressed sizes since we store compressed
-                    const cacheResponse = {
-                        ...response,
-                        index: contents.map((item) => {
-                            assert(item.uncompressed, "Must have uncompressed data");
-                            return {
-                                path: item.path,
-                                bytes: item.contents.length, // Compressed size
-                                uncompressedSize: item.uncompressed.byteLength
-                            };
-                        })
-                    };
-                    cacheResponse.commandLine = jobJob.commandLine;
-                    cacheResponse.environment = jobJob.hash;
-                    objectCache.add(cacheResponse, contents);
-                }
+                    });
 
-                toSend.forEach((x) => {
-                    if (x.contents && x.contents.byteLength) {
-                        jobJob.send(x.contents);
+                    const response: Response = {
+                        type: "response",
+                        index: toSend.map((item) => {
+                            const original = contents.find((c) => c.path === item.path);
+                            assert(original, "Must have original contents");
+                            assert(original.uncompressed, "Must have uncompressed data");
+                            const ret = {
+                                path: item.path,
+                                bytes: item.contents.length,
+                                uncompressedSize: original.uncompressed.byteLength
+                            };
+                            return ret;
+                        }),
+                        success: event.success,
+                        exitCode: event.exitCode,
+                        sha1: jobJob.sha1,
+                        // Just the basename. This goes into the object cache and is
+                        // replayed on every hit, so it has to still mean something
+                        // later: the /compiles/<id> directory belongs to this one
+                        // job's chroot, and the requesting client's own path belongs
+                        // to whichever client happened to compile it first. Only the
+                        // file name survives being shared.
+                        sourcePath: j.op!.sourceFileName,
+                        stderr: j.stderr,
+                        stdout: j.stdout
+                    };
+                    if (event.error) {
+                        response.error = event.error;
                     }
-                });
-                // console.log("GOT ID", j);
-                assert(uploadDuration !== undefined, "Must have uploadDuration");
-                if (event.success) {
-                    client.send("jobFinished", {
-                        id: j.id,
-                        cppSize: event.cppSize,
-                        compileDuration: event.compileDuration,
-                        compileSpeed: event.cppSize / event.compileDuration,
-                        uploadDuration: uploadDuration,
-                        uploadSpeed: event.cppSize / uploadDuration
+                    if (debug) {
+                        console.log("Sending response", jobJob.ip, jobJob.hostname, response);
+                    }
+                    jobJob.send(response);
+                    if (
+                        response.exitCode === 0 &&
+                        event.success &&
+                        objectCache &&
+                        response.sha1 &&
+                        objectCache.state(response.sha1) === "none"
+                    ) {
+                        // Cache metadata needs to reflect compressed sizes since we store compressed
+                        const cacheResponse = {
+                            ...response,
+                            index: contents.map((item) => {
+                                assert(item.uncompressed, "Must have uncompressed data");
+                                return {
+                                    path: item.path,
+                                    bytes: item.contents.length, // Compressed size
+                                    uncompressedSize: item.uncompressed.byteLength
+                                };
+                            })
+                        };
+                        cacheResponse.commandLine = jobJob.commandLine;
+                        cacheResponse.environment = jobJob.hash;
+                        objectCache.add(cacheResponse, contents);
+                    }
+
+                    toSend.forEach((x) => {
+                        if (x.contents && x.contents.byteLength) {
+                            jobJob.send(x.contents);
+                        }
                     });
-                } else {
-                    client.send("jobAborted", {
-                        id: j.id,
-                        cppSize: event.cppSize,
-                        compileDuration: event.compileDuration,
-                        compileSpeed: event.cppSize / event.compileDuration,
-                        uploadDuration: uploadDuration,
-                        uploadSpeed: event.cppSize / uploadDuration
-                    });
+                    // console.log("GOT ID", j);
+                    assert(uploadDuration !== undefined, "Must have uploadDuration");
+                    if (event.success) {
+                        client.send("jobFinished", {
+                            id: j.id,
+                            cppSize: event.cppSize,
+                            compileDuration: event.compileDuration,
+                            compileSpeed: event.cppSize / event.compileDuration,
+                            uploadDuration: uploadDuration,
+                            uploadSpeed: event.cppSize / uploadDuration
+                        });
+                    } else {
+                        client.send("jobAborted", {
+                            id: j.id,
+                            cppSize: event.cppSize,
+                            compileDuration: event.compileDuration,
+                            compileSpeed: event.cppSize / event.compileDuration,
+                            uploadDuration: uploadDuration,
+                            uploadSpeed: event.cppSize / uploadDuration
+                        });
+                    }
                 }
-                startPending();
             });
         },
         cancel: function () {
