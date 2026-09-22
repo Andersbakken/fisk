@@ -19,6 +19,16 @@ export class Server extends EventEmitter {
     readonly baseUrl: string;
     port?: number;
 
+    // Until this is set the port is open but every upgrade is turned away with
+    // a 503. Listening while still loading environments is deliberate: a closed
+    // port during a restart is indistinguishable, from the client's side, from
+    // a builder that is simply too busy to answer, and both cost it a full
+    // handshake budget before it gives up and compiles locally.
+    ready: boolean = false;
+
+    // Returns a reason to refuse the connection, or undefined to accept it.
+    shed?: (req: http.IncomingMessage) => string | undefined;
+
     constructor(private readonly option: Options, private readonly configVersion: number) {
         super();
         this.app = undefined;
@@ -42,6 +52,12 @@ export class Server extends EventEmitter {
 
         this.server.on("upgrade", (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
             assert(this.ws, "Must have ws");
+            const reason = this.ready ? this.shed?.(req) : "starting up";
+            if (reason) {
+                Server.refuse(socket, reason);
+                this.emit("shed", reason, req);
+                return;
+            }
             this.ws.handleUpgrade(req, socket, head, (ws) => {
                 this._handleConnection(ws, req);
             });
@@ -212,5 +228,19 @@ export class Server extends EventEmitter {
                 client.emit("error", err);
             }
         });
+    }
+
+    private static refuse(socket: stream.Duplex, reason: string): void {
+        // Answered before the handshake so the client gets a real status code
+        // instead of silence. Retry-After is in seconds per RFC 7231.
+        socket.write(
+            "HTTP/1.1 503 Service Unavailable\r\n" +
+                "Retry-After: 1\r\n" +
+                `x-fisk-shed-reason: ${reason}\r\n` +
+                "Connection: close\r\n" +
+                "Content-Length: 0\r\n" +
+                "\r\n"
+        );
+        socket.destroy();
     }
 }

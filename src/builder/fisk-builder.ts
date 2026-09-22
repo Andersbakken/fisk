@@ -1168,13 +1168,43 @@ server.on("error", (err) => {
     console.error("server error", err);
 });
 
+// Accepting a job we have no intention of starting any time soon is worse than
+// saying so: the client has already paid for the handshake and the upload, and
+// it can only find out it is queued by waiting. Past this depth the queue is
+// not absorbing a burst any more, it is just hiding one.
+const maxQueueDepth = option.int("max-queue-depth", client.slots * 4);
+
+server.shed = (): string | undefined => {
+    if (maxQueueDepth > 0 && jobQueue.length >= maxQueueDepth) {
+        return `queue full (${jobQueue.length})`;
+    }
+    return undefined;
+};
+
+let shedLogged = 0;
+server.on("shed", (reason: string) => {
+    const now = Date.now();
+    if (now - shedLogged >= 1000) {
+        shedLogged = now;
+        console.log("Refusing connections:", reason);
+    }
+});
+
+let listening = false;
+
 function start(): void {
+    // Listen before the environments are loaded so a restart refuses fast with
+    // a 503 instead of leaving clients to time out against a closed port.
+    if (!listening) {
+        listening = true;
+        server.listen();
+    }
     loadEnvironments()
         .then(() => {
             console.log(`Loaded ${Object.keys(environments).length} environments from ${environmentsRoot}`);
             console.log("environments", Object.keys(environments));
             client.connect(Object.keys(environments));
-            server.listen();
+            server.ready = true;
         })
         .catch((err: unknown) => {
             console.error(`Failed to initialize ${(err as Error).message}`);
