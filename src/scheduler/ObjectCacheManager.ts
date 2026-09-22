@@ -12,10 +12,8 @@ import type express from "express";
 function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: number, node: Builder): number {
     const data = bySHA1.get(sha1);
     if (data) {
-        if (data.nodes.indexOf(node) === -1) {
-            data.nodes.push(node);
-        }
-        return data.nodes.length;
+        data.nodes.add(node);
+        return data.nodes.size;
     }
     bySHA1.set(sha1, new SHA1Data(fileSize, node));
     return 1;
@@ -24,10 +22,8 @@ function addToSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, fileSize: num
 function removeFromSHA1Map(bySHA1: Map<string, SHA1Data>, sha1: string, node: Builder): void {
     const data = bySHA1.get(sha1);
     if (data) {
-        const idx = data.nodes.indexOf(node);
-        if (idx !== -1) {
-            data.nodes.splice(idx, 1);
-            if (data.nodes.length === 0) {
+        if (data.nodes.delete(node)) {
+            if (data.nodes.size === 0) {
                 bySHA1.delete(sha1);
             }
         } else {
@@ -50,7 +46,14 @@ interface CommandType {
 export class ObjectCacheManager extends EventEmitter {
     private bySHA1: Map<string, SHA1Data>;
     private byNode: Map<Builder, NodeData>;
-    private pendingTransfers: Set<string>;
+    // Indexed both ways because both directions are asked for on hot paths:
+    // by sha1 to count existing copies of an object, by node to drop
+    // everything a builder had outstanding when it disconnects. This used to
+    // be one flat set of "sha1:ip:port" strings, which meant answering either
+    // question was a scan of every pending transfer in the system, with a
+    // startsWith or endsWith per entry.
+    private pendingBySHA1: Map<string, Set<Builder>>;
+    private pendingByNode: Map<Builder, Set<string>>;
     private pendingTransferTimers: Map<string, NodeJS.Timeout>;
     private distributeOnInsertion: boolean;
     private distributeOnCacheHit: boolean;
@@ -64,7 +67,8 @@ export class ObjectCacheManager extends EventEmitter {
         this.hits = 0;
         this.bySHA1 = new Map();
         this.byNode = new Map();
-        this.pendingTransfers = new Set();
+        this.pendingBySHA1 = new Map();
+        this.pendingByNode = new Map();
         this.pendingTransferTimers = new Map();
         this.redundancy = option.int("object-cache-redundancy", 1);
         if (this.redundancy <= 0) {
@@ -80,7 +84,8 @@ export class ObjectCacheManager extends EventEmitter {
         for (const timer of this.pendingTransferTimers.values()) {
             clearTimeout(timer);
         }
-        this.pendingTransfers.clear();
+        this.pendingBySHA1.clear();
+        this.pendingByNode.clear();
         this.pendingTransferTimers.clear();
         this.emit("cleared");
     }
@@ -218,7 +223,7 @@ export class ObjectCacheManager extends EventEmitter {
                 // console.log(key, value);
                 sha1[key] = {
                     fileSize: prettySize(value.fileSize),
-                    nodes: value.nodes.map((node) => node.ip + ":" + node.port)
+                    nodes: Array.from(value.nodes, (node: Builder) => node.ip + ":" + node.port)
                 };
             });
             ret.sha1 = sha1;
@@ -271,11 +276,15 @@ export class ObjectCacheManager extends EventEmitter {
                     return;
                 }
                 const pendingCount = this.pendingCountForSha1(sha);
-                const totalCopies = value.nodes.length + pendingCount;
+                const totalCopies = value.nodes.size + pendingCount;
                 const needed = Math.min(redundancy + 1 - totalCopies, this.byNode.size - 1);
                 if (needed > 0) {
                     let firstIdx;
                     let found = 0;
+                    // Only materialised if we actually pick a source, since
+                    // most objects already have enough copies and never get
+                    // this far.
+                    let sources: Builder[] | undefined;
                     while (found < needed) {
                         if (++nodeIdx === nodes.length) {
                             nodeIdx = 0;
@@ -286,7 +295,7 @@ export class ObjectCacheManager extends EventEmitter {
                             break;
                         }
                         const node = nodes[nodeIdx];
-                        if (value.nodes.indexOf(node) !== -1) {
+                        if (value.nodes.has(node)) {
                             continue;
                         }
                         if (this.hasPendingTransfer(sha, node)) {
@@ -313,7 +322,10 @@ export class ObjectCacheManager extends EventEmitter {
                         }
                         ++found;
                         data.available -= value.fileSize;
-                        const src = value.nodes[roundRobinIndex++ % value.nodes.length];
+                        if (!sources) {
+                            sources = Array.from(value.nodes);
+                        }
+                        const src = sources[roundRobinIndex++ % sources.length];
                         data.objects.push({ source: src.ip + ":" + src.port, sha1: sha });
                         if (max !== undefined && !--max) {
                             break;
@@ -358,51 +370,68 @@ export class ObjectCacheManager extends EventEmitter {
     }
 
     private addPendingTransfer(sha1: string, node: Builder): void {
+        let nodes = this.pendingBySHA1.get(sha1);
+        if (!nodes) {
+            nodes = new Set();
+            this.pendingBySHA1.set(sha1, nodes);
+        }
+        nodes.add(node);
+
+        let sha1s = this.pendingByNode.get(node);
+        if (!sha1s) {
+            sha1s = new Set();
+            this.pendingByNode.set(node, sha1s);
+        }
+        sha1s.add(sha1);
+
         const key = pendingKey(sha1, node);
-        this.pendingTransfers.add(key);
+        const existing = this.pendingTransferTimers.get(key);
+        if (existing) {
+            clearTimeout(existing);
+        }
         const timer = setTimeout(() => {
-            this.pendingTransfers.delete(key);
-            this.pendingTransferTimers.delete(key);
+            this.forgetPendingTransfer(sha1, node);
         }, this.pendingTransferTimeoutMs);
         timer.unref();
         this.pendingTransferTimers.set(key, timer);
     }
 
     private clearPendingTransfer(sha1: string, node: Builder): void {
-        const key = pendingKey(sha1, node);
-        this.pendingTransfers.delete(key);
-        const timer = this.pendingTransferTimers.get(key);
+        const timer = this.pendingTransferTimers.get(pendingKey(sha1, node));
         if (timer) {
             clearTimeout(timer);
-            this.pendingTransferTimers.delete(key);
         }
+        this.forgetPendingTransfer(sha1, node);
+    }
+
+    private forgetPendingTransfer(sha1: string, node: Builder): void {
+        const nodes = this.pendingBySHA1.get(sha1);
+        if (nodes && nodes.delete(node) && nodes.size === 0) {
+            this.pendingBySHA1.delete(sha1);
+        }
+        const sha1s = this.pendingByNode.get(node);
+        if (sha1s && sha1s.delete(sha1) && sha1s.size === 0) {
+            this.pendingByNode.delete(node);
+        }
+        this.pendingTransferTimers.delete(pendingKey(sha1, node));
     }
 
     private clearAllPendingForNode(node: Builder): void {
-        const suffix = ":" + node.ip + ":" + node.port;
-        for (const key of this.pendingTransfers) {
-            if (key.endsWith(suffix)) {
-                this.pendingTransfers.delete(key);
-                const timer = this.pendingTransferTimers.get(key);
-                if (timer) {
-                    clearTimeout(timer);
-                    this.pendingTransferTimers.delete(key);
-                }
-            }
+        const sha1s = this.pendingByNode.get(node);
+        if (!sha1s) {
+            return;
         }
+        for (const sha1 of Array.from(sha1s)) {
+            this.clearPendingTransfer(sha1, node);
+        }
+        this.pendingByNode.delete(node);
     }
 
     private pendingCountForSha1(sha1: string): number {
-        let count = 0;
-        for (const key of this.pendingTransfers) {
-            if (key.startsWith(sha1 + ":")) {
-                ++count;
-            }
-        }
-        return count;
+        return this.pendingBySHA1.get(sha1)?.size ?? 0;
     }
 
     private hasPendingTransfer(sha1: string, node: Builder): boolean {
-        return this.pendingTransfers.has(pendingKey(sha1, node));
+        return this.pendingBySHA1.get(sha1)?.has(node) ?? false;
     }
 }
