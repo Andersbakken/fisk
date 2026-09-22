@@ -7,6 +7,7 @@ import { VM } from "./VM";
 import { common as commonFunc } from "../common";
 import { default as createOptions } from "@jhanssen/options";
 import { load } from "./load";
+import { monitorEventLoopLag } from "../common/eventLoopLag";
 import { promisify } from "util";
 import { quitOnError } from "./quitOnError";
 import Url from "url-parse";
@@ -52,6 +53,10 @@ Options:
   --inform-delay=MS              Delay before informing scheduler (default: 5000)
   --quit-on-error-delay=MS       Delay before quitting on error
   --loadInterval=MS              Load reporting interval (default: 1000)
+  --max-queue-depth=N            Refuse connections past this queue depth (default: slots * 4)
+  --event-loop-lag-interval=MS   Event loop lag sample interval (0 disables)
+  --event-loop-lag-threshold=MS  Log a stall at or above this lag
+  --event-loop-lag-summary-interval=MS  Lag summary interval (0 disables)
   --backlog=N                    Listen backlog (default: net.core.somaxconn)
   --cache-dir=PATH               Cache directory (default: ~/.cache/fisk/builder)
 
@@ -76,6 +81,8 @@ const common = commonFunc(option, true);
 if (!process.env.UV_THREADPOOL_SIZE) {
     process.env.UV_THREADPOOL_SIZE = String(Math.min(128, Math.max(8, os.cpus().length)));
 }
+
+monitorEventLoopLag(option, "builder");
 
 if (process.getuid() !== 0) {
     console.error("fisk builder needs to run as root to be able to chroot");
