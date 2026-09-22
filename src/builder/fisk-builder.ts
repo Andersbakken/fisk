@@ -67,6 +67,15 @@ const option: Options = createOptions({
 
 const common = commonFunc(option, true);
 
+// Reads, writes, gzip and gunzip all run on libuv's threadpool, and now that
+// the job and object cache paths use the asynchronous forms they share it.
+// Four threads is not enough to keep as many jobs as we have slots moving.
+// libuv reads this when it first creates the pool, so it has to be set before
+// anything asynchronous has been submitted, which is why it lives up here.
+if (!process.env.UV_THREADPOOL_SIZE) {
+    process.env.UV_THREADPOOL_SIZE = String(Math.min(128, Math.max(8, os.cpus().length)));
+}
+
 if (process.getuid() !== 0) {
     console.error("fisk builder needs to run as root to be able to chroot");
     process.exit(1);
@@ -174,30 +183,38 @@ function getFromCache(job: Job, cb: (err?: Error) => void): boolean {
                 } else {
                     // console.log("got good response from file", file);
                     // console.log("sending some data", buffer.length, fileIdx, item.response.index.length);
-                    let sendBuffer = buffer;
-                    // Decompress if client doesn't support compressed responses from cache
-                    if (!sendCompressed && buffer.byteLength > 0) {
-                        try {
-                            sendBuffer = zlib.gunzipSync(buffer);
-                        } catch (gunzipErr: unknown) {
-                            assert(objectCache, "Must have objectCache");
-                            console.error(
-                                `Failed to gunzip ${path.join(
-                                    objectCache.dir,
-                                    item.response.sha1!
-                                )} for file index ${fileIdx}:`,
-                                gunzipErr
-                            );
-                            finish(gunzipErr as Error);
-                            return;
+                    const sendAndContinue = (sendBuffer: Buffer): void => {
+                        job.send(sendBuffer);
+                        pos += read;
+                        if (++fileIdx < item.response.index.length) {
+                            work();
+                        } else {
+                            finish();
                         }
-                    }
-                    job.send(sendBuffer);
-                    pos += read;
-                    if (++fileIdx < item.response.index.length) {
-                        work();
+                    };
+                    // Decompress if client doesn't support compressed responses
+                    // from cache. Asynchronously: a cache hit is the fast path
+                    // and used to spend it inflating megabytes on the event
+                    // loop, once per file. Files are still sent in index order
+                    // because the next read only starts from sendAndContinue.
+                    if (!sendCompressed && buffer.byteLength > 0) {
+                        zlib.gunzip(buffer, (gunzipErr: Error | null, inflated: Buffer) => {
+                            if (gunzipErr) {
+                                assert(objectCache, "Must have objectCache");
+                                console.error(
+                                    `Failed to gunzip ${path.join(
+                                        objectCache.dir,
+                                        item.response.sha1!
+                                    )} for file index ${fileIdx}:`,
+                                    gunzipErr
+                                );
+                                finish(gunzipErr);
+                                return;
+                            }
+                            sendAndContinue(inflated);
+                        });
                     } else {
-                        finish();
+                        sendAndContinue(buffer);
                     }
                 }
             });
