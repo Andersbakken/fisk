@@ -47,6 +47,8 @@ Options:
   --max-file-descriptors=N     File descriptor limit
   --ping-interval=MS           WebSocket ping interval
   --monitor-log=PATH           Log file for monitor events
+  --max-log-files=N            Log files to keep, oldest pruned (default: 1000, 0 disables)
+  --log-scheduled-jobs         Log a line for every scheduled job
   --event-loop-lag-interval=MS Event loop lag sample interval (0 disables)
   --event-loop-lag-threshold=MS  Log a stall at or above this lag
   --event-loop-lag-summary-interval=MS  Lag summary interval (0 disables)
@@ -789,47 +791,45 @@ ${msg.stdout ? "stdout:\n" + msg.stdout + "\n" : ""}${msg.stderr ? "stderr:\n" +
     });
 });
 
+// Oldest first, which is the order both the monitor list and the pruning below
+// depend on. Seeded once at startup and maintained by whoever adds or removes a
+// file, because the alternative -- an fs.watch that readdir()s the whole
+// directory on every rename -- makes each new log file cost a directory scan of
+// all the ones before it, precisely when the scheduler is busiest.
+const logFiles: string[] = ((): string[] => {
+    try {
+        return fs.readdirSync(logFileDir).sort();
+    } catch (err: unknown) {
+        return [];
+    }
+})();
+
+const maxLogFiles = option.int("max-log-files", 1000);
+const logScheduledJobs = Boolean(option("log-scheduled-jobs"));
+
 function updateLogFilesToMonitors(): void {
     if (monitors.length) {
-        fs.readdir(logFileDir, (err, files) => {
-            if (files) {
-                files = files.reverse();
-            }
-            const msg = { type: "logFiles", files: files || [] };
-            // console.log("sending files", msg);
-            monitors.forEach((monitor) => {
-                monitor.send(msg);
-            });
+        const msg = { type: "logFiles", files: logFiles.slice().reverse() };
+        monitors.forEach((monitor) => {
+            monitor.send(msg);
         });
     }
 }
 
-function clearLogFiles(): void {
-    fs.readdir(logFileDir, (err, files) => {
-        if (err) {
-            console.log("Got error removing log files", err);
-            return;
+function removeLogFile(file: string): void {
+    fs.unlink(path.join(logFileDir, file), (error: NodeJS.ErrnoException): void => {
+        if (error) {
+            console.log("failed to remove file", path.join(logFileDir, file), error);
         }
-
-        for (const file of files) {
-            fs.unlink(path.join(logFileDir, file), (error: NodeJS.ErrnoException): void => {
-                if (error) {
-                    console.log("failed to remove file", path.join(logFileDir, file), error);
-                }
-            });
-        }
-        updateLogFilesToMonitors();
     });
 }
 
-try {
-    fs.watch(logFileDir, (type: string) => {
-        if (type === "rename") {
-            updateLogFilesToMonitors();
-        }
-    });
-} catch (err) {
-    /* */
+function clearLogFiles(): void {
+    const files = logFiles.splice(0, logFiles.length);
+    for (const file of files) {
+        removeLogFile(file);
+    }
+    updateLogFilesToMonitors();
 }
 
 function formatDate(date: Date): string {
@@ -865,11 +865,32 @@ interface LogEntry {
 }
 
 function addLogFile(log: LogEntry): void {
-    try {
-        fs.writeFileSync(path.join(logFileDir, `${formatDate(new Date())} ${log.source} ${log.ip}`), log.contents);
-    } catch (err) {
-        console.error(`Failed to write log file from ${log.ip}`, err);
+    // Every builder and every client can send these, so a synchronous write
+    // here put a disk write on the event loop for each one, stalling accept()
+    // and the handshakes behind it exactly when the traffic was heaviest.
+    let name = `${formatDate(new Date())} ${log.source} ${log.ip}`;
+    if (logFiles.includes(name)) {
+        // Names are second-resolution, so a second message from the same peer
+        // within the same second used to silently overwrite the first.
+        let i = 2;
+        while (logFiles.includes(`${name} (${i})`)) {
+            ++i;
+        }
+        name = `${name} (${i})`;
     }
+    logFiles.push(name);
+
+    while (maxLogFiles > 0 && logFiles.length > maxLogFiles) {
+        removeLogFile(logFiles.shift() as string);
+    }
+
+    fs.writeFile(path.join(logFileDir, name), log.contents, (err: NodeJS.ErrnoException | null) => {
+        if (err) {
+            console.error(`Failed to write log file from ${log.ip}`, err);
+            return;
+        }
+        updateLogFilesToMonitors();
+    });
 }
 
 server.on("builder", (builder: Builder) => {
@@ -1254,10 +1275,15 @@ server.on("compile", (compile: Compile) => {
     }
     ++builder.activeClients;
     ++builder.jobsScheduled;
-    console.log(
-        `${compile.name} ${compile.ip} ${compile.sourcePath} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
-            `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
-    );
+    // stdout is a synchronous write when it is redirected to a file, which is
+    // how this runs in production, so a line per job is a blocking write per
+    // job on the same loop that has to answer handshakes.
+    if (logScheduledJobs) {
+        console.log(
+            `${compile.name} ${compile.ip} ${compile.sourcePath} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
+                `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
+        );
+    }
     builder.lastJob = Date.now();
     const id = nextJobId();
     data.id = id;
@@ -1393,14 +1419,7 @@ server.on("monitor", (client: Client) => {
                 updateLogFilesToMonitors();
                 break;
             case "logFiles":
-                // console.log("logFiles:", message);
-                fs.readdir(logFileDir, (err, files) => {
-                    if (files) {
-                        files = files.reverse();
-                    }
-                    console.log("sending files", files);
-                    client.send({ type: "logFiles", files: files || [] });
-                });
+                client.send({ type: "logFiles", files: logFiles.slice().reverse() });
                 break;
             case "logFile": {
                 // console.log("logFile:", message);
