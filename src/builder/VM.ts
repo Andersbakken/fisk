@@ -22,7 +22,7 @@ export class VM extends EventEmitter {
 
         fs.remove(path.join(root, "compiles"));
 
-        const args = [`--root=${root}`, `--hash=${hash}`];
+        const args = [`--root=${root}`, `--hash=${hash}`, `--nice=${option.int("compiler-nice", 10)}`];
         const user = option("vm-user");
         if (typeof user === "string") {
             args.push(`--user=${user}`);

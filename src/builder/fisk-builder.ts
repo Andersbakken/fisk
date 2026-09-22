@@ -36,7 +36,8 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 Options:
   --scheduler=URL                Scheduler URL (default: localhost:8097)
   --port=PORT                    Listen port (default: 8096)
-  --slots=N                      Number of compile slots
+  --slots=N                      Number of compile slots (default: cpus - 1)
+  --compiler-nice=N              Nice value for spawned compilers (default: 10)
   --debug                        Enable debug logging
   --object-cache-size=SIZE       Object cache size (e.g. "10gb")
   --object-cache-dir=PATH        Object cache directory
@@ -51,7 +52,7 @@ Options:
   --inform-delay=MS              Delay before informing scheduler (default: 5000)
   --quit-on-error-delay=MS       Delay before quitting on error
   --loadInterval=MS              Load reporting interval (default: 1000)
-  --backlog=N                    Listen backlog (default: 50)
+  --backlog=N                    Listen backlog (default: net.core.somaxconn)
   --cache-dir=PATH               Cache directory (default: ~/.cache/fisk/builder)
 
 Config files: ~/.config/fisk/builder.conf, /etc/xdg/fisk/builder.conf

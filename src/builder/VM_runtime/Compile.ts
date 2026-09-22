@@ -2,6 +2,7 @@ import EventEmitter from "events";
 import assert from "assert";
 import child_process from "child_process";
 import fs from "fs-extra";
+import os from "os";
 import path from "path";
 import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 
@@ -25,6 +26,10 @@ const RECORD_FLAG_NEGATIONS: Record<string, string | undefined> = {
     "-frecord-gcc-switches": "-fno-record-gcc-switches"
 };
 
+export interface CompileOptions extends ClientPaths {
+    nice?: number;
+}
+
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
 
@@ -34,7 +39,7 @@ export class Compile extends EventEmitter {
         dir: string,
         debug: boolean,
         sourceFileName?: string,
-        { clientSourcePath, clientCwd }: ClientPaths = {}
+        { clientSourcePath, clientCwd, nice }: CompileOptions = {}
     ) {
         super();
 
@@ -314,6 +319,18 @@ export class Compile extends EventEmitter {
             /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
         });
         this.proc = proc;
+        // The builder runs as many compilers as it has cores, so without this
+        // the node process that has to answer websocket handshakes competes for
+        // CPU with N runnable compilers and waits a full scheduling slice for
+        // every wakeup. Lowering priority needs no privilege, so this still
+        // works after the runtime has dropped to --vm-user.
+        if (nice && proc.pid !== undefined) {
+            try {
+                os.setPriority(proc.pid, nice);
+            } catch (err: unknown) {
+                console.error(`Couldn't renice compiler ${proc.pid} to ${nice}`, err);
+            }
+        }
         proc.stdout.setEncoding("utf8");
         proc.stderr.setEncoding("utf8");
 

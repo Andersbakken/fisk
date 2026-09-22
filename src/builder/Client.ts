@@ -31,7 +31,10 @@ export class Client extends EventEmitter {
         this.serverPort = option.int("port", 8096);
         this.hostname = option.string("hostname");
         this.name = option.string("name");
-        this.slots = option.int("slots", os.cpus().length);
+        // One core short of the machine on purpose: the last one is what serves
+        // handshakes, uploads and heartbeats, and a builder that cannot answer
+        // those in time is worth less than the one compile slot it gains.
+        this.slots = option.int("slots", Math.max(1, os.cpus().length - 1));
         this.labels = option("labels") as string | undefined;
         try {
             this.npmVersion = String(

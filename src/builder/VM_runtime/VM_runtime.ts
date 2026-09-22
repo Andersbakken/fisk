@@ -159,7 +159,8 @@ process.on("message", (msg) => {
                 }
                 const compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug, msg.sourceFileName, {
                     clientSourcePath: msg.clientSourcePath,
-                    clientCwd: msg.clientCwd
+                    clientCwd: msg.clientCwd,
+                    nice: argv.nice
                 });
                 // console.log("running thing", msg.commandLine);
                 compile.on("stdout", (data) => {
