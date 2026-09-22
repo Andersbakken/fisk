@@ -2,6 +2,7 @@ import { Builder } from "./Builder";
 import { Client, ClientType } from "./Client";
 import { Compile } from "./Compile";
 import { DaemonConnection } from "./DaemonConnection";
+import { defaultBacklog } from "../common";
 import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
@@ -76,13 +77,7 @@ export class Server extends EventEmitter {
                     return;
                 }
             }
-            let defaultBacklog = 128;
-            try {
-                defaultBacklog = parseInt(fs.readFileSync("/proc/sys/net/core/somaxconn", "utf8")) || 128;
-            } catch (err: unknown) {
-                /* */
-            }
-            const backlog = this.option.int("backlog", defaultBacklog);
+            const backlog = this.option.int("backlog", defaultBacklog());
             this.ws = new WebSocket.Server({ noServer: true });
             let waitingServers = 1;
             const port = this.option.int("port", 8097);

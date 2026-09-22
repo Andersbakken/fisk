@@ -63,6 +63,22 @@ function validateObjectCache(option: Options): void {
     fs.writeFileSync(file, buf);
 }
 
+// The listen backlog is the depth of the kernel's accept queue. When it fills
+// -- which is what happens whenever the event loop stalls long enough to stop
+// calling accept() -- Linux does not refuse the connection, it silently drops
+// the SYN, and the client's first retransmit is a second later. A client with a
+// sub-second handshake budget sees that as a timeout with no server-side trace.
+// listen(2) clamps to net.core.somaxconn, so following somaxconn is both the
+// largest useful value and the one an operator can actually tune.
+export function defaultBacklog(): number {
+    try {
+        return parseInt(fs.readFileSync("/proc/sys/net/core/somaxconn", "utf8")) || 511;
+    } catch (err: unknown) {
+        // Not Linux, or procfs isn't mounted. 511 is node's own default.
+        return 511;
+    }
+}
+
 export interface Common {
     cacheDir: () => string;
     Version: number;

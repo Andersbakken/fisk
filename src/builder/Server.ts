@@ -1,4 +1,5 @@
 import { Job } from "./Job";
+import { defaultBacklog } from "../common";
 import EventEmitter from "events";
 import Url from "url-parse";
 import WebSocket from "ws";
@@ -30,8 +31,14 @@ export class Server extends EventEmitter {
         this.port = this.option.int("port", 8096);
 
         this.server = http.createServer(this.app);
-        this.ws = new WebSocket.Server({ noServer: true, backlog: this.option.int("backlog", 50) });
-        this.server.listen({ port: this.port, backlog: this.option.int("backlog", 50), host: "0.0.0.0" });
+        // No backlog here on purpose: ws only uses that option when it creates
+        // its own http server, which noServer mode explicitly does not do.
+        this.ws = new WebSocket.Server({ noServer: true });
+        this.server.listen({
+            port: this.port,
+            backlog: this.option.int("backlog", defaultBacklog()),
+            host: "0.0.0.0"
+        });
 
         this.server.on("upgrade", (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
             assert(this.ws, "Must have ws");
