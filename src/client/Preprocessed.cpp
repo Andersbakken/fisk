@@ -34,7 +34,9 @@ bool Preprocessed::done() const
     return mDone;
 }
 
-std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler, const std::shared_ptr<CompilerArgs> &args, Select *select,
+std::unique_ptr<Preprocessed> Preprocessed::create(const std::string &compiler,
+                                                   const std::shared_ptr<CompilerArgs> &args,
+                                                   Select *select,
                                                    DaemonSocket *daemonSocket)
 {
     const unsigned long long started = Client::mono();

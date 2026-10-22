@@ -22,7 +22,8 @@ enum OptionFlag
 {
     None = 0x0,
     Sha1 = 0x1,
-    SkipPreprocess = 0x2
+    SkipPreprocess = 0x2,
+    RequiredArgOnClangOnly = 0x4
 };
 
 struct OptionArg
@@ -75,7 +76,7 @@ static const OptionArg argOptions[] = { { "--CLASSPATH", 1, Sha1 },
                                         { "-F", 1, None },
                                         { "-G", 1, Sha1 },
                                         { "-I", 1, None },
-                                        { "-MQ", 1, Sha1 },
+                                        { "-MQ", 1, Sha1 | RequiredArgOnClangOnly },
                                         { "-Xanalyzer", 1, Sha1 },
                                         { "-Xarch_device", 1, Sha1 },
                                         { "-Xarch_host", 1, Sha1 },
@@ -207,15 +208,6 @@ static inline const OptionArg *lookupOption(const std::string &arg)
         return it;
     }
     return nullptr;
-}
-
-static inline size_t hasArg(const std::string &arg, bool &sha1)
-{
-    if (const OptionArg *o = lookupOption(arg)) {
-        sha1 = o->flags & Sha1;
-        return o->args;
-    }
-    return 0;
 }
 
 // Caller contract for the object-cache SHA1 chain (must not be reordered):
@@ -539,16 +531,22 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> &&ar
         }
 
         {
-            bool needSHA1 = false;
-            if (size_t count = hasArg(arg, needSHA1)) {
+            if (const OptionArg *opt = lookupOption(arg)) {
+                uint32_t count = opt->args;
+                if (opt->flags & RequiredArgOnClangOnly) {
+                    if (Client::data().builderCompiler.find("clang") == std::string::npos) {
+                        count = 0;
+                    }
+                }
                 if (i + count >= ret->commandLine.size()) {
                     DEBUG("%s missing operand(s), building local", arg.c_str());
                     *localReason = Local_ParseError;
                     ret.reset();
                     goto end;
                 }
-                if (needSHA1)
+                if (opt->flags & Sha1) {
                     sha1(count + 1);
+                }
                 i += count;
                 continue;
             }

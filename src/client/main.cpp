@@ -364,7 +364,6 @@ int main(int argc, char **argv)
         runLocal("no compiler info from daemon");
     }
 
-    // CompilerInfo now comes from the daemon (no more client-side disk cache).
     const Client::CompilerInfo &info = daemonSocket.compilerInfo();
     data.hash = info.hash;
     // CONTRACT (see CompilerArgs.cpp): finalize(info) MUST run after CompilerArgs::create and

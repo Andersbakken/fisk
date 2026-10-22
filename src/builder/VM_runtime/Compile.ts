@@ -66,10 +66,10 @@ export class Compile extends EventEmitter {
                     break;
                 }
 
-                case "-MF": {
+                case "-MF":
+                case "-MT":
                     args.splice(i--, 2);
                     break;
-                }
 
                 case "-MMD":
                 case "-MD":
@@ -78,8 +78,12 @@ export class Compile extends EventEmitter {
                     args.splice(i--, 1);
                     continue;
 
-                case "-MT":
-                    args.splice(i--, 2);
+                case "-MQ":
+                    if (isClang) {
+                        args.splice(i--, 2);
+                    } else {
+                        args.splice(i--, 1);
+                    }
                     continue;
 
                 case "-cxx-isystem":
