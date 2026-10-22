@@ -48,7 +48,12 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const bool success = msg.value("success", false);
         if (!success) {
             const std::string builderError = msg.value("error", std::string());
-            ERROR("Builder %s failed to compile %s: %s", url().c_str(), data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown", builderError.empty() ? "(no error message)" : builderError.c_str());
+            ERROR("Builder %s failed to compile %s: %s %s",
+                  url().c_str(),
+                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown",
+                  builderError.empty() ? "(no error message)" : builderError.c_str(),
+                  data.compilerArgs ? data.compilerArgs->arguments().c_str() : "(no arguments)");
+
             data.watchdog->stop();
             error = "builder run failure";
             done = true;

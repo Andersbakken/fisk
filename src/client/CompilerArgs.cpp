@@ -920,3 +920,14 @@ std::string CompilerArgs::output() const
         return output;
     }
 }
+
+std::string CompilerArgs::arguments() const
+{
+    std::string ret;
+    for (const std::string &arg : commandLine) {
+        if (!ret.empty())
+            ret += " ";
+        ret += arg;
+    }
+    return ret;
+}
