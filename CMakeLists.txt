@@ -76,7 +76,6 @@ set(TS_DEPS
     src/scheduler/ObjectCacheAddedOrRemovedMessage.ts
     src/scheduler/ObjectCacheManager.ts
     src/scheduler/ObjectCacheManagerMessage.ts
-    src/scheduler/ObjectCacheMessage.ts
     src/scheduler/Peak.ts
     src/scheduler/PeakData.ts
     src/scheduler/SHA1Data.ts

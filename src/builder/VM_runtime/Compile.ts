@@ -4,17 +4,8 @@ import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import type { CompileInit } from "./CompileInit";
-import type { ExitEvent, ExitEventFile } from "./ExitEvent";
-
-// The client's real paths, which we bake into the object rather than emitting
-// our own /compiles paths for the client to rewrite. That is the only approach
-// that works for LTO, where the output is bitcode no ELF patcher can touch.
-// Absent for a client too old to send them, in which case nothing is baked.
-export interface ClientPaths {
-    clientSourcePath: string;
-    clientCwd: string;
-    compilerType: "clang" | "gcc";
-}
+import type { CompileOutputFile } from "../CompileOutputFile";
+import type { ExitEvent } from "./ExitEvent";
 
 // Flags asking the compiler to record its own argv, mapped to the negation the
 // same compiler spells it with. -g* forms land in DW_AT_producer, -f* forms in a
@@ -332,7 +323,7 @@ export class Compile extends EventEmitter {
 
         proc.on("exit", (exitCode) => {
             // try {
-            const files: ExitEventFile[] = [];
+            const files: CompileOutputFile[] = [];
             let addDirError: Error | undefined;
             const addDir = (directory: string, prefix: string): void => {
                 try {

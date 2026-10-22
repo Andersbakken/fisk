@@ -1,11 +1,8 @@
-export interface ExitEventFile {
-    path: string;
-    mapped?: string;
-}
+import type { CompileOutputFile } from "../CompileOutputFile";
 
 export interface ExitEvent {
     exitCode: number;
-    files: ExitEventFile[];
+    files: CompileOutputFile[];
     error?: string;
     sourcePath: string;
 }

@@ -4,9 +4,10 @@ import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import type { CompileFinishedEvent } from "./CompileFinishedEvent";
+import type { CompileOutputFile } from "./CompileOutputFile";
 import type { CompilerInfo } from "../common/CompilerInfo";
 import type { Options } from "@jhanssen/options";
-import type { VMCompileFinished, VMCompileFinishedFile, VMRuntimeMessage } from "./VMRuntimeMessage";
+import type { VMCompileFinished, VMRuntimeMessage } from "./VMRuntimeMessage";
 import type { VMMessage } from "./VMMessage";
 
 export class VM extends EventEmitter {
@@ -123,7 +124,7 @@ export class VM extends EventEmitter {
             success: msg.success,
             error: msg.error,
             sourcePath: msg.sourcePath,
-            files: msg.files.map((file: VMCompileFinishedFile) => {
+            files: msg.files.map((file: CompileOutputFile) => {
                 return {
                     path: file.path,
                     absolute: path.join(this.root, file.mapped ? file.mapped : file.path)

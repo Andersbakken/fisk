@@ -1,3 +1,5 @@
+import type { CompileOutputFile } from "./CompileOutputFile";
+
 export interface VMReadyMessage {
     type: "ready";
 }
@@ -18,17 +20,12 @@ export interface VMCompileStdErr {
     data: string;
 }
 
-export interface VMCompileFinishedFile {
-    path: string;
-    mapped?: string;
-}
-
 export interface VMCompileFinished {
     type: "compileFinished";
     sourcePath: string;
     success: boolean;
     id: number;
-    files: VMCompileFinishedFile[];
+    files: CompileOutputFile[];
     exitCode: number;
     error?: string;
 }

@@ -4,6 +4,7 @@ import EventEmitter from "events";
 import fs from "fs-extra";
 import path from "path";
 import prettybytes from "pretty-bytes";
+import type { ObjectCacheEntry } from "../common/ObjectCacheMessage";
 import type { Response } from "./Response";
 
 function prettySize(bytes: number): string {
@@ -14,11 +15,6 @@ interface FileType {
     path: string;
     size?: number;
     atime?: number;
-}
-
-export interface SyncData {
-    sha1: string;
-    fileSize: number;
 }
 
 export interface Contents {
@@ -299,7 +295,7 @@ export class ObjectCache extends EventEmitter {
         return ret;
     }
 
-    syncData(): SyncData[] {
+    syncData(): ObjectCacheEntry[] {
         const ret = [];
         for (const key in this.cache) {
             ret.push({ sha1: key, fileSize: this.cache[key].fileSize });

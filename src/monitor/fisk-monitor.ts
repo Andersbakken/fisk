@@ -15,6 +15,7 @@ import type {
 } from "../common/BuilderAddedOrRemovedMessage";
 import type { JobMonitorMessage, JobMonitorMessageBase, JobMonitorMessageClient } from "../common/JobMonitorMessage";
 import type { Options } from "@jhanssen/options";
+import type { SlotsInfoMessage } from "../common/SlotsInfoMessage";
 import type { Unit } from "humanize-duration";
 import type { Widgets } from "@andersbakken/blessed";
 
@@ -749,13 +750,13 @@ function clientName(client: JobMonitorMessageClient): string {
     return client.ip;
 }
 
-interface JobData extends JobMonitorMessageBase {
+interface TrackedJob extends JobMonitorMessageBase {
     type?: string;
     time: number;
 }
 
 function jobStarted(j: JobMonitorMessage): void {
-    const job = j as JobData;
+    const job = j as TrackedJob;
     // log(job);
     const builderKey = `${job.builder.ip}:${job.builder.port}`;
     const builder = builders.get(builderKey);
@@ -865,19 +866,6 @@ const DaemonJSON = 5;
 const DaemonJSONResponse = 12;
 
 const daemonSocketPath = String(option("daemon-socket", path.join(os.homedir(), ".cache", "fisk", "daemon", "socket")));
-
-interface SlotInfo {
-    active: number;
-    capacity: number;
-    total: number;
-}
-
-interface SlotsInfoMessage {
-    type: "slotsInfo";
-    local: SlotInfo;
-    cpp: SlotInfo;
-    compile: SlotInfo;
-}
 
 let daemonSlotsInfo: SlotsInfoMessage | undefined;
 let daemonSocket: net.Socket | undefined;

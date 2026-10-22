@@ -15,6 +15,7 @@ import type { Compile } from "./Compile";
 import type { CompilerInfo, Probe } from "./CompilerInfoCache";
 import type { Options } from "@jhanssen/options";
 import type { SchedulerJobUpdate } from "./SchedulerConnection";
+import type { SlotsInfoMessage } from "../common/SlotsInfoMessage";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(`Usage: fisk-daemon [options]
@@ -138,7 +139,7 @@ interface SlotSubscriber {
 
 const slotSubscribers: SlotSubscriber[] = [];
 
-function slotsInfo(): Record<string, unknown> {
+function slotsInfo(): SlotsInfoMessage {
     return {
         type: "slotsInfo",
         local: {
