@@ -222,8 +222,8 @@ process.on("message", (msg: VMMessage) => {
 });
 
 function compilerTypeFromArgv(): "clang" | "gcc" {
-    if (argv.compilerType === "clang" || argv.compilerType === "gcc") {
-        return argv.compilerType;
+    if (argv["compiler-type"] === "clang" || argv["compiler-type"] === "gcc") {
+        return argv["compiler-type"];
     }
-    throw new Error("VM runtime requires a supported --compiler-type");
+    throw new Error("VM runtime requires a supported --compiler-type " + argv["compiler-type"]);
 }
