@@ -212,10 +212,11 @@ static inline const OptionArg *lookupOption(const std::string &arg)
 
 static bool isProbablyClang()
 {
-    if (!Config::isClang.get()) {
-        Config::isClang.set(Client::data().builderCompiler.find("clang") != std::string::npos);
+    const Client::Data &data = Client::data();
+    if (data.compilerTypeKnown) {
+        return data.compilerIsClang;
     }
-    return *Config::isClang.get();
+    return data.builderCompiler.find("clang") != std::string::npos;
 }
 
 // Caller contract for the object-cache SHA1 chain (must not be reordered):
@@ -728,9 +729,7 @@ end:
 
 void CompilerArgs::finalize(const Client::CompilerInfo &info)
 {
-    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw)
-                                     && info.type == Client::CompilerType::GCC
-                                     && info.version.major >= 10);
+    const bool hasJSONDiagnostics = ((Config::jsonDiagnostics || Config::jsonDiagnosticsRaw) && info.type == Client::CompilerType::GCC && info.version.major >= 10);
 
     if (hasJSONDiagnostics) {
         for (size_t i = 0; i < commandLine.size();) {

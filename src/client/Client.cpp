@@ -466,7 +466,6 @@ void Client::parsePath(const char *path, std::string *basename, std::string *dir
     }
 }
 
-
 bool Client::setFlag(int fd, uint32_t flag)
 {
     int flags, r;
@@ -778,8 +777,7 @@ std::string Client::cwd()
     const char *pwd = getenv("PWD");
     if (pwd && pwd[0] == '/' && physical != pwd) {
         struct stat pwdStat, dotStat;
-        if (!stat(pwd, &pwdStat) && !stat(".", &dotStat) && pwdStat.st_dev == dotStat.st_dev
-            && pwdStat.st_ino == dotStat.st_ino) {
+        if (!stat(pwd, &pwdStat) && !stat(".", &dotStat) && pwdStat.st_dev == dotStat.st_dev && pwdStat.st_ino == dotStat.st_ino) {
             DEBUG("Using logical cwd %s instead of %s", pwd, physical.c_str());
             return pwd;
         }
@@ -913,7 +911,22 @@ std::string Client::uncolor(std::string str)
     return str;
 }
 
-bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball)
+static nlohmann::json compilerInfoJSON(const Client::CompilerInfo &compilerInfo)
+{
+    return {
+        { "hash", compilerInfo.hash },
+        { "input", compilerInfo.input },
+        { "type", Client::compilerTypeToString(compilerInfo.type) },
+        { "version",
+          { { "major", compilerInfo.version.major },
+            { "minor", compilerInfo.version.minor },
+            { "patch", compilerInfo.version.patch } } }
+    };
+}
+
+static constexpr int EnvironmentInfoVersion = 2;
+
+bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball, const CompilerInfo &compilerInfo)
 {
     const Client::Data &data = Client::data();
 
@@ -929,7 +942,13 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
         return false;
     }
     {
-        nlohmann::json msg = { { "type", "uploadEnvironment" }, { "hash", data.hash }, { "bytes", static_cast<int>(st.st_size) } };
+        nlohmann::json msg = {
+            { "type", "uploadEnvironment" },
+            { "hash", data.hash },
+            { "bytes", static_cast<int>(st.st_size) },
+            { "environmentInfoVersion", EnvironmentInfoVersion },
+            { "compilerInfo", compilerInfoJSON(compilerInfo) }
+        };
 
         std::string json = msg.dump();
         schedulerWebSocket->send(WebSocket::Text, json.c_str(), json.size());
@@ -958,9 +977,14 @@ bool Client::uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std
 extern "C" const unsigned char create_fisk_env[];
 extern "C" const unsigned create_fisk_env_size;
 
-std::string Client::prepareEnvironmentForUpload(std::string *directory)
+std::string Client::prepareEnvironmentForUpload(std::string *directory, const CompilerInfo &compilerInfo)
 {
     const Client::Data &data = Client::data();
+
+    if (compilerInfo.type == CompilerType::Unknown) {
+        ERROR("Cannot create a distributed environment for an unknown compiler type");
+        return std::string();
+    }
 
     char dir[PATH_MAX];
     strcpy(dir, "/tmp/fisk-env-XXXXXX");
@@ -979,7 +1003,19 @@ std::string Client::prepareEnvironmentForUpload(std::string *directory)
         return std::string();
     }
 
-    fprintf(f, "{ \"hash\": \"%s\", \"system\": \"%s\", \"originalPath\": \"%s\" }\n", data.hash.c_str(), systemName, data.resolvedCompiler.c_str());
+    const std::string metadataLine = nlohmann::json {
+        { "environmentInfoVersion", EnvironmentInfoVersion },
+        { "hash", data.hash },
+        { "system", systemName },
+        { "originalPath", data.resolvedCompiler },
+        { "compilerInfo", compilerInfoJSON(compilerInfo) }
+    }.dump() +
+        "\n";
+    if (fwrite(metadataLine.data(), 1, metadataLine.size(), f) != metadataLine.size()) {
+        ERROR("Failed to write compiler metadata to %s: %d %s", info.c_str(), errno, strerror(errno));
+        fclose(f);
+        return std::string();
+    }
 
     {
         std::string stdOut, stdErr;
@@ -1188,4 +1224,3 @@ std::string Client::formatJSONDiagnostics(const std::string &str)
 
     return ret;
 }
-

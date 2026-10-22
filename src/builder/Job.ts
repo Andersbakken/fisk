@@ -12,7 +12,7 @@ export class Job extends EventEmitter implements JobData {
 
     hostname?: string;
     user?: string;
-    sourcePath?: string;
+    sourcePath: string;
     priority: number;
     builderIp?: string;
     closed?: boolean;

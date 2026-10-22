@@ -5,6 +5,7 @@ import fs from "fs";
 import minimist from "minimist";
 import os from "os";
 import path from "path";
+import type { VMMessage } from "../VMMessage";
 
 const argv = minimist(process.argv.slice(2));
 
@@ -127,7 +128,7 @@ setTimeout(() => {
 const compiles: Map<number, Compile> = new Map();
 let destroying = false;
 
-process.on("message", (msg) => {
+process.on("message", (msg: VMMessage) => {
     switch (msg.type) {
         case "destroy":
             if (!compiles.size) {
@@ -136,6 +137,7 @@ process.on("message", (msg) => {
                 destroying = true;
             }
             break;
+
         case "setDebug":
             if (msg.debug) {
                 argv.debug = true;
@@ -144,6 +146,7 @@ process.on("message", (msg) => {
             }
             console.log("set debug to", msg.debug, "for", argv.root);
             break;
+
         case "cancel": {
             const c = compiles.get(msg.id);
             if (c) {
@@ -151,16 +154,24 @@ process.on("message", (msg) => {
             }
             break;
         }
+
         case "compile":
             try {
                 // console.log("compiling for );
                 if (argv.debug) {
                     console.log("Creating new compile", msg.commandLine, msg.argv0, msg.dir);
                 }
-                const compile = new Compile(msg.commandLine, msg.argv0, msg.dir, argv.debug, msg.sourceFileName, {
+                const compile = new Compile({
+                    args: msg.commandLine,
+                    argv0: msg.argv0,
+                    dir: msg.dir,
+                    debug: argv.debug,
+                    sourceFileName: msg.sourceFileName,
                     clientSourcePath: msg.clientSourcePath,
+                    compilerType: compilerTypeFromArgv(),
                     clientCwd: msg.clientCwd
                 });
+
                 // console.log("running thing", msg.commandLine);
                 compile.on("stdout", (data) => {
                     send({ type: "compileStdOut", id: msg.id, data: data });
@@ -209,3 +220,10 @@ process.on("message", (msg) => {
             break;
     }
 });
+
+function compilerTypeFromArgv(): "clang" | "gcc" {
+    if (argv.compilerType === "clang" || argv.compilerType === "gcc") {
+        return argv.compilerType;
+    }
+    throw new Error("VM runtime requires a supported --compiler-type");
+}

@@ -34,3 +34,5 @@ scheduler/fisk-scheduler.js
 /monitor/fisk-monitor.js.map
 /scheduler/fisk-scheduler.js.map
 /node_modules/
+/builder/
+/scheduler/

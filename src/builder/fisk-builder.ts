@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Client } from "./Client";
+import { EnvironmentInfoVersion, isCompilerInfo } from "../common/CompilerInfo";
 import { ObjectCache } from "./ObjectCache";
 import { Server } from "./Server";
 import { VM } from "./VM";
@@ -22,6 +23,7 @@ import zlib from "zlib";
 import type { CompileFinishedEvent, CompileFinishedEventFile } from "./CompileFinishedEvent";
 import type { Contents } from "./ObjectCache";
 import type { DropEnvironmentsMessage } from "../common/DropEnvironmentsMessage";
+import type { EnvironmentsMessage } from "../common/EnvironmentsMessage";
 import type { FetchCacheObjectsMessage, FetchCacheObjectsMessageObject } from "../common/FetchCacheObjectsMessage";
 import type { Job } from "./Job";
 import type { JobState } from "./JobState";
@@ -452,8 +454,15 @@ function loadEnvironments(): Promise<void> {
                             } catch (error: unknown) {
                                 /* */
                             }
-                            if (env && env.hash) {
-                                const vm = new VM(dir, env.hash, option);
+                            if (
+                                env &&
+                                env.hash &&
+                                env.environmentInfoVersion === EnvironmentInfoVersion &&
+                                isCompilerInfo(env.compilerInfo) &&
+                                env.compilerInfo.type !== "unknown" &&
+                                env.compilerInfo.hash === env.hash
+                            ) {
+                                const vm = new VM(dir, env.hash, option, env.compilerInfo);
                                 ++pending;
                                 environments[env.hash] = vm;
                                 const errorHandler = (): void => {
@@ -537,7 +546,7 @@ client.on("dropEnvironments", (message: DropEnvironmentsMessage) => {
     });
 });
 
-client.on("getEnvironments", (message) => {
+client.on("getEnvironments", (message: EnvironmentsMessage) => {
     console.log(`Getting environments ${message.environments}`);
     let base = String(option("scheduler", "localhost:8097"));
     const idx = base.indexOf("://");
@@ -567,6 +576,12 @@ client.on("getEnvironments", (message) => {
             return;
         }
         const env = message.environments.splice(0, 1)[0];
+        const compilerInfo = message.compilerInfo[env];
+        if (!isCompilerInfo(compilerInfo) || compilerInfo.type === "unknown" || compilerInfo.hash !== env) {
+            console.error(`Scheduler sent invalid compiler info for environment ${env}`);
+            setTimeout(work, 0);
+            return;
+        }
         const url = base + env;
         console.log("Got environment url", url);
 
@@ -600,14 +615,22 @@ client.on("getEnvironments", (message) => {
                 .then(() => {
                     const json = path.join(dir, "environment.json");
                     console.log("Writing json file", json);
-                    return fs.writeFile(json, JSON.stringify({ hash: env, created: new Date().toString() }));
+                    return fs.writeFile(
+                        json,
+                        JSON.stringify({
+                            hash: env,
+                            created: new Date().toString(),
+                            environmentInfoVersion: EnvironmentInfoVersion,
+                            compilerInfo
+                        })
+                    );
                 })
                 .then(() => {
                     console.log(`Unlink ${file} ${env}`);
                     return fs.unlink(file);
                 })
                 .then(() => {
-                    const vm = new VM(dir, env, option);
+                    const vm = new VM(dir, env, option, compilerInfo);
                     return new Promise<VM>((resolve, reject) => {
                         let done = false;
                         vm.on("error", (err) => {
@@ -915,13 +938,8 @@ server.on("job", (job: Job) => {
             console.log("Starting job", j.id, jobJob.sourcePath, "for", jobJob.ip, jobJob.name, "wait", jobJob.wait);
             assert(jobJob.commandLine, "Must have commandLine");
             assert(jobJob.argv0, "Must have argv0");
-            j.op = vm.startCompile(
-                jobJob.commandLine,
-                jobJob.argv0,
-                jobJob.id,
-                jobJob.sourcePath,
-                jobJob.cwd
-            );
+            assert(jobJob.cwd, "Must have cwd");
+            j.op = vm.startCompile(jobJob.commandLine, jobJob.argv0, jobJob.id, jobJob.sourcePath, jobJob.cwd);
             if (j.buffer) {
                 j.op.feed(j.buffer);
                 j.buffer = undefined;

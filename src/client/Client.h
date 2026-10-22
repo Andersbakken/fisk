@@ -52,6 +52,8 @@ struct Data
     std::string compiler; // this is the next one on the path and the one we will exec if we run locally
     std::string resolvedCompiler; // this one resolves g++ to gcc and is used for generating hash
     std::string builderCompiler; // this is the one that actually will exist on the builder
+    bool compilerTypeKnown { false };
+    bool compilerIsClang { false };
     uint16_t builderPort { 0 };
     std::string builderIp, builderHostname;
     std::string hash;
@@ -345,8 +347,8 @@ struct CompilerInfo
     } version;
 };
 
-bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball);
-std::string prepareEnvironmentForUpload(std::string *dir);
+bool uploadEnvironment(SchedulerWebSocket *schedulerWebSocket, const std::string &tarball, const CompilerInfo &compilerInfo);
+std::string prepareEnvironmentForUpload(std::string *dir, const CompilerInfo &compilerInfo);
 bool isAtty();
 std::string formatJSONDiagnostics(const std::string &json);
 } // namespace Client

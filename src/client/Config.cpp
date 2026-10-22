@@ -112,7 +112,6 @@ Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload jo
 Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))",
                                            10000); // restarts on each heartbeat which happen every 5 seconds
 Getter<std::string> compiler("compiler", "Set fiskc's resolved compiler");
-Getter<std::optional<bool>> isClang("is-clang", "Set to true if the compiler is clang", std::nullopt);
 Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir",
                              getenv("HOME") ? std::string(getenv("HOME") + std::string("/.cache/fisk/client/")) : std::string(),
                              [](const std::string &value) {
@@ -440,7 +439,7 @@ bool Config::init(int &argc, char **&argv)
             const ssize_t readRet = read(fd, &ver, sizeof(ver));
             flock(fd, LOCK_UN); // what if it fails?
             ::close(fd);
-            if (readRet == sizeof(ver) && ver == htonl(Version)) {
+            if (readRet == sizeof(ver) && ver == htonl(CacheVersion)) {
                 return true;
             }
         }
@@ -450,7 +449,7 @@ bool Config::init(int &argc, char **&argv)
         fd = open(versionFile.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
         if (fd != -1) {
             flock(fd, LOCK_EX); // what if it fails?
-            const uint32_t ver = htonl(Version);
+            const uint32_t ver = htonl(CacheVersion);
             if (write(fd, &ver, sizeof(ver)) != sizeof(ver)) {
                 fprintf(stderr, "Failed to write to versionfile %d %s\n", errno, strerror(errno));
             }

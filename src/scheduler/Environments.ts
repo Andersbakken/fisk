@@ -1,12 +1,53 @@
 import { Environment } from "./Environment";
+import { EnvironmentInfoVersion, isCompilerInfo } from "../common/CompilerInfo";
 import { File } from "./File";
 import { Links } from "./Links";
 import { untarFile } from "./untarFile";
 import assert from "assert";
 import fs from "fs-extra";
 import path from "path";
+import type { CompilerInfo } from "../common/CompilerInfo";
 import type { Database } from "./Database";
 import type { LinkProperties } from "./LinkProperties";
+
+interface EnvironmentMetadata {
+    hash: string;
+    system: string;
+    originalPath: string;
+    compilerInfo: CompilerInfo;
+    info: string;
+}
+
+function parseEnvironmentMetadata(data: string, expectedHash: string): EnvironmentMetadata | undefined {
+    const idx = data.indexOf("\n");
+    if (idx === -1) {
+        return undefined;
+    }
+    let info: Record<string, unknown>;
+    try {
+        info = JSON.parse(data.substr(0, idx)) as Record<string, unknown>;
+    } catch (err: unknown) {
+        return undefined;
+    }
+    if (
+        info.environmentInfoVersion !== EnvironmentInfoVersion ||
+        info.hash !== expectedHash ||
+        typeof info.system !== "string" ||
+        typeof info.originalPath !== "string" ||
+        !isCompilerInfo(info.compilerInfo) ||
+        info.compilerInfo.type === "unknown" ||
+        info.compilerInfo.hash !== expectedHash
+    ) {
+        return undefined;
+    }
+    return {
+        hash: expectedHash,
+        system: info.system,
+        originalPath: info.originalPath,
+        compilerInfo: info.compilerInfo,
+        info: data.substr(idx + 1)
+    };
+}
 
 export class Environments {
     private _data: Record<string, Environment>;
@@ -59,17 +100,22 @@ export class Environments {
                                             promises.push(
                                                 untarFile(tarFile, "etc/compiler_info")
                                                     .then((data: string) => {
-                                                        const idx = data.indexOf("\n");
-                                                        const info = JSON.parse(data.substr(0, idx));
+                                                        const info = parseEnvironmentMetadata(data, hash);
+                                                        if (!info) {
+                                                            console.log("Removing stale environment metadata", tarFile);
+                                                            return fs.remove(tarFile);
+                                                        }
                                                         const env = new Environment(
                                                             tarFile,
                                                             hash,
                                                             info.system,
-                                                            info.originalPath
+                                                            info.originalPath,
+                                                            info.compilerInfo
                                                         );
-                                                        env.info = data.substr(idx + 1);
+                                                        env.info = info.info;
 
                                                         this._data[hash] = env;
+                                                        return undefined;
                                                     })
                                                     .catch((err: unknown) => {
                                                         console.error("Failed to extract compiler_info", err);
@@ -119,10 +165,12 @@ export class Environments {
 
     complete(file: File): Promise<void> {
         return untarFile(file.path, "etc/compiler_info").then((data) => {
-            const idx = data.indexOf("\n");
-            const info = JSON.parse(data.substr(0, idx));
-            const env = new Environment(file.path, file.hash, info.system, info.originalPath);
-            env.info = data.substr(idx + 1);
+            const info = parseEnvironmentMetadata(data, file.hash);
+            if (!info) {
+                throw new Error(`Invalid or stale compiler metadata in environment ${file.hash}`);
+            }
+            const env = new Environment(file.path, file.hash, info.system, info.originalPath, info.compilerInfo);
+            env.info = info.info;
             this._data[file.hash] = env;
         });
     }

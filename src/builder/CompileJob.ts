@@ -2,7 +2,7 @@ import EventEmitter from "events";
 import fs from "fs-extra";
 import path from "path";
 import type { VM } from "./VM";
-import type { VMCompileFinished } from "./VMMessage";
+import type { VMCompileFinished } from "./VMRuntimeMessage";
 
 export class CompileJob extends EventEmitter {
     // Creating the directory and opening the file used to be synchronous work
@@ -23,8 +23,8 @@ export class CompileJob extends EventEmitter {
         readonly argv0: string,
         readonly id: number,
         readonly vm: VM,
-        readonly sourcePath?: string,
-        readonly clientCwd?: string
+        readonly sourcePath: string,
+        readonly clientCwd: string
     ) {
         super();
         this.dir = path.join(vm.root, "compiles", String(this.id));
@@ -40,13 +40,6 @@ export class CompileJob extends EventEmitter {
         });
     }
 
-    sendCallback(error?: Error | null): void {
-        if (error) {
-            console.error("Got send error for", this.vmDir, this.id, this.commandLine);
-            this.fail(error);
-        }
-    }
-
     feed(data: Buffer): void {
         this.opened
             .then(async (fd: number) => {
@@ -54,28 +47,28 @@ export class CompileJob extends EventEmitter {
                 this.cppSize += data.length;
                 this.startCompile = Date.now();
                 await fs.close(fd);
-                this.vm.child.send(
-                    {
-                        type: "compile",
-                        commandLine: this.commandLine,
-                        argv0: this.argv0,
-                        id: this.id,
-                        dir: this.vmDir,
-                        sourceFileName: this.sourceFileName,
-                        clientSourcePath: this.sourcePath,
-                        clientCwd: this.clientCwd
-                    },
-                    this.sendCallback.bind(this)
-                );
+                return this.vm.send({
+                    type: "compile",
+                    commandLine: this.commandLine,
+                    argv0: this.argv0,
+                    id: this.id,
+                    dir: this.vmDir,
+                    sourceFileName: this.sourceFileName,
+                    clientSourcePath: this.sourcePath,
+                    clientCwd: this.clientCwd
+                });
             })
-            .catch((err: unknown) => {
+            .catch((err: Error) => {
                 console.error("Failed to write source file for", this.vmDir, this.id, err);
-                this.fail(err as Error);
+                this.fail(err);
             });
     }
 
     cancel(): void {
-        this.vm.child.send({ type: "cancel", id: this.id }, this.sendCallback.bind(this));
+        this.vm.send({ type: "cancel", id: this.id }).catch((error: Error) => {
+            console.error("Failed to cancel job for source file", this.vmDir, this.id, error);
+            this.fail(error);
+        });
     }
 
     private fail(error: Error): void {

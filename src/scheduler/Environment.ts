@@ -1,10 +1,17 @@
 import fs from "fs";
+import type { CompilerInfo } from "../common/CompilerInfo";
 
 export class Environment {
     info?: string;
     size?: number;
 
-    constructor(readonly path: string, readonly hash: string, readonly system: string, readonly originalPath: string) {
+    constructor(
+        readonly path: string,
+        readonly hash: string,
+        readonly system: string,
+        readonly originalPath: string,
+        readonly compilerInfo: CompilerInfo
+    ) {
         try {
             this.size = fs.statSync(path).size;
         } catch (err: unknown) {

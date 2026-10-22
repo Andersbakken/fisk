@@ -4,18 +4,23 @@ import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import type { CompileFinishedEvent } from "./CompileFinishedEvent";
+import type { CompilerInfo } from "../common/CompilerInfo";
 import type { Options } from "@jhanssen/options";
-import type { VMCompileFinished, VMCompileFinishedFile, VMMessage } from "./VMMessage";
+import type { VMCompileFinished, VMCompileFinishedFile, VMRuntimeMessage } from "./VMRuntimeMessage";
+import type { VMMessage } from "./VMMessage";
 
 export class VM extends EventEmitter {
+    #child: child_process.ChildProcess;
     compiles: Record<number, CompileJob>;
     keepCompiles: boolean;
     destroying: boolean;
-    child: child_process.ChildProcess;
     ready: boolean;
 
-    constructor(readonly root: string, readonly hash: string, readonly option: Options) {
+    constructor(readonly root: string, readonly hash: string, readonly option: Options, compilerInfo: CompilerInfo) {
         super();
+        if (compilerInfo.type !== "clang" && compilerInfo.type !== "gcc") {
+            throw new Error(`Unsupported compiler type for environment ${hash}: ${compilerInfo.type}`);
+        }
         this.compiles = {};
         this.destroying = false;
         this.keepCompiles = Boolean(option("keep-compiles"));
@@ -23,6 +28,7 @@ export class VM extends EventEmitter {
         fs.remove(path.join(root, "compiles"));
 
         const args = [`--root=${root}`, `--hash=${hash}`];
+        args.push(`--compiler-type=${compilerInfo.type}`);
         const user = option("vm-user");
         if (typeof user === "string") {
             args.push(`--user=${user}`);
@@ -31,9 +37,9 @@ export class VM extends EventEmitter {
             args.push("--debug");
         }
 
-        this.child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
+        this.#child = child_process.fork(path.join(__dirname, "VM_runtime.js"), args);
         this.ready = false;
-        this.child.on("message", (msg: VMMessage) => {
+        this.#child.on("message", (msg: VMRuntimeMessage) => {
             // console.log("Got message", msg);
             switch (msg.type) {
                 case "ready":
@@ -62,14 +68,14 @@ export class VM extends EventEmitter {
                     break;
             }
         });
-        this.child.on("error", (err) => {
+        this.#child.on("error", (err) => {
             if (!this.ready) {
                 this.emit("ready", { success: false, error: err });
             } else {
                 console.error("Got error", err);
             }
         });
-        this.child.on("exit", (evt) => {
+        this.#child.on("exit", (evt) => {
             console.log("Child going down", evt, this.destroying);
             if (this.destroying) {
                 fs.remove(root);
@@ -140,15 +146,13 @@ export class VM extends EventEmitter {
 
     destroy(): void {
         this.destroying = true;
-        this.child.send({ type: "destroy" }, (err) => {
-            if (err) {
-                console.error("Failed to send destroy message to child", this.hash, err);
-                this.child.kill();
-            }
+        this.send({ type: "destroy" }).catch((err: Error) => {
+            console.error("Failed to send destroy message to child", this.hash, err);
+            this.#child.kill();
         });
     }
 
-    startCompile(commandLine: string[], argv0: string, id: number, sourcePath?: string, cwd?: string): CompileJob {
+    startCompile(commandLine: string[], argv0: string, id: number, sourcePath: string, cwd: string): CompileJob {
         const compile = new CompileJob(commandLine, argv0, id, this, sourcePath, cwd);
         this.compiles[compile.id] = compile;
         // console.log("startCompile " + compile.id);
@@ -156,6 +160,21 @@ export class VM extends EventEmitter {
     }
 
     setDebug(debug: boolean): void {
-        this.child.send({ type: "setDebug", debug });
+        this.send({ type: "setDebug", debug }).catch((error: Error) => {
+            console.error("Failed to send setDebug message to child", this.hash, error);
+        });
+    }
+
+    send(msg: VMMessage): Promise<void> {
+        return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+            this.#child.send(msg, (err: Error | null) => {
+                if (err) {
+                    console.error("Failed to send message to child", this.hash, msg, err);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
     }
 }

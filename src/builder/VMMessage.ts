@@ -1,36 +1,26 @@
-export interface VMReadyMessage {
-    type: "ready";
-}
-export interface VMErrorMessage {
-    type: "error";
-    message: string;
-}
-
-export interface VMCompileStdOut {
-    type: "compileStdOut";
+// From VM to VM_runtime
+export interface VMCancelMessage {
+    type: "cancel";
     id: number;
-    data: string;
 }
 
-export interface VMCompileStdErr {
-    type: "compileStdErr";
+export interface VMCompileMessage {
+    type: "compile";
     id: number;
-    data: string;
+    argv0: string;
+    dir: string;
+    sourceFileName: string;
+    clientSourcePath: string;
+    clientCwd: string;
+    commandLine: string[];
 }
 
-export interface VMCompileFinishedFile {
-    path: string;
-    mapped?: string;
+export interface VMDestroyMessage {
+    type: "destroy";
 }
 
-export interface VMCompileFinished {
-    type: "compileFinished";
-    sourcePath: string;
-    success: boolean;
-    id: number;
-    files: VMCompileFinishedFile[];
-    exitCode: number;
-    error?: string;
+export interface VMSetDebugMessage {
+    type: "setDebug";
+    debug: boolean;
 }
-
-export type VMMessage = VMReadyMessage | VMErrorMessage | VMCompileStdOut | VMCompileStdErr | VMCompileFinished;
+export type VMMessage = VMCancelMessage | VMCompileMessage | VMDestroyMessage | VMSetDebugMessage;

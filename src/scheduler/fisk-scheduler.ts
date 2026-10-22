@@ -20,7 +20,9 @@ import type { BuilderAddedMessage, BuilderRemovedMessage } from "../common/Build
 import type { CacheHitMessage } from "./CacheHitMessage";
 import type { Client } from "./Client";
 import type { Compile } from "./Compile";
+import type { CompilerInfo } from "../common/CompilerInfo";
 import type { DaemonConnection } from "./DaemonConnection";
+import type { EnvironmentsMessage } from "../common/EnvironmentsMessage";
 import type { File } from "./File";
 import type { JobFinishedMessage } from "./JobFinishedMessage";
 import type { JobMonitorMessage } from "../common/JobMonitorMessage";
@@ -69,13 +71,10 @@ let nextCommandId = 0;
 
 const server = new Server(option, common.Version);
 
-// 5.0.14 is the first client that folds its debug paths into the object cache
-// key and asks the builder to bake those paths in at compile time. An older
-// client produces objects carrying the builder's /compiles paths -- unpatchable
-// for LTO bitcode -- and, because it does not key on those paths, stores them
-// under a key up-to-date clients also use. One stale client therefore poisons
-// everyone's backtraces, so it is refused rather than allowed to contribute.
-const clientMinimumVersion = "5.0.14";
+// 5.0.20 is the first client that sends daemon-probed compiler metadata with
+// environment uploads. Earlier clients cannot provide the compiler type and
+// version needed to prepare and select compatible builder environments.
+const clientMinimumVersion = "5.0.20";
 
 // compareVersions throws on an empty or malformed version rather than returning
 // an ordering, and npmVersion is "" for any client that sends no
@@ -500,6 +499,7 @@ function syncEnvironments(builder?: Builder): void {
     }
     const needs = [];
     const unwanted = [];
+    const compilerInfo: Record<string, CompilerInfo> = {};
     console.log("scheduler has", Object.keys(Environments.instance.environments).sort());
     assert(builder.environments);
     assert(builder.system);
@@ -509,6 +509,7 @@ function syncEnvironments(builder?: Builder): void {
             builder.environments[env] = -1;
         } else if (Environments.instance.environments[env].canRun(builder.system)) {
             needs.push(env);
+            compilerInfo[env] = Environments.instance.environments[env].compilerInfo;
         }
     }
     for (const env in builder.environments) {
@@ -525,7 +526,8 @@ function syncEnvironments(builder?: Builder): void {
         builder.send({ type: "dropEnvironments", environments: unwanted });
     }
     if (needs.length) {
-        builder.send({ type: "getEnvironments", environments: needs });
+        const message: EnvironmentsMessage = { type: "getEnvironments", environments: needs, compilerInfo };
+        builder.send(message);
     }
 }
 

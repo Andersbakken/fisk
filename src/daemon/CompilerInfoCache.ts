@@ -1,19 +1,12 @@
+import {
+    CompilerFingerprintVersion,
+    type CompilerInfo,
+    type CompilerType,
+    type CompilerVersion
+} from "../common/CompilerInfo";
 import { createHash } from "crypto";
 
-export type CompilerType = "clang" | "gcc" | "unknown";
-
-export interface CompilerVersion {
-    major: number;
-    minor: number;
-    patch: number;
-}
-
-export interface CompilerInfo {
-    hash: string;
-    input: string;
-    type: CompilerType;
-    version: CompilerVersion;
-}
+export type { CompilerInfo, CompilerType, CompilerVersion } from "../common/CompilerInfo";
 
 // Fingerprinting strategy:
 //
@@ -188,7 +181,7 @@ function toProbeOutputs(results: ProbeResults): ProbeOutputs {
 // hash for the same compiler (the label acts as a schema version bump).
 function canonicalFingerprint(p: ProbeOutputs): Buffer {
     const parts: string[] = [
-        "fisk-compiler-fingerprint-v1",
+        `fisk-compiler-fingerprint-v${CompilerFingerprintVersion}`,
         "dumpmachine",
         p.dumpmachine,
         "dumpversion",
@@ -209,9 +202,7 @@ export function createCompilerInfo(results: ProbeResults): CompilerInfo {
     const type = detectTypeFromMacros(probes.builtinsC);
     const versionFromMac = versionFromMacros(probes.builtinsC, type);
     const version =
-        versionFromMac.major !== 0
-            ? versionFromMac
-            : parseVersion(probes.dumpfullversion ?? probes.dumpversion);
+        versionFromMac.major !== 0 ? versionFromMac : parseVersion(probes.dumpfullversion ?? probes.dumpversion);
 
     const blob = canonicalFingerprint(probes);
     const hash = createHash("sha1").update(blob).digest("hex").toUpperCase();

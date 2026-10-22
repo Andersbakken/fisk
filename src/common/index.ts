@@ -3,11 +3,17 @@ import os from "os";
 import path from "path";
 import type { Options } from "@jhanssen/options";
 
+// Keep the wire protocol at v5 so updated clients can roll out before the
+// scheduler and builders. The cache version is independent of that protocol.
 const Version = 5;
+// 6: compiler environments now persist daemon-probed compiler identity and
+//    version metadata; old caches are discarded when a component upgrades.
+const CacheVersion = 6;
 // 6: objects now carry the client's real source path and compilation dir,
 // baked in at compile time instead of the builder's /compiles paths, and the
 // stored response no longer keeps the paths the client used to patch with.
-const ObjectCacheFormatVersion = 6;
+// 7: compiler fingerprint v2 changes the compiler component of every cache key.
+const ObjectCacheFormatVersion = 7;
 
 function cacheDir(option: Options): string {
     let dir = option("cache-dir");
@@ -24,7 +30,7 @@ function validateCache(option: Options): void {
     let version;
     try {
         version = fs.readFileSync(file);
-        if (version.readUInt32BE() === Version) {
+        if (version.readUInt32BE() === CacheVersion) {
             return;
         }
     } catch (err) {
@@ -36,7 +42,7 @@ function validateCache(option: Options): void {
     fs.removeSync(dir);
     fs.mkdirpSync(dir);
     const buf = Buffer.allocUnsafe(4);
-    buf.writeUInt32BE(Version);
+    buf.writeUInt32BE(CacheVersion);
     fs.writeFileSync(file, buf);
 }
 

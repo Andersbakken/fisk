@@ -3,21 +3,13 @@
 
 #include <assert.h>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <string>
 #include <strings.h>
 #include <type_traits>
 #include <vector>
-#include <functional>
-#include <optional>
-
-template <typename T>
-struct is_optional : std::false_type {};
-
-template <typename U>
-struct is_optional<std::optional<U>> : std::true_type {};
-
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
@@ -32,7 +24,8 @@ struct is_optional<std::optional<U>> : std::true_type {};
 namespace Config {
 enum
 {
-    Version = 5
+    Version = 5,
+    CacheVersion = 6
 };
 
 bool init(int &argc, char **&argv);
@@ -166,27 +159,12 @@ public:
     {
         std::ostringstream str;
         str << std::boolalpha;
-        if constexpr (std::is_same<T, std::string>::value) {
+        if (std::is_same<T, std::string>::value)
             str << '"';
-        }
-        if constexpr (is_optional<T>::value) {
-            if (mValue.has_value()) {
-                str << *static_cast<T>(*this);
-            } else {
-                str << "null";
-            }
-        } else {
-            str << static_cast<T>(*this);
-        }
-
-        if constexpr (std::is_same<T, std::string>::value)
+        str << static_cast<T>(*this);
+        if (std::is_same<T, std::string>::value)
             str << '"';
         return str.str();
-    }
-
-    void set(const T &value)
-    {
-        mValue = value;
     }
 
     T get() const
@@ -241,12 +219,6 @@ private:
         return true;
     }
 
-    static bool applyValue(const std::string &input, std::optional<bool> &dest)
-    {
-        dest = true;
-        return applyValue(input, *dest);
-    }
-
     template <typename Value>
     static bool applyValue(const std::string &input, Value &dest, typename std::enable_if<std::is_integral<Value>::value>::type * = nullptr,
                            typename std::enable_if<std::is_signed<Value>::value>::type * = nullptr)
@@ -285,15 +257,6 @@ private:
     }
 
     static bool applyJsonValue(const nlohmann::json &input, bool &dest)
-    {
-        if (input.is_boolean()) {
-            dest = input.get<bool>();
-            return true;
-        }
-        return false;
-    }
-
-    static bool applyJsonValue(const nlohmann::json &input, std::optional<bool> &dest)
     {
         if (input.is_boolean()) {
             dest = input.get<bool>();
@@ -354,7 +317,6 @@ extern Getter<unsigned long long> preprocessTimeout;
 extern Getter<unsigned long long> uploadJobTimeout;
 extern Getter<unsigned long long> responseTimeout;
 extern Getter<std::string> compiler;
-extern Getter<std::optional<bool>> isClang;
 extern Getter<std::string> cacheDir;
 extern Getter<std::string> builder;
 extern Getter<std::string> builderInterface;

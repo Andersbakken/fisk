@@ -2,6 +2,7 @@ import { Builder } from "./Builder";
 import { Client, ClientType } from "./Client";
 import { Compile } from "./Compile";
 import { DaemonConnection } from "./DaemonConnection";
+import { EnvironmentInfoVersion, isCompilerInfo } from "../common/CompilerInfo";
 import { defaultBacklog } from "../common";
 import EventEmitter from "events";
 import Url from "url-parse";
@@ -264,14 +265,23 @@ export class Server extends EventEmitter {
                         return;
                     }
 
-                    if (!("hash" in json)) {
+                    if (typeof json.hash !== "string" || !json.hash) {
                         console.log(json);
-                        client.error("Need a hash property");
+                        client.error("Need a non-empty hash property");
                         return;
                     }
                     if (!("bytes" in json) || typeof json.bytes !== "number") {
                         console.log(json);
                         client.error("Need a bytes property");
+                        return;
+                    }
+                    if (
+                        json.environmentInfoVersion !== EnvironmentInfoVersion ||
+                        !isCompilerInfo(json.compilerInfo) ||
+                        json.compilerInfo.type === "unknown" ||
+                        json.compilerInfo.hash !== json.hash
+                    ) {
+                        client.error("Need current compiler info matching the environment hash");
                         return;
                     }
 

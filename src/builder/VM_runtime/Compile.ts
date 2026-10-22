@@ -3,6 +3,7 @@ import assert from "assert";
 import child_process from "child_process";
 import fs from "fs-extra";
 import path from "path";
+import type { CompileInit } from "./CompileInit";
 import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 
 // The client's real paths, which we bake into the object rather than emitting
@@ -10,8 +11,9 @@ import type { ExitEvent, ExitEventFile } from "./ExitEvent";
 // that works for LTO, where the output is bitcode no ELF patcher can touch.
 // Absent for a client too old to send them, in which case nothing is baked.
 export interface ClientPaths {
-    clientSourcePath?: string;
-    clientCwd?: string;
+    clientSourcePath: string;
+    clientCwd: string;
+    compilerType: "clang" | "gcc";
 }
 
 // Flags asking the compiler to record its own argv, mapped to the negation the
@@ -28,26 +30,23 @@ const RECORD_FLAG_NEGATIONS: Record<string, string | undefined> = {
 export class Compile extends EventEmitter {
     proc: child_process.ChildProcessWithoutNullStreams;
 
-    constructor(
-        args: string[],
-        argv0: string,
-        dir: string,
-        debug: boolean,
-        sourceFileName?: string,
-        { clientSourcePath, clientCwd }: ClientPaths = {}
-    ) {
+    constructor(init: CompileInit) {
         super();
 
-        if (!args || !args.length || !dir || !argv0) {
-            console.error(argv0, args, dir);
+        if (!init.args || !init.args.length || !init.dir || !init.argv0) {
+            console.error("Bad Args", init);
             throw new Error("Bad args");
         }
-        const compiler = args.shift();
+        const compiler = init.args.shift();
         if (compiler === undefined) {
-            console.error(argv0, args, dir);
+            console.error("Bad Args 2", init);
             throw new Error("Bad args");
         }
-        const isClang = compiler.indexOf("clang") !== -1;
+        if (!init.compilerType) {
+            console.error("No compiler type specified", init);
+            throw new Error("No compiler type specified");
+        }
+        const isClang = init.compilerType === "clang";
 
         let output: string | undefined;
         let outputFileName: string | undefined;
@@ -55,34 +54,34 @@ export class Compile extends EventEmitter {
         let hasDashX: boolean = false;
         let sourcePath: string | undefined;
 
-        for (let i = 0; i < args.length; ++i) {
+        for (let i = 0; i < init.args.length; ++i) {
             // console.log(i, args[i]);
-            switch (args[i]) {
+            switch (init.args[i]) {
                 case "-o": {
                     hasDashO = true;
-                    output = args[++i];
+                    output = init.args[++i];
                     outputFileName = path.basename(output);
-                    args[i] = outputFileName;
+                    init.args[i] = outputFileName;
                     break;
                 }
 
                 case "-MF":
                 case "-MT":
-                    args.splice(i--, 2);
+                    init.args.splice(i--, 2);
                     break;
 
                 case "-MMD":
                 case "-MD":
                 case "-MM":
                 case "-M":
-                    args.splice(i--, 1);
+                    init.args.splice(i--, 1);
                     continue;
 
                 case "-MQ":
                     if (isClang) {
-                        args.splice(i--, 2);
+                        init.args.splice(i--, 2);
                     } else {
-                        args.splice(i--, 1);
+                        init.args.splice(i--, 1);
                     }
                     continue;
 
@@ -92,24 +91,24 @@ export class Compile extends EventEmitter {
                 case "-iquote":
                 case "-I":
                 case "-F":
-                    args.splice(i--, 2);
+                    init.args.splice(i--, 2);
                     break;
 
                 case "-x":
                     hasDashX = true;
                     if (!isClang) {
-                        switch (args[++i]) {
+                        switch (init.args[++i]) {
                             case "c":
-                                args[i] = "cpp-output";
+                                init.args[i] = "cpp-output";
                                 break;
                             case "c++":
-                                args[i] = "c++-cpp-output";
+                                init.args[i] = "c++-cpp-output";
                                 break;
                             case "objective-c":
-                                args[i] = "objective-c-output";
+                                init.args[i] = "objective-c-output";
                                 break;
                             case "objective-c++":
-                                args[i] = "objective-c++-cpp-output";
+                                init.args[i] = "objective-c++-cpp-output";
                                 break;
                             default:
                                 break;
@@ -145,31 +144,31 @@ export class Compile extends EventEmitter {
 
                 default:
                     if (
-                        args[i].startsWith("-mlinker-version=") ||
-                        args[i].startsWith("-stdlib=") ||
-                        args[i].startsWith("-I") ||
-                        args[i].startsWith("-F") ||
-                        args[i].startsWith("-isystem") ||
-                        args[i].startsWith("-isysroot") ||
-                        args[i].startsWith("-cxx-isystem") ||
-                        args[i].startsWith("-iquote") ||
-                        args[i].startsWith("--sysroot=") ||
-                        args[i].startsWith("--gcc-toolchain=")
+                        init.args[i].startsWith("-mlinker-version=") ||
+                        init.args[i].startsWith("-stdlib=") ||
+                        init.args[i].startsWith("-I") ||
+                        init.args[i].startsWith("-F") ||
+                        init.args[i].startsWith("-isystem") ||
+                        init.args[i].startsWith("-isysroot") ||
+                        init.args[i].startsWith("-cxx-isystem") ||
+                        init.args[i].startsWith("-iquote") ||
+                        init.args[i].startsWith("--sysroot=") ||
+                        init.args[i].startsWith("--gcc-toolchain=")
                     ) {
-                        args.splice(i--, 1);
+                        init.args.splice(i--, 1);
                         break;
                     }
 
-                    if (args[i][0] !== "-") {
+                    if (init.args[i][0] !== "-") {
                         if (sourcePath) {
-                            console.log("Multiple source files", sourcePath, args[i]);
+                            console.log("Multiple source files", sourcePath, init.args[i]);
                             throw new Error("More than one source file");
                         }
-                        sourcePath = args[i];
-                        if (!sourceFileName) {
-                            sourceFileName = path.basename(sourcePath);
+                        sourcePath = init.args[i];
+                        if (!init.sourceFileName) {
+                            init.sourceFileName = path.basename(sourcePath);
                         }
-                        args[i] = path.join(dir, sourceFileName);
+                        init.args[i] = path.join(init.dir, init.sourceFileName);
                     }
                     break;
             }
@@ -178,7 +177,7 @@ export class Compile extends EventEmitter {
             throw new Error("No sourcefile");
         }
 
-        const sourceFileInDir = path.join(dir, sourceFileName || path.basename(sourcePath));
+        const sourceFileInDir = path.join(init.dir, init.sourceFileName || path.basename(sourcePath));
 
         // Bake the client's real paths into the object instead of emitting the
         // builder's /compiles path for the client to rewrite afterwards. The
@@ -189,7 +188,7 @@ export class Compile extends EventEmitter {
         // bitcode, which no ELF-level patcher can load. It also needs no help
         // for compressed debug sections or for gcc, both of which defeat a byte
         // scan over the finished object.
-        if (clientSourcePath && clientCwd) {
+        if (init.clientSourcePath && init.clientCwd) {
             // -grecord-command-line (clang) / -frecord-gcc-switches (gcc) embed
             // our own argv verbatim into DW_AT_producer or .GCC.command.line,
             // which would leave the builder's /compiles path in there. The
@@ -200,10 +199,10 @@ export class Compile extends EventEmitter {
             // fixed negation: whichever compiler accepted the positive spelling
             // necessarily accepts its own negation, whereas a fixed flag is a
             // guess about the compiler.
-            for (let i = 0; i < args.length; ++i) {
-                const negation = RECORD_FLAG_NEGATIONS[args[i]];
+            for (let i = 0; i < init.args.length; ++i) {
+                const negation = RECORD_FLAG_NEGATIONS[init.args[i]];
                 if (negation) {
-                    args[i] = negation;
+                    init.args[i] = negation;
                 }
             }
 
@@ -221,8 +220,8 @@ export class Compile extends EventEmitter {
             // gcc takes DW_AT_name from the #line markers in the preprocessed
             // source, which already name the client's file -- but it is harmless
             // there and needed for clang.
-            args.push(`-fdebug-prefix-map=${dir}=${clientCwd}`);
-            args.push(`-fdebug-prefix-map=${sourceFileInDir}=${clientSourcePath}`);
+            init.args.push(`-fdebug-prefix-map=${init.dir}=${init.clientCwd}`);
+            init.args.push(`-fdebug-prefix-map=${sourceFileInDir}=${init.clientSourcePath}`);
         }
 
         if (!hasDashX) {
@@ -234,77 +233,77 @@ export class Compile extends EventEmitter {
                 case ".c++":
                 case ".cp":
                 case ".cxx":
-                    args.unshift(isClang ? "c++" : "c++-cpp-output");
+                    init.args.unshift(isClang ? "c++" : "c++-cpp-output");
                     break;
 
                 case ".ii":
-                    args.unshift("c++-cpp-output");
+                    init.args.unshift("c++-cpp-output");
                     break;
 
                 case ".hh":
                 case ".hpp":
                 case ".H":
-                    args.unshift("c++-header");
+                    init.args.unshift("c++-header");
                     break;
 
                 case ".h":
-                    args.unshift("c-header");
+                    init.args.unshift("c-header");
                     break;
 
                 case ".c":
-                    args.unshift(isClang ? "c" : "cpp-output");
+                    init.args.unshift(isClang ? "c" : "cpp-output");
                     break;
 
                 case ".i":
-                    args.unshift("cpp-output");
+                    init.args.unshift("cpp-output");
                     break;
 
                 case ".m":
                 case ".mi":
-                    args.unshift(isClang ? "objective-c" : "objective-c-cpp-output");
+                    init.args.unshift(isClang ? "objective-c" : "objective-c-cpp-output");
                     break;
 
                 case ".s":
-                    args.unshift("assembler");
+                    init.args.unshift("assembler");
                     break;
 
                 case ".sx":
                 case ".S":
-                    args.unshift("assembler-with-cpp");
+                    init.args.unshift("assembler-with-cpp");
                     break;
 
                 case ".mm":
                 case ".M":
                 case ".mii":
-                    args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
+                    init.args.unshift(isClang ? "objective-c++" : "objective-c++-cpp-output");
                     break;
 
                 default:
                     throw new Error(`Can't determine source language for file: ${sourcePath}`);
             }
-            args.unshift("-x");
+            init.args.unshift("-x");
         }
         if (!isClang) {
-            args.push("-fpreprocessed", "-fdirectives-only"); // this is not good for clang
+            init.args.push("-fpreprocessed", "-fdirectives-only"); // this is not good for clang
         } else {
-            args.push("-Wno-stdlibcxx-not-found");
+            init.args.push("-Wno-stdlibcxx-not-found");
         }
 
         if (!hasDashO) {
             const suffix = path.extname(sourcePath);
             outputFileName = output = sourcePath.substring(0, sourcePath.length - suffix.length) + ".o";
-            args.push("-o", outputFileName);
+            init.args.push("-o", outputFileName);
         }
 
         // debug = true;
-        if (debug) {
-            console.log("Calling", argv0, compiler, args.map((x) => '"' + x + '"').join(" "));
+        if (init.debug) {
+            console.log("Calling", init.argv0, compiler, init.args.map((x) => '"' + x + '"').join(" "));
         }
         if (!fs.existsSync("/usr/bin/as")) {
             this.emit("stderr", "as doesn't exist");
         }
         console.log(
-            `Compiling source file: ${sourcePath}\n${[compiler, ...args]
+            `Compiling source file: ${sourcePath}\n${[compiler, ...init.args]
                 .map((x) => {
                     if (x.startsWith("-fdebug-prefix-map=")) {
                         x = x.replace(/_+$/, "___");
@@ -314,8 +313,8 @@ export class Compile extends EventEmitter {
                 .join(" ")}`
         );
         // const env = Object.assign({ TMPDIR: dir, TEMPDIR: dir, TEMP: dir }, process.env);
-        const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, args, {
-            /*env: env, */ cwd: dir // , maxBuffer: 1024 * 1024 * 16
+        const proc: child_process.ChildProcessWithoutNullStreams = child_process.spawn(compiler, init.args, {
+            /*env: env, */ cwd: init.dir // , maxBuffer: 1024 * 1024 * 16
         });
         this.proc = proc;
         proc.stdout.setEncoding("utf8");
@@ -337,7 +336,7 @@ export class Compile extends EventEmitter {
             let addDirError: Error | undefined;
             const addDir = (directory: string, prefix: string): void => {
                 try {
-                    const sourceBaseName = sourceFileName || path.basename(sourcePath!);
+                    const sourceBaseName = init.sourceFileName || path.basename(sourcePath!);
                     fs.readdirSync(directory).forEach((file: string) => {
                         if (file === sourceBaseName) {
                             return;
@@ -367,7 +366,7 @@ export class Compile extends EventEmitter {
                                             break;
                                     }
                                 }
-                                if (debug) {
+                                if (init.debug) {
                                     console.log("Added file", file, files[files.length - 1]);
                                 }
                             }
@@ -381,7 +380,7 @@ export class Compile extends EventEmitter {
                 }
             };
             if (exitCode === 0) {
-                addDir(dir, dir);
+                addDir(init.dir, init.dir);
             }
             assert(sourcePath !== undefined, "Must have sourcePath4");
             if (addDirError) {

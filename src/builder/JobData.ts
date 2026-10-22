@@ -8,10 +8,9 @@ export interface JobData {
     sha1?: string;
     hostname?: string;
     user?: string;
-    sourcePath?: string;
+    sourcePath: string;
     priority?: number;
     id: number;
     builderIp?: string;
-    cwd?: string;
     supportsCompressedResponse?: boolean;
 }

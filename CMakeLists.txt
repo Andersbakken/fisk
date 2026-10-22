@@ -31,6 +31,8 @@ set(TS_DEPS
     src/builder/Server.ts
     src/builder/VM.ts
     src/builder/VMMessage.ts
+    src/builder/VMRuntimeMessage.ts
+    src/builder/VM_runtime/CompileInit.ts
     src/builder/VM_runtime/Compile.ts
     src/builder/VM_runtime/ExitEvent.ts
     src/builder/VM_runtime/VM_runtime.ts
@@ -38,7 +40,9 @@ set(TS_DEPS
     src/builder/load.ts
     src/builder/quitOnError.ts
     src/common/BuilderAddedOrRemovedMessage.ts
+    src/common/CompilerInfo.ts
     src/common/DropEnvironmentsMessage.ts
+    src/common/EnvironmentsMessage.ts
     src/common/FetchCacheObjectsMessage.ts
     src/common/JobMonitorMessage.ts
     src/common/ObjectCacheMessage.ts

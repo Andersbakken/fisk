@@ -1,3 +1,1 @@
-export interface EnvironmentsMessage {
-    environments: string[];
-}
+export type { EnvironmentsMessage } from "../common/EnvironmentsMessage";

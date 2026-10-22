@@ -341,7 +341,17 @@ int main(int argc, char **argv)
         return 0; // unreachable
     }
 
-    {
+    bool deferCompilerArgsUntilCompilerInfo = false;
+    for (int i = 1; i < data.argc; ++i) {
+        if (!strcmp(data.argv[i], "-MQ")) {
+            // -MQ consumes a target with Clang but not GCC. The daemon's probe is
+            // authoritative, so do not guess while parsing this command line.
+            deferCompilerArgsUntilCompilerInfo = true;
+            break;
+        }
+    }
+
+    auto parseCompilerArgs = [&data]() {
         std::vector<std::string> args(data.argc);
         for (int i = 0; i < data.argc; ++i) {
             // printf("%zu: %s\n", i, argv[i]);
@@ -349,8 +359,11 @@ int main(int argc, char **argv)
         }
 
         data.compilerArgs = CompilerArgs::create(std::move(args), &data.localReason);
+    };
+    if (!deferCompilerArgsUntilCompilerInfo) {
+        parseCompilerArgs();
     }
-    if (!data.compilerArgs) {
+    if (!data.compilerArgs && !deferCompilerArgsUntilCompilerInfo) {
         DEBUG("Have to run locally");
         runLocal(Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason)));
         return 0; // unreachable
@@ -366,6 +379,33 @@ int main(int argc, char **argv)
 
     const Client::CompilerInfo &info = daemonSocket.compilerInfo();
     data.hash = info.hash;
+    data.compilerTypeKnown = info.type != Client::CompilerType::Unknown;
+    data.compilerIsClang = info.type == Client::CompilerType::Clang;
+    if (deferCompilerArgsUntilCompilerInfo) {
+        parseCompilerArgs();
+        if (!data.compilerArgs) {
+            const std::string reason =
+                Client::format("compiler args parse failure: %s", CompilerArgs::localReasonToString(data.localReason));
+            if (daemonSocket.hasLocalSlot()) {
+                data.watchdog->stop();
+                Client::runLocal(reason);
+            }
+            if (daemonSocket.hasCppSlot()) {
+                daemonSocket.send(DaemonSocket::ReleaseCppSlot);
+            }
+            runLocal(reason);
+        }
+    }
+    if (info.type == Client::CompilerType::Clang || info.type == Client::CompilerType::GCC) {
+        const uint32_t cxxLanguages = CompilerArgs::CPlusPlus | CompilerArgs::CPlusPlusPreprocessed |
+                                      CompilerArgs::ObjectiveCPlusPlus | CompilerArgs::ObjectiveCPlusPlusPreprocessed;
+        const bool isCxx = data.builderCompiler.find("++") != std::string::npos || (data.compilerArgs->flags & cxxLanguages);
+        if (info.type == Client::CompilerType::Clang) {
+            data.builderCompiler = isCxx ? "/usr/bin/clang++" : "/usr/bin/clang";
+        } else {
+            data.builderCompiler = isCxx ? "/usr/bin/g++" : "/usr/bin/gcc";
+        }
+    }
     // CONTRACT (see CompilerArgs.cpp): finalize(info) MUST run after CompilerArgs::create and
     // BEFORE any preprocess-side sha1Update. Preprocessed::create below is what starts the
     // preprocess pipeline, so finalize has to happen here.
@@ -566,11 +606,11 @@ int main(int argc, char **argv)
         // already uploading and building 37MB of environment would be wasted.
         if (schedulerWebsocket && schedulerWebsocket->needsEnvironment) {
             std::string dir;
-            const std::string tarball = Client::prepareEnvironmentForUpload(&dir);
+            const std::string tarball = Client::prepareEnvironmentForUpload(&dir, info);
             // printf("GOT TARBALL %s\n", tarball.c_str());
             if (!tarball.empty()) {
                 select.remove(schedulerWebsocket.get());
-                Client::uploadEnvironment(schedulerWebsocket.get(), tarball);
+                Client::uploadEnvironment(schedulerWebsocket.get(), tarball, info);
             }
             Client::recursiveRmdir(dir);
         }
