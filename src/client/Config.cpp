@@ -112,6 +112,7 @@ Getter<unsigned long long> uploadJobTimeout("upload-job-timeout", "Set upload jo
 Getter<unsigned long long> responseTimeout("response-timeout", "Set response watchdog timeout (resets for every heartbeat (5s))",
                                            10000); // restarts on each heartbeat which happen every 5 seconds
 Getter<std::string> compiler("compiler", "Set fiskc's resolved compiler");
+Getter<std::optional<bool>> isClang("is-clang", "Set to true if the compiler is clang", std::nullopt);
 Getter<std::string> cacheDir("cache-dir", "Set fiskc's cache dir",
                              getenv("HOME") ? std::string(getenv("HOME") + std::string("/.cache/fisk/client/")) : std::string(),
                              [](const std::string &value) {

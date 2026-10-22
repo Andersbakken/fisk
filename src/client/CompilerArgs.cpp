@@ -210,6 +210,14 @@ static inline const OptionArg *lookupOption(const std::string &arg)
     return nullptr;
 }
 
+static bool isProbablyClang()
+{
+    if (!Config::isClang.get()) {
+        Config::isClang.set(Client::data().builderCompiler.find("clang") != std::string::npos);
+    }
+    return *Config::isClang.get();
+}
+
 // Caller contract for the object-cache SHA1 chain (must not be reordered):
 //   create() -> finalize(info) -> preprocess-driven sha1Update -> sha1Final.
 // finalize() applies the compiler-info-gated arg tweaks and their sha1Update
@@ -534,7 +542,7 @@ std::shared_ptr<CompilerArgs> CompilerArgs::create(std::vector<std::string> &&ar
             if (const OptionArg *opt = lookupOption(arg)) {
                 uint32_t count = opt->args;
                 if (opt->flags & RequiredArgOnClangOnly) {
-                    if (Client::data().builderCompiler.find("clang") == std::string::npos) {
+                    if (!isProbablyClang()) {
                         count = 0;
                     }
                 }
@@ -890,7 +898,7 @@ std::string CompilerArgs::preprocessCommandLine(const std::string &compiler) con
         ret += '\'';
     }
     ret += " '-E'";
-    if (Client::data().builderCompiler.find("clang") != std::string::npos) {
+    if (isProbablyClang()) {
         ret += " '-frewrite-includes'";
     } else {
         ret += " '-fdirectives-only'";
