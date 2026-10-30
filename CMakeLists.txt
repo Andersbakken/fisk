@@ -49,6 +49,7 @@ set(TS_DEPS
     src/common/index.ts
     src/daemon/ClientBuffer.ts
     src/daemon/Compile.ts
+    src/daemon/CompilerInfoCache.ts
     src/daemon/Constants.ts
     src/daemon/Server.ts
     src/daemon/Slots.ts
