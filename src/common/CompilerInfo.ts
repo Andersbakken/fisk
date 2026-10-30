@@ -14,7 +14,7 @@ export interface CompilerInfo {
 }
 
 // Bump this to invalidate compiler hashes created with older fingerprint inputs.
-export const CompilerFingerprintVersion = 2;
+export const CompilerFingerprintVersion = 3;
 
 // Bump when the persistent metadata stored with compiler environments changes.
 export const EnvironmentInfoVersion = 2;

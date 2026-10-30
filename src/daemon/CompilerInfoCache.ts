@@ -29,6 +29,12 @@ export type { CompilerInfo, CompilerType, CompilerVersion } from "../common/Comp
 //   -dumpversion                    version number
 //   -x c   -E -dM /dev/null         all builtin macros for C
 //   -x c++ -E -dM /dev/null         all builtin macros for C++
+//   -Werror -g -gz=FORMAT -c ...    zlib/zstd debug compression support
+//
+// Optional codecs are not exposed in the version or builtin macros. Compile
+// probes distinguish otherwise identical builds; -Werror rejects Clang's
+// warning-only fallback to uncompressed DWARF. Only success/failure is hashed,
+// never diagnostics that could contain machine-specific installation paths.
 //
 // The macro dumps include __clang_version__ / __GNUC__ / __GNUC_MINOR__ /
 // __GNUC_PATCHLEVEL__ / __VERSION__ / target width macros / feature-test
@@ -48,20 +54,46 @@ export type { CompilerInfo, CompilerType, CompilerVersion } from "../common/Comp
 
 export const PROBE_TIMEOUT_MS = 10000;
 
+// How a probe contributes to the fingerprint:
+//   "output"  - the (trimmed) output text is hashed. Use for probes whose
+//               output is frozen at compiler-build time.
+//   "success" - only whether the probe succeeded is hashed. Use for feature
+//               probes whose diagnostics may contain machine-specific paths.
+export type ProbeHashMode = "output" | "success";
+
 export interface Probe {
     label: string;
     args: readonly string[];
     // If false, the probe may fail (or the feature may be missing) without
     // failing the whole fingerprint.
     required: boolean;
+    hash: ProbeHashMode;
 }
 
+// Compile an empty C file with the given flags. -Werror rejects compilers
+// that accept a flag but only warn that they ignore it (e.g. Clang falling
+// back to uncompressed DWARF when built without zstd).
+function featureProbe(label: string, flags: readonly string[]): Probe {
+    return {
+        label,
+        args: ["-Werror", ...flags, "-c", "-x", "c", "/dev/null", "-o", "/dev/null"],
+        required: false,
+        hash: "success"
+    };
+}
+
+// Adding a probe here automatically adds it to the fingerprint; remember to
+// bump CompilerFingerprintVersion.
 export const PROBES: readonly Probe[] = [
-    { label: "dumpmachine", args: ["-dumpmachine"], required: true },
-    { label: "dumpversion", args: ["-dumpversion"], required: true },
-    { label: "dumpfullversion", args: ["-dumpfullversion"], required: false },
-    { label: "builtins-c", args: ["-x", "c", "-E", "-dM", "/dev/null"], required: true },
-    { label: "builtins-cxx", args: ["-x", "c++", "-E", "-dM", "/dev/null"], required: true }
+    { label: "dumpmachine", args: ["-dumpmachine"], required: true, hash: "output" },
+    { label: "dumpversion", args: ["-dumpversion"], required: true, hash: "output" },
+    // GCC only; Clang rejects -dumpfullversion ("no input files") and the
+    // client reports it as null.
+    { label: "dumpfullversion", args: ["-dumpfullversion"], required: false, hash: "output" },
+    { label: "builtins-c", args: ["-x", "c", "-E", "-dM", "/dev/null"], required: true, hash: "output" },
+    { label: "builtins-cxx", args: ["-x", "c++", "-E", "-dM", "/dev/null"], required: true, hash: "output" },
+    featureProbe("compression-zlib", ["-g", "-gz=zlib"]),
+    featureProbe("compression-zstd", ["-g", "-gz=zstd"])
 ];
 
 // Raw probe output as reported by a client: label -> combined stdout+stderr,
@@ -144,34 +176,30 @@ function versionFromMacros(macros: string, type: CompilerType): CompilerVersion 
     return { major: 0, minor: 0, patch: 0 };
 }
 
-interface ProbeOutputs {
-    dumpmachine: string;
-    dumpversion: string;
-    dumpfullversion: string | null;
-    builtinsC: string;
-    builtinsCxx: string;
-}
+// Validated probe results: label -> trimmed output, or null if the probe
+// failed. Every label in PROBES is present.
+type ProbeOutputs = Map<string, string | null>;
 
-// Turn a client's reported results into the shape the fingerprint wants,
-// failing if a required probe is missing. A client that reports nothing for a
-// required probe is telling us it could not identify the compiler, which must
-// not silently become a fingerprint of empty strings -- every such compiler
-// would hash the same.
+// Validate a client's reported results against PROBES. Every probe must be
+// reported (as a string, or null if it failed): a missing report must not
+// alias "failed", or an incomplete client would produce the same hash as a
+// compiler lacking the feature. A required probe with no output means the
+// client could not identify the compiler, which must not silently become a
+// fingerprint of empty strings -- every such compiler would hash the same.
 function toProbeOutputs(results: ProbeResults): ProbeOutputs {
+    const outputs: ProbeOutputs = new Map();
     for (const probe of PROBES) {
-        if (probe.required && !results[probe.label]) {
+        const raw: unknown = results[probe.label];
+        if (raw !== null && typeof raw !== "string") {
+            throw new Error(`Missing or invalid result for probe '${probe.label}'`);
+        }
+        const value = raw === null ? null : raw.trim();
+        if (probe.required && !value) {
             throw new Error(`Required probe '${probe.label}' produced no output`);
         }
+        outputs.set(probe.label, value);
     }
-    const value = (label: string): string => results[label] ?? "";
-    const full = results.dumpfullversion;
-    return {
-        dumpmachine: value("dumpmachine").trim(),
-        dumpversion: value("dumpversion").trim(),
-        dumpfullversion: full ? full.trim() : null,
-        builtinsC: value("builtins-c"),
-        builtinsCxx: value("builtins-cxx")
-    };
+    return outputs;
 }
 
 // Build the canonical fingerprint blob whose SHA becomes the compiler hash.
@@ -179,32 +207,37 @@ function toProbeOutputs(results: ProbeResults): ProbeOutputs {
 // contains our field label as a substring. Field labels are included so
 // that adding a new probe in a later version deterministically changes the
 // hash for the same compiler (the label acts as a schema version bump).
+// A failed probe is hashed as a distinct marker so it never collides with a
+// successful probe that produced empty output.
 function canonicalFingerprint(p: ProbeOutputs): Buffer {
-    const parts: string[] = [
-        `fisk-compiler-fingerprint-v${CompilerFingerprintVersion}`,
-        "dumpmachine",
-        p.dumpmachine,
-        "dumpversion",
-        p.dumpversion,
-        "dumpfullversion",
-        p.dumpfullversion ?? "",
-        "builtins-c",
-        p.builtinsC,
-        "builtins-cxx",
-        p.builtinsCxx
-    ];
+    const parts: string[] = [`fisk-compiler-fingerprint-v${CompilerFingerprintVersion}`];
+    for (const probe of PROBES) {
+        const value = p.get(probe.label) ?? null;
+        parts.push(probe.label);
+        if (value === null) {
+            parts.push("failed");
+        } else if (probe.hash === "success") {
+            parts.push("ok");
+        } else {
+            parts.push("ok", value);
+        }
+    }
     return Buffer.from(parts.join("\0"), "utf8");
 }
 
 export function createCompilerInfo(results: ProbeResults): CompilerInfo {
-    const probes = toProbeOutputs(results);
+    const outputs = toProbeOutputs(results);
+    const text = (label: string): string => outputs.get(label) ?? "";
+    const builtinsC = text("builtins-c");
+    const dumpmachine = text("dumpmachine");
+    const dumpversion = text("dumpversion");
+    const dumpfullversion = outputs.get("dumpfullversion") || null;
 
-    const type = detectTypeFromMacros(probes.builtinsC);
-    const versionFromMac = versionFromMacros(probes.builtinsC, type);
-    const version =
-        versionFromMac.major !== 0 ? versionFromMac : parseVersion(probes.dumpfullversion ?? probes.dumpversion);
+    const type = detectTypeFromMacros(builtinsC);
+    const versionFromMac = versionFromMacros(builtinsC, type);
+    const version = versionFromMac.major !== 0 ? versionFromMac : parseVersion(dumpfullversion ?? dumpversion);
 
-    const blob = canonicalFingerprint(probes);
+    const blob = canonicalFingerprint(outputs);
     const hash = createHash("sha1").update(blob).digest("hex").toUpperCase();
 
     // `input` is retained for debug/traceability: it lets a human see what
@@ -212,10 +245,15 @@ export function createCompilerInfo(results: ProbeResults): CompilerInfo {
     // small: just the identifying strings, not the full macro dumps.
     const input = [
         `type=${type}`,
-        `target=${probes.dumpmachine}`,
+        `target=${dumpmachine}`,
         `version=${version.major}.${version.minor}.${version.patch}`,
-        `dumpversion=${probes.dumpversion}`,
-        probes.dumpfullversion ? `dumpfullversion=${probes.dumpfullversion}` : ""
+        `dumpversion=${dumpversion}`,
+        dumpfullversion ? `dumpfullversion=${dumpfullversion}` : "",
+        `features=${
+            PROBES.filter((p) => p.hash === "success" && outputs.get(p.label) !== null)
+                .map((p) => p.label)
+                .join(",") || "none"
+        }`
     ]
         .filter((s) => s.length > 0)
         .join("\n");
