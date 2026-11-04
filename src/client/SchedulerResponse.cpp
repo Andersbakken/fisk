@@ -50,10 +50,10 @@ void SchedulerResponse::apply(const nlohmann::json &msg)
         data.builderPort = msg.value("port", 0);
         jobId = msg.value("id", -1);
         if (data.builderIp.empty() && data.builderHostname.empty()) {
-            ERROR("Scheduler returned no builder for environment %s (source: %s). "
-                  "No builders have a compatible environment available.",
-                  data.hash.c_str(),
-                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+            WARN("Scheduler returned no builder for environment %s (source: %s). "
+                 "No builders have a compatible environment available.",
+                 data.hash.c_str(),
+                 data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         } else if (!environment.empty() && environment != data.hash) {
             WARN("Scheduler assigned alternate environment %s (requested: %s) on builder %s:%d", environment.c_str(), data.hash.c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort);
         }

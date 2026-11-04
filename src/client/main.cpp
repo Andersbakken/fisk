@@ -287,7 +287,7 @@ int main(int argc, char **argv)
     }
     DaemonSocket daemonSocket;
     if (!daemonSocket.connect()) {
-        ERROR("Failed to connect to daemon");
+        WARN("Failed to connect to daemon");
         data.watchdog->stop();
         Client::runLocal("daemon connect failure");
     }
@@ -304,7 +304,7 @@ int main(int argc, char **argv)
             ERROR("Can't connect to daemon because of watchdog");
             return 1;
         } else {
-            ERROR("Have to run locally because we timed out connecting to daemon");
+            WARN("Have to run locally because we timed out connecting to daemon");
             data.watchdog->stop();
             Client::runLocal("daemon connect failure");
         }
@@ -483,7 +483,7 @@ int main(int argc, char **argv)
             select.exec();
         }
         if (data.watchdog->timedOut()) {
-            ERROR("Have to run locally because we timed out waiting for preprocessing");
+            WARN("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
         }
         if (releaseCppSlotOnCppFinished)
@@ -494,12 +494,12 @@ int main(int argc, char **argv)
         preprocessedSlotDuration = data.preprocessed->slotDuration;
 
         if (data.preprocessed->exitStatus != 0) {
-            ERROR("Failed to preprocess. Running locally");
+            WARN("Failed to preprocess. Running locally");
             runLocal("preprocess error 2");
         }
 
         if (data.preprocessed->stdOut.empty()) {
-            ERROR("Empty preprocessed output. Running locally");
+            WARN("Empty preprocessed output. Running locally");
             runLocal("preprocess error 3");
         }
 
@@ -561,8 +561,8 @@ int main(int argc, char **argv)
                  daemonSocket.builderResponse().error.c_str());
             askDaemonForBuilder = false;
         } else {
-            ERROR("Have to run locally because the daemon couldn't get us a builder: %s",
-                  daemonSocket.builderResponse().error.c_str());
+            WARN("Have to run locally because the daemon couldn't get us a builder: %s",
+                 daemonSocket.builderResponse().error.c_str());
             runLocal(daemonSocket.builderResponse().error);
         }
     }
@@ -571,7 +571,7 @@ int main(int argc, char **argv)
         std::variant<std::unique_ptr<SchedulerWebSocket>, std::string> schedulerWebsocketResult = connectToSchedulerDirectly();
 
         if (std::holds_alternative<std::string>(schedulerWebsocketResult)) {
-            ERROR("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
+            WARN("Have to run locally because scheduler connect failed: %s", std::get<std::string>(schedulerWebsocketResult).c_str());
             runLocal(std::get<std::string>(schedulerWebsocketResult));
         }
         schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(schedulerWebsocketResult));
@@ -598,7 +598,7 @@ int main(int argc, char **argv)
             if (std::holds_alternative<std::unique_ptr<SchedulerWebSocket>>(uploadWebsocket)) {
                 schedulerWebsocket = std::get<std::unique_ptr<SchedulerWebSocket>>(std::move(uploadWebsocket));
             } else {
-                ERROR("Couldn't connect to the scheduler to upload our environment: %s", std::get<std::string>(uploadWebsocket).c_str());
+                WARN("Couldn't connect to the scheduler to upload our environment: %s", std::get<std::string>(uploadWebsocket).c_str());
             }
         }
         // Only the connection the scheduler asked has somewhere to put the
@@ -633,10 +633,10 @@ int main(int argc, char **argv)
     };
 
     if ((data.builderHostname.empty() && data.builderIp.empty()) || !data.builderPort) {
-        ERROR("No builder available for environment %s (source: %s). "
-              "This may indicate no builders have this compiler environment or a compatible cross-compiler.",
-              data.hash.c_str(),
-              data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
+        WARN("No builder available for environment %s (source: %s). "
+             "This may indicate no builders have this compiler environment or a compatible cross-compiler.",
+             data.hash.c_str(),
+             data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown");
         runLocal("no builder");
     }
 
@@ -665,7 +665,7 @@ int main(int argc, char **argv)
         "builder");
 
     if (std::holds_alternative<std::string>(builderWebSocketResult)) {
-        ERROR("Have to run locally because builder connect failed: %s", std::get<std::string>(builderWebSocketResult).c_str());
+        WARN("Have to run locally because builder connect failed: %s", std::get<std::string>(builderWebSocketResult).c_str());
         runLocal(std::get<std::string>(builderWebSocketResult));
     }
     std::unique_ptr<BuilderWebSocket> builderWebSocket = std::get<std::unique_ptr<BuilderWebSocket>>(std::move(builderWebSocketResult));
@@ -677,7 +677,7 @@ int main(int argc, char **argv)
             select.exec();
         }
         if (data.watchdog->timedOut()) {
-            ERROR("Have to run locally because we timed out waiting for preprocessing");
+            WARN("Have to run locally because we timed out waiting for preprocessing");
             runLocal("watchdog preprocessing");
         }
 
@@ -689,12 +689,12 @@ int main(int argc, char **argv)
         preprocessedSlotDuration = data.preprocessed->slotDuration;
 
         if (data.preprocessed->exitStatus != 0) {
-            ERROR("Failed to preprocess. Running locally");
+            WARN("Failed to preprocess. Running locally");
             runLocal("preprocess error 4");
         }
 
         if (data.preprocessed->stdOut.empty()) {
-            ERROR("Empty preprocessed output. Running locally");
+            WARN("Empty preprocessed output. Running locally");
             runLocal("preprocess error 5");
         }
     }
@@ -747,7 +747,7 @@ int main(int argc, char **argv)
                 Client::writeStatistics();
                 return data.exitCode;
             } else {
-                ERROR("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket->error.c_str());
+                WARN("Builder error while compiling %s on %s:%d (environment: %s): %s", data.compilerArgs->sourceFile().c_str(), data.builderHostname.empty() ? data.builderIp.c_str() : data.builderHostname.c_str(), data.builderPort, data.hash.c_str(), builderWebSocket->error.c_str());
 
                 runLocal("error");
             }

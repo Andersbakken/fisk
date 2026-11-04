@@ -60,7 +60,7 @@ bool DaemonSocket::connect()
         ::close(mFD);
         mFD = -1;
         mState = Error;
-        ERROR("Failed to connect socket to %s: %d %s", path.c_str(), errno, strerror(errno));
+        WARN("Failed to connect socket to %s: %d %s", path.c_str(), errno, strerror(errno));
         return false;
     }
     mState = Connecting;
@@ -101,7 +101,7 @@ void DaemonSocket::onWrite()
             DEBUG("Still connecting to socket %s", Config::socket.get().c_str());
             return;
         } else if (err && err != EISCONN) {
-            ERROR("Failed to connect to socket %s (%d %s)", Config::socket.get().c_str(), err, strerror(err));
+            WARN("Failed to connect to socket %s (%d %s)", Config::socket.get().c_str(), err, strerror(err));
             mState = Error;
             return;
         }

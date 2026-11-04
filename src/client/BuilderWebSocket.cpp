@@ -48,11 +48,11 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
         const bool success = msg.value("success", false);
         if (!success) {
             const std::string builderError = msg.value("error", std::string());
-            ERROR("Builder %s failed to compile %s: %s %s",
-                  url().c_str(),
-                  data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown",
-                  builderError.empty() ? "(no error message)" : builderError.c_str(),
-                  data.compilerArgs ? data.compilerArgs->arguments().c_str() : "(no arguments)");
+            WARN("Builder %s failed to compile %s: %s %s",
+                 url().c_str(),
+                 data.compilerArgs ? data.compilerArgs->sourceFile().c_str() : "unknown",
+                 builderError.empty() ? "(no error message)" : builderError.c_str(),
+                 data.compilerArgs ? data.compilerArgs->arguments().c_str() : "(no arguments)");
 
             data.watchdog->stop();
             error = "builder run failure";
@@ -76,10 +76,10 @@ void BuilderWebSocket::onMessage(MessageType messageType, const void *bytes, siz
                 haystack = &stdErr;
             }
             if (haystack->empty() || haystack->find("unable to rename temporary ") != std::string::npos || haystack->find("execvp: No such file or directory") != std::string::npos || haystack->find("cannot execute ") != std::string::npos || haystack->find("cannot open ") != std::string::npos || haystack->find("internal compiler error") != std::string::npos || haystack->find("error trying to exec") != std::string::npos) {
-                ERROR("Builder %s%s had a suspicious error. Building locally:\n%s",
-                      data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
-                      url().c_str(),
-                      Client::base64(stdErr).c_str());
+                WARN("Builder %s%s had a suspicious error. Building locally:\n%s",
+                     data.builderHostname.empty() ? "" : (" " + data.builderHostname).c_str(),
+                     url().c_str(),
+                     Client::base64(stdErr).c_str());
                 data.watchdog->stop();
                 error = "suspicious error";
                 done = true;

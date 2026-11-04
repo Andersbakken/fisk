@@ -153,7 +153,7 @@ bool WebSocket::connect(const std::string &url,
         ret = getaddrinfo(mHost.c_str(), nullptr, &hints, &res);
         DEBUG("Getting addresses for %s -> %d", mHost.c_str(), ret);
         if (ret != 0) {
-            ERROR("Couldn't resolve host %s", mHost.c_str());
+            WARN("Couldn't resolve host %s", mHost.c_str());
             return false;
         }
     }
@@ -202,7 +202,7 @@ bool WebSocket::connect(const std::string &url,
             break;
         } else if (errno != EINPROGRESS) {
             ::close(mFD);
-            ERROR("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(), inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort, errno, strerror(errno));
+            WARN("Failed to connect socket %s (%s:%d) %d %s", mHost.c_str(), inet_ntoa(reinterpret_cast<sockaddr_in *>(addr->ai_addr)->sin_addr), mPort, errno, strerror(errno));
             mFD = -1;
             mState = Error;
             break;
@@ -215,7 +215,7 @@ bool WebSocket::connect(const std::string &url,
         freeaddrinfo(res);
 
     if (mFD == -1) {
-        ERROR("Couldn't connect to host %s", mHost.c_str());
+        WARN("Couldn't connect to host %s", mHost.c_str());
         return false;
     }
 
