@@ -5,6 +5,7 @@
 # GPL
 
 target_files=
+add_file_duplicates=
 
 for ARG in $ARG{100..1}; do
     set -- "$ARG" "$@"
@@ -84,14 +85,64 @@ convert_path_cdup ()
     echo ${fixed_directory}/$(basename $filename)
 }
 
+is_add_file_duplicate ()
+{
+    case " $add_file_duplicates " in
+        *" $1 "* ) return 0 ;;
+        * ) return 1 ;;
+    esac
+}
+
+same_arch ()
+{
+    command -v objdump >/dev/null 2>&1 || return 1
+    local arch1=$(objdump -f "$1" 2>/dev/null | grep architecture)
+    local arch2=$(objdump -f "$2" 2>/dev/null | grep architecture)
+    test -n "$arch1" -a "$arch1" = "$arch2"
+}
+
+# ldd gives us the build of a library tuned for this machine's CPU, which the
+# builder's CPU may not support. Pack the baseline build and the other tuned
+# builds too and let the builder's dynamic loader pick.
+add_cpu_variants ()
+{
+    local lib="$1"
+    case "$lib" in
+        */glibc-hwcaps/*/*)
+            local libname=${lib##*/}
+            local base=$(echo "$lib" | sed 's,/glibc-hwcaps/.*/,/,')
+            test -f "$base" && add_file skipldd "$base"
+            local variant
+            for variant in ${base%$libname}glibc-hwcaps/*/$libname; do
+                test -f "$variant" && add_file skipldd "$variant"
+            done
+            ;;
+        */haswell/*|*/avx512_1/*)
+            local non_avx512=$(echo "$lib" | sed s,/avx512_1/,/,)
+            local non_haswell=$(echo "$non_avx512" | sed s,/haswell/,/,)
+            test "$non_avx512" != "$lib" -a -f "$non_avx512" && add_file skipldd "$non_avx512"
+            test "$non_haswell" != "$lib" -a -f "$non_haswell" && add_file skipldd "$non_haswell"
+            ;;
+    esac
+}
+
 add_file ()
 {
+    local skipldd=
+    if test "$1" = "skipldd"; then
+        skipldd=1
+        shift
+    fi
     local name="$1"
     local path="$1";
     if test -n "$2"; then
         name="$2"
     fi
     test -z "$name" && return
+    # is_contained below catches this too, but only after the subshells in
+    # resolve_path and convert_path_cdup.
+    is_add_file_duplicate "$name" && return
+    add_file_duplicates="$add_file_duplicates $name"
     path=$(resolve_path $path)
     name=$(convert_path_cdup $name)
     if test -n "$stripprefix"; then
@@ -104,7 +155,7 @@ add_file ()
     is_contained "$toadd" && return
     echo "adding file $toadd"
     target_files="$target_files $toadd"
-    if test -x "$path"; then
+    if test -x "$path" -a -z "$skipldd"; then
         # Only call ldd when it makes sense
         if file -L "$path" | grep 'ELF' > /dev/null 2>&1; then
             if ! file -L "$path" | grep 'static' > /dev/null 2>&1; then
@@ -115,13 +166,19 @@ add_file ()
                 #         libc.so.6 => /lib/tls/libc.so.6 (0xb7e81000)
                 #         /lib/ld-linux.so.2 (0xb7fe8000)
                 # covering both situations ( with => and without )
+                local lib
                 for lib in $(ldd "$path" | sed -n 's,^[^/]*\(/[^ ]*\).*,\1,p'); do
                     test -f "$lib" || continue
                     # Check whether the same library also exists in the parent directory,
                     # and prefer that on the assumption that it is a more generic one.
+                    # On multilib systems that one can be for another architecture.
                     local baselib=$(echo "$lib" | sed 's,\(/[^/]*\)/.*\(/[^/]*\)$,\1\2,')
-                    test -f "$baselib" && lib=$baselib
-                    add_file "$lib"
+                    if test "$baselib" != "$lib" -a -f "$baselib" && same_arch "$lib" "$baselib"; then
+                        lib=$baselib
+                    fi
+                    # ldd already listed everything this library depends on.
+                    add_file skipldd "$lib"
+                    add_cpu_variants "$lib"
                 done
             fi
         elif test "$is_darwin" = 1; then
@@ -364,16 +421,8 @@ if test -n "$clang"; then
         add_file $tempdir/fakeproc/proc/cpuinfo /proc/cpuinfo
     fi
 
-    # clang always uses its internal .h files
-    clangincludes=$($added_clang -print-file-name=include/limits.h)
-    if test -z "$clangincludes"; then
-        echo $added_clang cannot find its includes
-        exit 1
-    fi
-    clangincludes=$(dirname $(abs_path $clangincludes))
-    for file in $(find $clangincludes -type f); do
-        add_file "$file"
-    done
+    # clang's builtin headers aren't needed: fiskc preprocesses with
+    # -frewrite-includes, so the builder never opens them.
 fi
 
 for extrafile in $extrafiles; do
@@ -411,6 +460,7 @@ if test -f /etc/ld.so.conf; then
 fi
 
 new_target_files=
+copied_files=
 for i in $target_files; do
     case $i in
         *=/*)
@@ -423,15 +473,33 @@ for i in $target_files; do
             ;;
     esac
     mkdir -p $tempdir/$(dirname $target)
-    cp -p $path $tempdir/$target
+    # One file can be packed under several names (clang and clang++ are
+    # usually the same binary). Hard-link the repeats so tar stores it once.
+    first_copy=
+    for copied in $copied_files; do
+        case $copied in
+            "$path="*)
+                first_copy=${copied#*=}
+                break
+                ;;
+        esac
+    done
+    if test -z "$first_copy" || ! ln $tempdir/$first_copy $tempdir/$target 2>/dev/null; then
+        cp -p $path $tempdir/$target
+        copied_files="$copied_files $path=$target"
+    fi
     target=$(echo $target | cut -b2-)
     new_target_files="$new_target_files $target"
 done
 
 if test -x /sbin/ldconfig -a "$is_linux" = 1; then
-    mkdir -p $tempdir/let/cache/ldconfig
+    mkdir -p $tempdir/var/cache/ldconfig
     /sbin/ldconfig -r $tempdir
-    new_target_files="$new_target_files etc/ld.so.cache"
+    for candidate in etc var/cache/ldconfig; do
+        test -e $tempdir/$candidate/ld.so.cache || continue
+        new_target_files="$new_target_files $candidate/ld.so.cache"
+        break
+    done
 fi
 
 md5sum=NONE
