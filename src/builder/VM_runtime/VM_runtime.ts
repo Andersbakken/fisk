@@ -86,6 +86,12 @@ function isLibrary(file: string): boolean {
     return file.indexOf(".so.") !== -1;
 }
 
+// Builds of a library tuned for particular CPUs. The dynamic loader looks in
+// these under each LD_LIBRARY_PATH directory itself and only picks one this
+// CPU supports, but one listed in LD_LIBRARY_PATH directly is loaded no matter
+// what, which on a builder with an older CPU than the client's means SIGILL.
+const cpuVariantDirs = new Set(["glibc-hwcaps", "haswell", "avx512_1"]);
+
 function findLibraries(dir: string): void {
     const files = fs.readdirSync(dir);
     // console.log("findLibraries", dir, files.length);
@@ -100,6 +106,14 @@ function findLibraries(dir: string): void {
         }
 
         if (stat.isDirectory()) {
+            if (cpuVariantDirs.has(file)) {
+                // List the parent instead so the loader still searches it.
+                if (!found) {
+                    found = true;
+                    libDirs.push(dir);
+                }
+                return;
+            }
             findLibraries(path.join(dir, file));
         } else if (!found && stat.isFile() && isLibrary(file)) {
             found = true;
