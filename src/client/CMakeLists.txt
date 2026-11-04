@@ -64,6 +64,15 @@ add_executable(fiskc
 target_compile_features(fiskc PRIVATE cxx_std_17)
 target_link_libraries(fiskc nlohmann_json::nlohmann_json pthread wslay ${OPENSSL_CRYPTO_LIBRARY} ${FISKC_OPENSSL_STATIC_EXTRA_LIBS} LUrlParser tiny-process-library dl ${ZLIB_LIBRARIES})
 
+# backtrace_symbols_fd() in the crash handler can only name symbols in the
+# dynamic symbol table, which also survives the strip below. Leave out the
+# static libcrypto and zlib so their copies can't interpose on the shared
+# ones if something we load pulls those in.
+if (NOT APPLE)
+    set_target_properties(fiskc PROPERTIES ENABLE_EXPORTS ON)
+    target_link_libraries(fiskc -Wl,--exclude-libs,libcrypto.a:libz.a)
+endif ()
+
 # Strip fiskc when building in Release / MinSizeRel
 if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     if (APPLE)
