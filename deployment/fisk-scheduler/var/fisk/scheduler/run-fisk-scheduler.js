@@ -69,11 +69,12 @@ function startFisk() {
 
         const opts = {
             stdio: "inherit",
-            cwd: path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/")
+            cwd: path.join(root, "/prod/node_modules/@andersbakken/fisk/scheduler/"),
+            execArgv: ["--max-old-space-size=8192"]
         };
 
         lastStart = Date.now();
-        fisk = child_process.fork("./fisk-scheduler.js", ["--max_old_space_size=8192"], opts);
+        fisk = child_process.fork("./fisk-scheduler.js", [], opts);
         fisk.on("error", (error) => {
             console.log("Got error from fork", error, opts.cwd);
         });
@@ -175,6 +176,22 @@ async function updateFisk() {
 
     await npm("cache clear --force");
     await npm("init --yes", { cwd: path.join(root, "stage") });
+
+    // Pin node-addon-api to a version whose C++ requirements are met by the
+    // system compiler on this host. The scheduler runs on old distros whose
+    // g++ predates C++17, so we cannot use the default (currently
+    // node-addon-api ^8.x -> C++17). node-addon-api 5.x is C++11, which
+    // works on gcc 4.8+, and the fisk-native.cpp surface (HandleScope /
+    // Value / Object / String / Error / Null) has been stable since 1.x.
+    // This is an npm `overrides` block so it takes effect on any transitive
+    // install of node-addon-api, including fisk-native's.
+    const stagePkgPath = path.join(root, "stage", "package.json");
+    const stagePkg = JSON.parse(fs.readFileSync(stagePkgPath));
+    stagePkg.overrides = Object.assign({}, stagePkg.overrides, {
+        "node-addon-api": "5.1.0"
+    });
+    fs.writeFileSync(stagePkgPath, JSON.stringify(stagePkg, null, 2));
+
     const tag = npmTag();
     await npm(`install --save --unsafe-perm @andersbakken/fisk@${tag} --node-gyp-version=8.4.1`, {
         cwd: path.join(root, "stage")
@@ -216,10 +233,30 @@ function killFisk(state) {
     });
 }
 
+const connectionTimeout = option.int("connection-timeout", 120000);
+const connectionFailureThreshold = option.int("connection-failure-threshold", 3);
+const connectionGracePeriod = option.int("connection-grace-period", 60000);
+let consecutiveConnectionFailures = 0;
+
 function checkForConnection() {
     return new Promise((resolve, reject) => {
         if (!fisk) {
             resolve("not running");
+            return;
+        }
+        // Prefer the fork IPC channel: if the child process is still
+        // connected over IPC it is alive as a process; a busy HTTP event
+        // loop is not proof of death. Only fall through to the HTTP probe
+        // when IPC is gone.
+        if (fisk.connected === false || fisk.exitCode !== null || fisk.signalCode !== null) {
+            resolve("not connected");
+            return;
+        }
+        // Give the scheduler a grace window after (re)start before we
+        // start counting probe failures against it. On a heavily loaded
+        // scheduler the accept queue can back up for tens of seconds.
+        if (Date.now() - lastStart < connectionGracePeriod) {
+            resolve("connected");
             return;
         }
         const options = {
@@ -227,14 +264,27 @@ function checkForConnection() {
             path: "/",
             port: port,
             method: "HEAD",
-            timeout: 15000
+            timeout: connectionTimeout
+        };
+        let settled = false;
+        const done = (state) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolve(state);
         };
         const req = http.request(options, (res) => {
-            resolve("connected");
+            res.resume();
+            done("connected");
+        });
+        req.on("timeout", () => {
+            console.error(`Connection probe to :${port} timed out after ${connectionTimeout}ms`);
+            req.destroy(new Error("probe timeout"));
         });
         req.on("error", (error) => {
             console.error("Got error trying to connect to webserver", error);
-            resolve("not connected");
+            done("not connected");
         });
         req.end();
     });
@@ -263,10 +313,28 @@ async function checkForUpdate() {
         }
 
         if (state === "connected" || state === "not running") {
+            if (state === "connected") {
+                consecutiveConnectionFailures = 0;
+            }
             console.log("Nothing to update");
+        } else if (state === "not connected") {
+            consecutiveConnectionFailures += 1;
+            console.log(
+                `Connection probe failed (${consecutiveConnectionFailures}/${connectionFailureThreshold})`
+            );
+            if (consecutiveConnectionFailures < connectionFailureThreshold) {
+                console.log("Not killing fisk yet, will re-probe next cycle");
+            } else {
+                console.log("killing fisk");
+                await killFisk(state);
+                consecutiveConnectionFailures = 0;
+                console.log("fisk stopped");
+                console.log("Restarting fisk");
+            }
         } else {
             console.log("killing fisk");
             await killFisk(state);
+            consecutiveConnectionFailures = 0;
             console.log("fisk stopped, copying to prod");
             if (state === "updated") {
                 await copyToProd();
