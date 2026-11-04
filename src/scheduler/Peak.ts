@@ -1,13 +1,16 @@
-import assert from "assert";
+import { WindowMax } from "./WindowMax";
 import type { PeakData } from "./PeakData";
 
+// record() runs for every scheduled job. This used to keep one entry per job for
+// up to 30 days and scan and splice that array, which got slow enough under load
+// to stall the event loop.
 export class Peak {
+    private readonly actives?: WindowMax;
+    private readonly utilizations?: WindowMax;
     peakActiveJobs: number;
     peakActiveJobsTime: number;
     peakUtilization: number;
     peakUtilizationTime: number;
-    actives?: Array<[number, number]>;
-    utilizations?: Array<[number, number]>;
 
     constructor(readonly interval: number, readonly name: string) {
         this.peakActiveJobs = 0;
@@ -15,14 +18,14 @@ export class Peak {
         this.peakUtilization = 0;
         this.peakUtilizationTime = Date.now();
         if (interval) {
-            this.actives = [];
-            this.utilizations = [];
+            this.actives = new WindowMax();
+            this.utilizations = new WindowMax();
         }
     }
 
     record(now: number, activeJobs: number, utilization: number): boolean {
         let ret = false;
-        if (!this.interval) {
+        if (!this.actives || !this.utilizations) {
             if (activeJobs > this.peakActiveJobs) {
                 this.peakActiveJobs = activeJobs;
                 this.peakActiveJobsTime = now;
@@ -35,75 +38,24 @@ export class Peak {
             }
         } else {
             const cutoff = now - this.interval;
-            let idx = 0;
-            assert(this.actives);
-            while (idx < this.actives.length) {
-                if (this.actives[idx][0] > cutoff && this.actives[idx][1] > activeJobs) {
-                    break;
-                }
-                ++idx;
-            }
-            if (idx === this.actives.length) {
+            if (this.actives.push(now, cutoff, activeJobs)) {
                 ret = true;
                 this.peakActiveJobs = activeJobs;
                 this.peakActiveJobsTime = now;
-                this.actives = [];
-            } else if (idx) {
-                assert(this.actives, "Must have actives");
-                this.actives.splice(0, idx);
             }
-            this.actives.push([now, activeJobs]);
-            idx = 0;
-            assert(this.utilizations);
-            while (idx < this.utilizations.length) {
-                if (this.utilizations[idx][0] > cutoff && this.utilizations[idx][1] > utilization) {
-                    break;
-                }
-                ++idx;
-            }
-            if (idx === this.utilizations.length) {
+            if (this.utilizations.push(now, cutoff, utilization)) {
                 ret = true;
                 this.peakUtilization = utilization;
                 this.peakUtilizationTime = now;
-                this.utilizations = [];
-            } else if (idx) {
-                this.utilizations.splice(0, idx);
             }
-            this.utilizations.push([now, utilization]);
         }
         return ret;
     }
 
     toObject(): PeakData {
-        if (this.interval) {
+        if (this.actives && this.utilizations) {
             const cutoff = Date.now() - this.interval;
-            let peakActiveJobs = 0;
-            let splice = 0;
-            assert(this.actives);
-            for (let idx = 0; idx < this.actives.length; ++idx) {
-                if (this.actives[idx][0] < cutoff) {
-                    splice = idx + 1;
-                } else {
-                    peakActiveJobs = Math.max(peakActiveJobs, this.actives[idx][1]);
-                }
-            }
-            if (splice) {
-                this.actives.splice(0, splice);
-            }
-            let peakUtilization = 0;
-            splice = 0;
-            assert(this.utilizations, "Must have utilizations");
-            for (let idx = 0; idx < this.utilizations.length; ++idx) {
-                if (this.utilizations[idx][0] < cutoff) {
-                    splice = idx + 1;
-                } else {
-                    peakUtilization = Math.max(peakUtilization, this.utilizations[idx][1]);
-                }
-            }
-            if (splice) {
-                this.utilizations.splice(0, splice);
-            }
-            return { activeJobs: peakActiveJobs, utilization: peakUtilization };
+            return { activeJobs: this.actives.max(cutoff), utilization: this.utilizations.max(cutoff) };
         }
 
         return {

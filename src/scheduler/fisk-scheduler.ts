@@ -49,6 +49,8 @@ Options:
   --max-file-descriptors=N     File descriptor limit
   --ping-interval=MS           WebSocket ping interval
   --monitor-log=PATH           Log file for monitor events
+  --log-jobs                   Log every job assignment
+  --log-object-cache           Log every object cache insertion and removal
   --event-loop-lag-interval=MS Event loop lag sample interval (0 disables)
   --event-loop-lag-threshold=MS  Log a stall at or above this lag
   --event-loop-lag-summary-interval=MS  Lag summary interval (0 disables)
@@ -151,6 +153,9 @@ process.on("uncaughtException", (err: Error) => {
 });
 
 const monitorsLog = option("monitor-log");
+// console.log is a synchronous write to journald, and at one line per job it is
+// enough volume for journald to start dropping messages.
+const logJobs = Boolean(option("log-jobs"));
 
 server.on("error", (error) => {
     throw error;
@@ -1256,10 +1261,12 @@ server.on("compile", (compile: Compile) => {
     }
     ++builder.activeClients;
     ++builder.jobsScheduled;
-    console.log(
-        `${compile.name} ${compile.ip} ${compile.sourcePath} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
-            `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
-    );
+    if (logJobs) {
+        console.log(
+            `${compile.name} ${compile.ip} ${compile.sourcePath} was assigned to builder ${builder.ip} ${builder.port} ${builder.name} score: ${bestScore} objectCache: ${foundInCache}. ` +
+                `Builder has ${builder.activeClients} and performed ${builder.jobsScheduled} jobs. Total active jobs is ${activeJobs}`
+        );
+    }
     builder.lastJob = Date.now();
     const id = nextJobId();
     data.id = id;

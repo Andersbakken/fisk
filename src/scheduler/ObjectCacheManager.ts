@@ -59,6 +59,7 @@ export class ObjectCacheManager extends EventEmitter {
     private distributeOnCacheHit: boolean;
     private redundancy: number;
     private pendingTransferTimeoutMs: number;
+    private log: boolean;
 
     hits: number;
 
@@ -77,6 +78,7 @@ export class ObjectCacheManager extends EventEmitter {
         this.pendingTransferTimeoutMs = option.int("object-cache-transfer-timeout", 5 * 60 * 1000);
         this.distributeOnInsertion = Boolean(option("distribute-object-cache-on-insertion"));
         this.distributeOnCacheHit = Boolean(option("distribute-object-cache-on-cache-hit"));
+        this.log = Boolean(option("log-object-cache"));
     }
 
     clear(): void {
@@ -104,19 +106,19 @@ export class ObjectCacheManager extends EventEmitter {
 
     insert(msg: ObjectCacheManagerMessage, node: Builder): void {
         const nodeData = this.byNode.get(node);
-        console.log(
-            "adding",
-            msg.sourcePath,
-            msg.sha1,
-            "for",
-            node.ip + ":" + node.port,
-            nodeData ? nodeData.sha1s.length : -1
-        );
+        if (this.log) {
+            console.log(
+                "adding",
+                msg.sourcePath,
+                msg.sha1,
+                "for",
+                node.ip + ":" + node.port,
+                nodeData ? nodeData.sha1s.size : -1
+            );
+        }
         if (nodeData) {
             this.clearPendingTransfer(msg.sha1, node);
-            if (nodeData.sha1s.indexOf(msg.sha1) === -1) {
-                nodeData.sha1s.push(msg.sha1);
-            }
+            nodeData.sha1s.add(msg.sha1);
             nodeData.size = msg.cacheSize;
             const count = addToSHA1Map(this.bySHA1, msg.sha1, msg.fileSize, node);
             if (this.distributeOnInsertion && count - 1 < this.redundancy) {
@@ -129,19 +131,18 @@ export class ObjectCacheManager extends EventEmitter {
 
     remove(msg: ObjectCacheManagerMessage, node: Builder): void {
         const nodeData = this.byNode.get(node);
-        console.log(
-            "removing",
-            msg.sourcePath,
-            msg.sha1,
-            "for",
-            node.ip + ":" + node.port,
-            nodeData ? nodeData.sha1s.length : -1
-        );
+        if (this.log) {
+            console.log(
+                "removing",
+                msg.sourcePath,
+                msg.sha1,
+                "for",
+                node.ip + ":" + node.port,
+                nodeData ? nodeData.sha1s.size : -1
+            );
+        }
         if (nodeData) {
-            const idx = nodeData.sha1s.indexOf(msg.sha1);
-            if (idx !== -1) {
-                nodeData.sha1s.splice(idx, 1);
-            } else {
+            if (!nodeData.sha1s.delete(msg.sha1)) {
                 console.error("We don't have", msg.sha1, "on", node.ip + ":" + node.port);
             }
             removeFromSHA1Map(this.bySHA1, msg.sha1, node);
@@ -168,11 +169,12 @@ export class ObjectCacheManager extends EventEmitter {
             console.log("We already have", node.ip + ":" + node.port);
             return;
         }
-        const sha1s = data.sha1s.map((item) => item.sha1);
-        this.byNode.set(node, new NodeData(data.cacheSize, data.maxSize, sha1s));
-        data.sha1s.forEach((item) => {
+        const nodeData = new NodeData(data.cacheSize, data.maxSize, []);
+        this.byNode.set(node, nodeData);
+        for (const item of data.sha1s) {
+            nodeData.sha1s.add(item.sha1);
             addToSHA1Map(this.bySHA1, item.sha1, item.fileSize, node);
-        });
+        }
     }
 
     removeNode(node: Builder): void {
@@ -184,9 +186,9 @@ export class ObjectCacheManager extends EventEmitter {
         }
         this.byNode.delete(node);
         this.clearAllPendingForNode(node);
-        nodeData.sha1s.forEach((sha1) => {
+        for (const sha1 of nodeData.sha1s) {
             removeFromSHA1Map(this.bySHA1, sha1, node);
-        });
+        }
     }
 
     dump(query: Record<string, unknown>): unknown {
@@ -202,7 +204,7 @@ export class ObjectCacheManager extends EventEmitter {
             const verbose = "verbose" in query;
             this.byNode.forEach((value, key) => {
                 const data: Record<string, unknown> = {
-                    sha1s: verbose ? value.sha1s : value.sha1s.length,
+                    sha1s: verbose ? Array.from(value.sha1s) : value.sha1s.size,
                     maxSize: prettySize(value.maxSize),
                     size: prettySize(value.size)
                 };
